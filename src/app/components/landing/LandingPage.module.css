@@ -1,0 +1,40 @@
+@import "../../theme/design-tokens.css";
+
+.landing {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+}
+
+.hero {
+  background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+  color: white;
+  padding: 40px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 2.5rem;
+  margin-bottom: 16px;
+}
+
+.hero p {
+  font-size: 1.25rem;
+  margin-bottom: 24px;
+}
+
+.button {
+  background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.button:hover {
+  background: var(--primary-hover);
+}

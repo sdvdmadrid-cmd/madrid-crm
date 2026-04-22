@@ -1,0 +1,152 @@
+{
+  "generatedAt": "2026-04-18T19:59:52.892Z",
+  "results": [
+    {
+      "module": "Auth",
+      "action": "READ",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"userId\":\"11111111-1111-1111-1111-111111111111\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"tenantDbId\":\"11111111-1111-1111-1111-111111111111\",\"email\":\"checkpoint-admin@contractorflow.local\",\"name\":\"Checkpoint Admin\",\"role\":\"admin\",\"capabilities\":{\"role\":\"admin\",\"isSuperAdmin\":false,\"isAdmin\":true,\"isWorker\":false,\"canReadTenantData\":true,\"canWriteOperationalData\":true,\"canDeleteRecords\":true,\"canManageSensitiveData\":true,\"canSendExternalCommunications\":true},\"businessType\":\"\",\"industry\":\"\",\"isSubscribed\":true,\"trialEndDate\":null}}"
+    },
+    {
+      "module": "Clients",
+      "action": "CREATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Client 1776542389608\",\"phone\":\"555-0101\",\"email\":\"checkpoint+1776542389608@example.com\",\"address\":\"123 Audit St\",\"company\":\"Checkpoint Co\",\"notes\":\"final validation\",\"lead_status\":\"new_lead\",\"estimate_sent\":false,\"won_at\":null,\"created_at\":\"2026-04-18T19:59:49.631+00:00\",\"updated_at\":\"2026-04-18T19:59:49.631+00:00\",\"_id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"companyName\":\"Checkpoint Co\",\"leadStatus\":\"new_lead\",\"estimateSent\":false,\"wonAt\":null,\"createdAt\":\"2026-04-18T19:59:49.631+00:00\",\"updatedAt\":\"2026-04-18T19:59:49.631+00:00\"}}"
+    },
+    {
+      "module": "Clients",
+      "action": "READ",
+      "success": true,
+      "status": 200,
+      "body": "{\"id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Client 1776542389608\",\"phone\":\"555-0101\",\"email\":\"checkpoint+1776542389608@example.com\",\"address\":\"123 Audit St\",\"company\":\"Checkpoint Co\",\"notes\":\"final validation\",\"lead_status\":\"new_lead\",\"estimate_sent\":false,\"won_at\":null,\"created_at\":\"2026-04-18T19:59:49.631+00:00\",\"updated_at\":\"2026-04-18T19:59:49.631+00:00\",\"_id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"companyName\":\"Checkpoint Co\",\"leadStatus\":\"new_lead\",\"estimateSent\":false,\"wonAt\":null,\"createdAt\":\"2026-04-18T19:59:49.631+00:00\",\"updatedAt\":\"2026-04-18T19:59:49.631+00:00\"}"
+    },
+    {
+      "module": "Clients",
+      "action": "UPDATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Client 1776542389608\",\"phone\":\"555-0101\",\"email\":\"checkpoint+1776542389608@example.com\",\"address\":\"123 Audit St\",\"company\":\"Checkpoint Co\",\"notes\":\"updated final validation\",\"lead_status\":\"contacted\",\"estimate_sent\":false,\"won_at\":null,\"created_at\":\"2026-04-18T19:59:49.631+00:00\",\"updated_at\":\"2026-04-18T19:59:50.225+00:00\",\"_id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"companyName\":\"Checkpoint Co\",\"leadStatus\":\"contacted\",\"estimateSent\":false,\"wonAt\":null,\"createdAt\":\"2026-04-18T19:59:49.631+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.225+00:00\"}}"
+    },
+    {
+      "module": "Jobs",
+      "action": "CREATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"_id\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"id\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"title\":\"Checkpoint Job 1776542389608\",\"description\":\"validation job\",\"clientId\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientName\":\"Checkpoint Client 1776542389608\",\"service\":\"audit\",\"status\":\"Pending\",\"price\":\"1250\",\"dueDate\":\"2026-04-30\",\"taxState\":\"TX\",\"downPaymentPercent\":\"10\",\"scopeDetails\":\"final validation job\",\"squareMeters\":\"10\",\"complexity\":\"standard\",\"materialsIncluded\":true,\"travelMinutes\":\"15\",\"urgency\":\"flexible\",\"estimateSnapshot\":null,\"quoteToken\":null,\"quoteSharedAt\":null,\"quoteSentAt\":null,\"quoteSentTo\":\"\",\"createdAt\":\"2026-04-18T19:59:50.346+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.346+00:00\"}}"
+    },
+    {
+      "module": "Jobs",
+      "action": "READ",
+      "success": true,
+      "status": 200,
+      "body": "{\"_id\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"id\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"title\":\"Checkpoint Job 1776542389608\",\"description\":\"validation job\",\"clientId\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientName\":\"Checkpoint Client 1776542389608\",\"service\":\"audit\",\"status\":\"Pending\",\"price\":\"1250\",\"dueDate\":\"2026-04-30\",\"taxState\":\"TX\",\"downPaymentPercent\":\"10\",\"scopeDetails\":\"final validation job\",\"squareMeters\":\"10\",\"complexity\":\"standard\",\"materialsIncluded\":true,\"travelMinutes\":\"15\",\"urgency\":\"flexible\",\"estimateSnapshot\":null,\"quoteToken\":null,\"quoteSharedAt\":null,\"quoteSentAt\":null,\"quoteSentTo\":\"\",\"createdAt\":\"2026-04-18T19:59:50.346+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.346+00:00\"}"
+    },
+    {
+      "module": "Jobs",
+      "action": "UPDATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"_id\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"id\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"title\":\"Checkpoint Job 1776542389608\",\"description\":\"validation job\",\"clientId\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientName\":\"Checkpoint Client 1776542389608\",\"service\":\"audit\",\"status\":\"Scheduled\",\"price\":\"1250\",\"dueDate\":\"2026-04-30\",\"taxState\":\"TX\",\"downPaymentPercent\":\"10\",\"scopeDetails\":\"updated validation scope\",\"squareMeters\":\"10\",\"complexity\":\"standard\",\"materialsIncluded\":true,\"travelMinutes\":\"15\",\"urgency\":\"flexible\",\"estimateSnapshot\":null,\"quoteToken\":null,\"quoteSharedAt\":null,\"quoteSentAt\":null,\"quoteSentTo\":\"\",\"createdAt\":\"2026-04-18T19:59:50.346+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.677+00:00\"}}"
+    },
+    {
+      "module": "Estimates",
+      "action": "CREATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"id\":\"31e1987f-8210-49b8-8b9d-ae3360d1a650\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Estimate 1776542389608\",\"notes\":\"validation estimate\",\"description\":\"estimate validation\",\"lines\":[{\"qty\":1,\"name\":\"Line 1\",\"price\":100,\"total\":100}],\"total_low\":100,\"total_high\":200,\"total_mid\":150,\"total_final\":150,\"client_id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientId\":null,\"quote_id\":null,\"quoteId\":null,\"last_sent_at\":null,\"lastSentAt\":null,\"created_at\":\"2026-04-18T19:59:50.777+00:00\",\"updated_at\":\"2026-04-18T19:59:50.777+00:00\",\"_id\":\"31e1987f-8210-49b8-8b9d-ae3360d1a650\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"createdBy\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-18T19:59:50.777+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.777+00:00\"}}"
+    },
+    {
+      "module": "Estimates",
+      "action": "READ",
+      "success": true,
+      "status": 200,
+      "body": "[{\"id\":\"31e1987f-8210-49b8-8b9d-ae3360d1a650\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Estimate 1776542389608\",\"notes\":\"validation estimate\",\"description\":\"estimate validation\",\"lines\":[{\"qty\":1,\"name\":\"Line 1\",\"price\":100,\"total\":100}],\"total_low\":100,\"total_high\":200,\"total_mid\":150,\"total_final\":150,\"client_id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientId\":null,\"quote_id\":null,\"quoteId\":null,\"last_sent_at\":null,\"lastSentAt\":null,\"created_at\":\"2026-04-18T19:59:50.777+00:00\",\"updated_at\":\"2026-04-18T19:59:50.777+00:00\",\"_id\":\"31e1987f-8210-49b8-8b9d-ae3360d1a650\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"createdBy\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-18T19:59:50.777+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.777+00:00\"},{\"id\":\"9f8eb67d-69b6-4661-8e0b-05bb89555537\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Estimate 1776394196840\",\"notes\":\"updated estimate note\",\"description\":\"estimate validation\",\"lines\":[{\"qty\":1,\"name\":\"Line 1\",\"price\":100,\"total\":100}],\"total_low\":100,\"total_high\":200,\"total_mid\":150,\"total_final\":175,\"client_id\":\"\",\"clientId\":null,\"quote_id\":null,\"quoteId\":null,\"last_sent_at\":null,\"lastSentAt\":null,\"created_at\":\"2026-04-17T02:50:00.93+00:00\",\"updated_at\":\"2026-04-17T02:50:01.477+00:00\",\"_id\":\"9f8eb67d-69b6-4661-8e0b-05bb89555537\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"createdBy\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-17T02:50:00.93+00:00\",\"updatedAt\":\"2026-04-17T02:50:01.477+00:00\"}]"
+    },
+    {
+      "module": "Estimates",
+      "action": "UPDATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"id\":\"31e1987f-8210-49b8-8b9d-ae3360d1a650\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"user_id\":\"11111111-1111-1111-1111-111111111111\",\"created_by\":\"11111111-1111-1111-1111-111111111111\",\"name\":\"Checkpoint Estimate 1776542389608\",\"notes\":\"updated estimate note\",\"description\":\"estimate validation\",\"lines\":[{\"qty\":1,\"name\":\"Line 1\",\"price\":100,\"total\":100}],\"total_low\":100,\"total_high\":200,\"total_mid\":150,\"total_final\":175,\"client_id\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientId\":null,\"quote_id\":null,\"quoteId\":null,\"last_sent_at\":null,\"lastSentAt\":null,\"created_at\":\"2026-04-18T19:59:50.777+00:00\",\"updated_at\":\"2026-04-18T19:59:50.987+00:00\",\"_id\":\"31e1987f-8210-49b8-8b9d-ae3360d1a650\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"createdBy\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-18T19:59:50.777+00:00\",\"updatedAt\":\"2026-04-18T19:59:50.987+00:00\"}}"
+    },
+    {
+      "module": "Invoices",
+      "action": "CREATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"_id\":\"4b956cab-cce2-4b68-93d5-1f73da6a658f\",\"id\":\"4b956cab-cce2-4b68-93d5-1f73da6a658f\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"invoiceNumber\":\"INV-0001\",\"invoiceTitle\":\"Checkpoint Invoice 1776542389608\",\"jobId\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"clientId\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientName\":\"Checkpoint Client 1776542389608\",\"clientEmail\":\"checkpoint+1776542389608@example.com\",\"amount\":\"150\",\"dueDate\":\"2026-05-05\",\"lineItems\":[],\"notes\":\"validation invoice\",\"preferredPaymentMethod\":\"other\",\"payments\":[],\"paidAmount\":0,\"balanceDue\":150,\"status\":\"Unpaid\",\"createdAt\":\"2026-04-18T19:59:51.096+00:00\",\"updatedAt\":\"2026-04-18T19:59:51.096+00:00\"}}"
+    },
+    {
+      "module": "Invoices",
+      "action": "READ",
+      "success": true,
+      "status": 200,
+      "body": "{\"_id\":\"4b956cab-cce2-4b68-93d5-1f73da6a658f\",\"id\":\"4b956cab-cce2-4b68-93d5-1f73da6a658f\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"invoiceNumber\":\"INV-0001\",\"invoiceTitle\":\"Checkpoint Invoice 1776542389608\",\"jobId\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"clientId\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientName\":\"Checkpoint Client 1776542389608\",\"clientEmail\":\"checkpoint+1776542389608@example.com\",\"amount\":\"150\",\"dueDate\":\"2026-05-05\",\"lineItems\":[],\"notes\":\"validation invoice\",\"preferredPaymentMethod\":\"other\",\"payments\":[],\"paidAmount\":0,\"balanceDue\":150,\"status\":\"Unpaid\",\"createdAt\":\"2026-04-18T19:59:51.096+00:00\",\"updatedAt\":\"2026-04-18T19:59:51.096+00:00\"}"
+    },
+    {
+      "module": "Invoices",
+      "action": "UPDATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"_id\":\"4b956cab-cce2-4b68-93d5-1f73da6a658f\",\"id\":\"4b956cab-cce2-4b68-93d5-1f73da6a658f\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"userId\":\"11111111-1111-1111-1111-111111111111\",\"invoiceNumber\":\"INV-0001\",\"invoiceTitle\":\"Checkpoint Invoice 1776542389608\",\"jobId\":\"b46c99ab-2622-47c6-a689-c0ea785cbd21\",\"clientId\":\"ae632ba4-86be-429e-80a9-cf67afb6097c\",\"clientName\":\"Checkpoint Client 1776542389608\",\"clientEmail\":\"checkpoint+1776542389608@example.com\",\"amount\":\"150\",\"dueDate\":\"2026-05-05\",\"lineItems\":[],\"notes\":\"updated invoice note\",\"preferredPaymentMethod\":\"other\",\"payments\":[{\"amount\":50,\"method\":\"cash\",\"reference\":\"\",\"notes\":\"\",\"date\":\"\",\"createdAt\":\"2026-04-18T19:59:52.057Z\"}],\"paidAmount\":50,\"balanceDue\":100,\"status\":\"Partial\",\"createdAt\":\"2026-04-18T19:59:51.096+00:00\",\"updatedAt\":\"2026-04-18T19:59:51.969+00:00\"}}"
+    },
+    {
+      "module": "Appointments",
+      "action": "CREATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"id\":\"fd0f17d1-36bb-42cf-9386-37572e1196e1\",\"title\":\"Checkpoint Appointment 1776542389608\",\"client\":\"Checkpoint Client 1776542389608\",\"date\":\"2026-04-20\",\"time\":\"10:00:00\",\"status\":\"Scheduled\",\"created_at\":\"2026-04-18T19:59:54.196597+00:00\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"_id\":\"fd0f17d1-36bb-42cf-9386-37572e1196e1\",\"clientName\":\"Checkpoint Client 1776542389608\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-18T19:59:54.196597+00:00\"}}"
+    },
+    {
+      "module": "Appointments",
+      "action": "READ",
+      "success": true,
+      "status": 200,
+      "body": "{\"id\":\"fd0f17d1-36bb-42cf-9386-37572e1196e1\",\"title\":\"Checkpoint Appointment 1776542389608\",\"client\":\"Checkpoint Client 1776542389608\",\"date\":\"2026-04-20\",\"time\":\"10:00:00\",\"status\":\"Scheduled\",\"created_at\":\"2026-04-18T19:59:54.196597+00:00\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"_id\":\"fd0f17d1-36bb-42cf-9386-37572e1196e1\",\"clientName\":\"Checkpoint Client 1776542389608\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-18T19:59:54.196597+00:00\"}"
+    },
+    {
+      "module": "Appointments",
+      "action": "UPDATE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true,\"data\":{\"id\":\"fd0f17d1-36bb-42cf-9386-37572e1196e1\",\"title\":\"Checkpoint Appointment 1776542389608 Updated\",\"client\":\"Checkpoint Client 1776542389608\",\"date\":\"2026-04-21\",\"time\":\"11:30:00\",\"status\":\"Confirmed\",\"created_at\":\"2026-04-18T19:59:54.196597+00:00\",\"tenant_id\":\"11111111-1111-1111-1111-111111111111\",\"_id\":\"fd0f17d1-36bb-42cf-9386-37572e1196e1\",\"clientName\":\"Checkpoint Client 1776542389608\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"createdAt\":\"2026-04-18T19:59:54.196597+00:00\"}}"
+    },
+    {
+      "module": "Appointments",
+      "action": "DELETE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true}"
+    },
+    {
+      "module": "Invoices",
+      "action": "DELETE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true}"
+    },
+    {
+      "module": "Estimates",
+      "action": "DELETE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true}"
+    },
+    {
+      "module": "Jobs",
+      "action": "DELETE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true}"
+    },
+    {
+      "module": "Clients",
+      "action": "DELETE",
+      "success": true,
+      "status": 200,
+      "body": "{\"success\":true}"
+    }
+  ]
+}

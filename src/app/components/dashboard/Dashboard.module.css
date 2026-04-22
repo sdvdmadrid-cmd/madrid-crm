@@ -1,0 +1,100 @@
+@import "../../theme/design-tokens.css";
+
+.dashboard {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+}
+
+.card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--card-shadow);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+.button {
+  background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  font-size: var(--text-md);
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.button:hover {
+  background: var(--primary-hover);
+}
+
+.sidebar {
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  width: var(--sidebar-width);
+  border-right: 1px solid var(--sidebar-border);
+}
+
+.sidebar .logo {
+  margin: 16px;
+}
+
+.sidebar-item {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  transition: background 0.3s;
+}
+
+.sidebar-item:hover {
+  background-color: var(--sidebar-item-hover);
+  color: white;
+}
+
+.sidebar-item.active {
+  background-color: var(--sidebar-item-active-bg);
+  color: white;
+}
+
+.content {
+  opacity: 1;
+  animation: fadeIn var(--transition-duration) var(--transition-ease);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Add persistent loaders */
+.loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--primary);
+}
+
+.billPaymentsLink {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.billPaymentsLink:hover {
+  background-color: var(--hover-bg-color);
+}

@@ -1,0 +1,111 @@
+.estimateBuilder {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.estimateBuilder h1 {
+  font-size: 2rem;
+  color: #333;
+}
+
+.estimateBuilder p {
+  font-size: 1rem;
+  color: #666;
+}
+
+.estimateBuilder label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 1rem;
+  color: #555;
+}
+
+.estimateBuilder input,
+.estimateBuilder textarea {
+  padding: 8px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.estimateBuilder textarea {
+  resize: vertical;
+}
+
+.lineItemsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lineItemRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.lineItemRow input {
+  flex: 1;
+}
+
+.lineItemRow button {
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  color: #fff;
+  background: #d9534f;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.lineItemRow button:hover {
+  background: #c9302c;
+}
+
+.summarySection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 1rem;
+  color: #333;
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+}
+
+.actions button {
+  padding: 12px;
+  font-size: 1rem;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.actions button:first-child {
+  background: #5bc0de;
+}
+
+.actions button:first-child:hover {
+  background: #31b0d5;
+}
+
+.actions button:last-child {
+  background: #5cb85c;
+}
+
+.actions button:last-child:hover {
+  background: #4cae4c;
+}

@@ -1,0 +1,534 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap");
+@import "tailwindcss";
+@import "./theme/design-tokens.css";
+
+:root {
+  /* Backgrounds */
+  --background: #f4f5f7;
+  --foreground: #111827;
+
+  /* Sidebar */
+  --sidebar-width: 240px;
+  --sidebar-bg: #1e293b; /* Dark blue */
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-item-active-bg: rgba(29, 78, 216, 0.15); /* Blue from landing page */
+  --sidebar-active-indicator: #1d4ed8;
+  --sidebar-text-muted: #64748b;
+  --sidebar-text: #94a3b8;
+  --sidebar-text-active: #f1f5f9;
+
+  /* Brand */
+  --primary: #1d4ed8; /* Blue from landing page */
+  --primary-hover: #1e40af;
+  --primary-light: #e0f2fe;
+  --primary-shadow: rgba(29, 78, 216, 0.25);
+
+  /* Cards & surfaces */
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --card-shadow-md:
+    0 4px 6px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.07);
+  --card-shadow-hover:
+    0 6px 14px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Typography */
+  --text-muted: #6b7280;
+  --text-secondary: #374151;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Borders */
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+
+  /* Status colors */
+  --green-bg: #f0fdf4;
+  --green-text: #166534;
+  --green-border: #bbf7d0;
+  --amber-bg: #fffbeb;
+  --amber-text: #92400e;
+  --amber-border: #fde68a;
+  --red-bg: #fef2f2;
+  --red-text: #991b1b;
+  --red-border: #fecaca;
+  --blue-bg: #eff6ff;
+  --blue-text: #1e40af;
+  --blue-border: #bfdbfe;
+
+  /* Transitions */
+  --transition-duration: 0.3s;
+  --transition-ease: ease-in-out;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans:
+    "Inter", var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  margin: 0;
+/* Add smooth transitions globally for better user experience */
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ─── Sidebar nav links ───────────────────────────────────── */
+.cf-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-text);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  transition:
+    background 0.1s,
+    color 0.1s;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.cf-nav-link:hover {
+  background: var(--sidebar-item-hover);
+  color: var(--sidebar-text-active);
+}
+.cf-nav-link.active {
+  background: var(--sidebar-item-active-bg);
+  color: var(--sidebar-text-active);
+  font-weight: 500;
+}
+
+/* ─── Cards ───────────────────────────────────────────────── */
+.cf-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--card-shadow);
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.15s ease;
+}
+.cf-card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+/* ─── Stat/workflow cards ─────────────────────────────────── */
+.cf-stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--card-shadow);
+  padding: 24px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.13s ease;
+}
+.cf-stat-card:hover {
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* ─── Buttons ─────────────────────────────────────────────── */
+.cf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  transition:
+    background 0.1s,
+    border-color 0.1s,
+    box-shadow 0.1s,
+    transform 0.1s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+.cf-btn:hover {
+  background: #f9fafb;
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+}
+.cf-btn:active {
+  transform: translateY(1px) translateZ(0);
+}
+
+button,
+[role="button"],
+.dash-card,
+.cf-stat-card,
+.cf-nav-link {
+  -webkit-tap-highlight-color: transparent;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.cf-btn-primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  box-shadow: 0 1px 4px var(--primary-shadow);
+}
+.cf-btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  box-shadow: 0 3px 10px var(--primary-shadow);
+}
+
+.cf-btn-sm {
+  padding: 6px 12px;
+  font-size: var(--text-xs);
+}
+
+/* ─── Form inputs ─────────────────────────────────────────── */
+.cf-input,
+input.cf-input,
+select.cf-input,
+textarea.cf-input {
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: var(--text-base);
+  font-family: inherit;
+  color: var(--foreground);
+  background: white;
+  width: 100%;
+  line-height: 1.5;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.cf-input::placeholder {
+  color: #9ca3af;
+}
+.cf-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+.cf-input:hover:not(:focus) {
+  border-color: var(--border-strong);
+}
+
+/* ─── Page topbar ─────────────────────────────────────────── */
+.cf-topbar {
+  background: white;
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+/* ─── Content area ────────────────────────────────────────── */
+.cf-content {
+  padding: 32px 32px 48px;
+  max-width: 1280px;
+}
+
+/* ─── Section label ───────────────────────────────────────── */
+.cf-section-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin: 0 0 12px 0;
+}
+
+/* ─── Divider ─────────────────────────────────────────────── */
+.cf-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+/* ─── Badge ───────────────────────────────────────────────── */
+.cf-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.cf-badge-green {
+  background: var(--green-bg);
+  color: var(--green-text);
+}
+.cf-badge-amber {
+  background: var(--amber-bg);
+  color: var(--amber-text);
+}
+.cf-badge-red {
+  background: var(--red-bg);
+  color: var(--red-text);
+}
+.cf-badge-blue {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+
+/* ─── Stat number typography ──────────────────────────────── */
+.cf-stat-num {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+}
+
+/* ─── Panel (sidebar-style card) ─────────────────────────── */
+.cf-panel {
+  background: white;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+.cf-panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cf-panel-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+}
+.cf-panel-body {
+  padding: 16px 20px;
+}
+
+/* ─── Subtle list rows ────────────────────────────────────── */
+.cf-list-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+  gap: 12px;
+  font-size: var(--text-sm);
+}
+.cf-list-row:last-child {
+  border-bottom: none;
+}
+
+/* ─── Animations ──────────────────────────────────────────── */
+@keyframes cf-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes cf-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.cf-animate-in {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+.cf-animate-fade {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+/* ─── Dashboard interactive cards ─────────────────────────── */
+.dash-card {
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.15s ease;
+  will-change: transform;
+}
+.dash-card:hover {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+.dash-card:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* ─── Dashboard quick-action buttons ──────────────────────── */
+.dash-action-btn {
+  transition:
+    background 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.1s ease;
+}
+.dash-action-btn:hover {
+  background: #15803d;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
+  transform: translateY(-1px);
+}
+.dash-action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+}
+
+/* ─── Business summary tiles ──────────────────────────────── */
+.dash-summary-tile {
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.13s ease;
+}
+.dash-summary-tile:hover {
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.09),
+    0 1px 3px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+/* ─── Sidebar nav links ────────────────────────────────────── */
+.sb-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.13s ease,
+    color 0.13s ease;
+  letter-spacing: -0.01em;
+  position: relative;
+  color: #9ca3af;
+  background: transparent;
+  box-sizing: border-box;
+}
+.sb-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #e2e8f0;
+}
+.sb-link:hover .sb-icon {
+  color: #d1d5db;
+}
+.sb-link.sb-active {
+  background: rgba(22, 163, 74, 0.14);
+  color: #f9fafb;
+  font-weight: 500;
+}
+.sb-link.sb-active .sb-icon {
+  color: #4ade80;
+}
+.sb-link.sb-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 3px;
+  background: #16a34a;
+  border-radius: 0 3px 3px 0;
+}

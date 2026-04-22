@@ -1,0 +1,114 @@
+{
+  "generatedAt": "2026-04-18T19:42:07.257Z",
+  "tables": {
+    "appointments": {
+      "ok": true,
+      "error": null,
+      "hasTenantId": true,
+      "probedColumns": [
+        "id",
+        "tenant_id",
+        "title",
+        "client",
+        "date",
+        "time",
+        "status"
+      ],
+      "rows": [
+        {
+          "id": "c3119a26-f345-48c5-981c-66f06a619342",
+          "tenant_id": "dbff881a-6cf1-4983-9547-572172863888",
+          "title": "test",
+          "client": "test",
+          "date": "2026-05-05",
+          "time": "10:30:00",
+          "status": "scheduled"
+        }
+      ]
+    },
+    "jobs": {
+      "ok": true,
+      "error": null,
+      "hasTenantId": true,
+      "probedColumns": [
+        "id",
+        "tenant_id",
+        "title",
+        "client_id",
+        "client_name",
+        "status",
+        "price"
+      ],
+      "rows": []
+    },
+    "clients": {
+      "ok": true,
+      "error": null,
+      "hasTenantId": true,
+      "probedColumns": [
+        "id",
+        "tenant_id",
+        "name",
+        "company",
+        "lead_status",
+        "estimate_sent"
+      ],
+      "rows": []
+    },
+    "estimates": {
+      "ok": true,
+      "error": null,
+      "hasTenantId": true,
+      "probedColumns": [
+        "id",
+        "tenant_id",
+        "user_id"
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "tenant_id": null,
+          "user_id": null
+        }
+      ]
+    },
+    "estimate_builder": {
+      "ok": true,
+      "error": null,
+      "hasTenantId": true,
+      "probedColumns": [
+        "id",
+        "tenant_id",
+        "user_id",
+        "name",
+        "total_final"
+      ],
+      "rows": [
+        {
+          "id": "9f8eb67d-69b6-4661-8e0b-05bb89555537",
+          "tenant_id": "11111111-1111-1111-1111-111111111111",
+          "user_id": "11111111-1111-1111-1111-111111111111",
+          "name": "Checkpoint Estimate 1776394196840",
+          "total_final": 175
+        }
+      ]
+    },
+    "invoices": {
+      "ok": true,
+      "error": null,
+      "hasTenantId": true,
+      "probedColumns": [
+        "id",
+        "tenant_id",
+        "invoice_number",
+        "client_name",
+        "amount",
+        "status"
+      ],
+      "rows": []
+    }
+  },
+  "limitations": [
+    "PostgREST service-role access cannot query information_schema or pg_catalog in this environment, so live RLS flags and policy definitions could not be read directly."
+  ]
+}

@@ -1,0 +1,178 @@
+﻿[
+    {
+        "module":  "Auth",
+        "action":  "LOGIN",
+        "success":  false,
+        "status":  0,
+        "note":  "dev-login redirect",
+        "body":  ""
+    },
+    {
+        "module":  "Auth",
+        "action":  "READ",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Clients",
+        "action":  "CREATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Clients",
+        "action":  "READ",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Clients",
+        "action":  "UPDATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Jobs",
+        "action":  "CREATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Jobs",
+        "action":  "READ",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Jobs",
+        "action":  "UPDATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Estimates",
+        "action":  "CREATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Estimates",
+        "action":  "READ",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Estimates",
+        "action":  "UPDATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Invoices",
+        "action":  "CREATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Invoices",
+        "action":  "READ",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Invoices",
+        "action":  "UPDATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Appointments",
+        "action":  "CREATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  ""
+    },
+    {
+        "module":  "Appointments",
+        "action":  "READ",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Appointments",
+        "action":  "UPDATE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Appointments",
+        "action":  "DELETE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Invoices",
+        "action":  "DELETE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Estimates",
+        "action":  "DELETE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Jobs",
+        "action":  "DELETE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    },
+    {
+        "module":  "Clients",
+        "action":  "DELETE",
+        "success":  false,
+        "status":  0,
+        "note":  "",
+        "body":  "skipped"
+    }
+]

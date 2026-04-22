@@ -1,0 +1,234 @@
+.page {
+  min-height: 100%;
+  padding: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(22, 163, 74, 0.16), transparent 28%),
+    linear-gradient(180deg, #f7fbf8 0%, #eef4f0 100%);
+}
+
+.hero {
+  margin: 0 auto 24px;
+  max-width: 1120px;
+  padding: 28px 30px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.9)),
+    #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #15803d;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  color: #0f172a;
+}
+
+.subtitle {
+  max-width: 620px;
+  margin: 14px 0 0;
+  font-size: 16px;
+  color: #475569;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1120px;
+  margin: 0 auto 24px;
+}
+
+.metricCard,
+.panel,
+.stateCard,
+.errorCard {
+  max-width: 1120px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.metricCard {
+  padding: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.metricCard::after {
+  content: "";
+  position: absolute;
+  inset: auto -30px -30px auto;
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(22, 163, 74, 0.18), transparent 70%);
+}
+
+.metricLabel {
+  position: relative;
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.metricValue {
+  position: relative;
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  color: #0f172a;
+}
+
+.metricHint {
+  position: relative;
+  margin: 12px 0 0;
+  color: #475569;
+}
+
+.panel,
+.stateCard,
+.errorCard {
+  padding: 24px;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.panelEyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #15803d;
+}
+
+.panelTitle,
+.stateTitle {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.stateText {
+  margin: 10px 0 0;
+  color: #475569;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.rowAmount {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.rowMeta,
+.rowDate {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.rowDate {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.emptyState {
+  padding: 24px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px dashed rgba(100, 116, 139, 0.35);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 3px solid rgba(22, 163, 74, 0.15);
+  border-top-color: #16a34a;
+  animation: spin 0.8s linear infinite;
+}
+
+.errorCard {
+  border-color: rgba(220, 38, 38, 0.16);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.96), #ffffff);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 20px;
+  }
+
+  .hero,
+  .panel,
+  .stateCard,
+  .errorCard,
+  .metricCard {
+    padding: 20px;
+  }
+
+  .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .listRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rowDate {
+    white-space: normal;
+  }
+}

@@ -1,0 +1,404 @@
+.shell {
+  display: grid;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.75rem, 2vw, 2.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  max-width: 720px;
+  font-size: 0.98rem;
+  color: #64748b;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.05);
+  padding: 24px;
+}
+
+.itemsCard {
+  min-height: 460px;
+}
+
+.summaryCard {
+  padding-bottom: 20px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field,
+.cellField {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.helperText {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.taxFieldStack {
+  display: grid;
+  gap: 10px;
+}
+
+.taxToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.taxToggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.descriptionComposer {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f8fbff 100%);
+}
+
+.descriptionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.descriptionTitle {
+  margin: 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.descriptionSubtitle {
+  margin: 6px 0 0;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.aiButton {
+  min-height: 46px;
+}
+
+.aiPromptInput {
+  min-height: 48px;
+}
+
+.descriptionInput {
+  min-height: 220px;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.tableScroller {
+  overflow-x: auto;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.8fr) 130px 150px 140px 110px;
+  gap: 12px;
+  padding: 0 4px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.rightHeader {
+  text-align: right;
+}
+
+.tableBody {
+  display: grid;
+  gap: 14px;
+  padding-top: 16px;
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.8fr) 130px 150px 140px 110px;
+  gap: 12px;
+  align-items: start;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.itemRow:hover {
+  background: #f8fafc;
+}
+
+.inputField {
+  min-height: 50px;
+  font-size: 0.98rem;
+}
+
+.rowTotalCell,
+.actionCell {
+  min-height: 50px;
+}
+
+.moneyCell {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  padding: 0 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  text-align: right;
+  color: #0f172a;
+}
+
+.moneyValue {
+  font-variant-numeric: tabular-nums;
+}
+
+.actionCell {
+  display: grid;
+  align-content: start;
+}
+
+.removeButton {
+  min-height: 50px;
+  justify-content: center;
+}
+
+.mobileLabel {
+  display: none;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.summaryLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.summaryStack {
+  display: grid;
+  gap: 12px;
+}
+
+.summaryRow,
+.totalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  font-size: 0.96rem;
+  color: #334155;
+  background: #f8fafc;
+}
+
+.summaryRow strong,
+.totalRow strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.totalRow {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+}
+
+.totalValue {
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  letter-spacing: -0.03em;
+}
+
+.actionsPanel {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+}
+
+.primaryAction {
+  width: 100%;
+  min-height: 52px;
+  justify-content: center;
+  font-size: 0.98rem;
+}
+
+.addItemButton {
+  min-height: 46px;
+}
+
+.actionHint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.inlineError {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.errorBanner,
+.successBanner,
+.loadingCard {
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.errorBanner {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.successBanner {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.loadingCard {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #64748b;
+}
+
+@media (max-width: 1100px) {
+  .infoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summaryLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    gap: 16px;
+  }
+
+  .card {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .infoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .descriptionHeader {
+    flex-direction: column;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .tableBody {
+    gap: 12px;
+  }
+
+  .itemRow {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+  }
+
+  .itemRow:hover {
+    background: #f8fafc;
+  }
+
+  .itemRow > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .rowTotalCell,
+  .actionCell {
+    min-height: auto;
+  }
+
+  .removeButton {
+    width: 100%;
+  }
+
+  .mobileLabel {
+    display: inline-flex;
+  }
+
+  .moneyCell {
+    justify-items: start;
+    text-align: left;
+  }
+}
