@@ -81,8 +81,8 @@ export async function GET(request) {
     }
 
     const { data, error } = await supabaseAdmin.rpc("get_revenue_dashboard", {
-      contractor_id: contractorFilter,
-      limit_count: limit,
+      p_contractor_id: contractorFilter,
+      p_limit_count: limit,
     });
 
     if (error) {

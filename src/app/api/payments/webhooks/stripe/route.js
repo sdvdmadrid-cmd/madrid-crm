@@ -1,5 +1,9 @@
 import Stripe from "stripe";
-import { computeBillStatus, createNotification } from "@/lib/bill-payments";
+import {
+  computeBillStatus,
+  createNotification,
+  maybeCreateNextRecurringBill,
+} from "@/lib/bill-payments";
 import {
   getStripeSecretKey,
   getStripeWebhookSecret,
@@ -182,6 +186,21 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
       stripePaymentIntentId: intent.id,
     },
   });
+
+  if (nextStatus === "paid") {
+    await maybeCreateNextRecurringBill({
+      context: {
+        tenantDbId: tenantId,
+        userId: userId || bill.user_id || null,
+      },
+      bill: {
+        ...bill,
+        status: "paid",
+        last_paid_at: nowIso,
+        last_payment_id: transaction.id,
+      },
+    });
+  }
 
   return new Response(
     JSON.stringify({

@@ -8,6 +8,41 @@ import {
 } from "@/lib/tenant";
 
 // Tabla relacional: services_catalog
+const TABLE = "services_catalog";
+
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function getServicesCatalogSchemaError(error) {
+  const message = String(error?.message || "");
+
+  if (
+    /Could not find the table 'public\.services_catalog' in the schema cache/i.test(
+      message,
+    )
+  ) {
+    return "Services catalog is unavailable because the Supabase table is missing or the schema cache has not reloaded yet. Run the services catalog migration and reload the PostgREST schema cache.";
+  }
+
+  if (/relation\s+"?public\.services_catalog"?\s+does not exist/i.test(message)) {
+    return "Services catalog is unavailable because the Supabase table does not exist yet. Run the services catalog migration first.";
+  }
+
+  return "";
+}
+
+function handleServicesCatalogError(error, fallbackMessage) {
+  const schemaError = getServicesCatalogSchemaError(error);
+  if (schemaError) {
+    return jsonResponse({ success: false, error: schemaError }, 503);
+  }
+
+  return jsonResponse({ success: false, error: fallbackMessage }, 500);
+}
 
 const serialize = (doc) => ({
   ...doc,
@@ -27,13 +62,7 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params;
     if (!id) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid service id" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return jsonResponse({ success: false, error: "Invalid service id" }, 400);
     }
 
     const body = sanitizePayloadDeep(await request.json());
@@ -72,7 +101,7 @@ export async function PATCH(request, { params }) {
     }
 
     let query = supabaseAdmin
-      .from("services_catalog")
+      .from(TABLE)
       .update(updateRow)
       .eq("id", id)
       .select("*")
@@ -80,7 +109,7 @@ export async function PATCH(request, { params }) {
 
     if ((role || "").toLowerCase() !== "super_admin") {
       query = supabaseAdmin
-        .from("services_catalog")
+        .from(TABLE)
         .update(updateRow)
         .eq("id", id)
         .eq("tenant_id", tenantDbId)
@@ -98,33 +127,18 @@ export async function PATCH(request, { params }) {
         "[api/services-catalog/:id][PATCH] Supabase update error",
         error,
       );
-      throw new Error(error.message);
+      throw error;
     }
     if (!data) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Service not found" }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return jsonResponse({ success: false, error: "Service not found" }, 404);
     }
 
-    return new Response(
-      JSON.stringify({ success: true, data: serialize(data) }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return jsonResponse({ success: true, data: serialize(data) }, 200);
   } catch (error) {
     console.error("[api/services-catalog/:id][PATCH] error", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+    return handleServicesCatalogError(
+      error,
+      "Unable to update service right now.",
     );
   }
 }
@@ -138,16 +152,10 @@ export async function DELETE(request, { params }) {
 
     const { id } = await params;
     if (!id) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid service id" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return jsonResponse({ success: false, error: "Invalid service id" }, 400);
     }
 
-    let query = supabaseAdmin.from("services_catalog").delete().eq("id", id);
+    let query = supabaseAdmin.from(TABLE).delete().eq("id", id);
 
     if ((role || "").toLowerCase() !== "super_admin") {
       query = query.eq("tenant_id", tenantDbId);
@@ -162,21 +170,15 @@ export async function DELETE(request, { params }) {
         "[api/services-catalog/:id][DELETE] Supabase delete error",
         error,
       );
-      throw new Error(error.message);
+      throw error;
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: true }, 200);
   } catch (error) {
     console.error("[api/services-catalog/:id][DELETE] error", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+    return handleServicesCatalogError(
+      error,
+      "Unable to delete service right now.",
     );
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { assertSafeText, sanitizeSearchInput } from "@/lib/input-sanitizer";
@@ -15,7 +15,11 @@ const VALID_CATEGORIES = new Set(SERVICE_CATEGORY_ORDER);
 
 const UI_I18N = {
   en: {
-    back: "Back to catalog",
+    back: "Back to Services Catalog",
+    breadcrumbs: {
+      home: "Home",
+      catalog: "Services Catalog",
+    },
     categories: "Categories",
     services: "Services",
     searchPlaceholder: "Find a service fast...",
@@ -52,8 +56,20 @@ const UI_I18N = {
       saved: "Saved",
       custom: "Custom",
     },
+    header: {
+      allSaved: "All saved",
+      unsavedCount: "unsaved",
+      addCustomService: "Add custom service",
+      editingOnlyPrefix: "Editing only",
+      editingOnlySuffix: "Use the button above to create your own service.",
+      duplicateTemplates: "Duplicate templates",
+      exportCategory: "Export category",
+      duplicateReadySuffix: "template copies ready to edit",
+      exportReady: "Category export downloaded",
+    },
     priceUnset: "Set price",
     invalidCategory: "Invalid category.",
+    newServicePrefix: "New service",
     errors: {
       fetch: "Unable to load services",
       load: "Error loading services",
@@ -65,7 +81,11 @@ const UI_I18N = {
     },
   },
   es: {
-    back: "Volver al catalogo",
+    back: "Volver al Catalogo de Servicios",
+    breadcrumbs: {
+      home: "Inicio",
+      catalog: "Catalogo de Servicios",
+    },
     categories: "Categorias",
     services: "Servicios",
     searchPlaceholder: "Encuentra un servicio rapido...",
@@ -102,8 +122,20 @@ const UI_I18N = {
       saved: "Guardado",
       custom: "Personalizado",
     },
+    header: {
+      allSaved: "Todo guardado",
+      unsavedCount: "sin guardar",
+      addCustomService: "Agregar servicio personalizado",
+      editingOnlyPrefix: "Editando solo",
+      editingOnlySuffix: "Usa el boton de arriba para crear tu propio servicio.",
+      duplicateTemplates: "Duplicar plantillas",
+      exportCategory: "Exportar categoria",
+      duplicateReadySuffix: "copias de plantilla listas para editar",
+      exportReady: "Exportacion de categoria descargada",
+    },
     priceUnset: "Definir precio",
     invalidCategory: "Categoria invalida.",
+    newServicePrefix: "Nuevo servicio",
     errors: {
       fetch: "No se pudieron cargar los servicios",
       load: "Error al cargar servicios",
@@ -115,7 +147,11 @@ const UI_I18N = {
     },
   },
   pl: {
-    back: "Powrot do katalogu",
+    back: "Powrot do Katalogu Uslug",
+    breadcrumbs: {
+      home: "Start",
+      catalog: "Katalog Uslug",
+    },
     categories: "Kategorie",
     services: "Uslugi",
     searchPlaceholder: "Znajdz usluge szybko...",
@@ -152,8 +188,20 @@ const UI_I18N = {
       saved: "Zapisane",
       custom: "Wlasne",
     },
+    header: {
+      allSaved: "Wszystko zapisane",
+      unsavedCount: "niezapisane",
+      addCustomService: "Dodaj usluge niestandardowa",
+      editingOnlyPrefix: "Edytujesz tylko",
+      editingOnlySuffix: "Uzyj przycisku powyzej, aby utworzyc wlasna usluge.",
+      duplicateTemplates: "Duplikuj szablony",
+      exportCategory: "Eksportuj kategorie",
+      duplicateReadySuffix: "kopii szablonow gotowych do edycji",
+      exportReady: "Eksport kategorii zostal pobrany",
+    },
     priceUnset: "Ustaw cene",
     invalidCategory: "Nieprawidlowa kategoria.",
+    newServicePrefix: "Nowa usluga",
     errors: {
       fetch: "Nie udalo sie zaladowac uslug",
       load: "Blad podczas ladowania uslug",
@@ -233,12 +281,24 @@ function formatPrice(value) {
   })}`;
 }
 
+function isDraftDirty(service, draft) {
+  if (!service || !draft) return false;
+  return (
+    draft.price !== (service.price ? String(service.price) : "") ||
+    draft.description !== (service.description || "") ||
+    draft.addOns !== (service.addOns || "") ||
+    draft.notes !== (service.notes || "")
+  );
+}
+
 export default function CategoryServicesPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [uiLanguage] = useStoredUiLanguage();
   const uiText = UI_I18N[uiLanguage] || UI_I18N.en;
   const category = String(params?.category || "").trim();
+  const categoryMeta = SERVICE_CATEGORY_META[category];
   const isValidCategory = VALID_CATEGORIES.has(category);
   const [viewportWidth, setViewportWidth] = useState(1280);
   const [savedServices, setSavedServices] = useState([]);
@@ -250,8 +310,33 @@ export default function CategoryServicesPage() {
   const [favorites, setFavorites] = useState([]);
   const [manualOrder, setManualOrder] = useState([]);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const prefsHydratedRef = useRef(false);
   const saveTimeoutRef = useRef(null);
+  const quickCreateHandledRef = useRef(false);
+
+  const pushWithTransition = useCallback(
+    (href, mode = "push") => {
+      const navigate = () => {
+        if (mode === "replace") {
+          router.replace(href);
+          return;
+        }
+        router.push(href);
+      };
+
+      if (
+        typeof document !== "undefined" &&
+        typeof document.startViewTransition === "function"
+      ) {
+        document.startViewTransition(navigate);
+        return;
+      }
+
+      navigate();
+    },
+    [router],
+  );
 
   useEffect(() => {
     const syncViewport = () => setViewportWidth(window.innerWidth || 1280);
@@ -357,6 +442,75 @@ export default function CategoryServicesPage() {
 
     return [...defaults, ...extras];
   }, [savedServices, templateServices]);
+
+  const createCustomService = useCallback(() => {
+    const stamp = Date.now().toString().slice(-5);
+    const baseName = `${uiText.newServicePrefix} ${stamp}`;
+    const existingNames = new Set(
+      allServices.map((service) => String(service.name || "").toLowerCase()),
+    );
+
+    let nextName = baseName;
+    let attempt = 1;
+    while (existingNames.has(nextName.toLowerCase())) {
+      attempt += 1;
+      nextName = `${baseName} ${attempt}`;
+    }
+
+    const quickService = {
+      _id: null,
+      id: null,
+      name: nextName,
+      description: "",
+      price: "",
+      priceMin: 0,
+      priceMax: 0,
+      addOns: "",
+      notes: "",
+      unit: "service",
+      state: "ALL",
+      pricingType: "per_unit",
+      materialCost: 0,
+      laborCost: 0,
+      overheadPercentage: 10,
+      profitPercentage: 20,
+      isTemplateOnly: false,
+      isCustom: true,
+    };
+
+    setSavedServices((current) => [quickService, ...current]);
+    setDraftByKey((current) => ({
+      ...current,
+      [makeServiceKey(quickService)]: buildDraft(quickService),
+    }));
+    setExpandedKey(makeServiceKey(quickService));
+    return quickService;
+  }, [allServices, uiText.newServicePrefix]);
+
+  useEffect(() => {
+    if (!isValidCategory) return;
+    if (searchParams?.get("new") !== "1") return;
+    if (quickCreateHandledRef.current) return;
+
+    quickCreateHandledRef.current = true;
+    createCustomService();
+
+    pushWithTransition(`/services-catalog/${category}`, "replace");
+  }, [
+    category,
+    createCustomService,
+    isValidCategory,
+    pushWithTransition,
+    searchParams,
+  ]);
+
+  useEffect(() => {
+    if (!statusMessage) return;
+    const timeoutId = window.setTimeout(() => {
+      setStatusMessage("");
+    }, 2200);
+    return () => window.clearTimeout(timeoutId);
+  }, [statusMessage]);
 
   useEffect(() => {
     if (!allServices.length) return;
@@ -719,6 +873,103 @@ export default function CategoryServicesPage() {
     }
   };
 
+  const duplicateCategoryTemplates = useCallback(() => {
+    const templates = DEFAULT_CATEGORY_SERVICES[category] || [];
+    if (!templates.length) return;
+
+    const existingNames = new Set(
+      allServices.map((service) => String(service.name || "").toLowerCase()),
+    );
+
+    const copies = templates.map((template, index) => {
+      let attempt = 1;
+      let nextName = `${template.name} Copy`;
+      while (existingNames.has(nextName.toLowerCase())) {
+        attempt += 1;
+        nextName = `${template.name} Copy ${attempt}`;
+      }
+      existingNames.add(nextName.toLowerCase());
+
+      return {
+        _id: null,
+        id: null,
+        name: nextName,
+        description: template.description || "",
+        price: "",
+        priceMin: 0,
+        priceMax: 0,
+        addOns: template.addOns || "",
+        notes: template.notes || "",
+        unit: template.unit || "service",
+        state: "ALL",
+        pricingType: "per_unit",
+        materialCost: 0,
+        laborCost: 0,
+        overheadPercentage: 10,
+        profitPercentage: 20,
+        isTemplateOnly: false,
+        isCustom: true,
+        __index: index,
+      };
+    });
+
+    setSavedServices((current) => [
+      ...copies.map(({ __index, ...service }) => service),
+      ...current,
+    ]);
+
+    setDraftByKey((current) => {
+      const next = { ...current };
+      copies.forEach(({ __index, ...service }) => {
+        next[makeServiceKey(service)] = buildDraft(service);
+      });
+      return next;
+    });
+
+    if (copies[0]) {
+      const { __index, ...firstCopy } = copies[0];
+      setExpandedKey(makeServiceKey(firstCopy));
+    }
+
+    setStatusMessage(`${copies.length} ${uiText.header.duplicateReadySuffix}`);
+  }, [allServices, category, uiText.header.duplicateReadySuffix]);
+
+  const exportCategoryData = useCallback(() => {
+    const timestamp = new Date().toISOString();
+    const payload = {
+      category,
+      title: categoryMeta?.title || category,
+      exportedAt: timestamp,
+      services: allServices.map((service) => {
+        const draft = getDraft(service);
+        const dirty = isDraftDirty(service, draft);
+        return {
+          name: draft.name,
+          description: dirty ? draft.description : service.description,
+          addOns: dirty ? draft.addOns : service.addOns,
+          notes: dirty ? draft.notes : service.notes,
+          price: dirty ? Number(draft.price || 0) || 0 : Number(service.price || 0) || 0,
+          unit: service.unit || "service",
+          state: service.state || "ALL",
+          type: service.isCustom ? "custom" : service.isTemplateOnly ? "template" : "saved",
+        };
+      }),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${category}-catalog-export.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+    setStatusMessage(uiText.header.exportReady);
+  }, [allServices, category, categoryMeta?.title, getDraft, uiText.header.exportReady]);
+
   if (!isValidCategory) {
     return (
       <main
@@ -751,11 +1002,14 @@ export default function CategoryServicesPage() {
     );
   }
 
-  const categoryMeta = SERVICE_CATEGORY_META[category];
   const favoriteSet = new Set(favorites);
+  const unsavedCount = allServices.reduce((count, service) => {
+    return isDraftDirty(service, getDraft(service)) ? count + 1 : count;
+  }, 0);
 
   return (
     <main
+      className="category-page"
       style={{
         padding: isMobile ? "14px" : "18px 20px 24px",
         fontFamily: "Arial, sans-serif",
@@ -763,10 +1017,34 @@ export default function CategoryServicesPage() {
         margin: "0 auto",
       }}
     >
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <button
+          type="button"
+          className="crumb-link"
+          onClick={() => {
+            pushWithTransition("/");
+          }}
+        >
+          {uiText.breadcrumbs.home}
+        </button>
+        <span className="crumb-sep">/</span>
+        <button
+          type="button"
+          className="crumb-link"
+          onClick={() => {
+            pushWithTransition("/services-catalog");
+          }}
+        >
+          {uiText.breadcrumbs.catalog}
+        </button>
+        <span className="crumb-sep">/</span>
+        <span className="crumb-current">{categoryMeta.title}</span>
+      </nav>
+
       <button
         type="button"
         onClick={() => {
-          router.push("/services-catalog");
+          pushWithTransition("/services-catalog");
         }}
         style={{
           display: "inline-flex",
@@ -786,29 +1064,57 @@ export default function CategoryServicesPage() {
         {uiText.back}
       </button>
 
-      <div style={{ marginBottom: 14 }}>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: isMobile ? 24 : 28,
-            lineHeight: 1.1,
-            color: "#111827",
-          }}
-        >
-          {categoryMeta.title}
-        </h1>
-        <p
-          style={{
-            margin: "6px 0 0",
-            fontSize: 13,
-            color: "#6b7280",
-            lineHeight: 1.4,
-            maxWidth: 780,
-          }}
-        >
-          {categoryMeta.description}
-        </p>
+      <div className="category-header" style={{ marginBottom: 14 }}>
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: isMobile ? 24 : 28,
+              lineHeight: 1.1,
+              color: "#111827",
+            }}
+          >
+            {categoryMeta.title}
+          </h1>
+          <p
+            style={{
+              margin: "6px 0 0",
+              fontSize: 13,
+              color: "#6b7280",
+              lineHeight: 1.4,
+              maxWidth: 780,
+            }}
+          >
+            {categoryMeta.description}
+          </p>
+        </div>
+
+        <div className="category-actions">
+          <span className={`unsaved-pill ${unsavedCount > 0 ? "is-dirty" : ""}`}>
+            {unsavedCount > 0
+              ? `${unsavedCount} ${uiText.header.unsavedCount}`
+              : uiText.header.allSaved}
+          </span>
+          <button
+            type="button"
+            className="header-action"
+            onClick={duplicateCategoryTemplates}
+          >
+            {uiText.header.duplicateTemplates}
+          </button>
+          <button
+            type="button"
+            className="header-action"
+            onClick={exportCategoryData}
+          >
+            {uiText.header.exportCategory}
+          </button>
+        </div>
       </div>
+
+      {statusMessage ? (
+        <div className="status-chip">{statusMessage}</div>
+      ) : null}
 
       {error ? (
         <div
@@ -826,28 +1132,24 @@ export default function CategoryServicesPage() {
         </div>
       ) : null}
 
-      <div
+      <section
         style={{
-          display: "grid",
-          gridTemplateColumns: isNarrow ? "1fr" : "220px minmax(0, 1fr)",
-          gap: 12,
-          alignItems: "start",
+          border: "1px solid #e5e7eb",
+          borderRadius: 14,
+          background: "#fbfcfd",
+          overflow: "hidden",
         }}
       >
-        <section
+        <div
           style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 14,
-            background: "#fbfcfd",
-            overflow: "hidden",
-            position: isNarrow ? "static" : "sticky",
-            top: 16,
+            padding: "10px 12px",
+            borderBottom: "1px solid #eef2f7",
+            display: "grid",
+            gap: 8,
           }}
         >
           <div
             style={{
-              padding: "10px 12px",
-              borderBottom: "1px solid #eef2f7",
               fontSize: 11,
               fontWeight: 700,
               textTransform: "uppercase",
@@ -855,91 +1157,10 @@ export default function CategoryServicesPage() {
               color: "#475569",
             }}
           >
-            {uiText.categories}
+            {uiText.services}
           </div>
-          <div style={{ maxHeight: isNarrow ? "none" : "calc(100vh - 220px)", overflowY: "auto" }}>
-            {SERVICE_CATEGORY_ORDER.map((slug, index) => {
-              const item = SERVICE_CATEGORY_META[slug];
-              const active = slug === category;
-              return (
-                <button
-                  key={slug}
-                  type="button"
-                  onClick={() => {
-                    router.push(`/services-catalog/${slug}`);
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "grid",
-                    gridTemplateColumns: "34px minmax(0, 1fr) auto",
-                    gap: 10,
-                    alignItems: "center",
-                    padding: "10px 12px",
-                    border: "none",
-                    borderBottom:
-                      index < SERVICE_CATEGORY_ORDER.length - 1
-                        ? "1px solid #eef2f7"
-                        : "none",
-                    background: active ? "#eef6ff" : "white",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 8,
-                      background: active ? "#dbeafe" : "#e8eef5",
-                      color: "#1f2937",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {item.icon}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
-                      {item.title}
-                    </div>
-                  </div>
-                  <span style={{ color: "#94a3b8", fontSize: 14 }}>›</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
 
-        <section
-          style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 14,
-            background: "#fbfcfd",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              padding: "10px 12px",
-              borderBottom: "1px solid #eef2f7",
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "#475569",
-              }}
-            >
-              {uiText.services}
-            </div>
+          <div className="services-toolbar">
             <input
               value={search}
               onChange={(event) => {
@@ -957,9 +1178,23 @@ export default function CategoryServicesPage() {
                 background: "white",
               }}
             />
+            <button
+              type="button"
+              className="header-action"
+              onClick={() => {
+                createCustomService();
+              }}
+            >
+              {uiText.header.addCustomService}
+            </button>
           </div>
 
-          <div style={{ maxHeight: isNarrow ? "none" : "calc(100vh - 220px)", overflowY: "auto" }}>
+          <div style={{ fontSize: 11, color: "#64748b" }}>
+            {uiText.header.editingOnlyPrefix} {categoryMeta.title}. {uiText.header.editingOnlySuffix}
+          </div>
+        </div>
+
+        <div style={{ maxHeight: isNarrow ? "none" : "calc(100vh - 260px)", overflowY: "auto" }}>
             {visibleServices.length === 0 ? (
               <div style={{ padding: 14, fontSize: 13, color: "#64748b" }}>
                 {uiText.noResults}
@@ -972,11 +1207,7 @@ export default function CategoryServicesPage() {
                 const isFavorite = favoriteSet.has(key);
                 const isSaving = savingKey === key;
                 const isDeleting = deletingKey === key;
-                const isDirty =
-                  draft.price !== (service.price ? String(service.price) : "") ||
-                  draft.description !== (service.description || "") ||
-                  draft.addOns !== (service.addOns || "") ||
-                  draft.notes !== (service.notes || "");
+                const isDirty = isDraftDirty(service, draft);
                 const badge = service.isCustom
                   ? uiText.badges.custom
                   : service.isTemplateOnly
@@ -1388,9 +1619,131 @@ export default function CategoryServicesPage() {
                 );
               })
             )}
-          </div>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <style jsx>{`
+        .category-page {
+          animation: page-in 220ms ease;
+        }
+
+        .category-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .breadcrumbs {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+          font-size: 12px;
+        }
+
+        .crumb-link {
+          border: 0;
+          background: transparent;
+          color: #2563eb;
+          cursor: pointer;
+          padding: 0;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .crumb-link:hover {
+          text-decoration: underline;
+        }
+
+        .crumb-sep {
+          color: #94a3b8;
+        }
+
+        .crumb-current {
+          color: #334155;
+          font-weight: 700;
+        }
+
+        .category-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .services-toolbar {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .unsaved-pill {
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          color: #334155;
+          border-radius: 999px;
+          padding: 7px 10px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+        }
+
+        .unsaved-pill.is-dirty {
+          border-color: #fdba74;
+          background: #fff7ed;
+          color: #9a3412;
+        }
+
+        .header-action {
+          border: 1px solid #cbd5e1;
+          background: white;
+          color: #1e3a8a;
+          border-radius: 10px;
+          padding: 7px 10px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.15s ease;
+        }
+
+        .header-action:hover {
+          background: #eff6ff;
+        }
+
+        .status-chip {
+          margin-bottom: 10px;
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid #bfdbfe;
+          background: #eff6ff;
+          color: #1d4ed8;
+          border-radius: 999px;
+          padding: 6px 10px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        @media (max-width: 760px) {
+          .services-toolbar {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @keyframes page-in {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </main>
   );
 }

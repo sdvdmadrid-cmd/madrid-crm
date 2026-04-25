@@ -1,0 +1,670 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+
+const THEME_PRESETS = [
+  { label: "Green",   value: "#16a34a" },
+  { label: "Blue",    value: "#2563eb" },
+  { label: "Orange",  value: "#ea580c" },
+  { label: "Purple",  value: "#7c3aed" },
+  { label: "Red",     value: "#dc2626" },
+  { label: "Teal",    value: "#0d9488" },
+];
+
+const UI = {
+  en: {
+    title: "Website Builder",
+    subtitle: "Build your contractor website with AI. Publish a professional site in minutes.",
+    generate: "Generate with AI",
+    generating: "Generating...",
+    save: "Save Changes",
+    saving: "Saving...",
+    publish: "Publish",
+    unpublish: "Unpublish",
+    publishing: "Updating...",
+    viewSite: "View Live Site",
+    previewLabel: "Preview",
+    editLabel: "Editor",
+    sectionHeadline: "Hero Headline",
+    sectionSub: "Subheadline",
+    sectionAbout: "About Text",
+    sectionCta: "CTA Button Text",
+    sectionTheme: "Brand Color",
+    sectionServices: "Services",
+    addService: "+ Add Service",
+    removeService: "Remove",
+    serviceNameLabel: "Service name",
+    serviceDescLabel: "Short description",
+    servicePriceLabel: "Price (optional)",
+    publishedBadge: "🟢 Published",
+    draftBadge: "⚪ Draft",
+    generateHint: "AI uses your company profile + services catalog to write the content.",
+    savedNotice: "Changes saved.",
+    errorGenerate: "AI generation failed. Check OpenAI key.",
+    errorSave: "Save failed. Try again.",
+    slugLabel: "Your site URL",
+    noApiKey: "OpenAI key not configured — you can still edit manually.",
+    breadcrumbHome: "Home",
+  },
+  es: {
+    title: "Constructor de Sitio Web",
+    subtitle: "Crea tu sitio web con IA. Publica un sitio profesional en minutos.",
+    generate: "Generar con IA",
+    generating: "Generando...",
+    save: "Guardar Cambios",
+    saving: "Guardando...",
+    publish: "Publicar",
+    unpublish: "Despublicar",
+    publishing: "Actualizando...",
+    viewSite: "Ver Sitio",
+    previewLabel: "Vista Previa",
+    editLabel: "Editor",
+    sectionHeadline: "Titular Principal",
+    sectionSub: "Subtítulo",
+    sectionAbout: "Acerca de",
+    sectionCta: "Texto del Botón CTA",
+    sectionTheme: "Color de Marca",
+    sectionServices: "Servicios",
+    addService: "+ Agregar Servicio",
+    removeService: "Eliminar",
+    serviceNameLabel: "Nombre del servicio",
+    serviceDescLabel: "Descripción corta",
+    servicePriceLabel: "Precio (opcional)",
+    publishedBadge: "🟢 Publicado",
+    draftBadge: "⚪ Borrador",
+    generateHint: "La IA usa tu perfil de empresa + catálogo de servicios.",
+    savedNotice: "Cambios guardados.",
+    errorGenerate: "Falló la generación. Verifica la clave de OpenAI.",
+    errorSave: "Error al guardar. Intenta de nuevo.",
+    slugLabel: "URL de tu sitio",
+    noApiKey: "Clave OpenAI no configurada — puedes editar manualmente.",
+    breadcrumbHome: "Inicio",
+  },
+  pl: {
+    title: "Kreator Strony",
+    subtitle: "Zbuduj swoją stronę z pomocą AI. Opublikuj profesjonalną stronę w minuty.",
+    generate: "Wygeneruj z AI",
+    generating: "Generowanie...",
+    save: "Zapisz Zmiany",
+    saving: "Zapisywanie...",
+    publish: "Opublikuj",
+    unpublish: "Cofnij publikację",
+    publishing: "Aktualizowanie...",
+    viewSite: "Zobacz stronę",
+    previewLabel: "Podgląd",
+    editLabel: "Edytor",
+    sectionHeadline: "Główny nagłówek",
+    sectionSub: "Podtytuł",
+    sectionAbout: "O nas",
+    sectionCta: "Tekst przycisku CTA",
+    sectionTheme: "Kolor marki",
+    sectionServices: "Usługi",
+    addService: "+ Dodaj usługę",
+    removeService: "Usuń",
+    serviceNameLabel: "Nazwa usługi",
+    serviceDescLabel: "Krótki opis",
+    servicePriceLabel: "Cena (opcjonalnie)",
+    publishedBadge: "🟢 Opublikowano",
+    draftBadge: "⚪ Wersja robocza",
+    generateHint: "AI używa profilu firmy i katalogu usług.",
+    savedNotice: "Zmiany zapisane.",
+    errorGenerate: "Generowanie nie powiodło się. Sprawdź klucz OpenAI.",
+    errorSave: "Nie udało się zapisać. Spróbuj ponownie.",
+    slugLabel: "URL Twojej strony",
+    noApiKey: "Klucz OpenAI nie skonfigurowany — możesz edytować ręcznie.",
+    breadcrumbHome: "Główna",
+  },
+};
+
+function useUiLanguage() {
+  const [lang, setLang] = useState("en");
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("ui_language") || "en";
+      if (stored in UI) setLang(stored);
+    } catch { /* noop */ }
+  }, []);
+  return UI[lang] || UI.en;
+}
+
+export default function WebsiteBuilderPage() {
+  const t = useUiLanguage();
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [tab, setTab] = useState("edit"); // "edit" | "preview"
+  const [slug, setSlug] = useState("");
+  const [published, setPublished] = useState(false);
+  const [companyProfile, setCompanyProfile] = useState(null);
+  const [form, setForm] = useState({
+    headline: "",
+    subheadline: "",
+    aboutText: "",
+    ctaText: "",
+    themeColor: "#16a34a",
+    services: [],
+  });
+
+  const saveTimerRef = useRef(null);
+
+  const showNotice = useCallback((msg, isError = false) => {
+    if (isError) setError(msg);
+    else setNotice(msg);
+    setTimeout(() => {
+      setError("");
+      setNotice("");
+    }, 4000);
+  }, []);
+
+  // Load website data
+  useEffect(() => {
+    apiFetch("/api/website-builder")
+      .then((res) => getJsonOrThrow(res, "Load failed"))
+      .then(({ data }) => {
+        setSlug(data.slug || "");
+        setPublished(data.published === true);
+        setCompanyProfile(data.companyProfile || null);
+        setForm({
+          headline: data.headline || "",
+          subheadline: data.subheadline || "",
+          aboutText: data.aboutText || "",
+          ctaText: data.ctaText || "",
+          themeColor: data.themeColor || "#16a34a",
+          services: Array.isArray(data.services) ? data.services : [],
+        });
+      })
+      .catch((err) => setError(err.message || "Load failed"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true);
+    setError("");
+    try {
+      // Fetch services from catalog for AI context
+      let catalogServices = [];
+      try {
+        const catalogRes = await apiFetch("/api/services-catalog");
+        if (catalogRes.ok) {
+          const catalogJson = await catalogRes.json();
+          catalogServices = (catalogJson.data || []).slice(0, 20).map((s) => ({
+            name: s.name || "",
+            description: s.description || "",
+          }));
+        }
+      } catch { /* use empty list */ }
+
+      const res = await apiFetch("/api/website-builder/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ services: catalogServices }),
+      });
+      const payload = await getJsonOrThrow(res, t.errorGenerate);
+      setForm((prev) => ({
+        ...prev,
+        headline: payload.data.headline || prev.headline,
+        subheadline: payload.data.subheadline || prev.subheadline,
+        aboutText: payload.data.aboutText || prev.aboutText,
+        ctaText: payload.data.ctaText || prev.ctaText,
+        services: payload.data.services?.length ? payload.data.services : prev.services,
+      }));
+      setTab("preview");
+    } catch (err) {
+      showNotice(err.message || t.errorGenerate, true);
+    } finally {
+      setGenerating(false);
+    }
+  }, [t, showNotice]);
+
+  const handleSave = useCallback(async (data) => {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await apiFetch("/api/website-builder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      await getJsonOrThrow(res, t.errorSave);
+      showNotice(t.savedNotice);
+    } catch (err) {
+      showNotice(err.message || t.errorSave, true);
+    } finally {
+      setSaving(false);
+    }
+  }, [t, showNotice]);
+
+  const handlePublishToggle = useCallback(async () => {
+    setPublishing(true);
+    const newPublished = !published;
+    try {
+      const res = await apiFetch("/api/website-builder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, published: newPublished }),
+      });
+      await getJsonOrThrow(res, t.errorSave);
+      setPublished(newPublished);
+      showNotice(newPublished ? t.publishedBadge : t.draftBadge);
+    } catch (err) {
+      showNotice(err.message || t.errorSave, true);
+    } finally {
+      setPublishing(false);
+    }
+  }, [published, form, t, showNotice]);
+
+  const setField = useCallback((key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const setServiceField = useCallback((index, key, value) => {
+    setForm((prev) => {
+      const next = [...prev.services];
+      next[index] = { ...next[index], [key]: value };
+      return { ...prev, services: next };
+    });
+  }, []);
+
+  const addService = useCallback(() => {
+    setForm((prev) => ({
+      ...prev,
+      services: [...prev.services, { name: "", description: "", price: "" }],
+    }));
+  }, []);
+
+  const removeService = useCallback((index) => {
+    setForm((prev) => ({
+      ...prev,
+      services: prev.services.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  const siteUrl = slug ? `/site/${slug}` : null;
+  const theme = form.themeColor || "#16a34a";
+
+  if (loading) {
+    return (
+      <div style={{ padding: 48, textAlign: "center", color: "#64748b", fontSize: 16 }}>
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <style>{`
+        .wb-shell { min-height: 100vh; background: #f8fafc; font-family: 'Inter', system-ui, sans-serif; }
+        .wb-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; min-height: 64px; gap: 16px; flex-wrap: wrap; }
+        .wb-breadcrumb { font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 6px; }
+        .wb-breadcrumb a { color: #64748b; text-decoration: none; }
+        .wb-breadcrumb a:hover { color: #0f172a; }
+        .wb-title { font-weight: 800; font-size: 20px; letter-spacing: -0.5px; color: #0f172a; }
+        .wb-header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .wb-badge { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .wb-badge-pub { background: #dcfce7; color: #15803d; }
+        .wb-badge-draft { background: #f1f5f9; color: #64748b; }
+        .wb-btn { border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 14px; cursor: pointer; transition: filter 0.15s; }
+        .wb-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .wb-btn-ai { background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; }
+        .wb-btn-save { background: #0f172a; color: #fff; }
+        .wb-btn-pub { background: #16a34a; color: #fff; }
+        .wb-btn-unpub { background: #dc2626; color: #fff; }
+        .wb-btn-view { background: transparent; border: 1px solid #e2e8f0 !important; color: #0f172a; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .wb-tabs { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 28px; display: flex; gap: 0; }
+        .wb-tab { padding: 14px 20px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; background: transparent; color: #64748b; border-bottom: 3px solid transparent; transition: color 0.15s; }
+        .wb-tab.active { color: #0f172a; border-bottom-color: var(--theme, #16a34a); }
+        .wb-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 130px); }
+        .wb-editor { padding: 32px 28px; overflow-y: auto; border-right: 1px solid #e2e8f0; }
+        .wb-preview { overflow-y: auto; background: #fff; }
+        .wb-notice { background: #dcfce7; color: #15803d; border-radius: 10px; padding: 12px 18px; font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+        .wb-error { background: #fee2e2; color: #b91c1c; border-radius: 10px; padding: 12px 18px; font-size: 14px; font-weight: 600; margin-bottom: 16px; }
+        .wb-field { margin-bottom: 24px; }
+        .wb-label { font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 6px; display: block; letter-spacing: 0.3px; }
+        .wb-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 11px 14px; font-size: 15px; font-family: inherit; color: #0f172a; background: #fafafa; transition: border-color 0.15s; resize: vertical; }
+        .wb-input:focus { outline: none; border-color: var(--theme, #16a34a); background: #fff; }
+        .wb-section-title { font-size: 16px; font-weight: 800; color: #0f172a; margin: 32px 0 16px; padding-top: 24px; border-top: 1px solid #e2e8f0; }
+        .wb-section-title:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+        .theme-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+        .theme-swatch { width: 34px; height: 34px; border-radius: 999px; cursor: pointer; border: 3px solid transparent; transition: transform 0.15s; }
+        .theme-swatch:hover { transform: scale(1.15); }
+        .theme-swatch.selected { border-color: #0f172a; }
+        .service-row { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; position: relative; }
+        .service-row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .service-num { font-size: 12px; font-weight: 700; color: #94a3b8; }
+        .service-remove { font-size: 12px; color: #dc2626; cursor: pointer; background: none; border: none; font-weight: 700; }
+        .wb-add-service { width: 100%; padding: 12px; border: 2px dashed #e2e8f0; border-radius: 12px; background: transparent; font-size: 14px; font-weight: 700; color: #64748b; cursor: pointer; transition: border-color 0.15s; }
+        .wb-add-service:hover { border-color: var(--theme, #16a34a); color: var(--theme, #16a34a); }
+        .wb-slug-row { display: flex; align-items: center; gap: 10px; background: #f1f5f9; border-radius: 10px; padding: 12px 16px; margin-bottom: 24px; }
+        .wb-slug-url { font-size: 13px; color: #334155; font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .wb-save-row { display: flex; gap: 10px; margin-top: 32px; flex-wrap: wrap; }
+        /* Preview styles */
+        .preview-nav { background: #0f172a; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .preview-logo { color: #fff; font-weight: 800; font-size: 16px; }
+        .preview-hero { padding: 70px 28px 56px; text-align: center; background: linear-gradient(135deg, #0f172a 0%, #1e293b 70%, color-mix(in srgb, var(--theme, #16a34a) 40%, #1e293b) 100%); color: #fff; }
+        .preview-hero h1 { font-size: clamp(1.4rem, 3.5vw, 2.8rem); font-weight: 900; letter-spacing: -1px; margin-bottom: 14px; }
+        .preview-hero p { font-size: 16px; opacity: 0.82; margin-bottom: 28px; }
+        .preview-cta { background: var(--theme, #16a34a); color: #fff; border: none; border-radius: 999px; padding: 14px 28px; font-weight: 800; font-size: 15px; cursor: default; }
+        .preview-section { padding: 48px 28px; }
+        .preview-section h2 { font-size: 22px; font-weight: 800; margin-bottom: 20px; color: #0f172a; }
+        .preview-services { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+        .preview-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; }
+        .preview-card-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: #0f172a; }
+        .preview-card-desc { font-size: 12px; color: #64748b; }
+        .preview-about { background: #f1f5f9; }
+        .preview-about p { font-size: 15px; line-height: 1.7; color: #334155; max-width: 640px; }
+        .preview-cta-section { background: var(--theme, #16a34a); color: #fff; padding: 48px 28px; text-align: center; }
+        .preview-cta-section h2 { font-size: 22px; font-weight: 900; margin-bottom: 10px; }
+        .preview-footer { background: #0f172a; color: rgba(255,255,255,0.5); padding: 20px; text-align: center; font-size: 12px; }
+        /* Mobile */
+        @media (max-width: 900px) {
+          .wb-body { grid-template-columns: 1fr; }
+          .wb-editor { border-right: none; }
+          .wb-preview { display: none; }
+          .wb-preview.show { display: block; }
+        }
+        @media (max-width: 600px) {
+          .wb-header { padding: 12px 16px; }
+          .wb-tabs { padding: 0 16px; }
+          .wb-editor { padding: 20px 16px; }
+        }
+      `}</style>
+
+      <div className="wb-shell" style={{ "--theme": theme }}>
+        {/* Header */}
+        <header className="wb-header">
+          <div>
+            <div className="wb-breadcrumb">
+              <a href="/">{t.breadcrumbHome}</a>
+              <span>/</span>
+              <span>{t.title}</span>
+            </div>
+            <div className="wb-title">{t.title}</div>
+          </div>
+          <div className="wb-header-actions">
+            <span className={`wb-badge ${published ? "wb-badge-pub" : "wb-badge-draft"}`}>
+              {published ? t.publishedBadge : t.draftBadge}
+            </span>
+            {siteUrl && published && (
+              <a
+                href={siteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="wb-btn wb-btn-view"
+              >
+                {t.viewSite} ↗
+              </a>
+            )}
+            <button
+              className={`wb-btn ${published ? "wb-btn-unpub" : "wb-btn-pub"}`}
+              disabled={publishing}
+              onClick={handlePublishToggle}
+            >
+              {publishing ? t.publishing : (published ? t.unpublish : t.publish)}
+            </button>
+          </div>
+        </header>
+
+        {/* Tabs */}
+        <div className="wb-tabs">
+          <button
+            className={`wb-tab${tab === "edit" ? " active" : ""}`}
+            onClick={() => setTab("edit")}
+          >
+            {t.editLabel}
+          </button>
+          <button
+            className={`wb-tab${tab === "preview" ? " active" : ""}`}
+            onClick={() => setTab("preview")}
+          >
+            {t.previewLabel}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="wb-body">
+          {/* Editor panel */}
+          <div className="wb-editor" style={{ display: tab === "preview" ? "none" : "block" }}>
+            {notice && <div className="wb-notice">{notice}</div>}
+            {error && <div className="wb-error">{error}</div>}
+
+            {/* Site URL */}
+            {slug && (
+              <div className="wb-slug-row">
+                <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>{t.slugLabel}:</span>
+                <span className="wb-slug-url">
+                  {typeof window !== "undefined" ? window.location.origin : ""}/site/{slug}
+                </span>
+                {published && (
+                  <a
+                    href={`/site/${slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 13, color: theme, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}
+                  >
+                    ↗ Open
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* AI generate */}
+            <div style={{ marginBottom: 28, background: "linear-gradient(135deg, #f5f3ff, #ede9fe)", borderRadius: 14, padding: "18px 20px" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#5b21b6", marginBottom: 6 }}>✨ AI Website Generator</div>
+              <div style={{ fontSize: 13, color: "#6d28d9", marginBottom: 14 }}>{t.generateHint}</div>
+              <button
+                className="wb-btn wb-btn-ai"
+                disabled={generating}
+                onClick={handleGenerate}
+              >
+                {generating ? t.generating : t.generate}
+              </button>
+            </div>
+
+            {/* Headline */}
+            <div className="wb-section-title">{t.sectionHeadline}</div>
+            <div className="wb-field">
+              <input
+                className="wb-input"
+                type="text"
+                value={form.headline}
+                maxLength={200}
+                placeholder="e.g. Your Yard, Our Craft"
+                onChange={(e) => setField("headline", e.target.value)}
+              />
+            </div>
+
+            {/* Subheadline */}
+            <div className="wb-section-title">{t.sectionSub}</div>
+            <div className="wb-field">
+              <input
+                className="wb-input"
+                type="text"
+                value={form.subheadline}
+                maxLength={300}
+                placeholder="e.g. Serving the greater Chicago area with 15+ years of experience."
+                onChange={(e) => setField("subheadline", e.target.value)}
+              />
+            </div>
+
+            {/* CTA text */}
+            <div className="wb-section-title">{t.sectionCta}</div>
+            <div className="wb-field">
+              <input
+                className="wb-input"
+                type="text"
+                value={form.ctaText}
+                maxLength={100}
+                placeholder="Get a Free Quote"
+                onChange={(e) => setField("ctaText", e.target.value)}
+              />
+            </div>
+
+            {/* About */}
+            <div className="wb-section-title">{t.sectionAbout}</div>
+            <div className="wb-field">
+              <textarea
+                className="wb-input"
+                rows={5}
+                value={form.aboutText}
+                maxLength={2000}
+                placeholder="Tell clients who you are and why they should choose you..."
+                onChange={(e) => setField("aboutText", e.target.value)}
+              />
+            </div>
+
+            {/* Theme color */}
+            <div className="wb-section-title">{t.sectionTheme}</div>
+            <div className="wb-field">
+              <div className="theme-swatches">
+                {THEME_PRESETS.map((p) => (
+                  <button
+                    key={p.value}
+                    className={`theme-swatch${form.themeColor === p.value ? " selected" : ""}`}
+                    style={{ background: p.value }}
+                    title={p.label}
+                    onClick={() => setField("themeColor", p.value)}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={form.themeColor}
+                  onChange={(e) => setField("themeColor", e.target.value)}
+                  style={{ width: 34, height: 34, border: "none", padding: 2, borderRadius: 999, cursor: "pointer", background: "transparent" }}
+                  title="Custom color"
+                />
+              </div>
+            </div>
+
+            {/* Services */}
+            <div className="wb-section-title">{t.sectionServices}</div>
+            {form.services.map((service, i) => (
+              <div key={i} className="service-row">
+                <div className="service-row-header">
+                  <span className="service-num">#{i + 1}</span>
+                  <button className="service-remove" onClick={() => removeService(i)}>
+                    {t.removeService}
+                  </button>
+                </div>
+                <div className="wb-field" style={{ marginBottom: 8 }}>
+                  <label className="wb-label" htmlFor={`svc-name-${i}`}>{t.serviceNameLabel}</label>
+                  <input
+                    id={`svc-name-${i}`}
+                    className="wb-input"
+                    type="text"
+                    value={service.name}
+                    maxLength={100}
+                    onChange={(e) => setServiceField(i, "name", e.target.value)}
+                  />
+                </div>
+                <div className="wb-field" style={{ marginBottom: 8 }}>
+                  <label className="wb-label" htmlFor={`svc-desc-${i}`}>{t.serviceDescLabel}</label>
+                  <input
+                    id={`svc-desc-${i}`}
+                    className="wb-input"
+                    type="text"
+                    value={service.description}
+                    maxLength={400}
+                    onChange={(e) => setServiceField(i, "description", e.target.value)}
+                  />
+                </div>
+                <div className="wb-field" style={{ marginBottom: 0 }}>
+                  <label className="wb-label" htmlFor={`svc-price-${i}`}>{t.servicePriceLabel}</label>
+                  <input
+                    id={`svc-price-${i}`}
+                    className="wb-input"
+                    type="text"
+                    value={service.price || ""}
+                    maxLength={50}
+                    placeholder="e.g. From $150"
+                    onChange={(e) => setServiceField(i, "price", e.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+            {form.services.length < 12 && (
+              <button className="wb-add-service" onClick={addService}>
+                {t.addService}
+              </button>
+            )}
+
+            {/* Save */}
+            <div className="wb-save-row">
+              <button
+                className="wb-btn wb-btn-save"
+                disabled={saving}
+                onClick={() => handleSave(form)}
+              >
+                {saving ? t.saving : t.save}
+              </button>
+            </div>
+          </div>
+
+          {/* Preview panel */}
+          <div className={`wb-preview${tab === "preview" ? " show" : ""}`} style={{ display: tab === "edit" ? undefined : "block" }}>
+            <div style={{ "--theme": theme }}>
+              {/* Preview nav */}
+              <div className="preview-nav">
+                <span className="preview-logo">{companyProfile?.companyName || "Your Company"}</span>
+                {companyProfile?.phone && (
+                  <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>{companyProfile.phone}</span>
+                )}
+              </div>
+
+              {/* Preview hero */}
+              <div className="preview-hero" style={{ "--theme": theme }}>
+                <h1>{form.headline || "Your Punchy Headline Here"}</h1>
+                <p>{form.subheadline || "Your supporting subheadline goes here."}</p>
+                <button className="preview-cta" style={{ background: theme }}>
+                  {form.ctaText || "Get a Free Quote"}
+                </button>
+              </div>
+
+              {/* Preview services */}
+              {form.services.length > 0 && (
+                <div className="preview-section">
+                  <h2>Our Services</h2>
+                  <div className="preview-services">
+                    {form.services.map((s, i) => (
+                      <div key={i} className="preview-card">
+                        <div className="preview-card-name">{s.name || "Service"}</div>
+                        {s.description && <div className="preview-card-desc">{s.description}</div>}
+                        {s.price && (
+                          <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: theme }}>{s.price}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview about */}
+              {form.aboutText && (
+                <div className="preview-section preview-about">
+                  <h2>About Us</h2>
+                  <p>{form.aboutText}</p>
+                </div>
+              )}
+
+              {/* Preview CTA */}
+              <div className="preview-cta-section" style={{ background: theme }}>
+                <h2>{form.ctaText || "Get a Free Quote"}</h2>
+                <p>Reach out today — no commitment required.</p>
+                {companyProfile?.phone && (
+                  <div style={{ fontSize: 22, fontWeight: 900, marginTop: 12 }}>{companyProfile.phone}</div>
+                )}
+              </div>
+
+              <div className="preview-footer">
+                &copy; {new Date().getFullYear()} {companyProfile?.companyName || "Your Company"}. Powered by ContractorFlow
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

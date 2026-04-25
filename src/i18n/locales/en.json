@@ -353,6 +353,7 @@
     "secondary": "Secondary",
     "account": "Account",
     "dashboard": "Dashboard",
+    "revenueOverview": "Revenue overview",
     "clients": "Clients",
     "estimates": "Estimates",
     "jobs": "Jobs",
@@ -361,6 +362,7 @@
     "calendar": "Calendar",
     "insights": "Insights",
     "services": "Services",
+    "websiteBuilder": "Website Builder",
     "platform": "Platform",
     "settings": "Settings",
     "logout": "Logout",
@@ -756,11 +758,39 @@
     "formTitleEdit": "Edit appointment",
     "listTitle": "Appointment list",
     "agendaTitle": "Agenda",
+    "scheduleYourAppointments": "Schedule your appointments",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
     "placeholders": {
       "title": "Title",
       "clientName": "Client",
       "date": "Date",
-      "time": "Time"
+      "time": "Time",
+      "location": "e.g. Chicago, IL",
+      "addressStreet": "Street number and name",
+      "city": "City",
+      "state": "State",
+      "zip": "ZIP code",
+      "notes": "Additional details..."
+    },
+    "labels": {
+      "title": "Title",
+      "clientName": "Client Name",
+      "date": "Date",
+      "time": "Time",
+      "status": "Status",
+      "location": "Job Location",
+      "addressStreet": "Street Address",
+      "city": "City",
+      "state": "State",
+      "zip": "ZIP Code",
+      "notes": "Notes"
+    },
+    "weather": {
+      "locationHint": "Used to fetch weather forecast for this job",
+      "outOfRange": "Forecast only available within next 5 days",
+      "unavailable": "Weather unavailable"
     },
     "statusOptions": {
       "Scheduled": "Scheduled",
@@ -773,7 +803,15 @@
       "update": "Update",
       "clear": "Clear",
       "edit": "Edit",
-      "delete": "Delete"
+      "reschedule": "Reschedule",
+      "delete": "Delete",
+      "cancel": "Cancel"
+    },
+    "modal": {
+      "newAppointment": "New Appointment",
+      "editAppointment": "Edit Appointment",
+      "confirmDelete": "Delete Appointment",
+      "confirmDeleteMessage": "Are you sure you want to delete this appointment?"
     },
     "empty": "No appointments to display.",
     "errors": {
@@ -809,13 +847,34 @@
   },
   "estimateForm": {
     "title": "Create Estimate",
+    "pageTitle": "New Estimate",
+    "headerSubtitle": "Build a professional estimate for your client",
     "subtitle": "Create and send a professional estimate to your client",
     "loading": "Loading estimate form...",
+    "steps": {
+      "step1": "Step 1",
+      "step2": "Step 2",
+      "step3": "Step 3",
+      "clientJobTitle": "Client & Job",
+      "pricingNotesTitle": "Pricing & Notes"
+    },
+    "links": {
+      "newClient": "+ New client",
+      "newJob": "+ New job"
+    },
+    "hints": {
+      "noJobs": "No jobs yet — create one from Jobs.",
+      "taxRateLabel": "Tax rate —",
+      "signedInAs": "Signed in as"
+    },
     "fields": {
       "client": "Client",
       "job": "Job",
-      "estimateNumber": "Estimate Number",
+      "jobOptional": "(optional)",
+      "estimateNumber": "Estimate #",
+      "currency": "Currency",
       "taxPct": "Tax (%)",
+      "stateTax": "State Tax",
       "lineItems": "Line Items",
       "description": "Description",
       "qty": "Qty",
@@ -824,13 +883,17 @@
     },
     "placeholders": {
       "client": "Select a client",
-      "job": "Select a job",
+      "job": "No job linked",
       "estimateNumber": "Auto-generated",
-      "notes": "Add any notes or terms..."
+      "notes": "Optional scope details, exclusions, or next steps",
+      "lineItemDescription": "Service or material"
     },
     "buttons": {
+      "saveDraft": "Save Draft",
+      "sendEstimate": "Send Estimate",
       "create": "Create Estimate",
-      "creating": "Creating...",
+      "creating": "Creating estimate...",
+      "saving": "Saving...",
       "addItem": "+ Add Item",
       "remove": "Remove"
     },
@@ -840,7 +903,8 @@
       "total": "Total"
     },
     "success": {
-      "created": "Estimate created successfully"
+      "created": "Estimate created successfully",
+      "estimateReady": "Estimate {{number}} is ready."
     },
     "errors": {
       "noAuth": "You must be signed in to create an estimate",
@@ -848,9 +912,11 @@
       "loadClients": "Unable to load clients",
       "loadJobs": "Unable to load jobs",
       "selectClient": "Select a client",
+      "selectClientFull": "Select a client before creating the estimate.",
       "selectJob": "Select a job",
-      "addLineItem": "Add at least one line item before creating the estimate",
-      "invalidLineItems": "Review your quantities and unit prices before continuing",
+      "addLineItem": "Add at least one line item before creating the estimate.",
+      "invalidLineItems": "Fix the highlighted line items before creating the estimate.",
+      "reviewLineItems": "Review your line items before continuing.",
       "missingUserContext": "Missing account context. Refresh and try again.",
       "createEstimate": "Unable to create the estimate"
     }

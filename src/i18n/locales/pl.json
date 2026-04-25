@@ -353,6 +353,7 @@
     "secondary": "Dodatkowe",
     "account": "Konto",
     "dashboard": "Panel",
+    "revenueOverview": "Przeglad przychodow",
     "clients": "Klienci",
     "estimates": "Wyceny",
     "jobs": "Zlecenia",
@@ -361,6 +362,7 @@
     "calendar": "Kalendarz",
     "insights": "Statystyki",
     "services": "Uslugi",
+    "websiteBuilder": "Kreator Strony",
     "platform": "Platforma",
     "settings": "Ustawienia",
     "logout": "Wyloguj",
@@ -756,11 +758,39 @@
     "formTitleEdit": "Edytuj wizyte",
     "listTitle": "Lista wizyt",
     "agendaTitle": "Agenda",
+    "scheduleYourAppointments": "Zaplanuj swoje wizyty",
+    "today": "Dzisiaj",
+    "prevMonth": "Poprzedni miesiac",
+    "nextMonth": "Nastepny miesiac",
     "placeholders": {
       "title": "Tytul",
       "clientName": "Klient",
       "date": "Data",
-      "time": "Godzina"
+      "time": "Godzina",
+      "location": "np. Chicago, IL",
+      "addressStreet": "Ulica i numer",
+      "city": "Miasto",
+      "state": "Wojewodztwo/Stan",
+      "zip": "Kod pocztowy",
+      "notes": "Dodatkowe szczegoly..."
+    },
+    "labels": {
+      "title": "Tytul",
+      "clientName": "Nazwa klienta",
+      "date": "Data",
+      "time": "Godzina",
+      "status": "Status",
+      "location": "Lokalizacja pracy",
+      "addressStreet": "Adres",
+      "city": "Miasto",
+      "state": "Wojewodztwo/Stan",
+      "zip": "Kod pocztowy",
+      "notes": "Notatki"
+    },
+    "weather": {
+      "locationHint": "Uzywane do pobierania prognozy pogody dla tej pracy",
+      "outOfRange": "Prognoza dostepna tylko dla najblizszych 5 dni",
+      "unavailable": "Pogoda niedostepna"
     },
     "statusOptions": {
       "Scheduled": "Zaplanowana",
@@ -773,7 +803,15 @@
       "update": "Aktualizuj",
       "clear": "Wyczysc",
       "edit": "Edytuj",
-      "delete": "Usun"
+      "reschedule": "Przeloz termin",
+      "delete": "Usun",
+      "cancel": "Anuluj"
+    },
+    "modal": {
+      "newAppointment": "Nowa Wizyta",
+      "editAppointment": "Edytuj Wizyte",
+      "confirmDelete": "Usun Wizyte",
+      "confirmDeleteMessage": "Czy na pewno chcesz usunac te wizyte?"
     },
     "empty": "Brak wizyt do wyswietlenia.",
     "errors": {
@@ -809,13 +847,34 @@
   },
   "estimateForm": {
     "title": "Utworz wycene",
+    "pageTitle": "Nowa wycena",
+    "headerSubtitle": "Przygotuj profesjonalna wycene dla klienta",
     "subtitle": "Przygotuj i wyslij profesjonalna wycene do klienta",
     "loading": "Ladowanie formularza wyceny...",
+    "steps": {
+      "step1": "Krok 1",
+      "step2": "Krok 2",
+      "step3": "Krok 3",
+      "clientJobTitle": "Klient i zlecenie",
+      "pricingNotesTitle": "Ceny i notatki"
+    },
+    "links": {
+      "newClient": "+ Nowy klient",
+      "newJob": "+ Nowe zlecenie"
+    },
+    "hints": {
+      "noJobs": "Brak zlecen — utworz nowe w sekcji Zlecenia.",
+      "taxRateLabel": "Stawka podatku —",
+      "signedInAs": "Zalogowany jako"
+    },
     "fields": {
       "client": "Klient",
       "job": "Zlecenie",
-      "estimateNumber": "Numer wyceny",
+      "jobOptional": "(opcjonalnie)",
+      "estimateNumber": "Wycena #",
+      "currency": "Waluta",
       "taxPct": "Podatek (%)",
+      "stateTax": "Podatek stanowy",
       "lineItems": "Pozycje",
       "description": "Opis",
       "qty": "Ilosc",
@@ -824,13 +883,17 @@
     },
     "placeholders": {
       "client": "Wybierz klienta",
-      "job": "Wybierz zlecenie",
+      "job": "Bez powiazanego zlecenia",
       "estimateNumber": "Generowany automatycznie",
-      "notes": "Dodaj notatki lub warunki..."
+      "notes": "Zakres prac, wylaczenia lub kolejne kroki (opcjonalnie)",
+      "lineItemDescription": "Usluga lub material"
     },
     "buttons": {
+      "saveDraft": "Zapisz szkic",
+      "sendEstimate": "Wyslij wycene",
       "create": "Utworz wycene",
-      "creating": "Tworzenie...",
+      "creating": "Tworzenie wyceny...",
+      "saving": "Zapisywanie...",
       "addItem": "+ Dodaj pozycje",
       "remove": "Usun"
     },
@@ -840,7 +903,8 @@
       "total": "Lacznie"
     },
     "success": {
-      "created": "Wycena zostala utworzona"
+      "created": "Wycena zostala utworzona",
+      "estimateReady": "Wycena {{number}} jest gotowa."
     },
     "errors": {
       "noAuth": "Musisz sie zalogowac, aby utworzyc wycene",
@@ -848,9 +912,11 @@
       "loadClients": "Nie udalo sie zaladowac klientow",
       "loadJobs": "Nie udalo sie zaladowac zlecen",
       "selectClient": "Wybierz klienta",
+      "selectClientFull": "Wybierz klienta przed utworzeniem wyceny.",
       "selectJob": "Wybierz zlecenie",
-      "addLineItem": "Dodaj co najmniej jedna pozycje przed utworzeniem wyceny",
-      "invalidLineItems": "Sprawdz ilosci i ceny jednostkowe przed kontynuowaniem",
+      "addLineItem": "Dodaj co najmniej jedna pozycje przed utworzeniem wyceny.",
+      "invalidLineItems": "Popraw zaznaczone pozycje przed utworzeniem wyceny.",
+      "reviewLineItems": "Sprawdz pozycje przed kontynuowaniem.",
       "missingUserContext": "Brakuje danych konta. Odswiez strone i sprobuj ponownie.",
       "createEstimate": "Nie udalo sie utworzyc wyceny"
     }

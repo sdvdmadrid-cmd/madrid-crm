@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { getUsStateLabel, getUsStateTaxRate } from "@/lib/estimate-pricing";
 import { supabase } from "@/lib/supabase";
-import styles from "./NewEstimateForm.module.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -85,6 +85,7 @@ function getRowErrors(item) {
 
 export default function NewEstimateForm({ onCreated }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [authState, setAuthState] = useState("checking");
   const [loadingData, setLoadingData] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -163,7 +164,7 @@ export default function NewEstimateForm({ onCreated }) {
 
         if (meRes.status === 401) {
           setAuthState("redirecting");
-          router.push("/login?next=/estimate-builder");
+          router.push("/login?next=/estimates");
           return;
         }
 
@@ -263,17 +264,17 @@ export default function NewEstimateForm({ onCreated }) {
     setSuccess("");
 
     if (!form.clientId) {
-      setFormError("Select a client before creating the estimate.");
+      setFormError(t("estimateForm.errors.selectClientFull"));
       return;
     }
 
     if (!hasMeaningfulItems) {
-      setFormError("Add at least one line item before creating the estimate.");
+      setFormError(t("estimateForm.errors.addLineItem"));
       return;
     }
 
     if (hasInvalidRows) {
-      setFormError("Fix the highlighted line items before creating the estimate.");
+      setFormError(t("estimateForm.errors.invalidLineItems"));
       return;
     }
 
@@ -336,7 +337,7 @@ export default function NewEstimateForm({ onCreated }) {
         throw new Error(error.message);
       }
 
-      setSuccess(`Estimate ${data?.estimate_number || "created"} is ready.`);
+      setSuccess(t("estimateForm.success.estimateReady", { number: data?.estimate_number || "" }));
       setSubmitAttempted(false);
       setForm((prev) => ({
         ...createEmptyEstimate(),
@@ -349,7 +350,7 @@ export default function NewEstimateForm({ onCreated }) {
       }
     } catch (error) {
       console.error("[NewEstimateForm] submit error", error);
-      setFormError(error.message || "Unable to create the estimate.");
+      setFormError(error.message || t("estimateForm.errors.createEstimate"));
     } finally {
       setSaving(false);
     }
@@ -361,240 +362,375 @@ export default function NewEstimateForm({ onCreated }) {
 
   if (authState === "checking" || loadingData) {
     return (
-      <div className={styles.shell}>
-        <div className={styles.loadingCard}>Loading estimate form...</div>
+      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-sm px-10 py-8 text-[#1d1d1f] text-sm font-medium">
+          {t("estimateForm.loading")}
+        </div>
       </div>
     );
   }
 
   return (
-    <form className={styles.shell} onSubmit={submit}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>New Estimate</h1>
-          <p className={styles.subtitle}>
-            Build a clean estimate linked to a client and optional job.
-          </p>
-        </div>
-      </header>
+    <form className="min-h-screen bg-[#f5f5f7] pb-16" onSubmit={submit}>
 
-      {formError ? <div className={styles.errorBanner}>{formError}</div> : null}
-      {success ? <div className={styles.successBanner}>{success}</div> : null}
-
-      <section className={styles.card}>
-        <div className={styles.sectionHeader}>
+      {/* ── Top header ─────────────────────────────────────────── */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/60 sticky top-0 z-20">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div>
-            <p className={styles.eyebrow}>Estimate setup</p>
-            <h2 className={styles.sectionTitle}>Client and pricing</h2>
-          </div>
-        </div>
-
-        <div className={styles.infoGrid}>
-          <label className={styles.field}>
-            <span className={styles.label}>Client</span>
-            <select
-              className={`cf-input ${styles.inputField}`}
-              value={form.clientId}
-              onChange={(event) => updateForm({ clientId: event.target.value })}
-            >
-              <option value="">Select a client</option>
-              {clients.map((client) => (
-                <option key={client._id || client.id} value={client._id || client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-            {submitAttempted && !form.clientId ? (
-              <span className={styles.inlineError}>Select a client</span>
-            ) : null}
-          </label>
-
-          <label className={styles.field}>
-            <span className={styles.label}>Job</span>
-            <select
-              className={`cf-input ${styles.inputField}`}
-              value={form.jobId}
-              onChange={(event) => handleJobChange(event.target.value)}
-            >
-              <option value="">Optional job link</option>
-              {availableJobs.map((job) => (
-                <option key={job.id} value={job.id}>
-                  {job.title} {job.clientName ? `- ${job.clientName}` : ""}
-                </option>
-              ))}
-            </select>
-            {availableJobs.length === 0 ? (
-              <span className={styles.helperText}>No jobs available yet.</span>
-            ) : null}
-          </label>
-
-          <label className={styles.field}>
-            <span className={styles.label}>Estimate number</span>
-            <input
-              className={`cf-input ${styles.inputField}`}
-              value={form.estimateNumber}
-              onChange={(event) => updateForm({ estimateNumber: event.target.value })}
-              placeholder="Auto-generated"
-            />
-          </label>
-
-          <label className={styles.field}>
-            <span className={styles.label}>Tax %</span>
-            <div className={styles.taxFieldStack}>
-              <label className={styles.taxToggle}>
-                <input
-                  checked={form.applyTax}
-                  onChange={(event) => handleTaxToggle(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>Apply automatic state tax</span>
-              </label>
-              <input
-                className={`cf-input ${styles.inputField}`}
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                disabled={!form.applyTax}
-                value={form.taxRatePct}
-                onChange={(event) => updateForm({ taxRatePct: event.target.value })}
-              />
-            </div>
-            <span className={styles.helperText}>
-              {form.applyTax
-                ? `Using ${getUsStateLabel(activeTaxState)} tax rate (${automaticTaxRate}%).`
-                : `Automatic tax is off for ${getUsStateLabel(activeTaxState)}.`}
-            </span>
-          </label>
-        </div>
-      </section>
-
-      <section className={`${styles.card} ${styles.itemsCard}`}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <p className={styles.eyebrow}>Scope</p>
-            <h2 className={styles.sectionTitle}>Line Items</h2>
-          </div>
-          <button className={`cf-button ${styles.addItemButton}`} onClick={addItem} type="button">
-            Add item
-          </button>
-        </div>
-
-        <div className={styles.tableScroller}>
-          <div className={styles.tableHeader}>
-            <span>Description</span>
-            <span>Quantity</span>
-            <span>Unit price</span>
-            <span className={styles.rightHeader}>Total</span>
-            <span className={styles.rightHeader}>Action</span>
-          </div>
-
-          <div className={styles.tableBody}>
-            {form.items.map((item, index) => {
-              const metrics = getRowMetrics(item);
-              const errors = rowErrors[index];
-
-              return (
-                <div key={item.id} className={styles.itemRow}>
-                  <label className={styles.cellField}>
-                    <span className={styles.mobileLabel}>Description</span>
-                    <input
-                      className={`cf-input ${styles.inputField}`}
-                      value={item.description}
-                      onChange={(event) => updateItem(item.id, { description: event.target.value })}
-                      placeholder="Service description"
-                    />
-                  </label>
-
-                  <label className={styles.cellField}>
-                    <span className={styles.mobileLabel}>Quantity</span>
-                    <input
-                      className={`cf-input ${styles.inputField}`}
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      inputMode="decimal"
-                      value={item.quantity}
-                      onChange={(event) => updateItem(item.id, { quantity: event.target.value })}
-                    />
-                    {errors.quantity ? <span className={styles.inlineError}>{errors.quantity}</span> : null}
-                  </label>
-
-                  <label className={styles.cellField}>
-                    <span className={styles.mobileLabel}>Unit price</span>
-                    <input
-                      className={`cf-input ${styles.inputField}`}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputMode="decimal"
-                      value={item.unitPrice}
-                      onChange={(event) => updateItem(item.id, { unitPrice: event.target.value })}
-                    />
-                    {errors.unitPrice ? <span className={styles.inlineError}>{errors.unitPrice}</span> : null}
-                  </label>
-
-                  <div className={`${styles.moneyCell} ${styles.rowTotalCell}`}>
-                    <span className={styles.mobileLabel}>Total</span>
-                    <strong>{formatMoney(metrics.rowTotal)}</strong>
-                  </div>
-
-                  <div className={styles.actionCell}>
-                    <button
-                      className={`cf-button-secondary ${styles.removeButton}`}
-                      onClick={() => removeItem(item.id)}
-                      type="button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {submitAttempted && (!hasMeaningfulItems || hasInvalidRows) ? (
-          <div className={styles.inlineError}>Review your line items before continuing.</div>
-        ) : null}
-      </section>
-
-      <section className={`${styles.card} ${styles.summaryCard}`}>
-        <div className={styles.summaryLayout}>
-          <div className={styles.summaryStack}>
-            <label className={styles.field}>
-              <span className={styles.label}>Notes</span>
-              <textarea
-                className={`cf-input ${styles.descriptionInput}`}
-                value={form.notes}
-                onChange={(event) => updateForm({ notes: event.target.value })}
-                placeholder="Optional scope details, exclusions, or next steps"
-              />
-            </label>
-          </div>
-
-          <div className={styles.actionsPanel}>
-            <div className={styles.summaryRow}>
-              <span>Subtotal</span>
-              <strong className={styles.moneyValue}>{formatMoney(subtotal)}</strong>
-            </div>
-            <div className={styles.summaryRow}>
-              <span>Tax</span>
-              <strong className={styles.moneyValue}>{formatMoney(taxAmount)}</strong>
-            </div>
-            <div className={styles.totalRow}>
-              <span>TOTAL</span>
-              <strong className={styles.totalValue}>{formatMoney(total)}</strong>
-            </div>
-            <button className={`cf-button ${styles.primaryAction}`} disabled={saving} type="submit">
-              {saving ? "Creating estimate..." : "Create estimate"}
-            </button>
-            <p className={styles.actionHint}>
-              Signed in as {userContext.name || userContext.email || "current user"}.
+            <h1 className="text-[1.35rem] font-semibold tracking-tight text-[#1d1d1f] leading-tight">
+              {t("estimateForm.pageTitle")}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {t("estimateForm.headerSubtitle")}
             </p>
           </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              name="action"
+              value="draft"
+              onClick={() => updateForm({ status: "draft" })}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-[#007aff] border border-[#007aff]/30 bg-[#007aff]/5 hover:bg-[#007aff]/10 transition-colors disabled:opacity-50"
+            >
+              {t("estimateForm.buttons.saveDraft")}
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              onClick={() => updateForm({ status: "sent" })}
+              className="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-[#007aff] hover:bg-[#0066dd] transition-colors shadow-sm disabled:opacity-50"
+            >
+              {saving ? t("estimateForm.buttons.saving") : t("estimateForm.buttons.sendEstimate")}
+            </button>
+          </div>
         </div>
-      </section>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 pt-8 space-y-5">
+
+        {/* ── Banners ──────────────────────────────────────────── */}
+        {formError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-2xl px-5 py-4">
+            {formError}
+          </div>
+        )}
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-2xl px-5 py-4">
+            {success}
+          </div>
+        )}
+
+        {/* ── Card 1: Client & Job ─────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 pt-6 pb-2">
+            <p className="text-[0.7rem] font-bold uppercase tracking-widest text-gray-400 mb-1">
+              {t("estimateForm.steps.step1")}
+            </p>
+            <h2 className="text-[1rem] font-semibold text-[#1d1d1f]">{t("estimateForm.steps.clientJobTitle")}</h2>
+          </div>
+
+          <div className="px-6 pb-6 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+            {/* Client */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[0.82rem] font-semibold text-[#1d1d1f]">{t("estimateForm.fields.client")}</label>
+                <a
+                  href="/clients"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[0.75rem] font-semibold text-[#007aff] hover:underline"
+                >
+                  {t("estimateForm.links.newClient")}
+                </a>
+              </div>
+              <select
+                value={form.clientId}
+                onChange={(e) => updateForm({ clientId: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+              >
+                <option value="">{t("estimateForm.placeholders.client")}</option>
+                {clients.map((c) => (
+                  <option key={c._id || c.id} value={c._id || c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {submitAttempted && !form.clientId && (
+                <span className="text-[0.75rem] text-red-500">{t("estimateForm.errors.selectClient")}</span>
+              )}
+            </div>
+
+            {/* Job */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[0.82rem] font-semibold text-[#1d1d1f]">
+                  {t("estimateForm.fields.job")}{" "}
+                  <span className="text-gray-400 font-normal">{t("estimateForm.fields.jobOptional")}</span>
+                </label>
+                <a
+                  href="/jobs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[0.75rem] font-semibold text-[#007aff] hover:underline"
+                >
+                  {t("estimateForm.links.newJob")}
+                </a>
+              </div>
+              <select
+                value={form.jobId}
+                onChange={(e) => handleJobChange(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+              >
+                <option value="">{t("estimateForm.placeholders.job")}</option>
+                {availableJobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title} {job.clientName ? `- ${job.clientName}` : ""}
+                  </option>
+                ))}
+              </select>
+              {availableJobs.length === 0 && (
+                <span className="text-[0.75rem] text-gray-400">{t("estimateForm.hints.noJobs")}</span>
+              )}
+            </div>
+
+            {/* Estimate number */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.82rem] font-semibold text-[#1d1d1f]">{t("estimateForm.fields.estimateNumber")}</label>
+              <input
+                value={form.estimateNumber}
+                onChange={(e) => updateForm({ estimateNumber: e.target.value })}
+                placeholder={t("estimateForm.placeholders.estimateNumber")}
+                className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+              />
+            </div>
+
+          </div>
+        </div>
+
+        {/* ── Card 2: Line Items ───────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 pt-6 pb-2 flex items-center justify-between">
+            <div>
+              <p className="text-[0.7rem] font-bold uppercase tracking-widest text-gray-400 mb-1">
+                {t("estimateForm.steps.step2")}
+              </p>
+              <h2 className="text-[1rem] font-semibold text-[#1d1d1f]">{t("estimateForm.fields.lineItems")}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={addItem}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-[#007aff] border border-[#007aff]/25 bg-[#007aff]/5 hover:bg-[#007aff]/10 transition-colors"
+            >
+              <span className="text-base leading-none">+</span> {t("estimateForm.buttons.addItem").replace(/^\+\s*/, "")}
+            </button>
+          </div>
+
+          {/* Table header */}
+          <div className="px-6 mt-3">
+            <div className="hidden sm:grid grid-cols-[1fr_100px_120px_100px_80px] gap-3 px-3 py-2 text-[0.72rem] font-bold uppercase tracking-wider text-gray-400">
+              <span>{t("estimateForm.fields.description")}</span>
+              <span>{t("estimateForm.fields.qty")}</span>
+              <span>{t("estimateForm.fields.unitPrice")}</span>
+              <span className="text-right">{t("estimateForm.summary.total")}</span>
+              <span />
+            </div>
+            <div className="divide-y divide-gray-100">
+              {form.items.map((item, index) => {
+                const metrics = getRowMetrics(item);
+                const errors = rowErrors[index];
+                return (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-1 sm:grid-cols-[1fr_100px_120px_100px_80px] gap-3 py-3 px-3 items-start"
+                  >
+                    {/* Description */}
+                    <div>
+                      <span className="sm:hidden block text-[0.72rem] font-bold uppercase tracking-wide text-gray-400 mb-1">{t("estimateForm.fields.description")}</span>
+                      <input
+                        value={item.description}
+                        onChange={(e) => updateItem(item.id, { description: e.target.value })}
+                        placeholder={t("estimateForm.placeholders.lineItemDescription")}
+                        className="w-full rounded-lg border border-gray-200 bg-[#f9f9f9] px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+                      />
+                    </div>
+                    {/* Quantity */}
+                    <div>
+                      <span className="sm:hidden block text-[0.72rem] font-bold uppercase tracking-wide text-gray-400 mb-1">{t("estimateForm.fields.qty")}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(item.id, { quantity: e.target.value })}
+                        className="w-full rounded-lg border border-gray-200 bg-[#f9f9f9] px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+                      />
+                      {errors.quantity && (
+                        <span className="block mt-1 text-[0.72rem] text-red-500">{errors.quantity}</span>
+                      )}
+                    </div>
+                    {/* Unit Price */}
+                    <div>
+                      <span className="sm:hidden block text-[0.72rem] font-bold uppercase tracking-wide text-gray-400 mb-1">{t("estimateForm.fields.unitPrice")}</span>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          value={item.unitPrice}
+                          onChange={(e) => updateItem(item.id, { unitPrice: e.target.value })}
+                          className="w-full rounded-lg border border-gray-200 bg-[#f9f9f9] pl-6 pr-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+                        />
+                      </div>
+                      {errors.unitPrice && (
+                        <span className="block mt-1 text-[0.72rem] text-red-500">{errors.unitPrice}</span>
+                      )}
+                    </div>
+                    {/* Row Total */}
+                    <div className="flex items-center justify-end sm:justify-end h-full pt-1">
+                      <span className="text-sm font-semibold text-[#1d1d1f]">
+                        {formatMoney(metrics.rowTotal)}
+                      </span>
+                    </div>
+                    {/* Remove */}
+                    <div className="flex items-center sm:justify-center h-full pt-1">
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors text-[0.78rem] font-medium"
+                      >
+                        {t("estimateForm.buttons.remove")}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {submitAttempted && (!hasMeaningfulItems || hasInvalidRows) && (
+            <div className="mx-6 mb-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">
+              {t("estimateForm.errors.reviewLineItems")}
+            </div>
+          )}
+
+          {/* Mobile add button */}
+          <div className="px-6 pb-5 pt-2 sm:hidden">
+            <button
+              type="button"
+              onClick={addItem}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold text-[#007aff] border border-[#007aff]/25 bg-[#007aff]/5 hover:bg-[#007aff]/10 transition-colors"
+            >
+              {t("estimateForm.buttons.addItem")}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Card 3: Summary ─────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 pt-6 pb-2">
+            <p className="text-[0.7rem] font-bold uppercase tracking-widest text-gray-400 mb-1">
+              {t("estimateForm.steps.step3")}
+            </p>
+            <h2 className="text-[1rem] font-semibold text-[#1d1d1f]">{t("estimateForm.steps.pricingNotesTitle")}</h2>
+          </div>
+
+          <div className="px-6 pb-6 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+            {/* Notes */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.82rem] font-semibold text-[#1d1d1f]">{t("estimateForm.fields.notes")}</label>
+              <textarea
+                rows={5}
+                value={form.notes}
+                onChange={(e) => updateForm({ notes: e.target.value })}
+                placeholder={t("estimateForm.placeholders.notes")}
+                className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] resize-none focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+              />
+            </div>
+
+            {/* Totals */}
+            <div className="flex flex-col gap-4">
+              {/* Tax toggle */}
+              <div className="bg-[#f9f9f9] rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-[#1d1d1f]">{t("estimateForm.fields.stateTax")}</span>
+                  {/* iOS toggle */}
+                  <button
+                    type="button"
+                    onClick={() => handleTaxToggle(!form.applyTax)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      form.applyTax ? "bg-[#007aff]" : "bg-gray-300"
+                    }`}
+                    aria-pressed={form.applyTax}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
+                        form.applyTax ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+                {form.applyTax && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[0.78rem] text-gray-500">
+                      {t("estimateForm.hints.taxRateLabel")} {getUsStateLabel(activeTaxState)}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={form.taxRatePct}
+                        onChange={(e) => updateForm({ taxRatePct: e.target.value })}
+                        className="w-full rounded-lg border border-gray-200 bg-white pl-3 pr-8 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Summary rows */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>{t("estimateForm.summary.subtotal")}</span>
+                  <span className="font-medium text-[#1d1d1f]">{formatMoney(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>{t("estimateForm.summary.tax")} ({form.applyTax ? `${form.taxRatePct}%` : "0%"})</span>
+                  <span className="font-medium text-[#1d1d1f]">{formatMoney(taxAmount)}</span>
+                </div>
+                <div className="h-px bg-gray-100 my-1" />
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-bold text-[#1d1d1f]">{t("estimateForm.summary.total")}</span>
+                  <span className="text-2xl font-bold tracking-tight text-[#007aff]">
+                    {formatMoney(total)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={saving}
+                className="w-full mt-1 py-3 rounded-2xl text-sm font-semibold text-white bg-[#007aff] hover:bg-[#0066dd] transition-colors shadow-sm disabled:opacity-50"
+              >
+                {saving ? t("estimateForm.buttons.creating") : t("estimateForm.buttons.create")}
+              </button>
+              <p className="text-center text-[0.75rem] text-gray-400">
+                {t("estimateForm.hints.signedInAs")} {userContext.name || userContext.email || ""}
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </form>
   );
 }

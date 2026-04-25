@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import GoogleIntegrationSection from "@/components/GoogleIntegrationSection";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
@@ -2232,8 +2233,9 @@ const RUNTIME_I18N = {
   },
 };
 
-export function WorkspaceContent() {
+export function WorkspaceContent({ initialTab = "dashboard" }) {
   const { t, i18n } = useTranslation();
+  const isSettingsOnlyMode = initialTab === "branding";
   const uiLanguage = ["en", "es", "pl"].includes(i18n.language)
     ? i18n.language
     : "en";
@@ -2247,11 +2249,18 @@ export function WorkspaceContent() {
     },
     [i18n],
   );
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [clients, setClients] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [contracts, setContracts] = useState([]);
+
+  useEffect(() => {
+    if (isSettingsOnlyMode && activeTab !== "branding") {
+      setActiveTab("branding");
+    }
+  }, [isSettingsOnlyMode, activeTab]);
+
   const [clientForm, setClientForm] = useState(initialClient);
   const [jobForm, setJobForm] = useState(getDefaultJobForm());
   const [invoiceForm, setInvoiceForm] = useState(getDefaultInvoiceForm());
@@ -2283,6 +2292,25 @@ export function WorkspaceContent() {
   const [error, setError] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [approvedEstimatePromptJob, setApprovedEstimatePromptJob] =
+    useState(null);
+  const [showApprovedEstimatePrompt, setShowApprovedEstimatePrompt] =
+    useState(false);
+  const [showApprovedEstimateScheduler, setShowApprovedEstimateScheduler] =
+    useState(false);
+  const [approvedEstimateScheduleDraft, setApprovedEstimateScheduleDraft] =
+    useState({
+      title: "",
+      clientName: "",
+      notes: "",
+      location: "",
+      date: todayIso(),
+      time: "",
+    });
+  const [schedulingApprovedEstimate, setSchedulingApprovedEstimate] =
+    useState(false);
+  const prevQuoteStatusByJobIdRef = useRef({});
+  const approvedEstimateHandledRef = useRef(new Set());
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Conversion rate metrics
@@ -2441,6 +2469,74 @@ export function WorkspaceContent() {
     }
   }, [uiLanguage]);
 
+  useEffect(() => {
+    const nextStatusById = {};
+    const newlyApproved = [];
+
+    for (const job of jobs) {
+      if (!job?._id) continue;
+      const nextStatus = getQuoteStatusValue(job);
+      const prevStatus = prevQuoteStatusByJobIdRef.current[job._id];
+      nextStatusById[job._id] = nextStatus;
+
+      if (
+        prevStatus &&
+        prevStatus !== "approved" &&
+        nextStatus === "approved" &&
+        !approvedEstimateHandledRef.current.has(job._id)
+      ) {
+        newlyApproved.push(job);
+      }
+    }
+
+    prevQuoteStatusByJobIdRef.current = nextStatusById;
+
+    if (
+      newlyApproved.length > 0 &&
+      !showApprovedEstimatePrompt &&
+      !showApprovedEstimateScheduler &&
+      !approvedEstimatePromptJob
+    ) {
+      setApprovedEstimatePromptJob(newlyApproved[0]);
+      setShowApprovedEstimatePrompt(true);
+    }
+  }, [
+    jobs,
+    showApprovedEstimatePrompt,
+    showApprovedEstimateScheduler,
+    approvedEstimatePromptJob,
+  ]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("jobs-approved-workflow")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "jobs" },
+        async (payload) => {
+          const nextStatus = String(payload?.new?.quote_status || "").toLowerCase();
+          const prevStatus = String(payload?.old?.quote_status || "").toLowerCase();
+          if (nextStatus !== "approved" || prevStatus === "approved") return;
+          try {
+            const res = await apiFetch("/api/jobs", {
+              suppressUnauthorizedEvent: true,
+            });
+            const jobsData = await getJsonOrThrow(res, "Failed to refresh jobs");
+            if (Array.isArray(jobsData)) {
+              setJobs(jobsData);
+            }
+          } catch (err) {
+            console.error("[approved-workflow] realtime refresh failed", err);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Per-tab lazy loader: track which tabs have been fetched
   const [loadedTabs, setLoadedTabs] = useState(new Set());
   const [dashboardMetrics, setDashboardMetrics] = useState(null);
@@ -2470,8 +2566,8 @@ export function WorkspaceContent() {
       const { data, error: rpcError } = await supabase.rpc(
         "get_revenue_dashboard",
         {
-          contractor_id: contractorId,
-          limit_count: 10,
+          p_contractor_id: contractorId,
+          p_limit_count: 10,
         },
       );
 
@@ -2709,6 +2805,102 @@ export function WorkspaceContent() {
         String(client.name || "").toLowerCase() ===
         String(clientName || "").toLowerCase(),
     ) || null;
+
+  const getQuoteStatusValue = (job) =>
+    String(job?.quoteStatus || job?.quote_status || "").toLowerCase();
+
+  const buildApprovedEstimateScheduleDraft = useCallback(
+    (job) => {
+      const linkedClient =
+        findClientById(job?.clientId) || findClientByName(job?.clientName);
+      const location = [
+        linkedClient?.addressLine1,
+        linkedClient?.city,
+        linkedClient?.state,
+        linkedClient?.zip,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      return {
+        title: job?.title || job?.service || "Approved estimate",
+        clientName: job?.clientName || linkedClient?.name || "",
+        notes:
+          job?.description ||
+          job?.notes ||
+          `${job?.service ? `Service: ${job.service}` : "Approved estimate"}`,
+        location,
+        date: todayIso(),
+        time: "",
+      };
+    },
+    [findClientById, findClientByName],
+  );
+
+  const closeApprovedEstimatePrompt = () => {
+    if (approvedEstimatePromptJob?._id) {
+      approvedEstimateHandledRef.current.add(approvedEstimatePromptJob._id);
+    }
+    setShowApprovedEstimatePrompt(false);
+    setShowApprovedEstimateScheduler(false);
+    setApprovedEstimatePromptJob(null);
+  };
+
+  const openApprovedEstimateScheduler = () => {
+    if (!approvedEstimatePromptJob) return;
+    setApprovedEstimateScheduleDraft(
+      buildApprovedEstimateScheduleDraft(approvedEstimatePromptJob),
+    );
+    setShowApprovedEstimatePrompt(false);
+    setShowApprovedEstimateScheduler(true);
+  };
+
+  const submitApprovedEstimateSchedule = async (e) => {
+    e.preventDefault();
+    if (!approvedEstimateScheduleDraft.date || !approvedEstimateScheduleDraft.time) {
+      setError("Please select a date and time to schedule this job.");
+      return;
+    }
+
+    setSchedulingApprovedEstimate(true);
+    setError("");
+    try {
+      const res = await apiFetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: approvedEstimateScheduleDraft.title,
+          clientName: approvedEstimateScheduleDraft.clientName,
+          date: approvedEstimateScheduleDraft.date,
+          time: approvedEstimateScheduleDraft.time,
+          location: approvedEstimateScheduleDraft.location,
+          notes: approvedEstimateScheduleDraft.notes,
+          status: "Scheduled",
+        }),
+      });
+
+      await getJsonOrThrow(res, "Unable to schedule approved estimate");
+
+      if (approvedEstimatePromptJob?._id) {
+        approvedEstimateHandledRef.current.add(approvedEstimatePromptJob._id);
+      }
+      setShowApprovedEstimateScheduler(false);
+      setApprovedEstimatePromptJob(null);
+      setApprovedEstimateScheduleDraft({
+        title: "",
+        clientName: "",
+        notes: "",
+        location: "",
+        date: todayIso(),
+        time: "",
+      });
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Unable to schedule this approved estimate");
+    } finally {
+      setSchedulingApprovedEstimate(false);
+    }
+  };
 
   const getLinkedInvoice = (jobId) =>
     invoices.find((invoice) => invoice.jobId === jobId) || null;
@@ -3893,7 +4085,9 @@ export function WorkspaceContent() {
         : "greeting.evening",
   );
   const ownerFirstName =
-    (companyProfile?.companyName || "").split(" ")[0] || "there";
+    companyProfile?.companyName ||
+    (typeof window !== "undefined" ? window.localStorage.getItem("user-display-name") : "") ||
+    "";
 
   // Quotes = jobs with a quote (all jobs are leads/quotes until invoiced)
   const jobsActive = useMemo(
@@ -4000,7 +4194,7 @@ export function WorkspaceContent() {
             }}
           >
             {activeTab === "dashboard"
-              ? `${greeting}, ${ownerFirstName}`
+              ? ownerFirstName ? `${greeting}, ${ownerFirstName}` : greeting
               : uiText.tabs[activeTab] || activeTab}
           </h1>
           {activeTab === "dashboard" && (
@@ -4233,32 +4427,6 @@ export function WorkspaceContent() {
             )}
           </div>
           {/* /Notification Bell */}
-
-          {["dashboard", "branding"].map((tab) => (
-            <button
-              type="button"
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 7,
-                border:
-                  activeTab === tab
-                    ? "1.5px solid #0f172a"
-                    : "1px solid #e5e7eb",
-                background: activeTab === tab ? "#0f172a" : "white",
-                color: activeTab === tab ? "white" : "#374151",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: activeTab === tab ? 600 : 400,
-                fontFamily: "inherit",
-                letterSpacing: "-0.01em",
-                transition: "background 0.1s",
-              }}
-            >
-              {uiText.tabs[tab]}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -8448,35 +8616,6 @@ export function WorkspaceContent() {
                 }}
               >
                 <div style={{ display: "grid", gap: "12px" }}>
-                  <div
-                    style={{
-                      border: "1px solid #e2e6ef",
-                      borderRadius: "10px",
-                      padding: "14px",
-                      background: "#fafbfc",
-                      display: "grid",
-                      gap: "8px",
-                    }}
-                  >
-                    <strong>{uiText.settings.businessMetricsTitle}</strong>
-                    <p style={{ margin: 0, color: "#333" }}>
-                      {uiText.settings.totalRevenueLabel}: {money(totalRevenue)}
-                    </p>
-                    <p style={{ margin: 0, color: "#333" }}>
-                      {uiText.settings.pendingInvoicesLabel}:{" "}
-                      {invoices.filter((inv) => inv.status !== "Paid").length}
-                    </p>
-                    <p style={{ margin: 0, color: "#333" }}>
-                      {uiText.settings.outstandingLabel}:{" "}
-                      {money(outstandingAmount)}
-                    </p>
-                    <p style={{ margin: 0, color: "#333" }}>
-                      {uiText.settings.reviewsLabel}:{" "}
-                      {companyForm.googleReviewsUrl ||
-                        uiText.settings.reviewsMissing}
-                    </p>
-                  </div>
-
                   <input
                     placeholder={uiText.settings.companyNameLabel}
                     value={companyForm.companyName}
@@ -8492,51 +8631,6 @@ export function WorkspaceContent() {
                       border: "1px solid #ccc",
                     }}
                   />
-
-                  <label style={{ display: "grid", gap: "8px", color: "#333" }}>
-                    <span>{uiText.settings.documentLanguageLabel}</span>
-                    <select
-                      value={companyForm.documentLanguage}
-                      onChange={(e) =>
-                        setCompanyForm({
-                          ...companyForm,
-                          documentLanguage: e.target.value,
-                        })
-                      }
-                      style={{
-                        padding: "10px",
-                        borderRadius: "8px",
-                        border: "1px solid #ccc",
-                      }}
-                    >
-                      {DOCUMENT_LANGUAGE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      color: "#333",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={companyForm.forceEnglishTranslation}
-                      onChange={(e) =>
-                        setCompanyForm({
-                          ...companyForm,
-                          forceEnglishTranslation: e.target.checked,
-                        })
-                      }
-                    />
-                    {uiText.settings.alwaysTranslateCheckbox}
-                  </label>
 
                   <div
                     style={{
@@ -8788,11 +8882,268 @@ export function WorkspaceContent() {
               </div>
             </section>
           : null}
+
+        {showApprovedEstimatePrompt && approvedEstimatePromptJob
+          ? <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(2, 6, 23, 0.48)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1200,
+                padding: "16px",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "520px",
+                  background: "#fff",
+                  borderRadius: "16px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+                  padding: "22px",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "22px", color: "#0f172a" }}>
+                  This estimate was approved.
+                </h3>
+                <p style={{ margin: "10px 0 0 0", color: "#475569" }}>
+                  Do you want to schedule this job?
+                </p>
+                <p style={{ margin: "14px 0 0 0", color: "#334155" }}>
+                  <strong>{approvedEstimatePromptJob.title || approvedEstimatePromptJob.service}</strong>{" "}
+                  for {approvedEstimatePromptJob.clientName || "Client"}
+                </p>
+                <div
+                  style={{
+                    marginTop: "20px",
+                    display: "flex",
+                    gap: "10px",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={closeApprovedEstimatePrompt}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                      background: "#fff",
+                      color: "#0f172a",
+                      cursor: "pointer",
+                    }}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openApprovedEstimateScheduler}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      border: "none",
+                      background: "#0b69ff",
+                      color: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Yes, schedule it
+                  </button>
+                </div>
+              </div>
+            </div>
+          : null}
+
+        {showApprovedEstimateScheduler && approvedEstimatePromptJob
+          ? <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(2, 6, 23, 0.55)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1210,
+                padding: "16px",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "640px",
+                  background: "#fff",
+                  borderRadius: "16px",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 22px 56px rgba(15, 23, 42, 0.28)",
+                  padding: "22px",
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: "22px", color: "#0f172a" }}>
+                  Schedule Approved Job
+                </h3>
+                <p style={{ margin: "8px 0 16px 0", color: "#475569" }}>
+                  Confirm the job details, then select date and time.
+                </p>
+
+                <form
+                  onSubmit={submitApprovedEstimateSchedule}
+                  style={{ display: "grid", gap: "10px" }}
+                >
+                  <input
+                    value={approvedEstimateScheduleDraft.title}
+                    onChange={(e) =>
+                      setApprovedEstimateScheduleDraft((current) => ({
+                        ...current,
+                        title: e.target.value,
+                      }))
+                    }
+                    placeholder="Job title"
+                    style={{
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                  <input
+                    value={approvedEstimateScheduleDraft.clientName}
+                    onChange={(e) =>
+                      setApprovedEstimateScheduleDraft((current) => ({
+                        ...current,
+                        clientName: e.target.value,
+                      }))
+                    }
+                    placeholder="Client"
+                    style={{
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                  <input
+                    value={approvedEstimateScheduleDraft.location}
+                    onChange={(e) =>
+                      setApprovedEstimateScheduleDraft((current) => ({
+                        ...current,
+                        location: e.target.value,
+                      }))
+                    }
+                    placeholder="Location (optional)"
+                    style={{
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                  <textarea
+                    value={approvedEstimateScheduleDraft.notes}
+                    onChange={(e) =>
+                      setApprovedEstimateScheduleDraft((current) => ({
+                        ...current,
+                        notes: e.target.value,
+                      }))
+                    }
+                    placeholder="Notes"
+                    rows={3}
+                    style={{
+                      padding: "10px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      gap: "10px",
+                    }}
+                  >
+                    <input
+                      type="date"
+                      required
+                      value={approvedEstimateScheduleDraft.date}
+                      onChange={(e) =>
+                        setApprovedEstimateScheduleDraft((current) => ({
+                          ...current,
+                          date: e.target.value,
+                        }))
+                      }
+                      style={{
+                        padding: "10px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                      }}
+                    />
+                    <input
+                      type="time"
+                      required
+                      value={approvedEstimateScheduleDraft.time}
+                      onChange={(e) =>
+                        setApprovedEstimateScheduleDraft((current) => ({
+                          ...current,
+                          time: e.target.value,
+                        }))
+                      }
+                      style={{
+                        padding: "10px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "6px",
+                      display: "flex",
+                      gap: "10px",
+                      justifyContent: "flex-end",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={closeApprovedEstimatePrompt}
+                      disabled={schedulingApprovedEstimate}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                        background: "#fff",
+                        color: "#0f172a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={schedulingApprovedEstimate}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "10px",
+                        border: "none",
+                        background: "#0b69ff",
+                        color: "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {schedulingApprovedEstimate
+                        ? "Scheduling..."
+                        : "Create appointment"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          : null}
       </div>
     </div>
   );
 }
 
 export default function Home() {
-  return <WorkspaceContent />;
+  return <WorkspaceContent initialTab="dashboard" />;
 }

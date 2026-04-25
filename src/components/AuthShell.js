@@ -173,11 +173,14 @@ export default function AuthShell({ children }) {
     }
   }, []);
 
-  // Persist industry to localStorage so catalog pages can read it without an extra fetch
+  // Persist industry/name to localStorage so other components can read without an extra fetch
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (authUser?.industry !== undefined) {
       window.localStorage.setItem("user-industry", authUser.industry || "");
+    }
+    if (authUser?.name !== undefined) {
+      window.localStorage.setItem("user-display-name", authUser.companyName || authUser.name || "");
     }
   }, [authUser]);
 
@@ -625,6 +628,10 @@ export default function AuthShell({ children }) {
       "M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z",
       "M9 22V12h6v10",
     ],
+    revenue: [
+      "M3 3v18h18",
+      "M7 14l4-4 3 3 5-6",
+    ],
     clients: [
       "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2",
       "M9 11a4 4 0 100-8 4 4 0 000 8",
@@ -682,6 +689,11 @@ export default function AuthShell({ children }) {
       "M16 17l5-5-5-5",
       "M21 12H9",
     ],
+    website: [
+      "M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z",
+      "M2 12h20",
+      "M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z",
+    ],
   };
 
   // ─── Nav groups ──────────────────────────────────────────────────────────
@@ -689,7 +701,7 @@ export default function AuthShell({ children }) {
     { href: "/", label: t("sidebar.dashboard"), iconKey: "dashboard" },
     { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
     {
-      href: "/estimate-builder",
+      href: "/estimates",
       label: t("sidebar.estimates"),
       iconKey: "estimates",
     },
@@ -718,6 +730,11 @@ export default function AuthShell({ children }) {
           },
         ]
       : []),
+    {
+      href: "/website-builder",
+      label: t("sidebar.websiteBuilder"),
+      iconKey: "website",
+    },
   ];
 
   const bottomNavItems = [

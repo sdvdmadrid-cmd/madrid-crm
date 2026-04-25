@@ -27,13 +27,31 @@ export const BILL_AUTOPAY_RULE_TABLE = "bill_autopay_rules";
 export const NOTIFICATIONS_TABLE = "notifications";
 
 export const BILL_STATUSES = new Set([
+  "upcoming",
   "open",
+  "due_soon",
+  "overdue",
   "processing",
   "paid",
   "failed",
-  "overdue",
   "cancelled",
 ]);
+
+export const BILL_CATEGORIES = [
+  { id: "utilities",      label: "Utilities",              icon: "⚡", defaultTags: ["utility"] },
+  { id: "credit_card",   label: "Credit Cards",            icon: "💳", defaultTags: ["credit"] },
+  { id: "equipment",     label: "Equipment Financing",     icon: "🛠️", defaultTags: ["equipment"] },
+  { id: "vehicle",       label: "Truck / Vehicle",         icon: "🚛", defaultTags: ["vehicle", "fleet"] },
+  { id: "insurance",     label: "Insurance",               icon: "🛡️", defaultTags: ["insurance"] },
+  { id: "rent",          label: "Rent / Yard / Storage",   icon: "🏢", defaultTags: ["rent"] },
+  { id: "payroll",       label: "Payroll / Subs",          icon: "👷", defaultTags: ["payroll"] },
+  { id: "materials",     label: "Materials / Suppliers",   icon: "🧱", defaultTags: ["materials"] },
+  { id: "internet",      label: "Internet / Phone",        icon: "📡", defaultTags: ["internet"] },
+  { id: "subscriptions", label: "Subscriptions",           icon: "📦", defaultTags: ["subscription"] },
+  { id: "general",       label: "General",                 icon: "📄", defaultTags: [] },
+];
+
+export const BILL_FREQUENCIES = ["weekly", "monthly", "yearly"];
 
 export const AUTOPAY_RULE_TYPES = new Set([
   "full_balance",
@@ -151,6 +169,9 @@ export function serializeBill(row, autopayRule = null) {
     autopayEnabled: row.autopay_enabled === true,
     lastPaidAt: row.last_paid_at || null,
     lastPaymentId: row.last_payment_id || "",
+    category: row.category || "general",
+    isRecurring: row.is_recurring === true,
+    frequency: row.frequency || null,
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
     autopayRule: autopayRule ? serializeAutopayRule(autopayRule) : null,
@@ -258,6 +279,8 @@ export function buildBillWritePayload(body, currentBill = null) {
     throw new Error("Due date is required");
   }
 
+  const categoryId = String(body.category || "general").trim().toLowerCase();
+
   const payload = {
     provider_id: normalizeUuid(body.providerId),
     provider_name: providerName,
@@ -278,6 +301,9 @@ export function buildBillWritePayload(body, currentBill = null) {
     tags: normalizeTagList(body.tags),
     notes: normalizeText(body.notes, 1000),
     autopay_enabled: body.autopayEnabled === true,
+    category: categoryId || "general",
+    is_recurring: body.isRecurring === true,
+    frequency: BILL_FREQUENCIES.includes(body.frequency) ? body.frequency : null,
     updated_at: new Date().toISOString(),
   };
 
@@ -363,10 +389,145 @@ export function computeBillStatus(row) {
   }
 
   const dueDate = normalizeDateOnly(row.due_date);
-  if (!dueDate) return status || "open";
+  if (!dueDate) return "open";
 
-  const today = new Date().toISOString().slice(0, 10);
-  return dueDate < today ? "overdue" : "open";
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  if (dueDate < todayStr) return "overdue";
+
+  // Due within 3 days = "due_soon"
+  const dueSoonCutoff = new Date(today);
+  dueSoonCutoff.setDate(dueSoonCutoff.getDate() + 3);
+  const dueSoonStr = dueSoonCutoff.toISOString().slice(0, 10);
+  if (dueDate <= dueSoonStr) return "due_soon";
+
+  // Due more than 7 days away = "upcoming"
+  const upcomingCutoff = new Date(today);
+  upcomingCutoff.setDate(upcomingCutoff.getDate() + 7);
+  const upcomingStr = upcomingCutoff.toISOString().slice(0, 10);
+  if (dueDate > upcomingStr) return "upcoming";
+
+  return "open";
+}
+
+function computeNextRecurringDueDate(dueDate, frequency) {
+  const normalizedDueDate = normalizeDateOnly(dueDate);
+  if (!normalizedDueDate) return null;
+
+  const [year, month, day] = normalizedDueDate.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(nextDate.getTime())) return null;
+
+  if (frequency === "weekly") {
+    nextDate.setUTCDate(nextDate.getUTCDate() + 7);
+  } else if (frequency === "monthly") {
+    nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
+  } else if (frequency === "yearly") {
+    nextDate.setUTCFullYear(nextDate.getUTCFullYear() + 1);
+  } else {
+    return null;
+  }
+
+  return nextDate.toISOString().slice(0, 10);
+}
+
+export async function maybeCreateNextRecurringBill({ context, bill }) {
+  const isRecurring = bill?.is_recurring === true;
+  const frequency = String(bill?.frequency || "").trim().toLowerCase();
+  if (!isRecurring || !BILL_FREQUENCIES.includes(frequency)) {
+    return null;
+  }
+
+  const nextDueDate = computeNextRecurringDueDate(bill.due_date, frequency);
+  if (!nextDueDate) return null;
+
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from(BILL_TABLE)
+    .select("id")
+    .eq("tenant_id", context.tenantDbId)
+    .eq("provider_name", bill.provider_name || "")
+    .eq("account_label", bill.account_label || "")
+    .eq("due_date", nextDueDate)
+    .eq("is_recurring", true)
+    .eq("frequency", frequency)
+    .maybeSingle();
+
+  if (existingError) {
+    logSupabaseError(
+      "[bill-payments] recurring bill duplicate check error",
+      existingError,
+      {
+        tenantDbId: context.tenantDbId,
+        billId: bill.id,
+        nextDueDate,
+      },
+    );
+    return null;
+  }
+
+  if (existing?.id) {
+    return existing;
+  }
+
+  const nowIso = new Date().toISOString();
+  const nextBillPayload = {
+    tenant_id: context.tenantDbId,
+    user_id: bill.user_id || context.userId,
+    provider_id: bill.provider_id || null,
+    provider_name: bill.provider_name || "",
+    account_label: bill.account_label || "",
+    account_reference_masked: bill.account_reference_masked || "",
+    account_reference_hash: bill.account_reference_hash || "",
+    amount_due: Number(bill.amount_due || 0),
+    minimum_amount:
+      bill.minimum_amount == null ? null : Number(bill.minimum_amount || 0),
+    currency: (bill.currency || "usd").toLowerCase(),
+    due_date: nextDueDate,
+    schedule_anchor_date: nextDueDate,
+    status: computeBillStatus({ due_date: nextDueDate, status: "open" }),
+    source: "recurring",
+    tags: Array.isArray(bill.tags) ? bill.tags : [],
+    notes: bill.notes || "",
+    autopay_enabled: bill.autopay_enabled === true,
+    category: bill.category || "general",
+    is_recurring: true,
+    frequency,
+    created_at: nowIso,
+    updated_at: nowIso,
+    last_paid_at: null,
+    last_payment_id: null,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from(BILL_TABLE)
+    .insert(nextBillPayload)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("[bill-payments] recurring bill create error", error, {
+      tenantDbId: context.tenantDbId,
+      billId: bill.id,
+      nextDueDate,
+    });
+    return null;
+  }
+
+  await createNotification({
+    tenantId: context.tenantDbId,
+    userId: context.userId,
+    type: "bill_recurring_created",
+    title: "Next recurring bill scheduled",
+    message: `${bill.provider_name || "Recurring bill"} was queued for ${nextDueDate}.`,
+    metadata: {
+      sourceBillId: bill.id,
+      nextBillId: data?.id || null,
+      frequency,
+      nextDueDate,
+    },
+  });
+
+  return data || null;
 }
 
 export async function createNotification({
@@ -1026,6 +1187,18 @@ export async function processBillPayment({
         stripePaymentIntentId: intent.id,
       },
     });
+
+    if (nextStatus === "paid") {
+      await maybeCreateNextRecurringBill({
+        context,
+        bill: {
+          ...bill,
+          status: "paid",
+          last_paid_at: nowIso,
+          last_payment_id: transaction.id,
+        },
+      });
+    }
 
     return {
       ...transaction,

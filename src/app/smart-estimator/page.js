@@ -68,7 +68,7 @@ export default function SmartEstimatorPage() {
       return;
     }
 
-    router.push("/");
+    router.push("/estimates");
   };
 
   return (

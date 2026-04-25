@@ -8,6 +8,41 @@ import {
 } from "@/lib/tenant";
 
 // Tabla relacional: services_catalog
+const TABLE = "services_catalog";
+
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function getServicesCatalogSchemaError(error) {
+  const message = String(error?.message || "");
+
+  if (
+    /Could not find the table 'public\.services_catalog' in the schema cache/i.test(
+      message,
+    )
+  ) {
+    return "Services catalog is unavailable because the Supabase table is missing or the schema cache has not reloaded yet. Run the services catalog migration and reload the PostgREST schema cache.";
+  }
+
+  if (/relation\s+"?public\.services_catalog"?\s+does not exist/i.test(message)) {
+    return "Services catalog is unavailable because the Supabase table does not exist yet. Run the services catalog migration first.";
+  }
+
+  return "";
+}
+
+function handleServicesCatalogError(error, fallbackMessage) {
+  const schemaError = getServicesCatalogSchemaError(error);
+  if (schemaError) {
+    return jsonResponse({ success: false, error: schemaError }, 503);
+  }
+
+  return jsonResponse({ success: false, error: fallbackMessage }, 500);
+}
 
 const serialize = (doc) => ({
   ...doc,
@@ -54,7 +89,7 @@ export async function GET(request) {
     const state = String(searchParams.get("state") || "").trim();
 
     let query = supabaseAdmin
-      .from("services_catalog")
+      .from(TABLE)
       .select("*")
       .order("name", { ascending: true });
 
@@ -72,21 +107,15 @@ export async function GET(request) {
     const { data, error } = await query;
     if (error) {
       console.error("[api/services-catalog][GET] Supabase query error", error);
-      throw new Error(error.message);
+      throw error;
     }
 
-    return new Response(JSON.stringify((data || []).map(serialize)), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse((data || []).map(serialize), 200);
   } catch (error) {
     console.error("[api/services-catalog][GET] error", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+    return handleServicesCatalogError(
+      error,
+      "Unable to load services catalog right now.",
     );
   }
 }
@@ -103,7 +132,7 @@ export async function POST(request) {
     if (Array.isArray(body)) {
       const rows = body.map((item) => toRow(item, tenantDbId, userId));
       const { data, error } = await supabaseAdmin
-        .from("services_catalog")
+        .from(TABLE)
         .insert(rows)
         .select("*");
       if (error) {
@@ -111,17 +140,17 @@ export async function POST(request) {
           "[api/services-catalog][POST] Supabase bulk insert error",
           error,
         );
-        throw new Error(error.message);
+        throw error;
       }
 
-      return new Response(
-        JSON.stringify({ success: true, data: (data || []).map(serialize) }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
+      return jsonResponse(
+        { success: true, data: (data || []).map(serialize) },
+        200,
       );
     }
 
     const { data, error } = await supabaseAdmin
-      .from("services_catalog")
+      .from(TABLE)
       .insert(toRow(body, tenantDbId, userId))
       .select("*")
       .single();
@@ -131,24 +160,15 @@ export async function POST(request) {
         "[api/services-catalog][POST] Supabase insert error",
         error,
       );
-      throw new Error(error.message);
+      throw error;
     }
 
-    return new Response(
-      JSON.stringify({ success: true, data: serialize(data) }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return jsonResponse({ success: true, data: serialize(data) }, 200);
   } catch (error) {
     console.error("[api/services-catalog][POST] error", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+    return handleServicesCatalogError(
+      error,
+      "Unable to save services catalog right now.",
     );
   }
 }

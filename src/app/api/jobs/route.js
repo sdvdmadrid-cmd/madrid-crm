@@ -191,8 +191,13 @@ export async function POST(request) {
       const { createGoogleCalendarEvent } = await import(
         "@/lib/google-calendar"
       );
-      const startDate = data.due_date ? new Date(data.due_date) : new Date();
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+      const hasDueDate = Boolean(String(data.due_date || "").trim());
+      const parsedDueDate = hasDueDate ? new Date(data.due_date) : new Date();
+      const safeStart = Number.isNaN(parsedDueDate.getTime())
+        ? new Date()
+        : parsedDueDate;
+      const safeEnd = new Date(safeStart.getTime() + 60 * 60 * 1000);
 
       await createGoogleCalendarEvent({
         userId,
@@ -206,8 +211,8 @@ export async function POST(request) {
         ]
           .filter(Boolean)
           .join("\n"),
-        start: { dateTime: startDate.toISOString() },
-        end: { dateTime: endDate.toISOString() },
+        start: { dateTime: safeStart.toISOString() },
+        end: { dateTime: safeEnd.toISOString() },
       });
     } catch (err) {
       console.warn("[jobs] Google Calendar integration skipped", err?.message);

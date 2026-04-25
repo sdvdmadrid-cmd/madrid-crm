@@ -1,5 +1,5 @@
 import { WorkspaceContent } from "@/app/page";
 
 export default function OwnerWorkspacePage() {
-  return <WorkspaceContent />;
+  return <WorkspaceContent initialTab="branding" />;
 }

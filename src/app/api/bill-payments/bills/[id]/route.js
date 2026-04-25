@@ -3,6 +3,7 @@ import {
   BILL_TABLE,
   buildBillWritePayload,
   computeBillStatus,
+  maybeCreateNextRecurringBill,
   requireBillPaymentsAccess,
   serializeBill,
 } from "@/lib/bill-payments";
@@ -115,6 +116,9 @@ export async function PATCH(request, { params }) {
   try {
     const payload = buildBillWritePayload(body, currentBill);
     payload.status = computeBillStatus({ ...currentBill, ...payload });
+    if (payload.status === "paid") {
+      payload.last_paid_at = new Date().toISOString();
+    }
     const { data, error } = await supabaseAdmin
       .from(BILL_TABLE)
       .update(payload)
@@ -124,6 +128,13 @@ export async function PATCH(request, { params }) {
       .maybeSingle();
 
     if (error) throw error;
+
+    if (data?.status === "paid") {
+      await maybeCreateNextRecurringBill({
+        context,
+        bill: data,
+      });
+    }
 
     return new Response(
       JSON.stringify({ success: true, data: serializeBill(data) }),

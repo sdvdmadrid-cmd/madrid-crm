@@ -50,6 +50,8 @@ const toAppointmentPatch = (body) => ({
   client: body.clientName || body.client || "",
   date: body.date || null,
   time: body.time || null,
+  location: body.location || "",
+  notes: body.notes || "",
   status: statusToDb(body.status),
 });
 

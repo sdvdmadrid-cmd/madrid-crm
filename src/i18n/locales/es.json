@@ -353,6 +353,7 @@
     "secondary": "Secundario",
     "account": "Cuenta",
     "dashboard": "Dashboard",
+    "revenueOverview": "Resumen de ingresos",
     "clients": "Clientes",
     "estimates": "Estimados",
     "jobs": "Trabajos",
@@ -361,6 +362,7 @@
     "calendar": "Calendario",
     "insights": "Estadisticas",
     "services": "Servicios",
+    "websiteBuilder": "Constructor Web",
     "platform": "Plataforma",
     "settings": "Ajustes",
     "logout": "Cerrar sesion",
@@ -756,11 +758,39 @@
     "formTitleEdit": "Editar cita",
     "listTitle": "Lista de citas",
     "agendaTitle": "Agenda",
+    "scheduleYourAppointments": "Programa tus citas",
+    "today": "Hoy",
+    "prevMonth": "Mes anterior",
+    "nextMonth": "Próximo mes",
     "placeholders": {
       "title": "Titulo",
       "clientName": "Cliente",
       "date": "Fecha",
-      "time": "Hora"
+      "time": "Hora",
+      "location": "ej. Chicago, IL",
+      "addressStreet": "Calle y numero",
+      "city": "Ciudad",
+      "state": "Estado",
+      "zip": "Codigo postal",
+      "notes": "Detalles adicionales..."
+    },
+    "labels": {
+      "title": "Título",
+      "clientName": "Nombre del cliente",
+      "date": "Fecha",
+      "time": "Hora",
+      "status": "Estado",
+      "location": "Ubicación del trabajo",
+      "addressStreet": "Direccion",
+      "city": "Ciudad",
+      "state": "Estado",
+      "zip": "Codigo postal",
+      "notes": "Notas"
+    },
+    "weather": {
+      "locationHint": "Se usa para obtener el pronóstico del tiempo para este trabajo",
+      "outOfRange": "El pronóstico solo está disponible para los próximos 5 días",
+      "unavailable": "Clima no disponible"
     },
     "statusOptions": {
       "Scheduled": "Programada",
@@ -773,7 +803,15 @@
       "update": "Actualizar",
       "clear": "Limpiar",
       "edit": "Editar",
-      "delete": "Eliminar"
+      "reschedule": "Reprogramar",
+      "delete": "Eliminar",
+      "cancel": "Cancelar"
+    },
+    "modal": {
+      "newAppointment": "Nueva Cita",
+      "editAppointment": "Editar Cita",
+      "confirmDelete": "Eliminar Cita",
+      "confirmDeleteMessage": "¿Estás seguro de que quieres eliminar esta cita?"
     },
     "empty": "No hay citas para mostrar.",
     "errors": {
@@ -809,13 +847,34 @@
   },
   "estimateForm": {
     "title": "Crear estimado",
+    "pageTitle": "Nuevo estimado",
+    "headerSubtitle": "Crea un estimado profesional para tu cliente",
     "subtitle": "Crea y envia un estimado profesional a tu cliente",
     "loading": "Cargando formulario de estimado...",
+    "steps": {
+      "step1": "Paso 1",
+      "step2": "Paso 2",
+      "step3": "Paso 3",
+      "clientJobTitle": "Cliente y trabajo",
+      "pricingNotesTitle": "Precios y notas"
+    },
+    "links": {
+      "newClient": "+ Nuevo cliente",
+      "newJob": "+ Nuevo trabajo"
+    },
+    "hints": {
+      "noJobs": "Sin trabajos aun — crea uno desde Trabajos.",
+      "taxRateLabel": "Tasa de impuesto —",
+      "signedInAs": "Sesion como"
+    },
     "fields": {
       "client": "Cliente",
       "job": "Trabajo",
-      "estimateNumber": "Numero de estimado",
+      "jobOptional": "(opcional)",
+      "estimateNumber": "Estimado #",
+      "currency": "Moneda",
       "taxPct": "Impuesto (%)",
+      "stateTax": "Impuesto estatal",
       "lineItems": "Partidas",
       "description": "Descripcion",
       "qty": "Cant.",
@@ -824,13 +883,17 @@
     },
     "placeholders": {
       "client": "Selecciona un cliente",
-      "job": "Selecciona un trabajo",
+      "job": "Sin trabajo vinculado",
       "estimateNumber": "Se genera automaticamente",
-      "notes": "Agrega notas o terminos..."
+      "notes": "Notas, exclusiones o proximos pasos (opcional)",
+      "lineItemDescription": "Servicio o material"
     },
     "buttons": {
+      "saveDraft": "Guardar borrador",
+      "sendEstimate": "Enviar estimado",
       "create": "Crear estimado",
-      "creating": "Creando...",
+      "creating": "Creando estimado...",
+      "saving": "Guardando...",
       "addItem": "+ Agregar partida",
       "remove": "Quitar"
     },
@@ -840,7 +903,8 @@
       "total": "Total"
     },
     "success": {
-      "created": "Estimado creado correctamente"
+      "created": "Estimado creado correctamente",
+      "estimateReady": "Estimado {{number}} listo."
     },
     "errors": {
       "noAuth": "Debes iniciar sesion para crear un estimado",
@@ -848,9 +912,11 @@
       "loadClients": "No se pudieron cargar los clientes",
       "loadJobs": "No se pudieron cargar los trabajos",
       "selectClient": "Selecciona un cliente",
+      "selectClientFull": "Selecciona un cliente antes de crear el estimado.",
       "selectJob": "Selecciona un trabajo",
-      "addLineItem": "Agrega al menos una partida antes de crear el estimado",
-      "invalidLineItems": "Revisa las cantidades y precios unitarios antes de continuar",
+      "addLineItem": "Agrega al menos una partida antes de crear el estimado.",
+      "invalidLineItems": "Corrige las partidas marcadas antes de crear el estimado.",
+      "reviewLineItems": "Revisa las partidas antes de continuar.",
       "missingUserContext": "Falta contexto de la cuenta. Recarga e intentalo de nuevo.",
       "createEstimate": "No se pudo crear el estimado"
     }

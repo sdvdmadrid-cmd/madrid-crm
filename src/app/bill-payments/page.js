@@ -14,12 +14,30 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
+
+const BILL_CATEGORIES = [
+  { id: "utilities",      label: "Utilities",             icon: "⚡", defaultTags: ["utility"] },
+  { id: "credit_card",   label: "Credit Cards",           icon: "💳", defaultTags: ["credit"] },
+  { id: "equipment",     label: "Equipment",              icon: "🛠️", defaultTags: ["equipment"] },
+  { id: "vehicle",       label: "Truck / Vehicle",        icon: "🚛", defaultTags: ["vehicle", "fleet"] },
+  { id: "insurance",     label: "Insurance",              icon: "🛡️", defaultTags: ["insurance"] },
+  { id: "rent",          label: "Rent / Storage",         icon: "🏢", defaultTags: ["rent"] },
+  { id: "payroll",       label: "Payroll / Subs",         icon: "👷", defaultTags: ["payroll"] },
+  { id: "materials",     label: "Materials",              icon: "🧱", defaultTags: ["materials"] },
+  { id: "internet",      label: "Internet / Phone",       icon: "📡", defaultTags: ["internet"] },
+  { id: "subscriptions", label: "Subscriptions",          icon: "📦", defaultTags: ["subscription"] },
+  { id: "general",       label: "General",                icon: "📄", defaultTags: [] },
+];
+
+// Categories where minimum payment field is prominently shown
+const CATEGORIES_WITH_MIN_PAYMENT = new Set(["credit_card", "equipment", "vehicle"]);
 
 const initialBillForm = {
   providerId: "",
@@ -29,6 +47,9 @@ const initialBillForm = {
   amountDue: "",
   minimumAmount: "",
   dueDate: "",
+  category: "general",
+  isRecurring: false,
+  frequency: "monthly",
   tags: "",
   notes: "",
 };
@@ -229,6 +250,9 @@ function loadPlaidScript() {
 
 export default function BillPaymentsPage() {
   const { capabilities } = useCurrentUserAccess();
+  const pathname = usePathname();
+  const params = useParams();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [savingBill, setSavingBill] = useState(false);
   const [paying, setPaying] = useState(false);
@@ -258,8 +282,11 @@ export default function BillPaymentsPage() {
   });
   const [savingMethod, setSavingMethod] = useState(false);
   const [plaidLaunching, setPlaidLaunching] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const deferredProviderQuery = useDeferredValue(providerQuery);
   const deferredFilterQuery = useDeferredValue(filterQuery);
+  const routeBillId =
+    typeof params?.id === "string" && params.id ? params.id : "";
 
   const canManageSensitiveData = capabilities.canManageSensitiveData;
   const bills = dashboard.bills || [];
@@ -271,8 +298,10 @@ export default function BillPaymentsPage() {
 
   const stats = useMemo(() => {
     const openBills = bills.filter(
-      (bill) => bill.status === "open" || bill.status === "overdue",
+      (bill) => ["open", "overdue", "due_soon"].includes(bill.status),
     );
+    const dueSoonBills = bills.filter((bill) => bill.status === "due_soon");
+    const upcomingBills = bills.filter((bill) => bill.status === "upcoming");
     const scheduledAutopay = bills.filter((bill) => bill.autopayEnabled).length;
     const totalDue = openBills.reduce(
       (sum, bill) => sum + Number(bill.amountDue || 0),
@@ -280,12 +309,104 @@ export default function BillPaymentsPage() {
     );
     return {
       openCount: openBills.length,
+      dueSoonCount: dueSoonBills.length,
+      upcomingCount: upcomingBills.length,
       scheduledAutopay,
       totalDue,
       recentPayments: recentTransactions.filter((tx) => tx.status === "paid")
         .length,
     };
   }, [bills, recentTransactions]);
+
+  const selectedTotalAmount = useMemo(() => {
+    if (!selectedBillIds.length) return 0;
+    return bills
+      .filter((bill) => selectedBillIds.includes(bill.id))
+      .reduce((sum, bill) => sum + Number(bill.amountDue || 0), 0);
+  }, [bills, selectedBillIds]);
+
+  const categoryFieldHints = useMemo(() => {
+    const selectedCategory =
+      BILL_CATEGORIES.find((category) => category.id === billForm.category) ||
+      BILL_CATEGORIES.find((category) => category.id === "general");
+    const suggestionsByCategory = {
+      credit_card: {
+        providerPlaceholder: "Card issuer (e.g. Chase, AmEx)",
+        accountLabelPlaceholder: "Business card",
+        helper: "Track statement due date and required minimum payment.",
+      },
+      utilities: {
+        providerPlaceholder: "Utility provider",
+        accountLabelPlaceholder: "Main service account",
+        helper: "Save account details to speed up monthly utility payments.",
+      },
+      equipment: {
+        providerPlaceholder: "Lender or equipment financer",
+        accountLabelPlaceholder: "Financing agreement",
+        helper: "Use notes for term details, payoff date, and contract reference.",
+      },
+      vehicle: {
+        providerPlaceholder: "Auto lender or leasing company",
+        accountLabelPlaceholder: "Truck payment account",
+        helper: "Keep fleet payment schedules visible with due date + minimum.",
+      },
+      default: {
+        providerPlaceholder: "Provider / Payee",
+        accountLabelPlaceholder: "Account label",
+        helper: "Save a bill profile once and pay it from the same workflow.",
+      },
+    };
+    const categoryHints =
+      suggestionsByCategory[selectedCategory?.id] || suggestionsByCategory.default;
+    return {
+      selectedCategory,
+      ...categoryHints,
+    };
+  }, [billForm.category]);
+
+  const categoryAnalytics = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    return BILL_CATEGORIES.map((category) => {
+      const billsInCategory = bills.filter(
+        (bill) => (bill.category || "general") === category.id,
+      );
+
+      const openOrDue = billsInCategory.filter((bill) =>
+        ["open", "due_soon", "overdue", "upcoming"].includes(bill.status),
+      );
+      const overdue = billsInCategory.filter((bill) => bill.status === "overdue");
+
+      const totalDue = openOrDue.reduce(
+        (sum, bill) => sum + Number(bill.amountDue || 0),
+        0,
+      );
+
+      const paidThisMonth = billsInCategory.filter((bill) => {
+        if (!bill.lastPaidAt) return false;
+        const paidDate = new Date(bill.lastPaidAt);
+        if (Number.isNaN(paidDate.getTime())) return false;
+        return (
+          paidDate.getMonth() === currentMonth &&
+          paidDate.getFullYear() === currentYear
+        );
+      }).length;
+
+      const overdueRate = billsInCategory.length
+        ? Math.round((overdue.length / billsInCategory.length) * 100)
+        : 0;
+
+      return {
+        ...category,
+        totalBills: billsInCategory.length,
+        totalDue,
+        overdueRate,
+        paidThisMonth,
+      };
+    }).filter((category) => category.totalBills > 0);
+  }, [bills]);
 
   const knownTags = useMemo(() => {
     const tags = new Set();
@@ -303,6 +424,8 @@ export default function BillPaymentsPage() {
       if (statusFilter !== "all" && bill.status !== statusFilter) return false;
       if (tagFilter !== "all" && !(bill.tags || []).includes(tagFilter))
         return false;
+      if (categoryFilter !== "all" && bill.category !== categoryFilter)
+        return false;
       if (!query) return true;
       return [
         bill.providerName,
@@ -314,7 +437,7 @@ export default function BillPaymentsPage() {
         .toLowerCase()
         .includes(query);
     });
-  }, [bills, deferredFilterQuery, statusFilter, tagFilter]);
+  }, [bills, deferredFilterQuery, statusFilter, tagFilter, categoryFilter]);
 
   const loadProviders = useCallback(async (query = "") => {
     try {
@@ -380,6 +503,29 @@ export default function BillPaymentsPage() {
     loadProviders(deferredProviderQuery.trim());
   }, [deferredProviderQuery, loadProviders]);
 
+  useEffect(() => {
+    if (loading) return;
+
+    if (pathname === "/bill-payments/new") {
+      if (editingBillId) {
+        setEditingBillId("");
+      }
+      return;
+    }
+
+    if (pathname === "/bill-payments/categories") {
+      setCategoryFilter("all");
+      return;
+    }
+
+    if (routeBillId) {
+      const targetBill = bills.find((bill) => bill.id === routeBillId);
+      if (targetBill && editingBillId !== targetBill.id) {
+        selectBillForEdit(targetBill, { navigate: false });
+      }
+    }
+  }, [bills, editingBillId, loading, pathname, routeBillId]);
+
   const selectedPaymentMethodId = useMemo(() => {
     const defaultMethod = executablePaymentMethods.find(
       (method) => method.isDefault,
@@ -387,13 +533,16 @@ export default function BillPaymentsPage() {
     return defaultMethod?.id || executablePaymentMethods[0]?.id || "";
   }, [executablePaymentMethods]);
 
-  function resetBillForm() {
+  function resetBillForm({ keepCurrentRoute = false } = {}) {
     setBillForm(initialBillForm);
     setEditingBillId("");
     setProviderQuery("");
+    if (!keepCurrentRoute && pathname !== "/bill-payments") {
+      router.replace("/bill-payments");
+    }
   }
 
-  function selectBillForEdit(bill) {
+  function selectBillForEdit(bill, { navigate = true } = {}) {
     setEditingBillId(bill.id);
     setBillForm({
       providerId: bill.providerId || "",
@@ -404,10 +553,16 @@ export default function BillPaymentsPage() {
       minimumAmount:
         bill.minimumAmount == null ? "" : String(bill.minimumAmount),
       dueDate: bill.dueDate || "",
+      category: bill.category || "general",
+      isRecurring: bill.isRecurring === true,
+      frequency: bill.frequency || "monthly",
       tags: (bill.tags || []).join(", "),
       notes: bill.notes || "",
     });
     setProviderQuery(bill.providerName || "");
+    if (navigate && pathname !== `/bill-payments/${bill.id}`) {
+      router.push(`/bill-payments/${bill.id}`);
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -429,6 +584,8 @@ export default function BillPaymentsPage() {
               .split(",")
               .map((value) => value.trim())
               .filter(Boolean),
+            isRecurring: billForm.isRecurring,
+            frequency: billForm.isRecurring ? billForm.frequency : null,
           }),
         },
       );
@@ -459,6 +616,23 @@ export default function BillPaymentsPage() {
       await loadDashboard();
     } catch (deleteError) {
       setError(deleteError.message || "Unable to delete bill.");
+    }
+  }
+
+  async function markAsPaid(id) {
+    setError("");
+    setNotice("");
+    try {
+      const response = await apiFetch(`/api/bill-payments/bills/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "paid" }),
+      });
+      await getJsonOrThrow(response, "Unable to mark bill as paid.");
+      setNotice("Bill marked as paid.");
+      await loadDashboard();
+    } catch (markError) {
+      setError(markError.message || "Unable to mark bill as paid.");
     }
   }
 
@@ -605,11 +779,20 @@ export default function BillPaymentsPage() {
     }
   }
 
-  async function paySelectedBills() {
-    if (!selectedBillIds.length) {
+  async function paySelectedBills(billIds = selectedBillIds) {
+    if (!billIds.length) {
       setError("Select at least one bill to pay.");
       return;
     }
+
+    const payAmount = bills
+      .filter((bill) => billIds.includes(bill.id))
+      .reduce((sum, bill) => sum + Number(bill.amountDue || 0), 0);
+    const confirmed = window.confirm(
+      `Pay ${billIds.length} bill${billIds.length === 1 ? "" : "s"} for ${formatCurrency(payAmount)}?`,
+    );
+    if (!confirmed) return;
+
     setPaying(true);
     setError("");
     setNotice("");
@@ -618,7 +801,7 @@ export default function BillPaymentsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          billIds: selectedBillIds,
+          billIds,
           paymentMethodId: selectedPaymentMethodId,
         }),
       });
@@ -632,13 +815,23 @@ export default function BillPaymentsPage() {
           ? `Submitted ${payload.data.transactions.length} payments with ${failureCount} failures.`
           : `Submitted ${payload.data.transactions.length} bill payment${payload.data.transactions.length === 1 ? "" : "s"}.`,
       );
-      setSelectedBillIds([]);
+      if (billIds === selectedBillIds) {
+        setSelectedBillIds([]);
+      } else {
+        setSelectedBillIds((current) =>
+          current.filter((billId) => !billIds.includes(billId)),
+        );
+      }
       await loadDashboard();
     } catch (paymentError) {
       setError(paymentError.message || "Unable to submit bill payment.");
     } finally {
       setPaying(false);
     }
+  }
+
+  async function payBillNow(billId) {
+    await paySelectedBills([billId]);
   }
 
   async function exportBillsCsv() {
@@ -790,7 +983,7 @@ export default function BillPaymentsPage() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                   gap: 10,
                 }}
               >
@@ -813,15 +1006,30 @@ export default function BillPaymentsPage() {
                   style={{
                     padding: 14,
                     borderRadius: 18,
+                    background: stats.dueSoonCount > 0 ? "rgba(245,158,11,0.22)" : "rgba(15,23,42,0.35)",
+                    border: stats.dueSoonCount > 0 ? "1px solid rgba(245,158,11,0.4)" : "1px solid rgba(148,163,184,0.16)",
+                  }}
+                >
+                  <div style={{ fontSize: 24, fontWeight: 800, color: stats.dueSoonCount > 0 ? "#f59e0b" : "inherit" }}>
+                    {stats.dueSoonCount}
+                  </div>
+                  <div style={{ color: "#94a3b8", fontSize: 12 }}>
+                    Due soon
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 18,
                     background: "rgba(15,23,42,0.35)",
                     border: "1px solid rgba(148,163,184,0.16)",
                   }}
                 >
                   <div style={{ fontSize: 24, fontWeight: 800 }}>
-                    {stats.scheduledAutopay}
+                    {stats.upcomingCount}
                   </div>
                   <div style={{ color: "#94a3b8", fontSize: 12 }}>
-                    AutoPay live
+                    Upcoming
                   </div>
                 </div>
                 <div
@@ -858,6 +1066,146 @@ export default function BillPaymentsPage() {
           >
             {error || notice}
           </div>
+        )}
+
+        {pathname === "/bill-payments/categories" && (
+          <section
+            style={{
+              background: "rgba(255,255,255,0.94)",
+              borderRadius: 24,
+              border: "1px solid rgba(15,23,42,0.08)",
+              padding: 20,
+              boxShadow: "0 16px 40px rgba(15,23,42,0.08)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, color: "#0f172a", fontSize: 24 }}>
+                  Category performance
+                </h2>
+                <p style={{ margin: "8px 0 0", color: "#64748b" }}>
+                  Track what categories are carrying the most payable balance and risk.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/bill-payments")}
+                style={{
+                  borderRadius: 999,
+                  border: "1px solid rgba(15,23,42,0.14)",
+                  background: "#fff",
+                  color: "#0f172a",
+                  padding: "10px 14px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Back to register
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: 16,
+                display: "grid",
+                gap: 12,
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              }}
+            >
+              {categoryAnalytics.map((category) => (
+                <article
+                  key={category.id}
+                  style={{
+                    borderRadius: 18,
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    background: "#fff",
+                    padding: 14,
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <strong style={{ color: "#0f172a" }}>
+                      {category.icon} {category.label}
+                    </strong>
+                    <span
+                      style={{
+                        borderRadius: 999,
+                        background: "rgba(15,23,42,0.06)",
+                        color: "#334155",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "3px 8px",
+                      }}
+                    >
+                      {category.totalBills} bill{category.totalBills === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "#475569", fontSize: 13 }}>
+                      <span>Total due</span>
+                      <strong style={{ color: "#0f172a" }}>{formatCurrency(category.totalDue)}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "#475569", fontSize: 13 }}>
+                      <span>Overdue rate</span>
+                      <strong style={{ color: category.overdueRate > 25 ? "#b91c1c" : "#0f172a" }}>{category.overdueRate}%</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "#475569", fontSize: 13 }}>
+                      <span>Paid this month</span>
+                      <strong style={{ color: "#065f46" }}>{category.paidThisMonth}</strong>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryFilter(category.id);
+                      router.push("/bill-payments");
+                    }}
+                    style={{
+                      marginTop: 4,
+                      borderRadius: 999,
+                      border: "1px solid rgba(15,23,42,0.12)",
+                      background: "#f8fafc",
+                      color: "#0f172a",
+                      padding: "8px 10px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Open in register
+                  </button>
+                </article>
+              ))}
+
+              {categoryAnalytics.length === 0 && (
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    background: "rgba(15,23,42,0.03)",
+                    color: "#475569",
+                  }}
+                >
+                  No bill categories have activity yet.
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
         <div
@@ -923,10 +1271,12 @@ export default function BillPaymentsPage() {
                   }}
                 >
                   <option value="all">All statuses</option>
+                  <option value="upcoming">🟢 Upcoming</option>
                   <option value="open">Open</option>
-                  <option value="overdue">Overdue</option>
+                  <option value="due_soon">⚠️ Due Soon</option>
+                  <option value="overdue">🔴 Overdue</option>
                   <option value="processing">Processing</option>
-                  <option value="paid">Paid</option>
+                  <option value="paid">✅ Paid</option>
                   <option value="failed">Failed</option>
                 </select>
                 <select
@@ -945,6 +1295,22 @@ export default function BillPaymentsPage() {
                     </option>
                   ))}
                 </select>
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  style={{
+                    borderRadius: 999,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                  }}
+                >
+                  <option value="all">All categories</option>
+                  {BILL_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   onClick={exportBillsCsv}
@@ -960,6 +1326,52 @@ export default function BillPaymentsPage() {
                 >
                   Export CSV
                 </button>
+              </div>
+            </div>
+
+            {/* ── Quick-add category buttons ─────────────────────── */}
+            <div
+              style={{
+                marginTop: 16,
+                overflowX: "auto",
+                paddingBottom: 4,
+              }}
+            >
+              <div style={{ display: "flex", gap: 8, minWidth: "max-content" }}>
+                {BILL_CATEGORIES.filter((c) => c.id !== "general").map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setBillForm((f) => ({
+                        ...f,
+                        category: cat.id,
+                        accountLabel: cat.label,
+                        tags: cat.defaultTags.join(", "),
+                      }));
+                      if (pathname !== "/bill-payments/new") {
+                        router.push("/bill-payments/new");
+                      }
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    style={{
+                      borderRadius: 999,
+                      border: "1.5px solid rgba(15,23,42,0.10)",
+                      background: "#fff",
+                      color: "#0f172a",
+                      padding: "8px 14px",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      transition: "background 0.12s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+                  >
+                    {cat.icon} {cat.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -992,7 +1404,7 @@ export default function BillPaymentsPage() {
               >
                 {paying
                   ? "Submitting payments..."
-                  : `Pay selected (${selectedBillIds.length})`}
+                  : `Pay selected (${selectedBillIds.length}) • ${formatCurrency(selectedTotalAmount)}`}
               </button>
               {!canManageSensitiveData && (
                 <span style={{ color: "#64748b", fontSize: 14 }}>
@@ -1008,7 +1420,97 @@ export default function BillPaymentsPage() {
                 )}
             </div>
 
-            <div style={{ marginTop: 20, display: "grid", gap: 14 }}>
+            <div style={{ marginTop: 20, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+
+              {/* ── Category sidebar ───────────────────────────── */}
+              <nav
+                style={{
+                  flexShrink: 0,
+                  width: 210,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  position: "sticky",
+                  top: 80,
+                }}
+              >
+                {/* "All" item */}
+                {[{ id: "all", label: "All bills", icon: "📋" }, ...BILL_CATEGORIES].map((cat) => {
+                  const count =
+                    cat.id === "all"
+                      ? bills.length
+                      : bills.filter((b) => b.category === cat.id).length;
+                  const total =
+                    cat.id === "all"
+                      ? bills.reduce((s, b) => s + (parseFloat(b.amountDue) || 0), 0)
+                      : bills
+                          .filter((b) => b.category === cat.id)
+                          .reduce((s, b) => s + (parseFloat(b.amountDue) || 0), 0);
+                  const isActive = categoryFilter === cat.id;
+
+                  // Per-category accent colors
+                  const COLOR_MAP = {
+                    all:           { bg: "rgba(15,23,42,0.06)",   activeBg: "#0f172a",        text: "#0f172a", activeText: "#fff" },
+                    utilities:     { bg: "rgba(234,179,8,0.10)",  activeBg: "#ca8a04",        text: "#854d0e", activeText: "#fff" },
+                    credit_card:   { bg: "rgba(99,102,241,0.10)", activeBg: "#4f46e5",        text: "#3730a3", activeText: "#fff" },
+                    equipment:     { bg: "rgba(14,165,233,0.10)", activeBg: "#0284c7",        text: "#0369a1", activeText: "#fff" },
+                    vehicle:       { bg: "rgba(16,185,129,0.10)", activeBg: "#059669",        text: "#065f46", activeText: "#fff" },
+                    insurance:     { bg: "rgba(239,68,68,0.09)",  activeBg: "#dc2626",        text: "#991b1b", activeText: "#fff" },
+                    rent:          { bg: "rgba(168,85,247,0.10)", activeBg: "#7c3aed",        text: "#5b21b6", activeText: "#fff" },
+                    payroll:       { bg: "rgba(251,146,60,0.12)", activeBg: "#ea580c",        text: "#9a3412", activeText: "#fff" },
+                    materials:     { bg: "rgba(120,113,108,0.10)",activeBg: "#57534e",        text: "#44403c", activeText: "#fff" },
+                    internet:      { bg: "rgba(6,182,212,0.10)",  activeBg: "#0891b2",        text: "#0e7490", activeText: "#fff" },
+                    subscriptions: { bg: "rgba(236,72,153,0.10)", activeBg: "#db2777",        text: "#9d174d", activeText: "#fff" },
+                    general:       { bg: "rgba(100,116,139,0.10)",activeBg: "#475569",        text: "#334155", activeText: "#fff" },
+                  };
+                  const c = COLOR_MAP[cat.id] || COLOR_MAP.general;
+                  if (!isActive && count === 0) return null;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 9,
+                        borderRadius: 14,
+                        border: "none",
+                        background: isActive ? c.activeBg : c.bg,
+                        color: isActive ? c.activeText : c.text,
+                        padding: "10px 14px",
+                        fontWeight: isActive ? 700 : 500,
+                        fontSize: 13,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "background 0.12s",
+                        width: "100%",
+                      }}
+                    >
+                      <span style={{ fontSize: 16, lineHeight: 1 }}>{cat.icon}</span>
+                      <span style={{ flex: 1 }}>{cat.label}</span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: isActive ? "rgba(255,255,255,0.25)" : "rgba(15,23,42,0.08)",
+                          color: isActive ? "#fff" : c.text,
+                          borderRadius: 999,
+                          padding: "2px 7px",
+                          minWidth: 22,
+                          textAlign: "center",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* ── Main bill list ─────────────────────────────── */}
+              <div style={{ flex: 1, display: "grid", gap: 14 }}>
               {loading
                 ? <div style={{ padding: 20, color: "#475569" }}>
                     Loading Bill Payments...
@@ -1096,24 +1598,36 @@ export default function BillPaymentsPage() {
                                           ? "rgba(16,185,129,0.14)"
                                           : bill.status === "overdue"
                                             ? "rgba(239,68,68,0.12)"
-                                            : bill.status === "processing"
-                                              ? "rgba(245,158,11,0.14)"
-                                              : "rgba(15,23,42,0.08)",
+                                            : bill.status === "due_soon"
+                                              ? "rgba(245,158,11,0.18)"
+                                              : bill.status === "processing"
+                                                ? "rgba(245,158,11,0.14)"
+                                                : bill.status === "upcoming"
+                                                  ? "rgba(14,165,233,0.10)"
+                                                  : "rgba(15,23,42,0.08)",
                                       color:
                                         bill.status === "paid"
                                           ? "#065f46"
                                           : bill.status === "overdue"
                                             ? "#991b1b"
-                                            : bill.status === "processing"
-                                              ? "#92400e"
-                                              : "#334155",
+                                            : bill.status === "due_soon"
+                                              ? "#b45309"
+                                              : bill.status === "processing"
+                                                ? "#92400e"
+                                                : bill.status === "upcoming"
+                                                  ? "#0369a1"
+                                                  : "#334155",
                                       fontWeight: 700,
                                       fontSize: 12,
                                       textTransform: "uppercase",
                                       letterSpacing: "0.08em",
                                     }}
                                   >
-                                    {bill.status}
+                                    {bill.status === "due_soon" ? "⚠ Due Soon"
+                                      : bill.status === "upcoming" ? "🟢 Upcoming"
+                                      : bill.status === "overdue" ? "🔴 Overdue"
+                                      : bill.status === "paid" ? "✅ Paid"
+                                      : bill.status}
                                   </span>
                                   {bill.autopayEnabled && (
                                     <span
@@ -1127,6 +1641,39 @@ export default function BillPaymentsPage() {
                                       }}
                                     >
                                       AutoPay on
+                                    </span>
+                                  )}
+                                  {/* Category badge */}
+                                  {(() => {
+                                    const cat = BILL_CATEGORIES.find((c) => c.id === bill.category);
+                                    return cat && cat.id !== "general" ? (
+                                      <span
+                                        style={{
+                                          padding: "4px 10px",
+                                          borderRadius: 999,
+                                          background: "rgba(99,102,241,0.10)",
+                                          color: "#4338ca",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        {cat.icon} {cat.label}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                  {/* Recurring badge */}
+                                  {bill.isRecurring && (
+                                    <span
+                                      style={{
+                                        padding: "4px 10px",
+                                        borderRadius: 999,
+                                        background: "rgba(16,185,129,0.10)",
+                                        color: "#047857",
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      🔁 {bill.frequency || "recurring"}
                                     </span>
                                   )}
                                 </div>
@@ -1161,8 +1708,7 @@ export default function BillPaymentsPage() {
                                   </span>
                                   {bill.minimumAmount != null && (
                                     <span>
-                                      Minimum{" "}
-                                      {formatCurrency(
+                                      Min {formatCurrency(
                                         bill.minimumAmount,
                                         bill.currency,
                                       )}
@@ -1207,6 +1753,34 @@ export default function BillPaymentsPage() {
                                 alignItems: "flex-start",
                               }}
                             >
+                              {bill.status !== "paid" &&
+                                bill.status !== "processing" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => payBillNow(bill.id)}
+                                    disabled={
+                                      !canManageSensitiveData ||
+                                      paying ||
+                                      !selectedPaymentMethodId
+                                    }
+                                    style={{
+                                      borderRadius: 999,
+                                      border: "1px solid rgba(15,118,110,0.32)",
+                                      background: "rgba(15,118,110,0.08)",
+                                      color: "#0f766e",
+                                      padding: "10px 14px",
+                                      fontWeight: 700,
+                                      cursor:
+                                        canManageSensitiveData &&
+                                        !paying &&
+                                        selectedPaymentMethodId
+                                          ? "pointer"
+                                          : "not-allowed",
+                                    }}
+                                  >
+                                    Pay now
+                                  </button>
+                                )}
                               <button
                                 type="button"
                                 onClick={() => selectBillForEdit(bill)}
@@ -1222,6 +1796,23 @@ export default function BillPaymentsPage() {
                               >
                                 Edit
                               </button>
+                              {bill.status !== "paid" && (
+                                <button
+                                  type="button"
+                                  onClick={() => markAsPaid(bill.id)}
+                                  style={{
+                                    borderRadius: 999,
+                                    border: "1px solid rgba(16,185,129,0.3)",
+                                    background: "rgba(16,185,129,0.08)",
+                                    color: "#047857",
+                                    padding: "10px 14px",
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  ✓ Mark as Paid
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1543,7 +2134,8 @@ export default function BillPaymentsPage() {
                         </article>
                       );
                     })}
-            </div>
+              </div>{/* end main bill list */}
+            </div>{/* end sidebar+list flex wrapper */}
           </section>
 
           <div style={{ display: "grid", gap: 20 }}>
@@ -1563,6 +2155,18 @@ export default function BillPaymentsPage() {
                 Search the provider catalog or create a custom payee with tags
                 for operations, rent, fleet, or vendor spend.
               </p>
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: "rgba(15,23,42,0.04)",
+                  color: "#475569",
+                  fontSize: 13,
+                }}
+              >
+                {categoryFieldHints.selectedCategory?.icon} {categoryFieldHints.selectedCategory?.label}: {categoryFieldHints.helper}
+              </div>
               <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
                 <div style={{ position: "relative" }}>
                   <input
@@ -1575,7 +2179,7 @@ export default function BillPaymentsPage() {
                         providerId: "",
                       }));
                     }}
-                    placeholder="Search provider or enter custom payee"
+                    placeholder={categoryFieldHints.providerPlaceholder}
                     style={{
                       width: "100%",
                       borderRadius: 16,
@@ -1639,7 +2243,7 @@ export default function BillPaymentsPage() {
                       accountLabel: event.target.value,
                     }))
                   }
-                  placeholder="Account label"
+                  placeholder={categoryFieldHints.accountLabelPlaceholder}
                   style={{
                     borderRadius: 16,
                     border: "1px solid rgba(15,23,42,0.12)",
@@ -1700,11 +2304,21 @@ export default function BillPaymentsPage() {
                     step="0.01"
                     style={{
                       borderRadius: 16,
-                      border: "1px solid rgba(15,23,42,0.12)",
+                      border: CATEGORIES_WITH_MIN_PAYMENT.has(billForm.category)
+                        ? "1.5px solid rgba(99,102,241,0.45)"
+                        : "1px solid rgba(15,23,42,0.12)",
                       padding: "14px 16px",
+                      background: CATEGORIES_WITH_MIN_PAYMENT.has(billForm.category)
+                        ? "rgba(99,102,241,0.04)"
+                        : undefined,
                     }}
                   />
                 </div>
+                {CATEGORIES_WITH_MIN_PAYMENT.has(billForm.category) && (
+                  <div style={{ fontSize: 12, color: "#6366f1", marginTop: -6 }}>
+                    Tip: enter the minimum payment required for this {billForm.category === "credit_card" ? "credit card" : "account"}.
+                  </div>
+                )}
                 <input
                   value={billForm.dueDate}
                   onChange={(event) =>
@@ -1720,6 +2334,82 @@ export default function BillPaymentsPage() {
                     padding: "14px 16px",
                   }}
                 />
+                {/* Category selector */}
+                <select
+                  value={billForm.category}
+                  onChange={(event) => {
+                    const cat = BILL_CATEGORIES.find((c) => c.id === event.target.value);
+                    setBillForm((current) => ({
+                      ...current,
+                      category: event.target.value,
+                      tags: cat?.defaultTags.length
+                        ? cat.defaultTags.join(", ")
+                        : current.tags,
+                    }));
+                  }}
+                  style={{
+                    borderRadius: 16,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    padding: "14px 16px",
+                    background: "#fff",
+                  }}
+                >
+                  {BILL_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.label}
+                    </option>
+                  ))}
+                </select>
+                {/* Recurring toggle */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "12px 16px",
+                    borderRadius: 16,
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    background: billForm.isRecurring ? "rgba(16,185,129,0.05)" : "#fafafa",
+                  }}
+                >
+                  <input
+                    id="recurring-toggle"
+                    type="checkbox"
+                    checked={billForm.isRecurring}
+                    onChange={(event) =>
+                      setBillForm((current) => ({
+                        ...current,
+                        isRecurring: event.target.checked,
+                      }))
+                    }
+                    style={{ width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  <label htmlFor="recurring-toggle" style={{ fontWeight: 600, fontSize: 14, cursor: "pointer", color: "#0f172a" }}>
+                    🔁 Recurring bill
+                  </label>
+                  {billForm.isRecurring && (
+                    <select
+                      value={billForm.frequency}
+                      onChange={(event) =>
+                        setBillForm((current) => ({
+                          ...current,
+                          frequency: event.target.value,
+                        }))
+                      }
+                      style={{
+                        marginLeft: "auto",
+                        borderRadius: 999,
+                        border: "1px solid rgba(15,23,42,0.12)",
+                        padding: "6px 12px",
+                        fontSize: 13,
+                      }}
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  )}
+                </div>
                 <input
                   value={billForm.tags}
                   onChange={(event) =>
@@ -1728,7 +2418,7 @@ export default function BillPaymentsPage() {
                       tags: event.target.value,
                     }))
                   }
-                  placeholder="Tags separated by commas"
+                  placeholder="Tags (comma-separated)"
                   style={{
                     borderRadius: 16,
                     border: "1px solid rgba(15,23,42,0.12)",
@@ -1744,7 +2434,7 @@ export default function BillPaymentsPage() {
                     }))
                   }
                   placeholder="Internal note or payment instruction"
-                  rows={4}
+                  rows={3}
                   style={{
                     borderRadius: 16,
                     border: "1px solid rgba(15,23,42,0.12)",

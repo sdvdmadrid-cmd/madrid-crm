@@ -83,6 +83,25 @@
   color: #334155;
 }
 
+.fieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.newLink {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.newLink:hover {
+  text-decoration: underline;
+}
+
 .helperText {
   font-size: 0.8rem;
   color: #64748b;

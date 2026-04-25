@@ -1,5 +1,7 @@
 "use client";
 
+import PlacesAutocomplete from "@/components/PlacesAutocomplete";
+
 export const EMPTY_CLIENT_FORM = {
   id: "",
   name: "",
@@ -50,12 +52,17 @@ export default function ClientForm({
           value={form.email}
           onChange={(e) => onChange({ ...form, email: e.target.value })}
         />
-        <textarea
-          className="cf-input"
+        <PlacesAutocomplete
+          id="client-address"
+          value={form.address || ""}
+          onChange={(value) => onChange({ ...form, address: value })}
+          onSelect={({ street, city, state, zip }) => {
+            const parts = [street, city, state, zip].filter(Boolean);
+            onChange({ ...form, address: parts.join(", ") });
+          }}
           placeholder={t("clients.placeholders.address")}
-          value={form.address}
-          onChange={(e) => onChange({ ...form, address: e.target.value })}
-          rows={3}
+          inputClass="cf-input"
+          disabled={saving}
         />
         <textarea
           className="cf-input"

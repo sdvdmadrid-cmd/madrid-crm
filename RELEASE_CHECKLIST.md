@@ -58,6 +58,20 @@
 - [ ] Run `npm run bill:autopay` with `BILL_AUTOPAY_CRON_SECRET` configured.
 - [ ] Confirm AutoPay reminders and due payments are created only once per intended cycle.
 
+### 5.1) Bill Payments Control Center functional gate
+
+- [ ] Verify route access works for `/bill-payments`, `/bill-payments/new`, `/bill-payments/[id]`, and `/bill-payments/categories`.
+- [ ] Create a bill with `category`, `isRecurring=true`, and `frequency=monthly`.
+- [ ] Confirm bill row shows category badge and recurring badge.
+- [ ] Confirm status badge transitions correctly (`upcoming` / `due_soon` / `overdue` / `paid`).
+- [ ] Use `Pay now` on one bill and verify transaction history updates.
+- [ ] Use `Mark as Paid` on one bill and verify `last_paid_at` is populated.
+- [ ] Confirm recurring rollover creates the next bill cycle automatically after paid status.
+- [ ] Confirm duplicate rollover is blocked (same provider/account/frequency/due date should not double-create).
+- [ ] Confirm `Pay selected` displays total amount and requires explicit confirmation.
+- [ ] Confirm category analytics panel shows `Total due`, `Overdue rate`, and `Paid this month`.
+- [ ] Confirm `Open in register` from categories returns to bill register flow.
+
 ## 6) Operational checks
 
 - [ ] Confirm logs contain no unhandled errors during smoke test window.
