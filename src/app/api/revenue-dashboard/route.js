@@ -1,7 +1,7 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
-  getAuthenticatedTenantContext,
+  getTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -26,7 +26,13 @@ function getCached(key) {
   return entry.data;
 }
 
+const MAX_CACHE_SIZE = 2000;
+
 function setCached(key, data) {
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
+  }
   cache.set(key, {
     data,
     expiresAt: Date.now() + CACHE_TTL_MS,
@@ -52,8 +58,7 @@ function toNullableUuid(value) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const { tenantDbId, role, authenticated } = getTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();
     }
@@ -130,8 +135,7 @@ export async function DELETE(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const { tenantDbId, role, authenticated } = getTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();
     }

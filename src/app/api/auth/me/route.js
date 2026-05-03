@@ -1,8 +1,8 @@
-import { getAuthenticatedTenantContext } from "@/lib/tenant";
+import { getTenantContext } from "@/lib/tenant";
 
 export async function GET(request) {
   try {
-    const session = await getAuthenticatedTenantContext(request);
+    const session = getTenantContext(request);
 
     if (!session?.authenticated) {
       return new Response(

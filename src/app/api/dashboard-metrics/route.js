@@ -1,7 +1,7 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
-  getAuthenticatedTenantContext,
+  getTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -22,7 +22,14 @@ function getCached(key) {
   return entry.data;
 }
 
+const MAX_CACHE_SIZE = 2000;
+
 function setCached(key, data) {
+  if (cache.size >= MAX_CACHE_SIZE) {
+    // Evict the oldest entry
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
+  }
   cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
@@ -53,8 +60,8 @@ async function safeCount(table, tenantId, role, extraFilters = []) {
   return Number(count || 0);
 }
 
-async function safeRows(table, columns, tenantId, role) {
-  let query = supabaseAdmin.from(table).select(columns);
+async function safeRows(table, columns, tenantId, role, limit = 500) {
+  let query = supabaseAdmin.from(table).select(columns).limit(limit);
   if ((role || "").toLowerCase() !== "super_admin") {
     query = query.eq("tenant_id", tenantId);
   }
@@ -73,8 +80,7 @@ async function safeRows(table, columns, tenantId, role) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const { tenantDbId, role, authenticated } = getTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();
     }
@@ -107,6 +113,7 @@ export async function GET(request) {
       contractsActive,
       estimateRequestsTotal,
       estimateRequestsNew,
+      invoicesOverdue,
       jobRows,
       invoiceRows,
     ] = await Promise.all([
@@ -138,6 +145,9 @@ export async function GET(request) {
       safeCount("estimate_requests", tenantDbId, role),
       safeCount("estimate_requests", tenantDbId, role, [
         { type: "eq", column: "status", value: "new" },
+      ]),
+      safeCount("invoices", tenantDbId, role, [
+        { type: "in", column: "status", value: ["Overdue", "Past Due"] },
       ]),
       safeRows("jobs", "price,status,invoiced", tenantDbId, role),
       safeRows("invoices", "amount,balance_due,status", tenantDbId, role),
@@ -183,6 +193,7 @@ export async function GET(request) {
         total: invoicesTotal,
         unpaidCount: invoicesUnpaid,
         draftCount: invoicesDraft,
+        overdueCount: invoicesOverdue,
         outstanding,
       },
       contracts: { total: contractsTotal, active: contractsActive },
@@ -225,8 +236,7 @@ export async function DELETE(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
   try {
-    const { tenantDbId, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const { tenantDbId, authenticated } = getTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();
     }

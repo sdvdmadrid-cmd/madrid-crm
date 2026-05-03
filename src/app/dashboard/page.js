@@ -87,11 +87,19 @@ export default function RevenueDashboardPage() {
     async function loadDashboard() {
       setLoading(true);
 
-      const requests = await Promise.allSettled([
-        apiFetch("/api/auth/me", { suppressUnauthorizedEvent: true }),
-        apiFetch("/api/dashboard-metrics", { suppressUnauthorizedEvent: true }),
-        apiFetch("/api/revenue-dashboard?limit=10", { suppressUnauthorizedEvent: true }),
-      ]);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12_000);
+
+      let requests;
+      try {
+        requests = await Promise.allSettled([
+          apiFetch("/api/auth/me", { signal: controller.signal, suppressUnauthorizedEvent: true }),
+          apiFetch("/api/dashboard-metrics", { signal: controller.signal, suppressUnauthorizedEvent: true }),
+          apiFetch("/api/revenue-dashboard?limit=10", { signal: controller.signal, suppressUnauthorizedEvent: true }),
+        ]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (cancelled) return;
 
@@ -142,7 +150,7 @@ export default function RevenueDashboardPage() {
     0,
     Number(metrics?.invoices?.total || 0) - Number(metrics?.invoices?.unpaidCount || 0),
   );
-  const overdueInvoices = metrics?.invoices?.draftCount ?? 0;
+  const overdueInvoices = metrics?.invoices?.overdueCount ?? 0;
 
   const chartValues = (() => {
     const values = (revenueData.recentPayments || [])
