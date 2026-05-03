@@ -1,15 +1,26 @@
-import "server-only";
+﻿import "server-only";
 import crypto from "node:crypto";
 import { getSenderAddress, isTestEmailDomain } from "@/lib/production-config";
 
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "mock").toLowerCase();
 const EMAIL_FROM =
-  process.env.EMAIL_FROM || "ContractorFlow <no-reply@example.com>";
+  process.env.EMAIL_FROM || "FieldBase <no-reply@example.com>";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const EMAIL_WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET || "";
 const ALLOW_INSECURE_DEV_WEBHOOKS =
-  String(process.env.ALLOW_INSECURE_DEV_WEBHOOKS || "false").toLowerCase() ===
-  "true";
+  String(process.env.ALLOW_INSECURE_DEV_WEBHOOKS || "").trim().toLowerCase() ===
+  "dev-local-only";
+
+function isLocalOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    const host = new URL(raw).hostname.toLowerCase();
+    return host === "localhost" || host === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
 
 function validateResendConfig() {
   if (!RESEND_API_KEY) {
@@ -112,7 +123,16 @@ export async function sendEmail({ to, subject, html, text, metadata }) {
 
 export function isWebhookAuthorized(request) {
   if (!EMAIL_WEBHOOK_SECRET) {
-    return process.env.NODE_ENV !== "production" && ALLOW_INSECURE_DEV_WEBHOOKS;
+    if (process.env.NODE_ENV === "production") {
+      return false;
+    }
+
+    const origin = request.headers.get("origin") || "";
+    const referer = request.headers.get("referer") || "";
+    return (
+      ALLOW_INSECURE_DEV_WEBHOOKS &&
+      (isLocalOrigin(origin) || isLocalOrigin(referer))
+    );
   }
 
   const direct = (request.headers.get("x-email-webhook-secret") || "").trim();

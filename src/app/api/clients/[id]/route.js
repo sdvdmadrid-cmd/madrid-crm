@@ -5,6 +5,7 @@ import {
   serializeClient,
 } from "@/lib/client-records";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
 import {
@@ -94,6 +95,9 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
+
     if (!hasAuthCredentials(request)) {
       return unauthenticatedResponse();
     }
@@ -157,6 +161,9 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
+
     if (!hasAuthCredentials(request)) {
       return unauthenticatedResponse();
     }

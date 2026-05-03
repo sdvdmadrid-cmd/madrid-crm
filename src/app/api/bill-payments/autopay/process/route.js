@@ -8,6 +8,7 @@ import {
   resolveAutopayAmount,
   shouldSendAutopayReminder,
 } from "@/lib/bill-payments";
+import { timingSafeEqualString } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request) {
@@ -15,7 +16,7 @@ export async function POST(request) {
   const requestSecret = String(
     request.headers.get("x-cron-secret") || "",
   ).trim();
-  if (!cronSecret || requestSecret !== cronSecret) {
+  if (!cronSecret || !timingSafeEqualString(requestSecret, cronSecret)) {
     return new Response(
       JSON.stringify({ success: false, error: "Unauthorized" }),
       {

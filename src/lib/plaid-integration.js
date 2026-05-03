@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 import { Configuration, PlaidApi, PlaidEnvironments } from "plaid";
 
 let cachedPlaidClient = null;
@@ -60,7 +60,7 @@ export async function createPlaidLinkToken({ userId, redirectUri = "", language 
     user: {
       client_user_id: String(userId || "").trim(),
     },
-    client_name: "ContractorFlow",
+    client_name: "FieldBase",
     products: ["auth"],
     country_codes: ["US"],
     language,

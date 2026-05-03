@@ -1,4 +1,4 @@
-import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+﻿import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -13,6 +13,22 @@ const CLIENTS = "clients";
 function isValidQuoteToken(value) {
   const token = String(value || "").trim();
   return token.length >= 24 && /^[a-zA-Z0-9_-]+$/.test(token);
+}
+
+function computeQuoteTotal(lineItems) {
+  if (!Array.isArray(lineItems)) return 0;
+  return lineItems.reduce((sum, item) => {
+    const qty = Number(item?.qty || 0);
+    const unitPrice = Number(item?.unitPrice || 0);
+    const explicitTotal = Number(item?.total);
+    if (Number.isFinite(explicitTotal)) {
+      return sum + explicitTotal;
+    }
+    if (Number.isFinite(qty) && Number.isFinite(unitPrice)) {
+      return sum + qty * unitPrice;
+    }
+    return sum;
+  }, 0);
 }
 
 export async function GET(_request, { params }) {
@@ -74,6 +90,9 @@ export async function GET(_request, { params }) {
     let job = null;
 
     if (quoteRow) {
+      const lineItems = Array.isArray(quoteRow.line_items) ? quoteRow.line_items : [];
+      const quoteTotal = computeQuoteTotal(lineItems);
+      const quoteStatus = String(quoteRow.status || "sent").toLowerCase();
       job = {
         id: quoteRow.id,
         tenant_id: quoteRow.tenant_id,
@@ -81,15 +100,15 @@ export async function GET(_request, { params }) {
         title: quoteRow.title,
         client_name: quoteRow.client_name,
         service: "",
-        status: quoteRow.status || "Pending",
-        price: "",
+        status: quoteStatus === "signed" ? "Active" : quoteRow.status || "Pending",
+        price: quoteTotal,
         due_date: "",
         scope_details: quoteRow.scope_of_work || "",
         tax_state: quoteRow.state || "TX",
         down_payment_percent: "0",
-        quote_status: quoteRow.status || "sent",
+        quote_status: quoteStatus,
         quote_approved_at: quoteRow.approved_at || "",
-        quote_signed_at: "",
+        quote_signed_at: quoteStatus === "signed" ? quoteRow.approved_at || "" : "",
         quote_approved_by_name: "",
         quote_approved_by_email: "",
         quote_signed_by_name: "",
@@ -192,7 +211,7 @@ export async function GET(_request, { params }) {
             quoteSignatureText: job.quote_signature_text || "",
           },
           companyProfile: {
-            companyName: companyProfile?.companyName || "ContractorFlow",
+            companyName: companyProfile?.companyName || "FieldBase",
             logoDataUrl: companyProfile?.logoDataUrl || "",
             websiteUrl: companyProfile?.websiteUrl || "",
             googleReviewsUrl: companyProfile?.googleReviewsUrl || "",

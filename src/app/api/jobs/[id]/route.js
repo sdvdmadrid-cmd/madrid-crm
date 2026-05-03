@@ -1,4 +1,6 @@
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
+import { JOB_FILES_BUCKET } from "@/lib/job-files";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { logSupabaseError, normalizeUuid } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -10,6 +12,7 @@ import {
 } from "@/lib/tenant";
 
 const JOBS = "jobs";
+const JOB_FILES = "job_files";
 
 const serialize = (doc) => ({
   _id: doc.id,
@@ -144,6 +147,8 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   try {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
@@ -215,6 +220,8 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   try {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
@@ -229,6 +236,90 @@ export async function DELETE(request, { params }) {
     const { id } = await params;
     if (!id) {
       return badId();
+    }
+
+    const body = await request.json().catch(() => ({}));
+    if (String(body?.confirmText || "").trim() !== "DELETE") {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Type DELETE to confirm job deletion",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    let jobLookup = supabaseAdmin
+      .from(JOBS)
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if ((role || "").toLowerCase() !== "super_admin") {
+      jobLookup = supabaseAdmin
+        .from(JOBS)
+        .select("id")
+        .eq("id", id)
+        .eq("tenant_id", tenantDbId)
+        .maybeSingle();
+    }
+
+    const { data: existingJob, error: jobLookupError } = await jobLookup;
+    if (jobLookupError) {
+      logSupabaseError("[api/jobs/:id][DELETE] Supabase lookup error", jobLookupError, {
+        id,
+        tenantDbId,
+        role,
+      });
+      throw new Error(jobLookupError.message);
+    }
+
+    if (!existingJob) {
+      return notFound();
+    }
+
+    const { data: relatedFiles, error: filesQueryError } = await supabaseAdmin
+      .from(JOB_FILES)
+      .select("id, file_path")
+      .eq("job_id", id);
+
+    if (filesQueryError) {
+      logSupabaseError("[api/jobs/:id][DELETE] Supabase files query error", filesQueryError, {
+        id,
+        tenantDbId,
+        role,
+      });
+      throw new Error(filesQueryError.message);
+    }
+
+    const filePaths = (relatedFiles || [])
+      .map((row) => row.file_path)
+      .filter(Boolean);
+
+    if (filePaths.length > 0) {
+      const { error: storageDeleteError } = await supabaseAdmin.storage
+        .from(JOB_FILES_BUCKET)
+        .remove(filePaths);
+      if (storageDeleteError) {
+        throw new Error(storageDeleteError.message);
+      }
+    }
+
+    const { error: filesDeleteError } = await supabaseAdmin
+      .from(JOB_FILES)
+      .delete()
+      .eq("job_id", id);
+
+    if (filesDeleteError) {
+      logSupabaseError("[api/jobs/:id][DELETE] Supabase file records delete error", filesDeleteError, {
+        id,
+        tenantDbId,
+        role,
+      });
+      throw new Error(filesDeleteError.message);
     }
 
     let query = supabaseAdmin.from(JOBS).delete().eq("id", id);

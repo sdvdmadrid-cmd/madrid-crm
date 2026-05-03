@@ -6,6 +6,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const JOBS = "jobs";
+const QUOTES = "quotes";
 
 function isValidQuoteToken(value) {
   const token = String(value || "").trim();
@@ -86,6 +87,76 @@ export async function POST(request, { params }) {
         JSON.stringify({ success: false, error: "Signature is required" }),
         {
           status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const { data: quoteRow, error: quoteError } = await supabaseAdmin
+      .from(QUOTES)
+      .select("*")
+      .eq("quote_token", quoteToken)
+      .maybeSingle();
+    if (quoteError) {
+      console.error(
+        "[api/public/quotes/:token/approval][POST] Supabase quote query error",
+        quoteError,
+      );
+      throw new Error(quoteError.message);
+    }
+
+    if (quoteRow) {
+      const currentStatus = String(quoteRow.status || "").toLowerCase();
+      if (currentStatus === "signed") {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "This quote is already signed and cannot be edited.",
+          }),
+          {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const nowIso = new Date().toISOString();
+      const nextStatus = action === "sign" ? "signed" : "approved";
+      const update = {
+        status: nextStatus,
+        approved_at: quoteRow.approved_at || nowIso,
+        updated_at: nowIso,
+      };
+
+      const { error: quoteUpdateError } = await supabaseAdmin
+        .from(QUOTES)
+        .update(update)
+        .eq("id", quoteRow.id)
+        .eq("tenant_id", quoteRow.tenant_id || null);
+      if (quoteUpdateError) {
+        console.error(
+          "[api/public/quotes/:token/approval][POST] Supabase quote update error",
+          quoteUpdateError,
+        );
+        throw new Error(quoteUpdateError.message);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            quoteStatus: nextStatus,
+            quoteApprovedAt: update.approved_at,
+            quoteSignedAt: action === "sign" ? nowIso : "",
+            quoteApprovedByName: contactName || "",
+            quoteApprovedByEmail: contactEmail || "",
+            quoteSignedByName: action === "sign" ? contactName || "" : "",
+            quoteSignedByEmail: action === "sign" ? contactEmail || "" : "",
+            quoteSignatureText: action === "sign" ? signatureText : "",
+          },
+        }),
+        {
+          status: 200,
           headers: { "Content-Type": "application/json" },
         },
       );

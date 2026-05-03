@@ -46,7 +46,7 @@ export async function GET(request) {
       : now.toISOString();
     const trialEndDate = hasTrial
       ? normalized.userMetadata.trialEndDate
-      : new Date(now.getTime() + 22 * 24 * 60 * 60 * 1000).toISOString();
+      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const nextUserMetadata = {
       ...normalized.userMetadata,

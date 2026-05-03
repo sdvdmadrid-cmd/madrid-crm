@@ -1,4 +1,4 @@
-import { sendEmail } from "@/lib/email";
+﻿import { sendEmail } from "@/lib/email";
 import {
   findAuthUserByEmail,
   generateSignupVerificationLink,
@@ -42,7 +42,7 @@ export async function POST(request) {
 
     const emailResult = await sendEmail({
       to: email,
-      subject: "Verify your ContractorFlow account",
+      subject: "Verify your FieldBase account",
       html: `<p>Hi ${normalized.name || "there"},</p><p>Click the link below to verify your email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
       text: `Hi ${normalized.name || "there"},\n\nVerify your account:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
       metadata: { tenantId: normalized.tenantId },

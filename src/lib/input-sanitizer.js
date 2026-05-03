@@ -1,6 +1,7 @@
 const UNSAFE_KEY_REGEX = /(^\$)|\./;
+// Covers XSS vectors, HTML entity encoding tricks, and SQL injection patterns
 const UNSAFE_TEXT_REGEX =
-  /<\s*\/?\s*script\b|javascript:|data:text\/html|on[a-z]+\s*=|\bunion\b\s+\bselect\b|\bdrop\b\s+\btable\b|\bdelete\b\s+\bfrom\b|--|\/\*|\*\//i;
+  /<\s*\/?\s*script\b|javascript\s*:|vbscript\s*:|data\s*:\s*text\/html|data\s*:\s*application\/|<\s*\/?\s*(iframe|object|embed|applet|base|form|meta|link)\b|on[a-z]{2,20}\s*=|expression\s*\(|&#x?[0-9a-f]+;|\\u[0-9a-f]{4}|\bunion\b\s+\bselect\b|\bdrop\b\s+\btable\b|\bdelete\b\s+\bfrom\b|\binsert\b\s+\binto\b|\bexec\s*\(|\bxp_cmdshell\b|--|\/\*|\*\//i;
 
 function stripControlChars(value) {
   let output = "";

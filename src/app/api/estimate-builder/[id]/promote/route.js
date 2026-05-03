@@ -28,7 +28,15 @@ async function nextQuoteNumber(tenantId) {
   }
 
   const total = Number(count || 0);
-  return `QT-${String(total + 1).padStart(4, "0")}`;
+  return String(total + 1);
+}
+
+function normalizeBaseNumber(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
+  const compact = stripped.replace(/\s+/g, "");
+  return compact || raw;
 }
 
 function serializeQuote(doc) {
@@ -174,7 +182,9 @@ export async function POST(request, { params }) {
     }));
 
     const nowIso = new Date().toISOString();
-    const quoteNumber = await nextQuoteNumber(tenantDbId);
+    const baseNumber =
+      normalizeBaseNumber(estimate.quote_number || estimate.quoteNumber) ||
+      (await nextQuoteNumber(tenantDbId));
     const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
     const baseUrl = (process.env.APP_BASE_URL || new URL(request.url).origin)
       .replace(/\/$/, "");
@@ -185,7 +195,7 @@ export async function POST(request, { params }) {
       tenant_id: tenantDbId,
       user_id: userId || null,
       created_by: userId || null,
-      quote_number: quoteNumber,
+      quote_number: baseNumber,
       title: estimate.name || "Estimate",
       client_id: estimateClientId,
       client_name: clientDoc.name || "",
@@ -227,10 +237,41 @@ export async function POST(request, { params }) {
       throw new Error(insertError.message);
     }
 
-    const quoteId = insertedQuote.id;
+    await supabaseAdmin
+      .from(ESTIMATES_COL)
+      .update({
+        quote_number: baseNumber,
+        quote_id: insertedQuote.id,
+        updated_at: nowIso,
+      })
+      .eq("id", id)
+      .eq("tenant_id", tenantDbId);
 
     // ── 5. Create the Invoice ───────────────────────────────────────────────
-    const invoiceNumber = `INV-${String(Date.now()).slice(-6)}`;
+    const invoiceNumber = baseNumber;
+    const { data: existingInvoice, error: existingInvoiceError } = await supabaseAdmin
+      .from("invoices")
+      .select("id")
+      .eq("tenant_id", tenantDbId)
+      .eq("estimate_id", id)
+      .eq("invoice_number", invoiceNumber)
+      .maybeSingle();
+
+    if (existingInvoiceError) {
+      console.error(
+        "[api/estimate-builder/:id/promote] Supabase existing invoice query error",
+        existingInvoiceError,
+      );
+      throw new Error(existingInvoiceError.message);
+    }
+
+    if (existingInvoice) {
+      return Response.json(
+        { success: true, quote: serializeQuote(insertedQuote), invoice: existingInvoice },
+        { status: 200 },
+      );
+    }
+
     const invoiceDoc = {
       tenant_id: tenantDbId,
       user_id: userId || null,

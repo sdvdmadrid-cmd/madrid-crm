@@ -3,6 +3,7 @@ import {
   getCompanyProfileByTenant,
   upsertCompanyProfileForTenant,
 } from "@/lib/company-profile-store";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canManageSensitive,
   forbiddenResponse,
@@ -153,6 +154,8 @@ export async function GET(request) {
 }
 
 export async function PATCH(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   try {
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);

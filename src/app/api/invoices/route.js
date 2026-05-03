@@ -18,6 +18,14 @@ import {
 
 const INVOICES = "invoices";
 
+function normalizeBaseNumber(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
+  const compact = stripped.replace(/\s+/g, "");
+  return compact || raw;
+}
+
 function serialize(doc) {
   const amount = Number(
     doc.amount ?? (Number(doc.total_cents || 0) / 100 || 0),
@@ -160,19 +168,37 @@ export async function POST(request) {
     const amountCents = Math.round(amount * 100);
 
     const invoiceNumber =
-      String(body.invoiceNumber || "").trim() ||
+      normalizeBaseNumber(body.invoiceNumber) ||
       (await nextInvoiceNumber(tenantDbId));
 
-    // Auto-link: buscar estimate/quote por número
+    // Auto-link by shared base number
     let estimateId = null;
+    let quoteId = null;
+    let linkedClientId = normalizeUuid(body.clientId);
     if (invoiceNumber) {
       const { data: est, error: estErr } = await supabaseAdmin
         .from("estimate_builder")
-        .select("id,quote_number")
+        .select("id,quote_number,client_id")
         .eq("tenant_id", tenantDbId)
-        .or(`quote_number.eq.${invoiceNumber},id.eq.${invoiceNumber}`)
+        .eq("quote_number", invoiceNumber)
         .maybeSingle();
-      if (est && est.id) estimateId = est.id;
+
+      if (!estErr && est?.id) {
+        estimateId = est.id;
+        linkedClientId = linkedClientId || normalizeUuid(est.client_id);
+      }
+
+      const { data: quote, error: quoteErr } = await supabaseAdmin
+        .from("quotes")
+        .select("id,client_id")
+        .eq("tenant_id", tenantDbId)
+        .eq("quote_number", invoiceNumber)
+        .maybeSingle();
+
+      if (!quoteErr && quote?.id) {
+        quoteId = quote.id;
+        linkedClientId = linkedClientId || normalizeUuid(quote.client_id);
+      }
     }
 
     const paymentState = computeInvoicePaymentState({
@@ -186,7 +212,7 @@ export async function POST(request) {
       invoice_number: invoiceNumber,
       invoice_title: String(body.invoiceTitle || "").trim(),
       job_id: normalizeUuid(body.jobId),
-      client_id: normalizeUuid(body.clientId),
+      client_id: linkedClientId,
       client_name: String(body.clientName || "").trim(),
       client_email: String(body.clientEmail || "").trim(),
       amount,
@@ -207,6 +233,7 @@ export async function POST(request) {
       created_at: nowIso,
       updated_at: nowIso,
       estimate_id: estimateId,
+      quote_id: quoteId,
     };
 
     const { data, error } = await supabaseAdmin

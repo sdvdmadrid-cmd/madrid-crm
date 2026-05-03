@@ -1,6 +1,6 @@
-function dispatchStandardLeadEvent(metadata) {
+﻿function dispatchStandardLeadEvent(metadata) {
   const leadPayload = {
-    form_id: metadata.formId || "founder_access",
+    form_id: metadata.formId || "account_signup",
     placement: metadata.placement,
     language: metadata.language,
   };
@@ -31,7 +31,7 @@ export function trackMarketingEvent(eventName, metadata = {}) {
   };
 
   window.dispatchEvent(
-    new CustomEvent("contractorflow:marketing-event", {
+    new CustomEvent("FieldBase:marketing-event", {
       detail: payload,
     }),
   );
@@ -47,14 +47,14 @@ export function trackMarketingEvent(eventName, metadata = {}) {
   }
 
   if (
-    eventName === "founder_access_submit" ||
-    eventName === "founder_access_account_submit"
+    eventName === "account_signup_submit" ||
+    eventName === "account_create_submit"
   ) {
     dispatchStandardLeadEvent(metadata);
   }
 
-  window.__contractorFlowMarketingEvents = [
-    ...(window.__contractorFlowMarketingEvents || []),
+  window.__FieldBaseMarketingEvents = [
+    ...(window.__FieldBaseMarketingEvents || []),
     payload,
   ].slice(-50);
 }

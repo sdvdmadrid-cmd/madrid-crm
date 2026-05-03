@@ -16,6 +16,11 @@ export const CLIENT_SELECT_COLUMNS = [
   "phone",
   "email",
   "address",
+  "city",
+  "state",
+  "zip_code",
+  "latitude",
+  "longitude",
   "company",
   "notes",
   "lead_status",
@@ -41,6 +46,12 @@ function normalizeLeadStatus(value) {
   return CLIENT_LEAD_STATUSES.has(normalized) ? normalized : "new_lead";
 }
 
+function toNullableCoordinate(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function composeAddress(body = {}) {
   const directAddress = toText(body.address);
   if (directAddress) return directAddress;
@@ -60,6 +71,11 @@ function normalizeClientBody(body = {}) {
     email: toText(body.email),
     phone: toText(body.phone),
     address: composeAddress(body),
+    city: toText(body.city),
+    state: toText(body.state),
+    zipCode: toText(body.zip ?? body.zipCode),
+    latitude: toNullableCoordinate(body.latitude),
+    longitude: toNullableCoordinate(body.longitude),
     company: toText(body.company ?? body.companyName),
     notes: toText(body.notes),
     leadStatus: normalizeLeadStatus(body.leadStatus ?? body.lead_status),
@@ -77,6 +93,14 @@ export function serializeClient(doc = {}) {
     userId: doc.user_id || null,
     company: doc.company || "",
     companyName: doc.company || "",
+    city: doc.city || "",
+    state: doc.state || "",
+    zip: doc.zip_code || "",
+    zipCode: doc.zip_code || "",
+    latitude:
+      typeof doc.latitude === "number" ? doc.latitude : null,
+    longitude:
+      typeof doc.longitude === "number" ? doc.longitude : null,
     notes: doc.notes || "",
     leadStatus: normalizeLeadStatus(doc.lead_status || doc.leadStatus),
     estimateSent: Boolean(doc.estimate_sent ?? doc.estimateSent),
@@ -99,6 +123,11 @@ export function buildClientInsertRow(body, { tenantId, userId }) {
     email: normalized.email,
     phone: normalized.phone,
     address: normalized.address,
+    city: normalized.city,
+    state: normalized.state,
+    zip_code: normalized.zipCode,
+    latitude: normalized.latitude,
+    longitude: normalized.longitude,
     company: normalized.company,
     notes: normalized.notes,
     lead_status: normalized.leadStatus,
@@ -137,6 +166,13 @@ export function buildClientUpdateRow(body = {}) {
   ) {
     updateRow.address = normalized.address;
   }
+  if ("city" in body) updateRow.city = normalized.city;
+  if ("state" in body) updateRow.state = normalized.state;
+  if ("zip" in body || "zipCode" in body) {
+    updateRow.zip_code = normalized.zipCode;
+  }
+  if ("latitude" in body) updateRow.latitude = normalized.latitude;
+  if ("longitude" in body) updateRow.longitude = normalized.longitude;
   if ("company" in body || "companyName" in body) {
     updateRow.company = normalized.company;
   }

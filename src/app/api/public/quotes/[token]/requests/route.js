@@ -6,6 +6,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const JOBS = "jobs";
+const QUOTES = "quotes";
 const ESTIMATE_REQUESTS = "estimate_requests";
 const NOTIFICATIONS = "notifications";
 
@@ -85,6 +86,98 @@ export async function POST(request, { params }) {
         JSON.stringify({ success: false, error: "Message is required" }),
         {
           status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const { data: quoteRow, error: quoteError } = await supabaseAdmin
+      .from(QUOTES)
+      .select("*")
+      .eq("quote_token", quoteToken)
+      .maybeSingle();
+    if (quoteError) {
+      console.error(
+        "[api/public/quotes/:token/requests][POST] Supabase quote query error",
+        quoteError,
+      );
+      throw new Error(quoteError.message);
+    }
+
+    if (quoteRow) {
+      const now = new Date();
+      const tenantId = quoteRow.tenant_id || "default";
+
+      const toInsert = {
+        tenant_id: tenantId,
+        user_id: null,
+        job_id: quoteRow.id,
+        quote_token: quoteToken,
+        request_type: type,
+        item,
+        message,
+        client_name: quoteRow.client_name || "",
+        job_title: quoteRow.title || "",
+        contact_name: contactName,
+        contact_email: contactEmail,
+        contact_phone: contactPhone,
+        status: "pending",
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+
+      const { data: requestRow, error: requestError } = await supabaseAdmin
+        .from(ESTIMATE_REQUESTS)
+        .insert(toInsert)
+        .select("*")
+        .maybeSingle();
+      if (requestError) {
+        console.error(
+          "[api/public/quotes/:token/requests][POST] Supabase estimate request insert error",
+          requestError,
+        );
+        throw new Error(requestError.message);
+      }
+
+      const { error: updateQuoteError } = await supabaseAdmin
+        .from(QUOTES)
+        .update({
+          status: "changes_requested",
+          updated_at: now.toISOString(),
+        })
+        .eq("id", quoteRow.id)
+        .eq("tenant_id", tenantId);
+      if (updateQuoteError) {
+        console.error(
+          "[api/public/quotes/:token/requests][POST] Supabase quote update error",
+          updateQuoteError,
+        );
+        throw new Error(updateQuoteError.message);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            _id: requestRow?.id || `${quoteToken}-${Date.now()}`,
+            tenantId,
+            jobId: quoteRow.id,
+            quoteToken,
+            requestType: type,
+            item,
+            message,
+            clientName: quoteRow.client_name || "",
+            jobTitle: quoteRow.title || "",
+            contactName,
+            contactEmail,
+            contactPhone,
+            status: "pending",
+            createdAt: requestRow?.created_at || now.toISOString(),
+            updatedAt: requestRow?.updated_at || now.toISOString(),
+          },
+        }),
+        {
+          status: 200,
           headers: { "Content-Type": "application/json" },
         },
       );

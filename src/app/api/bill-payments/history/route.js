@@ -24,7 +24,7 @@ export async function GET(request) {
     .select("*")
     .eq("tenant_id", context.tenantDbId)
     .order("created_at", { ascending: false })
-    .limit(250);
+    .limit(100);
 
   if (status) query = query.eq("status", status);
   if (source) query = query.eq("source", source);

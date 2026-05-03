@@ -5,6 +5,7 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+import { getIndustryProfile } from "@/lib/industry-profiles";
 
 export async function POST(request) {
   const access = await getAuthenticatedTenantContext(request);
@@ -28,6 +29,7 @@ export async function POST(request) {
 
   const companyName = profile.companyName || "Our Company";
   const businessType = profile.businessType || "contractor";
+  const industryProfile = getIndustryProfile(businessType);
   const phone = profile.phone || "";
   const address = profile.businessAddress || "";
 
@@ -44,6 +46,11 @@ Address: ${address || "(not provided)"}
 
 Services offered:
 ${topServices || "(no services listed yet)"}
+
+Industry profile:
+- Industry key: ${industryProfile.key}
+- Industry label: ${industryProfile.label}
+- Suggested services: ${(industryProfile.websiteServices || []).join(", ")}
 
 Generate professional website content for this contractor. Return ONLY a valid JSON object with these exact keys:
 {
@@ -126,7 +133,11 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text.
             description: String(s.description || "").slice(0, 400),
             price: "",
           }))
-        : [],
+        : (industryProfile.websiteServices || []).slice(0, 8).map((name) => ({
+            name,
+            description: "",
+            price: "",
+          })),
     },
   });
 }

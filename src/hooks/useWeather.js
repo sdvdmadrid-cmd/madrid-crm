@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/client-auth";
+import { formatLocalDate, parseYmdToLocalDate, todayLocalYmd } from "@/lib/local-date";
 
 // ─── Client-side in-memory cache (survives re-renders, cleared on page refresh)
 const clientCache = new Map();
@@ -21,14 +22,6 @@ function setClientCache(key, data) {
   clientCache.set(key, { ts: Date.now(), data });
 }
 
-function toLocalDateString(dateInput) {
-  const d = new Date(dateInput);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 // Stable map key
 export function weatherKey(location, date) {
   if (!location || !date) return null;
@@ -36,7 +29,10 @@ export function weatherKey(location, date) {
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
-export function useWeather(appointments, { calendarDays = [], defaultLocation = "" } = {}) {
+export function useWeather(
+  appointments,
+  { calendarDays = [], defaultLocation = "", forecastDates = [] } = {},
+) {
   const [weatherMap, setWeatherMap] = useState(new Map());
   const fetchingRef = useRef(new Set()); // Prevents duplicate in-flight requests
 
@@ -105,19 +101,30 @@ export function useWeather(appointments, { calendarDays = [], defaultLocation = 
   // Fetch day-level weather for every visible calendar day using defaultLocation
   useEffect(() => {
     if (!defaultLocation || !calendarDays || calendarDays.length === 0) return;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const fiveDaysAhead = new Date(today);
-    fiveDaysAhead.setDate(today.getDate() + 5);
+    const today = todayLocalYmd();
+    const maxForecastDate = formatLocalDate(
+      new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        new Date().getDate() + 15,
+      ),
+    );
     for (const { date } of calendarDays) {
       if (!date) continue;
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      if (d < today || d > fiveDaysAhead) continue;
-      const dateStr = toLocalDateString(d);
+      const dateStr = formatLocalDate(date);
+      if (!dateStr || dateStr < today || dateStr > maxForecastDate) continue;
       fetchOne(defaultLocation, dateStr);
     }
   }, [calendarDays, defaultLocation, fetchOne]);
+
+  // Fetch explicit forecast dates so weather appears without depending on appointments.
+  useEffect(() => {
+    if (!defaultLocation || !forecastDates || forecastDates.length === 0) return;
+    for (const date of forecastDates) {
+      if (!date) continue;
+      fetchOne(defaultLocation, date);
+    }
+  }, [defaultLocation, fetchOne, forecastDates]);
 
   const getWeather = useCallback(
     (location, date) => {
@@ -131,7 +138,10 @@ export function useWeather(appointments, { calendarDays = [], defaultLocation = 
   const getDayWeather = useCallback(
     (date) => {
       if (!defaultLocation || !date) return null;
-      const dateStr = typeof date === "string" ? date : toLocalDateString(date);
+      const dateStr =
+        typeof date === "string"
+          ? date
+          : formatLocalDate(date instanceof Date ? date : parseYmdToLocalDate(date));
       return weatherMap.get(weatherKey(defaultLocation, dateStr)) ?? null;
     },
     [weatherMap, defaultLocation],

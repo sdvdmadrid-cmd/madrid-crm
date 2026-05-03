@@ -1,4 +1,4 @@
-import { normalizeAppRole } from "@/lib/access-control";
+﻿import { normalizeAppRole } from "@/lib/access-control";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
 import { upsertProfile } from "@/lib/profiles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -10,7 +10,7 @@ import {
 const DEV_PROFILES = {
   super_admin: {
     tenantId: process.env.DEV_SUPERADMIN_TENANT_ID || "platform",
-    email: (process.env.DEV_SUPERADMIN_EMAIL || "owner@contractorflow.local")
+    email: (process.env.DEV_SUPERADMIN_EMAIL || "owner@FieldBase.local")
       .trim()
       .toLowerCase(),
     password: String(process.env.DEV_SUPERADMIN_PASSWORD || "").trim(),
@@ -19,7 +19,7 @@ const DEV_PROFILES = {
   },
   admin: {
     tenantId: process.env.DEV_ADMIN_TENANT_ID || "tenant-admin",
-    email: (process.env.DEV_ADMIN_EMAIL || "admin@contractorflow.local")
+    email: (process.env.DEV_ADMIN_EMAIL || "admin@FieldBase.local")
       .trim()
       .toLowerCase(),
     password: String(process.env.DEV_ADMIN_PASSWORD || "").trim(),
@@ -28,7 +28,7 @@ const DEV_PROFILES = {
   },
   viewer: {
     tenantId: process.env.DEV_VIEWER_TENANT_ID || "tenant-admin",
-    email: (process.env.DEV_VIEWER_EMAIL || "viewer@contractorflow.local")
+    email: (process.env.DEV_VIEWER_EMAIL || "viewer@FieldBase.local")
       .trim()
       .toLowerCase(),
     password: String(process.env.DEV_VIEWER_PASSWORD || "").trim(),
@@ -38,7 +38,7 @@ const DEV_PROFILES = {
   contractor: {
     tenantId: process.env.DEV_CONTRACTOR_TENANT_ID || "tenant-admin",
     email: (
-      process.env.DEV_CONTRACTOR_EMAIL || "contractor@contractorflow.local"
+      process.env.DEV_CONTRACTOR_EMAIL || "contractor@FieldBase.local"
     )
       .trim()
       .toLowerCase(),

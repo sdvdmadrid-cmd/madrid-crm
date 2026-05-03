@@ -1,4 +1,4 @@
-# ContractorFlow
+﻿# FieldBase
 
 Aplicacion Next.js para gestion de clientes, trabajos e ingresos de contratistas con Supabase.
 
@@ -198,7 +198,7 @@ Required production settings:
 - `APP_URL=https://app.yourdomain.com`
 - `APP_BASE_URL=https://app.yourdomain.com`
 - `RESEND_API_KEY=re_...` from the active Resend workspace
-- `EMAIL_FROM=ContractorFlow <noreply@mail.yourdomain.com>` using a domain verified in Resend
+- `EMAIL_FROM=FieldBase <noreply@mail.yourdomain.com>` using a domain verified in Resend
 - `EMAIL_WEBHOOK_SECRET=<long-random-secret>`
 - `ALLOW_INSECURE_DEV_WEBHOOKS=false`
 - `DEV_LOGIN_ENABLED=false`
@@ -213,7 +213,7 @@ Use these values as the expected baseline before deploying:
 - `APP_URL=https://app.yourdomain.com`
 - `APP_BASE_URL=https://app.yourdomain.com`
 - `EMAIL_PROVIDER=resend`
-- `EMAIL_FROM=ContractorFlow <noreply@mail.yourdomain.com>`
+- `EMAIL_FROM=FieldBase <noreply@mail.yourdomain.com>`
 - `RESEND_API_KEY=re_...`
 - `EMAIL_WEBHOOK_SECRET=<long-random-secret>`
 - `ALLOW_INSECURE_DEV_WEBHOOKS=false`

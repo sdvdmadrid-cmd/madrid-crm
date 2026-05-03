@@ -13,6 +13,8 @@ const PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS = 40;
 const PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS = 25;
 const PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS = 15;
 const PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS = 10;
+const WEBSITE_LEAD_IP_MAX_ATTEMPTS = 20;
+const WEBSITE_LEAD_SLUG_MAX_ATTEMPTS = 12;
 
 const memoryStore = new Map();
 
@@ -293,6 +295,26 @@ export async function recordPublicQuoteAttempt({ token, ip, action = "view" }) {
       maxAttempts: isMutation
         ? PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS
         : PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS,
+    },
+  ]);
+}
+
+export async function checkWebsiteLeadRateLimit({ slug, ip }) {
+  return checkScopedRateLimit([
+    { key: buildKey("website-lead:ip", ip) },
+    { key: buildKey("website-lead:slug", slug) },
+  ]);
+}
+
+export async function recordWebsiteLeadAttempt({ slug, ip }) {
+  return recordScopedAttempt([
+    {
+      key: buildKey("website-lead:ip", ip),
+      maxAttempts: WEBSITE_LEAD_IP_MAX_ATTEMPTS,
+    },
+    {
+      key: buildKey("website-lead:slug", slug),
+      maxAttempts: WEBSITE_LEAD_SLUG_MAX_ATTEMPTS,
     },
   ]);
 }

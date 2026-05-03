@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
@@ -138,6 +138,7 @@ export default function WebsiteBuilderPage() {
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState("edit"); // "edit" | "preview"
   const [slug, setSlug] = useState("");
+  const [publicUrl, setPublicUrl] = useState("");
   const [published, setPublished] = useState(false);
   const [companyProfile, setCompanyProfile] = useState(null);
   const [form, setForm] = useState({
@@ -166,6 +167,7 @@ export default function WebsiteBuilderPage() {
       .then((res) => getJsonOrThrow(res, "Load failed"))
       .then(({ data }) => {
         setSlug(data.slug || "");
+        setPublicUrl(data.publicUrl || "");
         setPublished(data.published === true);
         setCompanyProfile(data.companyProfile || null);
         setForm({
@@ -185,18 +187,10 @@ export default function WebsiteBuilderPage() {
     setGenerating(true);
     setError("");
     try {
-      // Fetch services from catalog for AI context
-      let catalogServices = [];
-      try {
-        const catalogRes = await apiFetch("/api/services-catalog");
-        if (catalogRes.ok) {
-          const catalogJson = await catalogRes.json();
-          catalogServices = (catalogJson.data || []).slice(0, 20).map((s) => ({
-            name: s.name || "",
-            description: s.description || "",
-          }));
-        }
-      } catch { /* use empty list */ }
+      const catalogServices = (form.services || []).slice(0, 20).map((service) => ({
+        name: service?.name || "",
+        description: service?.description || "",
+      }));
 
       const res = await apiFetch("/api/website-builder/generate", {
         method: "POST",
@@ -218,7 +212,7 @@ export default function WebsiteBuilderPage() {
     } finally {
       setGenerating(false);
     }
-  }, [t, showNotice]);
+  }, [form.services, t, showNotice]);
 
   const handleSave = useCallback(async (data) => {
     setSaving(true);
@@ -283,7 +277,7 @@ export default function WebsiteBuilderPage() {
     }));
   }, []);
 
-  const siteUrl = slug ? `/site/${slug}` : null;
+  const siteUrl = publicUrl || (slug ? `/site/${slug}` : null);
   const theme = form.themeColor || "#16a34a";
 
   if (loading) {
@@ -436,11 +430,11 @@ export default function WebsiteBuilderPage() {
               <div className="wb-slug-row">
                 <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>{t.slugLabel}:</span>
                 <span className="wb-slug-url">
-                  {typeof window !== "undefined" ? window.location.origin : ""}/site/{slug}
+                  {publicUrl || `${typeof window !== "undefined" ? window.location.origin : ""}/site/${slug}`}
                 </span>
                 {published && (
                   <a
-                    href={`/site/${slug}`}
+                    href={siteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ fontSize: 13, color: theme, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}
@@ -659,7 +653,7 @@ export default function WebsiteBuilderPage() {
               </div>
 
               <div className="preview-footer">
-                &copy; {new Date().getFullYear()} {companyProfile?.companyName || "Your Company"}. Powered by ContractorFlow
+                &copy; {new Date().getFullYear()} {companyProfile?.companyName || "Your Company"}. Powered by FieldBase
               </div>
             </div>
           </div>

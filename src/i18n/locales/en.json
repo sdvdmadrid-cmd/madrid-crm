@@ -25,6 +25,68 @@
     "noInvoices": "No invoices yet.",
     "invoiceWithoutNumber": "Invoice without number"
   },
+  "dashboardControl": {
+    "operationsLabel": "Operations command center",
+    "title": "Dashboard",
+    "subtitle": "Here is your business at a glance.",
+    "subtitleWithName": "Welcome back, {{name}}. Here is your business at a glance.",
+    "actions": {
+      "newEstimate": "New Estimate",
+      "newJob": "New Job",
+      "addClient": "Add Client"
+    },
+    "metrics": {
+      "revenue": "Revenue",
+      "revenueHint": "Collected across paid jobs and invoices",
+      "activeJobs": "Active Jobs",
+      "activeJobsHint": "Currently in progress",
+      "pendingEstimates": "Pending Estimates",
+      "pendingEstimatesHint": "Need response from customers"
+    },
+    "sections": {
+      "performance": "Performance",
+      "revenueTrend": "Revenue trend",
+      "lastPeriods": "Last 10 periods",
+      "updates": "Updates",
+      "recentActivity": "Recent activity",
+      "workspace": "Workspace",
+      "coreModules": "Core modules",
+      "financeStatus": "Finance status",
+      "collectionsHealth": "Collections health"
+    },
+    "chart": {
+      "outstanding": "Outstanding:",
+      "unpaidInvoices": "Unpaid invoices:"
+    },
+    "activity": {
+      "paymentRecorded": "Payment recorded {{amount}}",
+      "estimateAwaitingApproval": "Estimate awaiting client approval",
+      "invoiceReminderScheduled": "Invoice reminder scheduled",
+      "paymentReceivedCompletedJob": "Payment received for completed job",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "unknownDate": "Unknown date"
+    },
+    "workspace": {
+      "clientsTitle": "Clients",
+      "clientsDesc": "View customer history, notes, and contact details.",
+      "clientsAction": "View clients",
+      "estimatesTitle": "Estimates",
+      "estimatesDesc": "Create professional estimates and track approvals.",
+      "estimatesAction": "Create estimate",
+      "jobsTitle": "Jobs",
+      "jobsDesc": "Manage active work, assignments, and job progress.",
+      "jobsAction": "Open jobs",
+      "invoicesTitle": "Invoices",
+      "invoicesDesc": "Send invoices, collect payments, and monitor balances.",
+      "invoicesAction": "View invoices"
+    },
+    "statuses": {
+      "paid": "Paid",
+      "pending": "Pending",
+      "overdue": "Overdue"
+    }
+  },
   "sections": {
     "clients": "Clients",
     "jobs": "Jobs",
@@ -209,7 +271,7 @@
     "websiteUrlPlaceholder": "https://your-site.com",
     "googleReviewsPlaceholder": "https://g.page/r/... (Google Reviews)",
     "phoneLabel": "Contact phone",
-    "businessAddressLabel": "Business address (optional)",
+    "businessAddressLabel": "Business address",
     "poBoxAddressLabel": "P.O. box address (optional)",
     "legalFooterPlaceholder": "Legal footer text",
     "saveSettings": "Save settings",
@@ -310,8 +372,11 @@
       "contractAi": "Unable to generate AI contract draft",
       "contractAiFallback": "Error drafting contract with AI",
       "invoiceNeedsJob": "Link the invoice to a job before generating the contract.",
-      "invalidLogoType": "Select a valid image for the logo.",
-      "invalidLogoSize": "The logo must be 2MB max.",
+      "businessAddressRequired": "Business address is required.",
+      "phoneRequired": "Contact phone is required.",
+      "invalidLogoType": "Please select a PNG, JPG, or SVG file for your logo.",
+      "invalidLogoSize": "Logo is over 2MB — it can't be saved. Try compressing it at squoosh.app or tinypng.com first.",
+      "logoSizeHint": "File accepted. For best performance, use a logo under 500KB — most logos compress well at squoosh.app.",
       "saveCompanyProfile": "Unable to save company profile",
       "saveCompanyProfileFallback": "Error saving company profile",
       "quoteLink": "Unable to generate quote link",
@@ -362,7 +427,10 @@
     "calendar": "Calendar",
     "insights": "Insights",
     "services": "Services",
-    "websiteBuilder": "Website Builder",
+    "websiteBuilder": "Website",
+    "feedback": "Feedback",
+    "leadInbox": "Lead Inbox",
+    "ownerAdmin": "Owner Admin",
     "platform": "Platform",
     "settings": "Settings",
     "logout": "Logout",
@@ -371,7 +439,7 @@
   "auth": {
     "loading": "Loading...",
     "welcomeBack": "Welcome back",
-    "signInDesc": "Sign in to your ContractorFlow account.",
+    "signInDesc": "Sign in to your FieldBase account.",
     "createAccount": "Create your account",
     "createAccountDesc": "Start managing your contracting business.",
     "checkYourEmail": "Check your email",
@@ -426,7 +494,21 @@
     "invalidCredentials": "Invalid email or password",
     "authError": "Authentication error",
     "loginError": "Unable to sign in",
-    "registerError": "Unable to register"
+    "registerError": "Unable to register",
+    "industries": {
+      "landscapingHardscaping": "Landscaping / Hardscaping",
+      "cleaning": "Cleaning",
+      "construction": "Construction",
+      "generalContractor": "General Contractor",
+      "electrical": "Electrical",
+      "hvac": "HVAC",
+      "handyman": "Handyman",
+      "painting": "Painting",
+      "plumbing": "Plumbing",
+      "roofing": "Roofing",
+      "treeCare": "Tree Care",
+      "other": "Other"
+    }
   },
   "quote": {
     "loading": "Loading your quote...",
@@ -485,7 +567,7 @@
       "describeChanges": "Please describe the changes you'd like.",
       "submit": "Something went wrong. Please try again."
     },
-    "footer": "Sent via ContractorFlow"
+    "footer": "Sent via FieldBase"
   },
   "notifications": {
     "title": "Notifications",
@@ -494,7 +576,7 @@
   },
   "verifyEmail": {
     "checkEmail": "Check your email",
-    "checkEmailDesc": "We sent a verification link to your inbox. Click it to activate your account and start your 22-day free trial.",
+    "checkEmailDesc": "We sent a verification link to your inbox. Click it to activate your account and start your 30-day free trial.",
     "backToSignIn": "Back to sign in",
     "verifying": "Verifying your email...",
     "verifyingDesc": "Please wait while we activate your account.",
@@ -502,15 +584,42 @@
     "resendPrompt": "Request a new verification link:"
   },
   "trial": {
-    "expired": "Your free trial has ended. Subscribe to continue using ContractorFlow.",
+    "expired": "Your free trial has ended. Subscribe to continue using FieldBase.",
     "daysLeft": "{{count}} day left in your free trial.",
     "daysLeft_other": "{{count}} days left in your free trial.",
     "subscribe": "Subscribe now"
   },
+  "feedback": {
+    "title": "Feedback",
+    "description": "Share a quick note without leaving your workflow.",
+    "types": {
+      "suggestion": "Suggestion",
+      "issue": "Issue",
+      "improvement": "Improvement"
+    },
+    "messagePlaceholder": "Tell us what would help you most.",
+    "screenshotLabel": "Screenshot (optional)",
+    "screenshotAttached": "Attached: {{name}}",
+    "buttons": {
+      "close": "Close",
+      "cancel": "Cancel",
+      "submit": "Submit",
+      "submitting": "Sending..."
+    },
+    "errors": {
+      "imageOnly": "Please upload an image file.",
+      "fileSize": "Screenshot must be under 1.5MB.",
+      "fileRead": "Unable to read the screenshot file.",
+      "messageRequired": "Message is required.",
+      "submitFailed": "Unable to submit feedback."
+    },
+    "success": "Thanks! Feedback sent."
+  },
   "greeting": {
     "morning": "Good morning",
     "afternoon": "Good afternoon",
-    "evening": "Good evening"
+    "evening": "Good evening",
+    "defaultName": "Friend"
   },
   "clients": {
     "title": "Clients",
@@ -549,6 +658,7 @@
       "save": "Unable to save client",
       "saveFallback": "Error saving client",
       "nameRequired": "Client name is required",
+      "addressSelectionRequired": "Please select an address from the suggestions list",
       "delete": "Unable to delete client",
       "deleteFallback": "Error deleting client"
     },
@@ -789,8 +899,33 @@
     },
     "weather": {
       "locationHint": "Used to fetch weather forecast for this job",
+      "changeLocationLabel": "Change location",
+      "changeLocationPlaceholder": "City, town, ZIP, or lat,lon",
+      "applyLocation": "Apply location",
+      "activeLocation": "Current location",
       "outOfRange": "Forecast only available within next 5 days",
-      "unavailable": "Weather unavailable"
+      "unavailable": "Weather unavailable",
+      "hourlyTitle": "Hourly forecast",
+      "noHourly": "No hourly data available for this day",
+      "checkingLocation": "Checking...",
+      "locationRequired": "Enter a location to update forecast",
+      "locationInvalid": "We could not match that location right now. Try another city or ZIP code.",
+      "locationBestMatch": "Using best match: {{location}}",
+      "locationFallbackNotice": "Could not match that location. Using {{location}} for now.",
+      "locationSuggestionHint": "Start typing a city or town for suggestions, or enter a valid ZIP code or coordinates.",
+      "scrollToCalendar": "Back to calendar",
+      "fallbackLabel": "Backup",
+      "fallbackHint": "Using backup weather data",
+      "sectionTitle": "Weather Forecast",
+      "feelsLike": "Feels like {{temp}}°F",
+      "humidity": "Humidity {{pct}}%",
+      "wind": "Wind {{speed}} mph",
+      "alertRain": "Rain expected — consider rescheduling",
+      "alertStorm": "Storm expected — recommend rescheduling",
+      "alertSnow": "Snow expected — verify job site access",
+      "alertHighWind": "High winds — consider rescheduling outdoor work",
+      "alertMist": "Reduced visibility expected",
+      "alertClear": "Clear skies — ideal conditions"
     },
     "statusOptions": {
       "Scheduled": "Scheduled",
@@ -819,6 +954,9 @@
       "load": "Error loading calendar",
       "save": "Unable to save appointment",
       "saveFallback": "Error saving appointment",
+      "required": "This field is required",
+      "invalidDate": "Date must be in YYYY-MM-DD format",
+      "pastDate": "Cannot schedule in the past",
       "delete": "Unable to delete appointment",
       "deleteFallback": "Error deleting appointment"
     }
@@ -919,6 +1057,37 @@
       "reviewLineItems": "Review your line items before continuing.",
       "missingUserContext": "Missing account context. Refresh and try again.",
       "createEstimate": "Unable to create the estimate"
+    }
+  },
+  "legal": {
+    "pageTitle": "Legal & Compliance",
+    "version": "v1.0-April-2026",
+    "updatedAt": "April 30, 2026",
+    "required": {
+      "heading": "Review & Accept Legal Terms",
+      "subheading": "You must accept the FieldBase Legal & Compliance Terms before accessing the platform.",
+      "scrollHint": "Scroll down to read all terms before accepting",
+      "checkbox": "I have read and agree to the FieldBase Legal & Compliance Terms including the Terms of Service, Privacy Policy, Payment Authorization, SMS Consent, and Estimate/Invoice Terms.",
+      "accept": "I Accept — Continue to Platform",
+      "accepting": "Recording acceptance\u2026",
+      "alreadyAccepted": "Terms already accepted. Redirecting\u2026",
+      "complianceNote": "Your acceptance is recorded with timestamp, IP address, and browser information for compliance purposes."
+    },
+    "footer": {
+      "legal": "Legal & Compliance",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "sms": "SMS Consent"
+    },
+    "acceptance": {
+      "heading": "Accept These Terms",
+      "checkbox": "I have read and agree to all terms on this page.",
+      "submit": "Accept & Continue to Platform",
+      "submitting": "Saving acceptance\u2026",
+      "accepted": "Terms accepted. Redirecting\u2026",
+      "signInToAccept": "Please sign in to accept these terms.",
+      "signInLink": "Sign in",
+      "complianceNote": "Your acceptance is recorded with timestamp and IP address for compliance."
     }
   }
 }

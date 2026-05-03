@@ -1,3 +1,4 @@
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
@@ -221,6 +222,8 @@ export async function GET(request) {
 }
 
 export async function DELETE(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   try {
     const { tenantDbId, authenticated } =
       await getAuthenticatedTenantContext(request);

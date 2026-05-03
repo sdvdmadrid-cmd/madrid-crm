@@ -9,6 +9,12 @@ export const EMPTY_CLIENT_FORM = {
   phone: "",
   email: "",
   address: "",
+  city: "",
+  state: "",
+  zip: "",
+  latitude: null,
+  longitude: null,
+  addressPlaceId: "",
   notes: "",
 };
 
@@ -55,10 +61,40 @@ export default function ClientForm({
         <PlacesAutocomplete
           id="client-address"
           value={form.address || ""}
-          onChange={(value) => onChange({ ...form, address: value })}
-          onSelect={({ street, city, state, zip }) => {
-            const parts = [street, city, state, zip].filter(Boolean);
-            onChange({ ...form, address: parts.join(", ") });
+          selectedValueKey="formattedAddress"
+          onChange={(value) =>
+            onChange({
+              ...form,
+              address: value,
+              city: "",
+              state: "",
+              zip: "",
+              latitude: null,
+              longitude: null,
+              addressPlaceId: "",
+            })
+          }
+          onSelect={({
+            city,
+            state,
+            zip,
+            formattedAddress,
+            latitude,
+            longitude,
+            placeId,
+          }) => {
+            onChange({
+              ...form,
+              address: formattedAddress || form.address || "",
+              city: city || "",
+              state: state || "",
+              zip: zip || "",
+              latitude:
+                typeof latitude === "number" ? latitude : null,
+              longitude:
+                typeof longitude === "number" ? longitude : null,
+              addressPlaceId: placeId || "",
+            });
           }}
           placeholder={t("clients.placeholders.address")}
           inputClass="cf-input"

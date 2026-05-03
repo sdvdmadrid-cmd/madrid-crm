@@ -1,4 +1,4 @@
-import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+﻿import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { normalizeRecipients, sendEmail } from "@/lib/email";
 import { computeInvoicePaymentState } from "@/lib/invoice-payments";
 import {
@@ -28,7 +28,7 @@ function buildInvoiceEmailTemplate({
   dueDate,
   checkoutUrl,
 }) {
-  const safeCompany = companyName || "ContractorFlow";
+  const safeCompany = companyName || "FieldBase";
   const safeClient = clientName || "Client";
   const safeInvoice = invoiceNumber || "Invoice";
   const safeTitle = invoiceTitle || "Service invoice";
@@ -155,7 +155,7 @@ export async function POST(request, { params }) {
     });
 
     const template = buildInvoiceEmailTemplate({
-      companyName: companyProfile?.companyName || "ContractorFlow",
+      companyName: companyProfile?.companyName || "FieldBase",
       clientName: invoice.client_name || "Client",
       invoiceNumber: invoice.invoice_number || "Invoice",
       invoiceTitle: invoice.invoice_title || "Service invoice",

@@ -1,13 +1,23 @@
-import {
+﻿import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+import { getIndustryProfile } from "@/lib/industry-profiles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const WEBSITE_TABLE = "contractor_websites";
+
+function getPublicWebsiteUrl(slug) {
+  const domain = (process.env.NEXT_PUBLIC_SITE_DOMAIN || "FieldBase.com")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/$/, "");
+  if (!slug) return "";
+  return `https://${slug}.${domain}`;
+}
 
 function generateSlug(companyName) {
   return String(companyName || "")
@@ -61,19 +71,32 @@ export async function GET(request) {
   });
 
   const row = await findOrCreateWebsite(access.tenantDbId, profile);
+  const industryProfile = getIndustryProfile(profile.businessType || "");
+  const effectiveServices =
+    Array.isArray(row.services) && row.services.length > 0
+      ? row.services
+      : industryProfile.websiteServices.map((name) => ({
+          name,
+          description: "",
+          price: "",
+        }));
 
   return Response.json({
     success: true,
     data: {
       id: row.id,
       slug: row.slug,
+      publicUrl: getPublicWebsiteUrl(row.slug),
+      websitePath: `/site/${row.slug}`,
       headline: row.headline || "",
       subheadline: row.subheadline || "",
       aboutText: row.about_text || "",
       ctaText: row.cta_text || "",
       themeColor: row.theme_color || "#16a34a",
-      services: Array.isArray(row.services) ? row.services : [],
+      services: effectiveServices,
       published: row.published === true,
+      industry: industryProfile.key,
+      industryLabel: industryProfile.label,
       companyProfile: profile,
     },
   });
@@ -118,7 +141,8 @@ export async function POST(request) {
     .single();
 
   if (error) {
-    return Response.json({ success: false, error: error.message }, { status: 500 });
+    console.error("[api/website-builder][PATCH] DB error", error);
+    return Response.json({ success: false, error: "Unable to save website" }, { status: 500 });
   }
 
   return Response.json({

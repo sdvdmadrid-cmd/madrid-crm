@@ -16,6 +16,11 @@ import {
 } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import {
+  BILL_ACCOUNT_NUMBER_MAX_LENGTH,
+  getBillAccountNumberError,
+  isValidBillAccountNumber,
+} from "@/lib/bill-payments-validation";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -52,6 +57,13 @@ const initialBillForm = {
   frequency: "monthly",
   tags: "",
   notes: "",
+};
+
+const REQUIRED_BILL_FIELD_MESSAGES = {
+  providerName: "Provider is required",
+  accountLabel: "Account label is required",
+  amountDue: "Amount due is required",
+  dueDate: "Due date is required",
 };
 
 const initialAutopayDraft = {
@@ -99,6 +111,7 @@ function buildAutopayDraft(bill) {
 
 function PaymentMethodSetupForm({
   methodType,
+  billingDetails,
   onCancel,
   onSaved,
   onError,
@@ -120,6 +133,12 @@ function PaymentMethodSetupForm({
       confirmParams: {
         return_url:
           typeof window !== "undefined" ? window.location.href : undefined,
+        payment_method_data: {
+          billing_details: {
+            name: billingDetails?.name || "Cardholder",
+            email: billingDetails?.email || undefined,
+          },
+        },
       },
     });
 
@@ -249,7 +268,7 @@ function loadPlaidScript() {
 }
 
 export default function BillPaymentsPage() {
-  const { capabilities } = useCurrentUserAccess();
+  const { authUser, capabilities } = useCurrentUserAccess();
   const pathname = usePathname();
   const params = useParams();
   const router = useRouter();
@@ -269,10 +288,15 @@ export default function BillPaymentsPage() {
   const [billForm, setBillForm] = useState(initialBillForm);
   const [editingBillId, setEditingBillId] = useState("");
   const [providerQuery, setProviderQuery] = useState("");
+  const [providerPickerOpen, setProviderPickerOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");
   const [selectedBillIds, setSelectedBillIds] = useState([]);
+  const [bulkPaymentMethodId, setBulkPaymentMethodId] = useState("");
+  const [bulkPaymentMethodMenuOpen, setBulkPaymentMethodMenuOpen] =
+    useState(false);
+  const [billFormErrors, setBillFormErrors] = useState({});
   const [activeAutopayBillId, setActiveAutopayBillId] = useState("");
   const [autopayDrafts, setAutopayDrafts] = useState({});
   const [setupIntentState, setSetupIntentState] = useState({
@@ -283,6 +307,10 @@ export default function BillPaymentsPage() {
   const [savingMethod, setSavingMethod] = useState(false);
   const [plaidLaunching, setPlaidLaunching] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [billDrawerOpen, setBillDrawerOpen] = useState(false);
+  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
+  const [compactMode, setCompactMode] = useState(true);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const deferredProviderQuery = useDeferredValue(providerQuery);
   const deferredFilterQuery = useDeferredValue(filterQuery);
   const routeBillId =
@@ -295,6 +323,100 @@ export default function BillPaymentsPage() {
     () => paymentMethods.filter((method) => method.provider !== "plaid"),
     [paymentMethods],
   );
+  const selectedPaymentMethod = useMemo(
+    () =>
+      executablePaymentMethods.find((method) => method.id === bulkPaymentMethodId) ||
+      executablePaymentMethods.find((method) => method.isDefault) ||
+      executablePaymentMethods[0] ||
+      null,
+    [bulkPaymentMethodId, executablePaymentMethods],
+  );
+  const accountNumberError = useMemo(
+    () => getBillAccountNumberError(billForm.accountNumber),
+    [billForm.accountNumber],
+  );
+
+  function formatSelectedPaymentMethodLabel(method) {
+    if (!method) return "Choose payment method";
+    if (method.methodType === "bank_account") {
+      return `${method.bankName || "Bank"} ending in ${method.last4 || "----"}`;
+    }
+
+    const brand = method.brand
+      ? `${method.brand.charAt(0).toUpperCase()}${method.brand.slice(1)}`
+      : "Card";
+    return `${brand} ending in ${method.last4 || "----"}`;
+  }
+
+  function validateBillForm(currentForm) {
+    const nextErrors = {};
+    const currentAccountNumberError = getBillAccountNumberError(
+      currentForm.accountNumber,
+    );
+
+    if (!currentForm.providerName.trim()) {
+      nextErrors.providerName = REQUIRED_BILL_FIELD_MESSAGES.providerName;
+    }
+    if (!currentForm.accountLabel.trim()) {
+      nextErrors.accountLabel = REQUIRED_BILL_FIELD_MESSAGES.accountLabel;
+    }
+    if (!String(currentForm.amountDue || "").trim()) {
+      nextErrors.amountDue = REQUIRED_BILL_FIELD_MESSAGES.amountDue;
+    }
+    if (!String(currentForm.dueDate || "").trim()) {
+      nextErrors.dueDate = REQUIRED_BILL_FIELD_MESSAGES.dueDate;
+    }
+    if (currentAccountNumberError) {
+      nextErrors.accountNumber = currentAccountNumberError;
+    }
+
+    return nextErrors;
+  }
+
+  function handleAccountLabelChange(event) {
+    setBillForm((current) => ({
+      ...current,
+      accountLabel: event.target.value,
+    }));
+    setBillFormErrors((current) => ({
+      ...current,
+      accountLabel: "",
+    }));
+  }
+
+  function handleAccountNumberChange(event) {
+    const nextValue = event.target.value;
+    setBillForm((current) => ({
+      ...current,
+      accountNumber: nextValue,
+    }));
+    setBillFormErrors((current) => ({
+      ...current,
+      accountNumber: "",
+    }));
+  }
+
+  function handleAmountDueChange(event) {
+    setBillForm((current) => ({
+      ...current,
+      amountDue: event.target.value,
+    }));
+    setBillFormErrors((current) => ({
+      ...current,
+      amountDue: "",
+    }));
+  }
+
+  function handleDueDateChange(event) {
+    setBillForm((current) => ({
+      ...current,
+      dueDate: event.target.value,
+    }));
+    setBillFormErrors((current) => ({
+      ...current,
+      dueDate: "",
+    }));
+  }
 
   const stats = useMemo(() => {
     const openBills = bills.filter(
@@ -496,6 +618,51 @@ export default function BillPaymentsPage() {
   }, [loadDashboard, loadProviders]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const desktopPref = window.localStorage.getItem("billPayments.compactMode");
+    const methodsPanelPref = window.localStorage.getItem(
+      "billPayments.showPaymentMethods",
+    );
+    if (desktopPref === "true") {
+      setCompactMode(true);
+    } else if (desktopPref === "false") {
+      setCompactMode(false);
+    }
+    if (methodsPanelPref === "true") {
+      setShowPaymentMethods(true);
+    } else if (methodsPanelPref === "false") {
+      setShowPaymentMethods(false);
+    }
+
+    const updateViewportMode = () => {
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
+      setIsMobileViewport(isMobile);
+      if (isMobile) {
+        setCompactMode(true);
+      }
+    };
+
+    updateViewportMode();
+    window.addEventListener("resize", updateViewportMode);
+    return () => window.removeEventListener("resize", updateViewportMode);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isMobileViewport) return;
+    window.localStorage.setItem("billPayments.compactMode", String(compactMode));
+  }, [compactMode, isMobileViewport]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "billPayments.showPaymentMethods",
+      String(showPaymentMethods),
+    );
+  }, [showPaymentMethods]);
+
+  useEffect(() => {
     if (deferredProviderQuery.trim().length < 2) {
       loadProviders();
       return;
@@ -507,6 +674,7 @@ export default function BillPaymentsPage() {
     if (loading) return;
 
     if (pathname === "/bill-payments/new") {
+      setBillDrawerOpen(true);
       if (editingBillId) {
         setEditingBillId("");
       }
@@ -526,17 +694,33 @@ export default function BillPaymentsPage() {
     }
   }, [bills, editingBillId, loading, pathname, routeBillId]);
 
-  const selectedPaymentMethodId = useMemo(() => {
-    const defaultMethod = executablePaymentMethods.find(
-      (method) => method.isDefault,
-    );
-    return defaultMethod?.id || executablePaymentMethods[0]?.id || "";
+  const selectedPaymentMethodId = selectedPaymentMethod?.id || "";
+
+  useEffect(() => {
+    if (!executablePaymentMethods.length) {
+      setBulkPaymentMethodId("");
+      setBulkPaymentMethodMenuOpen(false);
+      return;
+    }
+
+    setBulkPaymentMethodId((current) => {
+      if (executablePaymentMethods.some((method) => method.id === current)) {
+        return current;
+      }
+      const defaultMethod = executablePaymentMethods.find(
+        (method) => method.isDefault,
+      );
+      return defaultMethod?.id || executablePaymentMethods[0]?.id || "";
+    });
   }, [executablePaymentMethods]);
 
   function resetBillForm({ keepCurrentRoute = false } = {}) {
     setBillForm(initialBillForm);
+    setBillFormErrors({});
     setEditingBillId("");
     setProviderQuery("");
+    setProviderPickerOpen(false);
+    setBillDrawerOpen(false);
     if (!keepCurrentRoute && pathname !== "/bill-payments") {
       router.replace("/bill-payments");
     }
@@ -559,14 +743,24 @@ export default function BillPaymentsPage() {
       tags: (bill.tags || []).join(", "),
       notes: bill.notes || "",
     });
+    setBillFormErrors({});
     setProviderQuery(bill.providerName || "");
+    setProviderPickerOpen(false);
+    setBillDrawerOpen(true);
     if (navigate && pathname !== `/bill-payments/${bill.id}`) {
       router.push(`/bill-payments/${bill.id}`);
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function saveBill() {
+    const nextErrors = validateBillForm(billForm);
+    setBillFormErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setError(nextErrors.accountNumber || "Please fix the highlighted fields.");
+      setNotice("");
+      return;
+    }
+
     setSavingBill(true);
     setError("");
     setNotice("");
@@ -598,6 +792,17 @@ export default function BillPaymentsPage() {
     } finally {
       setSavingBill(false);
     }
+  }
+
+  function openPaymentMethodSelector() {
+    if (!canManageSensitiveData) {
+      return;
+    }
+    if (!executablePaymentMethods.length && stripePromise) {
+      startPaymentMethodSetup("card");
+      return;
+    }
+    setBulkPaymentMethodMenuOpen((current) => !current);
   }
 
   async function deleteBill(id) {
@@ -879,6 +1084,1000 @@ export default function BillPaymentsPage() {
     } finally {
       setAutopaySavingId("");
     }
+  }
+
+  if (true) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "clamp(14px, 2.5vw, 26px)",
+          background:
+            "radial-gradient(circle at 0% 0%, rgba(14,116,144,0.10), transparent 32%), radial-gradient(circle at 100% 100%, rgba(15,118,110,0.08), transparent 40%), #f3f6f9",
+          fontFamily: "'Segoe UI', sans-serif",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1140,
+            margin: "0 auto",
+            display: "grid",
+            gap: 18,
+          }}
+        >
+          <section
+            style={{
+              background: "rgba(255,255,255,0.95)",
+              border: "1px solid rgba(15,23,42,0.08)",
+              borderRadius: 22,
+              padding: "clamp(14px, 2vw, 22px)",
+              boxShadow: "0 20px 40px rgba(15,23,42,0.06)",
+              display: "grid",
+              gap: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: "clamp(1.55rem, 2.6vw, 2.15rem)",
+                    color: "#0f172a",
+                    letterSpacing: "-0.03em",
+                    lineHeight: 1.08,
+                  }}
+                >
+                  Bills & Payments
+                </h1>
+                <p style={{ margin: "7px 0 0", color: "#64748b", fontSize: 15 }}>
+                  View, select, and pay bills fast.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingBillId("");
+                  setBillForm(initialBillForm);
+                  setBillFormErrors({});
+                  setProviderQuery("");
+                  setBillDrawerOpen(true);
+                  if (pathname !== "/bill-payments/new") {
+                    router.push("/bill-payments/new");
+                  }
+                }}
+                style={{
+                  border: 0,
+                  borderRadius: 999,
+                  background: "linear-gradient(135deg, #0f766e, #0b5f5a)",
+                  color: "#fff",
+                  padding: "11px 17px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 10px 20px rgba(15,118,110,0.26)",
+                }}
+              >
+                + Add Bill
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMobileViewport) return;
+                  setCompactMode((current) => !current);
+                }}
+                disabled={isMobileViewport}
+                style={{
+                  borderRadius: 999,
+                  border: "1px solid rgba(15,23,42,0.16)",
+                  background: compactMode ? "#0f172a" : "#fff",
+                  color: compactMode ? "#fff" : "#0f172a",
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: isMobileViewport ? "not-allowed" : "pointer",
+                  opacity: isMobileViewport ? 0.72 : 1,
+                }}
+              >
+                {isMobileViewport
+                  ? "Compact: ON (Mobile)"
+                  : compactMode
+                    ? "Compact: ON"
+                    : "Compact: OFF"}
+              </button>
+              <span
+                style={{
+                  borderRadius: 999,
+                  background: "rgba(15,23,42,0.06)",
+                  padding: "6px 10px",
+                  color: "#334155",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Open Balance: {formatCurrency(stats.totalDue)}
+              </span>
+              <span
+                style={{
+                  borderRadius: 999,
+                  background: "rgba(15,118,110,0.10)",
+                  padding: "6px 10px",
+                  color: "#0f766e",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                Selected: {selectedBillIds.length} bill{selectedBillIds.length === 1 ? "" : "s"} ({formatCurrency(selectedTotalAmount)})
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 9,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid rgba(15,23,42,0.12)",
+                  padding: "10px 11px",
+                  background: "#fff",
+                }}
+              >
+                <option value="all">Status: All</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="open">Open</option>
+                <option value="due_soon">Due soon</option>
+                <option value="overdue">Overdue</option>
+                <option value="processing">Processing</option>
+                <option value="paid">Paid</option>
+                <option value="failed">Failed</option>
+              </select>
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid rgba(15,23,42,0.12)",
+                  padding: "10px 11px",
+                  background: "#fff",
+                }}
+              >
+                <option value="all">Category: All</option>
+                {BILL_CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+
+              <div
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setBulkPaymentMethodMenuOpen(false);
+                  }
+                }}
+                style={{ position: "relative" }}
+              >
+                <button
+                  type="button"
+                  onClick={openPaymentMethodSelector}
+                  disabled={!canManageSensitiveData || (!executablePaymentMethods.length && !stripePromise)}
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "#fff",
+                    color: "#0f172a",
+                    padding: "10px 11px",
+                    fontWeight: 600,
+                    cursor:
+                      canManageSensitiveData &&
+                      (executablePaymentMethods.length || stripePromise)
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                >
+                  {formatSelectedPaymentMethodLabel(selectedPaymentMethod)}
+                </button>
+                {bulkPaymentMethodMenuOpen && executablePaymentMethods.length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      left: 0,
+                      zIndex: 20,
+                      background: "#fff",
+                      borderRadius: 14,
+                      border: "1px solid rgba(15,23,42,0.12)",
+                      boxShadow: "0 14px 30px rgba(15,23,42,0.12)",
+                      minWidth: 280,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {executablePaymentMethods.map((method) => (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => {
+                          setBulkPaymentMethodId(method.id);
+                          setBulkPaymentMethodMenuOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          border: 0,
+                          background:
+                            method.id === selectedPaymentMethodId
+                              ? "rgba(15,118,110,0.08)"
+                              : "#fff",
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {formatSelectedPaymentMethodLabel(method)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={paySelectedBills}
+                disabled={
+                  !canManageSensitiveData ||
+                  !selectedBillIds.length ||
+                  paying ||
+                  !executablePaymentMethods.length
+                }
+                style={{
+                  border: 0,
+                  borderRadius: 999,
+                  background: !canManageSensitiveData
+                    ? "#94a3b8"
+                    : "linear-gradient(135deg, #0f766e, #0b5f5a)",
+                  color: "#fff",
+                  padding: "11px 16px",
+                  fontWeight: 700,
+                  cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                  boxShadow: canManageSensitiveData
+                    ? "0 10px 20px rgba(15,118,110,0.24)"
+                    : "none",
+                }}
+              >
+                {paying
+                  ? "Submitting..."
+                  : `Pay Selected (${selectedBillIds.length}) • ${formatCurrency(selectedTotalAmount)}`}
+              </button>
+            </div>
+
+            {(error || notice) && (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: `1px solid ${error ? "rgba(239,68,68,0.24)" : "rgba(16,185,129,0.22)"}`,
+                  background: error ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)",
+                  color: error ? "#991b1b" : "#065f46",
+                }}
+              >
+                {error || notice}
+              </div>
+            )}
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {loading ? (
+                <div style={{ padding: 18, color: "#64748b" }}>Loading bills...</div>
+              ) : filteredBills.length === 0 ? (
+                <div
+                  style={{
+                    padding: 18,
+                    borderRadius: 12,
+                    background: "#f8fafc",
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    color: "#64748b",
+                  }}
+                >
+                  No bills match the current filters.
+                </div>
+              ) : (
+                filteredBills.map((bill) => {
+                  const selected = selectedBillIds.includes(bill.id);
+                  const statusLabel = bill.status === "due_soon"
+                    ? "Due soon"
+                    : bill.status === "overdue"
+                      ? "Overdue"
+                      : bill.status === "paid"
+                        ? "Paid"
+                        : bill.status;
+                  const statusTone = bill.status === "overdue"
+                    ? { bg: "rgba(239,68,68,0.12)", color: "#991b1b" }
+                    : bill.status === "due_soon"
+                      ? { bg: "rgba(245,158,11,0.18)", color: "#92400e" }
+                      : bill.status === "paid"
+                        ? { bg: "rgba(16,185,129,0.16)", color: "#065f46" }
+                        : { bg: "rgba(15,23,42,0.08)", color: "#334155" };
+                  return (
+                    <article
+                      key={bill.id}
+                      style={{
+                        border: selected
+                          ? "1px solid rgba(15,118,110,0.42)"
+                          : "1px solid rgba(15,23,42,0.10)",
+                        background: selected ? "rgba(15,118,110,0.04)" : "#fff",
+                        borderRadius: 16,
+                        padding: compactMode ? "10px 11px" : "14px 14px 13px",
+                        display: "grid",
+                        gap: compactMode ? 7 : 10,
+                        boxShadow: selected
+                          ? "0 12px 24px rgba(15,118,110,0.10)"
+                          : "0 6px 12px rgba(15,23,42,0.03)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            alignItems: "flex-start",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(event) =>
+                              setSelectedBillIds((current) =>
+                                event.target.checked
+                                  ? [...current, bill.id]
+                                  : current.filter((id) => id !== bill.id),
+                              )
+                            }
+                            style={{ marginTop: 4 }}
+                          />
+                          <div>
+                            <div style={{ display: "flex", gap: compactMode ? 6 : 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <strong style={{ color: "#0f172a", fontSize: compactMode ? 15 : 17 }}>
+                                {bill.providerName}
+                              </strong>
+                              <span
+                                style={{
+                                  padding: compactMode ? "2px 7px" : "3px 8px",
+                                  borderRadius: 999,
+                                  background: statusTone.bg,
+                                  color: statusTone.color,
+                                  fontSize: compactMode ? 10 : 11,
+                                  fontWeight: 700,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                {statusLabel}
+                              </span>
+                            </div>
+                            <div style={{ marginTop: compactMode ? 2 : 4, color: "#64748b", fontSize: compactMode ? 12 : 13 }}>
+                              {bill.accountLabel || "General account"}
+                              {bill.accountReferenceMasked
+                                ? ` | ${bill.accountReferenceMasked}`
+                                : ""}
+                            </div>
+                            <div style={{ marginTop: compactMode ? 4 : 6, display: "flex", gap: compactMode ? 10 : 14, color: "#334155", fontSize: compactMode ? 13 : 14, flexWrap: "wrap" }}>
+                              <span>Due {formatDate(bill.dueDate)}</span>
+                              <strong>{formatCurrency(bill.amountDue, bill.currency)}</strong>
+                              <span>{(BILL_CATEGORIES.find((c) => c.id === bill.category)?.label) || "General"}</span>
+                            </div>
+                          </div>
+                        </label>
+
+                        <div style={{ display: "flex", gap: compactMode ? 6 : 8, flexWrap: "wrap" }}>
+                          {bill.status !== "paid" && bill.status !== "processing" && (
+                            <button
+                              type="button"
+                              onClick={() => payBillNow(bill.id)}
+                              disabled={
+                                !canManageSensitiveData ||
+                                paying ||
+                                !selectedPaymentMethodId
+                              }
+                              style={{
+                                borderRadius: 999,
+                                border: "1px solid rgba(15,118,110,0.28)",
+                                background: "rgba(15,118,110,0.08)",
+                                color: "#0f766e",
+                                padding: compactMode ? "6px 10px" : "8px 12px",
+                                fontWeight: 700,
+                                cursor:
+                                  canManageSensitiveData &&
+                                  !paying &&
+                                  selectedPaymentMethodId
+                                    ? "pointer"
+                                    : "not-allowed",
+                              }}
+                            >
+                              Pay now
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => selectBillForEdit(bill)}
+                            style={{
+                              borderRadius: 999,
+                              border: "1px solid rgba(15,23,42,0.14)",
+                              background: "#fff",
+                              color: "#0f172a",
+                              padding: compactMode ? "6px 10px" : "8px 12px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteBill(bill.id)}
+                            style={{
+                              borderRadius: 999,
+                              border: "1px solid rgba(239,68,68,0.24)",
+                              background: "#fff5f5",
+                              color: "#b91c1c",
+                              padding: compactMode ? "6px 10px" : "8px 12px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          <section
+            style={{
+              background: "rgba(255,255,255,0.92)",
+              border: "1px solid rgba(15,23,42,0.08)",
+              borderRadius: 16,
+              padding: 14,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowPaymentMethods((current) => !current)}
+              style={{
+                border: 0,
+                background: "transparent",
+                color: "#0f172a",
+                fontWeight: 700,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              {showPaymentMethods ? "Hide payment methods" : "Manage payment methods"}
+            </button>
+
+            {showPaymentMethods && (
+              <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => startPaymentMethodSetup("card")}
+                    disabled={!canManageSensitiveData || !stripePromise}
+                    style={{
+                      border: 0,
+                      borderRadius: 999,
+                      background: "#0f766e",
+                      color: "#fff",
+                      padding: "8px 12px",
+                      fontWeight: 700,
+                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    Add card/debit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startPaymentMethodSetup("bank_account")}
+                    disabled={!canManageSensitiveData || !stripePromise}
+                    style={{
+                      borderRadius: 999,
+                      border: "1px solid rgba(15,23,42,0.14)",
+                      background: "#fff",
+                      color: "#0f172a",
+                      padding: "8px 12px",
+                      fontWeight: 700,
+                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    Add ACH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={launchPlaidLink}
+                    disabled={!canManageSensitiveData || plaidLaunching}
+                    style={{
+                      borderRadius: 999,
+                      border: "1px solid rgba(14,165,233,0.22)",
+                      background: "rgba(14,165,233,0.08)",
+                      color: "#075985",
+                      padding: "8px 12px",
+                      fontWeight: 700,
+                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    {plaidLaunching ? "Opening Plaid..." : "Link bank via Plaid"}
+                  </button>
+                </div>
+
+                {setupIntentState.active &&
+                  setupIntentState.clientSecret &&
+                  stripePromise && (
+                    <Elements
+                      stripe={stripePromise}
+                      options={{
+                        clientSecret: setupIntentState.clientSecret,
+                        appearance: {
+                          theme: "flat",
+                          variables: {
+                            colorPrimary: "#0f766e",
+                            borderRadius: "14px",
+                          },
+                        },
+                      }}
+                    >
+                      <PaymentMethodSetupForm
+                        methodType={setupIntentState.methodType}
+                        billingDetails={{
+                          name:
+                            authUser?.name ||
+                            authUser?.fullName ||
+                            authUser?.email ||
+                            "",
+                          email: authUser?.email || "",
+                        }}
+                        saving={savingMethod}
+                        setSaving={setSavingMethod}
+                        onCancel={() =>
+                          setSetupIntentState({
+                            active: false,
+                            clientSecret: "",
+                            methodType: "card",
+                          })
+                        }
+                        onError={setError}
+                        onSaved={async (method) => {
+                          setSetupIntentState({
+                            active: false,
+                            clientSecret: "",
+                            methodType: "card",
+                          });
+                          setBulkPaymentMethodId(method.id || "");
+                          setBulkPaymentMethodMenuOpen(false);
+                          setNotice(
+                            method
+                              ? `Selected ${formatSelectedPaymentMethodLabel(method)}.`
+                              : "Payment method saved.",
+                          );
+                          await loadDashboard();
+                        }}
+                      />
+                    </Elements>
+                  )}
+
+                <div style={{ display: "grid", gap: 8 }}>
+                  {paymentMethods.length === 0 ? (
+                    <div style={{ color: "#64748b" }}>No saved payment methods yet.</div>
+                  ) : (
+                    paymentMethods.map((method) => (
+                      <div
+                        key={method.id}
+                        style={{
+                          border: "1px solid rgba(15,23,42,0.1)",
+                          borderRadius: 10,
+                          padding: "8px 10px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#0f172a" }}>
+                            {method.methodLabel}
+                          </div>
+                          <div style={{ color: "#64748b", fontSize: 13 }}>
+                            {method.provider || "stripe"}
+                            {method.isDefault ? " | Default" : ""}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {!method.isDefault && method.provider !== "plaid" && (
+                            <button
+                              type="button"
+                              onClick={() => markMethodDefault(method.id)}
+                              style={{
+                                borderRadius: 999,
+                                border: "1px solid rgba(15,23,42,0.14)",
+                                background: "#fff",
+                                color: "#0f172a",
+                                padding: "6px 10px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Make default
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeMethod(method.id)}
+                            style={{
+                              borderRadius: 999,
+                              border: "1px solid rgba(239,68,68,0.24)",
+                              background: "#fff5f5",
+                              color: "#b91c1c",
+                              padding: "6px 10px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+
+        {billDrawerOpen && (
+          <>
+            <button
+              type="button"
+              aria-label="Close drawer"
+              onClick={() => resetBillForm({ keepCurrentRoute: false })}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(15,23,42,0.44)",
+                border: 0,
+                padding: 0,
+                margin: 0,
+                cursor: "pointer",
+                zIndex: 50,
+              }}
+            />
+            <aside
+              style={{
+                position: "fixed",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: "min(480px, 100vw)",
+                background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                zIndex: 60,
+                borderLeft: "1px solid rgba(15,23,42,0.10)",
+                boxShadow: "-20px 0 50px rgba(15,23,42,0.15)",
+                overflowY: "auto",
+                padding: 20,
+                display: "grid",
+                gap: 14,
+                alignContent: "start",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <h2 style={{ margin: 0, color: "#0f172a" }}>
+                  {editingBillId ? "Edit bill" : "Add bill"}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => resetBillForm({ keepCurrentRoute: false })}
+                  style={{
+                    border: "1px solid rgba(15,23,42,0.14)",
+                    borderRadius: 10,
+                    background: "#fff",
+                    color: "#0f172a",
+                    padding: "6px 10px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <input
+                  value={billForm.providerName}
+                  onChange={(event) => {
+                    setBillForm((current) => ({
+                      ...current,
+                      providerName: event.target.value,
+                      providerId: "",
+                    }));
+                    setBillFormErrors((current) => ({ ...current, providerName: "" }));
+                  }}
+                  placeholder="Provider / Payee"
+                  style={{
+                    borderRadius: 12,
+                    border: billFormErrors.providerName
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                  }}
+                />
+                {billFormErrors.providerName && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -2 }}>
+                    {billFormErrors.providerName}
+                  </div>
+                )}
+
+                <input
+                  value={billForm.accountLabel}
+                  onChange={handleAccountLabelChange}
+                  placeholder="Account label"
+                  style={{
+                    borderRadius: 12,
+                    border: billFormErrors.accountLabel
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                  }}
+                />
+                {billFormErrors.accountLabel && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -2 }}>
+                    {billFormErrors.accountLabel}
+                  </div>
+                )}
+
+                <input
+                  value={billForm.accountNumber}
+                  onChange={handleAccountNumberChange}
+                  inputMode="numeric"
+                  placeholder="Account or member number"
+                  style={{
+                    borderRadius: 12,
+                    border: accountNumberError
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                  }}
+                />
+                {accountNumberError && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -2 }}>
+                    {accountNumberError}
+                  </div>
+                )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <input
+                    value={billForm.amountDue}
+                    onChange={handleAmountDueChange}
+                    placeholder="Amount due"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    style={{
+                      borderRadius: 12,
+                      border: billFormErrors.amountDue
+                        ? "1px solid #dc2626"
+                        : "1px solid rgba(15,23,42,0.12)",
+                      padding: "12px 14px",
+                    }}
+                  />
+                  <input
+                    value={billForm.minimumAmount}
+                    onChange={(event) =>
+                      setBillForm((current) => ({
+                        ...current,
+                        minimumAmount: event.target.value,
+                      }))
+                    }
+                    placeholder="Minimum amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    style={{
+                      borderRadius: 12,
+                      border: "1px solid rgba(15,23,42,0.12)",
+                      padding: "12px 14px",
+                    }}
+                  />
+                </div>
+                {billFormErrors.amountDue && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -2 }}>
+                    {billFormErrors.amountDue}
+                  </div>
+                )}
+
+                <input
+                  value={billForm.dueDate}
+                  onChange={handleDueDateChange}
+                  type="date"
+                  style={{
+                    borderRadius: 12,
+                    border: billFormErrors.dueDate
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                  }}
+                />
+                {billFormErrors.dueDate && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -2 }}>
+                    {billFormErrors.dueDate}
+                  </div>
+                )}
+
+                <select
+                  value={billForm.category}
+                  onChange={(event) =>
+                    setBillForm((current) => ({
+                      ...current,
+                      category: event.target.value,
+                    }))
+                  }
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                    background: "#fff",
+                  }}
+                >
+                  {BILL_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,23,42,0.08)",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={billForm.isRecurring}
+                    onChange={(event) =>
+                      setBillForm((current) => ({
+                        ...current,
+                        isRecurring: event.target.checked,
+                      }))
+                    }
+                  />
+                  Recurring bill
+                </label>
+
+                {billForm.isRecurring && (
+                  <select
+                    value={billForm.frequency}
+                    onChange={(event) =>
+                      setBillForm((current) => ({
+                        ...current,
+                        frequency: event.target.value,
+                      }))
+                    }
+                    style={{
+                      borderRadius: 12,
+                      border: "1px solid rgba(15,23,42,0.12)",
+                      padding: "12px 14px",
+                      background: "#fff",
+                    }}
+                  >
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                )}
+
+                <textarea
+                  value={billForm.notes}
+                  onChange={(event) =>
+                    setBillForm((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
+                  placeholder="Internal note"
+                  rows={3}
+                  style={{
+                    borderRadius: 12,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    padding: "12px 14px",
+                    resize: "vertical",
+                  }}
+                />
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={saveBill}
+                    disabled={savingBill}
+                    style={{
+                      border: 0,
+                      borderRadius: 999,
+                      background: "#0f766e",
+                      color: "#fff",
+                      padding: "10px 14px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {savingBill
+                      ? "Saving..."
+                      : editingBillId
+                        ? "Update bill"
+                        : "Add bill"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetBillForm({ keepCurrentRoute: false })}
+                    style={{
+                      borderRadius: 999,
+                      border: "1px solid rgba(15,23,42,0.14)",
+                      background: "#fff",
+                      color: "#0f172a",
+                      padding: "10px 14px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </aside>
+          </>
+        )}
+      </main>
+    );
   }
 
   const pageGradient =
@@ -1383,6 +2582,113 @@ export default function BillPaymentsPage() {
                 flexWrap: "wrap",
               }}
             >
+              <div
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setBulkPaymentMethodMenuOpen(false);
+                  }
+                }}
+                style={{ position: "relative" }}
+              >
+                <button
+                  type="button"
+                  onClick={openPaymentMethodSelector}
+                  disabled={!canManageSensitiveData || (!executablePaymentMethods.length && !stripePromise)}
+                  style={{
+                    minWidth: 260,
+                    borderRadius: 18,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "#fff",
+                    color: "#0f172a",
+                    padding: "12px 16px",
+                    fontWeight: 600,
+                    display: "grid",
+                    gap: 4,
+                    textAlign: "left",
+                    cursor: canManageSensitiveData &&
+                      (executablePaymentMethods.length || stripePromise)
+                      ? "pointer"
+                      : "not-allowed",
+                  }}
+                >
+                  <span style={{ fontSize: 12, color: "#64748b" }}>
+                    Payment method
+                  </span>
+                  <span>
+                    {formatSelectedPaymentMethodLabel(selectedPaymentMethod)}
+                  </span>
+                </button>
+                {bulkPaymentMethodMenuOpen && executablePaymentMethods.length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      left: 0,
+                      minWidth: "100%",
+                      zIndex: 20,
+                      background: "#fff",
+                      borderRadius: 18,
+                      border: "1px solid rgba(15,23,42,0.10)",
+                      boxShadow: "0 18px 40px rgba(15,23,42,0.12)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {executablePaymentMethods.map((method) => (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => {
+                          setBulkPaymentMethodId(method.id);
+                          setBulkPaymentMethodMenuOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          background:
+                            method.id === selectedPaymentMethodId
+                              ? "rgba(15,118,110,0.08)"
+                              : "#fff",
+                          border: 0,
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid rgba(15,23,42,0.06)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, color: "#0f172a" }}>
+                          {formatSelectedPaymentMethodLabel(method)}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#64748b" }}>
+                          {method.isDefault ? "Default" : "Saved payment method"}
+                        </div>
+                      </button>
+                    ))}
+                    {stripePromise && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkPaymentMethodMenuOpen(false);
+                          startPaymentMethodSetup("card");
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          background: "#fff",
+                          border: 0,
+                          padding: "12px 14px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, color: "#0f766e" }}>
+                          Add new card with Stripe
+                        </div>
+                        <div style={{ fontSize: 13, color: "#64748b" }}>
+                          Open Stripe payment selector
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={paySelectedBills}
@@ -1789,11 +3095,19 @@ export default function BillPaymentsPage() {
                                   border: "1px solid rgba(15,23,42,0.14)",
                                   background: "#fff",
                                   color: "#0f172a",
-                                  padding: "10px 14px",
+                                  padding: "6px 10px",
+                                  fontSize: 12,
                                   fontWeight: 600,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
                                   cursor: "pointer",
                                 }}
                               >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M12 20h9" />
+                                  <path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+                                </svg>
                                 Edit
                               </button>
                               {bill.status !== "paid" && (
@@ -1842,11 +3156,22 @@ export default function BillPaymentsPage() {
                                   border: "1px solid rgba(239,68,68,0.24)",
                                   background: "#fff5f5",
                                   color: "#b91c1c",
-                                  padding: "10px 14px",
+                                  padding: "6px 10px",
+                                  fontSize: 12,
                                   fontWeight: 600,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
                                   cursor: "pointer",
                                 }}
                               >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M3 6h18" />
+                                  <path d="M8 6V4h8v2" />
+                                  <path d="M19 6l-1 14H6L5 6" />
+                                  <path d="M10 11v6" />
+                                  <path d="M14 11v6" />
+                                </svg>
                                 Delete
                               </button>
                             </div>
@@ -2168,16 +3493,33 @@ export default function BillPaymentsPage() {
                 {categoryFieldHints.selectedCategory?.icon} {categoryFieldHints.selectedCategory?.label}: {categoryFieldHints.helper}
               </div>
               <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-                <div style={{ position: "relative" }}>
+                <div
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                      setProviderPickerOpen(false);
+                    }
+                  }}
+                  style={{ position: "relative" }}
+                >
                   <input
                     value={providerQuery}
                     onChange={(event) => {
                       setProviderQuery(event.target.value);
+                      setProviderPickerOpen(event.target.value.trim().length >= 2);
+                      setBillFormErrors((current) => ({
+                        ...current,
+                        providerName: "",
+                      }));
                       setBillForm((current) => ({
                         ...current,
                         providerName: event.target.value,
                         providerId: "",
                       }));
+                    }}
+                    onFocus={() => {
+                      if (providerQuery.trim().length >= 2) {
+                        setProviderPickerOpen(true);
+                      }
                     }}
                     placeholder={categoryFieldHints.providerPlaceholder}
                     style={{
@@ -2187,7 +3529,9 @@ export default function BillPaymentsPage() {
                       padding: "14px 16px",
                     }}
                   />
-                  {providerQuery.trim().length >= 2 && providers.length > 0 && (
+                  {providerPickerOpen &&
+                    providerQuery.trim().length >= 2 &&
+                    providers.length > 0 && (
                     <div
                       style={{
                         position: "absolute",
@@ -2195,6 +3539,8 @@ export default function BillPaymentsPage() {
                         left: 0,
                         right: 0,
                         zIndex: 20,
+                        maxHeight: 280,
+                        overflowY: "auto",
                         background: "#fff",
                         borderRadius: 18,
                         border: "1px solid rgba(15,23,42,0.10)",
@@ -2213,6 +3559,11 @@ export default function BillPaymentsPage() {
                               providerName: provider.providerName,
                             }));
                             setProviderQuery(provider.providerName);
+                            setProviderPickerOpen(false);
+                            setBillFormErrors((current) => ({
+                              ...current,
+                              providerName: "",
+                            }));
                           }}
                           style={{
                             width: "100%",
@@ -2237,34 +3588,40 @@ export default function BillPaymentsPage() {
                 </div>
                 <input
                   value={billForm.accountLabel}
-                  onChange={(event) =>
-                    setBillForm((current) => ({
-                      ...current,
-                      accountLabel: event.target.value,
-                    }))
-                  }
+                  onChange={handleAccountLabelChange}
                   placeholder={categoryFieldHints.accountLabelPlaceholder}
                   style={{
                     borderRadius: 16,
-                    border: "1px solid rgba(15,23,42,0.12)",
+                    border: billFormErrors.accountLabel
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
                     padding: "14px 16px",
                   }}
                 />
+                {billFormErrors.accountLabel && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -4 }}>
+                    {billFormErrors.accountLabel}
+                  </div>
+                )}
                 <input
                   value={billForm.accountNumber}
-                  onChange={(event) =>
-                    setBillForm((current) => ({
-                      ...current,
-                      accountNumber: event.target.value,
-                    }))
-                  }
+                  onChange={handleAccountNumberChange}
+                  aria-invalid={accountNumberError ? "true" : "false"}
+                  inputMode="numeric"
                   placeholder="Account or member number"
                   style={{
                     borderRadius: 16,
-                    border: "1px solid rgba(15,23,42,0.12)",
+                    border: accountNumberError
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
                     padding: "14px 16px",
                   }}
                 />
+                {accountNumberError && (
+                  <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -4 }}>
+                    {accountNumberError}
+                  </div>
+                )}
                 <div
                   style={{
                     display: "grid",
@@ -2274,19 +3631,16 @@ export default function BillPaymentsPage() {
                 >
                   <input
                     value={billForm.amountDue}
-                    onChange={(event) =>
-                      setBillForm((current) => ({
-                        ...current,
-                        amountDue: event.target.value,
-                      }))
-                    }
+                    onChange={handleAmountDueChange}
                     placeholder="Amount due"
                     type="number"
                     min="0"
                     step="0.01"
                     style={{
                       borderRadius: 16,
-                      border: "1px solid rgba(15,23,42,0.12)",
+                      border: billFormErrors.amountDue
+                        ? "1px solid #dc2626"
+                        : "1px solid rgba(15,23,42,0.12)",
                       padding: "14px 16px",
                     }}
                   />
@@ -2321,19 +3675,30 @@ export default function BillPaymentsPage() {
                 )}
                 <input
                   value={billForm.dueDate}
-                  onChange={(event) =>
-                    setBillForm((current) => ({
-                      ...current,
-                      dueDate: event.target.value,
-                    }))
-                  }
+                  onChange={handleDueDateChange}
                   type="date"
                   style={{
                     borderRadius: 16,
-                    border: "1px solid rgba(15,23,42,0.12)",
+                    border: billFormErrors.dueDate
+                      ? "1px solid #dc2626"
+                      : "1px solid rgba(15,23,42,0.12)",
                     padding: "14px 16px",
                   }}
                 />
+                {(billFormErrors.amountDue || billFormErrors.dueDate) && (
+                  <div style={{ display: "grid", gap: 4, marginTop: -4 }}>
+                    {billFormErrors.amountDue && (
+                      <div style={{ color: "#b91c1c", fontSize: 13 }}>
+                        {billFormErrors.amountDue}
+                      </div>
+                    )}
+                    {billFormErrors.dueDate && (
+                      <div style={{ color: "#b91c1c", fontSize: 13 }}>
+                        {billFormErrors.dueDate}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {/* Category selector */}
                 <select
                   value={billForm.category}
@@ -2584,6 +3949,10 @@ export default function BillPaymentsPage() {
                     >
                       <PaymentMethodSetupForm
                         methodType={setupIntentState.methodType}
+                        billingDetails={{
+                          name: authUser?.name || authUser?.fullName || authUser?.email || "",
+                          email: authUser?.email || "",
+                        }}
                         saving={savingMethod}
                         setSaving={setSavingMethod}
                         onCancel={() =>
@@ -2594,13 +3963,19 @@ export default function BillPaymentsPage() {
                           })
                         }
                         onError={setError}
-                        onSaved={async () => {
+                        onSaved={async (method) => {
                           setSetupIntentState({
                             active: false,
                             clientSecret: "",
                             methodType: "card",
                           });
-                          setNotice("Payment method saved.");
+                          setBulkPaymentMethodId(method.id || "");
+                          setBulkPaymentMethodMenuOpen(false);
+                          setNotice(
+                            method
+                              ? `Selected ${formatSelectedPaymentMethodLabel(method)}.`
+                              : "Payment method saved.",
+                          );
                           await loadDashboard();
                         }}
                       />

@@ -25,6 +25,68 @@
     "noInvoices": "No hay facturas registradas.",
     "invoiceWithoutNumber": "Factura sin numero"
   },
+  "dashboardControl": {
+    "operationsLabel": "Centro de control operativo",
+    "title": "Dashboard",
+    "subtitle": "Aqui tienes tu negocio de un vistazo.",
+    "subtitleWithName": "Bienvenido de nuevo, {{name}}. Aqui tienes tu negocio de un vistazo.",
+    "actions": {
+      "newEstimate": "Nuevo estimado",
+      "newJob": "Nuevo trabajo",
+      "addClient": "Agregar cliente"
+    },
+    "metrics": {
+      "revenue": "Ingresos",
+      "revenueHint": "Acumulado en trabajos y facturas pagadas",
+      "activeJobs": "Trabajos activos",
+      "activeJobsHint": "Actualmente en progreso",
+      "pendingEstimates": "Estimados pendientes",
+      "pendingEstimatesHint": "Esperando respuesta del cliente"
+    },
+    "sections": {
+      "performance": "Rendimiento",
+      "revenueTrend": "Tendencia de ingresos",
+      "lastPeriods": "Ultimos 10 periodos",
+      "updates": "Actualizaciones",
+      "recentActivity": "Actividad reciente",
+      "workspace": "Espacio de trabajo",
+      "coreModules": "Modulos principales",
+      "financeStatus": "Estado financiero",
+      "collectionsHealth": "Salud de cobranza"
+    },
+    "chart": {
+      "outstanding": "Pendiente:",
+      "unpaidInvoices": "Facturas sin pagar:"
+    },
+    "activity": {
+      "paymentRecorded": "Pago registrado {{amount}}",
+      "estimateAwaitingApproval": "Estimado pendiente de aprobacion del cliente",
+      "invoiceReminderScheduled": "Recordatorio de factura programado",
+      "paymentReceivedCompletedJob": "Pago recibido por trabajo completado",
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "unknownDate": "Fecha desconocida"
+    },
+    "workspace": {
+      "clientsTitle": "Clientes",
+      "clientsDesc": "Consulta historial, notas y contactos de tus clientes.",
+      "clientsAction": "Ver clientes",
+      "estimatesTitle": "Estimados",
+      "estimatesDesc": "Crea estimados profesionales y monitorea aprobaciones.",
+      "estimatesAction": "Crear estimado",
+      "jobsTitle": "Trabajos",
+      "jobsDesc": "Gestiona trabajos activos, asignaciones y progreso.",
+      "jobsAction": "Abrir trabajos",
+      "invoicesTitle": "Facturas",
+      "invoicesDesc": "Envia facturas, cobra pagos y controla balances.",
+      "invoicesAction": "Ver facturas"
+    },
+    "statuses": {
+      "paid": "Pagado",
+      "pending": "Pendiente",
+      "overdue": "Vencido"
+    }
+  },
   "sections": {
     "clients": "Clientes",
     "jobs": "Trabajos",
@@ -209,7 +271,7 @@
     "websiteUrlPlaceholder": "https://tu-sitio.com",
     "googleReviewsPlaceholder": "https://g.page/r/... (Resenas de Google)",
     "phoneLabel": "Telefono de contacto",
-    "businessAddressLabel": "Direccion comercial (opcional)",
+    "businessAddressLabel": "Direccion comercial",
     "poBoxAddressLabel": "Apartado postal (opcional)",
     "legalFooterPlaceholder": "Texto legal para pie de pagina",
     "saveSettings": "Guardar ajustes",
@@ -310,8 +372,11 @@
       "contractAi": "No se pudo generar borrador IA para contrato",
       "contractAiFallback": "Error al redactar contrato con IA",
       "invoiceNeedsJob": "Primero vincula la factura a un trabajo para generar el contrato.",
-      "invalidLogoType": "Selecciona una imagen valida para el logo.",
-      "invalidLogoSize": "El logo debe pesar maximo 2MB.",
+      "businessAddressRequired": "La direccion comercial es obligatoria.",
+      "phoneRequired": "El telefono de contacto es obligatorio.",
+      "invalidLogoType": "Selecciona un archivo PNG, JPG o SVG para el logo.",
+      "invalidLogoSize": "El logo supera 2MB y no se puede guardar. Comprímelo en squoosh.app o tinypng.com e intenta de nuevo.",
+      "logoSizeHint": "Archivo aceptado. Para mejor rendimiento usa un logo de menos de 500KB — la mayoria comprime bien en squoosh.app.",
       "saveCompanyProfile": "No se pudo guardar el perfil de empresa",
       "saveCompanyProfileFallback": "Error al guardar perfil de empresa",
       "quoteLink": "No se pudo generar el link de quote",
@@ -362,7 +427,10 @@
     "calendar": "Calendario",
     "insights": "Estadisticas",
     "services": "Servicios",
-    "websiteBuilder": "Constructor Web",
+    "websiteBuilder": "Sitio Web",
+    "feedback": "Feedback",
+    "leadInbox": "Bandeja de Leads",
+    "ownerAdmin": "Admin del Dueño",
     "platform": "Plataforma",
     "settings": "Ajustes",
     "logout": "Cerrar sesion",
@@ -371,7 +439,7 @@
   "auth": {
     "loading": "Cargando...",
     "welcomeBack": "Bienvenido de nuevo",
-    "signInDesc": "Inicia sesion en tu cuenta de ContractorFlow.",
+    "signInDesc": "Inicia sesion en tu cuenta de FieldBase.",
     "createAccount": "Crea tu cuenta",
     "createAccountDesc": "Empieza a gestionar tu negocio de contratista.",
     "checkYourEmail": "Revisa tu email",
@@ -426,7 +494,21 @@
     "invalidCredentials": "Email o contrasena invalidos",
     "authError": "Error de autenticacion",
     "loginError": "No se pudo iniciar sesion",
-    "registerError": "No se pudo registrar"
+    "registerError": "No se pudo registrar",
+    "industries": {
+      "landscapingHardscaping": "Jardineria / Paisajismo",
+      "cleaning": "Limpieza",
+      "construction": "Construccion",
+      "generalContractor": "Contratista General",
+      "electrical": "Electricidad",
+      "hvac": "Climatizacion (HVAC)",
+      "handyman": "Mantenimiento General",
+      "painting": "Pintura",
+      "plumbing": "Plomeria",
+      "roofing": "Techado",
+      "treeCare": "Cuidado de Arboles",
+      "other": "Otro"
+    }
   },
   "quote": {
     "loading": "Cargando tu cotizacion...",
@@ -485,7 +567,7 @@
       "describeChanges": "Por favor describe los cambios que deseas.",
       "submit": "Algo salio mal. Intenta de nuevo."
     },
-    "footer": "Enviado con ContractorFlow"
+    "footer": "Enviado con FieldBase"
   },
   "notifications": {
     "title": "Notificaciones",
@@ -494,7 +576,7 @@
   },
   "verifyEmail": {
     "checkEmail": "Revisa tu email",
-    "checkEmailDesc": "Enviamos un enlace de verificacion a tu inbox. Hazle clic para activar tu cuenta y comenzar tu prueba gratuita de 22 dias.",
+    "checkEmailDesc": "Enviamos un enlace de verificacion a tu inbox. Hazle clic para activar tu cuenta y comenzar tu prueba gratuita de 30 dias.",
     "backToSignIn": "Volver al inicio de sesion",
     "verifying": "Verificando tu email...",
     "verifyingDesc": "Espera mientras activamos tu cuenta.",
@@ -502,15 +584,42 @@
     "resendPrompt": "Solicita un nuevo enlace de verificacion:"
   },
   "trial": {
-    "expired": "Tu periodo de prueba ha finalizado. Suscribete para seguir usando ContractorFlow.",
+    "expired": "Tu periodo de prueba ha finalizado. Suscribete para seguir usando FieldBase.",
     "daysLeft": "Te queda {{count}} dia en tu prueba gratuita.",
     "daysLeft_other": "Te quedan {{count}} dias en tu prueba gratuita.",
     "subscribe": "Suscribirse ahora"
   },
+  "feedback": {
+    "title": "Retroalimentacion",
+    "description": "Comparte una nota rapida sin salir de tu flujo de trabajo.",
+    "types": {
+      "suggestion": "Sugerencia",
+      "issue": "Problema",
+      "improvement": "Mejora"
+    },
+    "messagePlaceholder": "Cuentanos que te ayudaria.",
+    "screenshotLabel": "Captura de pantalla (opcional)",
+    "screenshotAttached": "Adjunto: {{name}}",
+    "buttons": {
+      "close": "Cerrar",
+      "cancel": "Cancelar",
+      "submit": "Enviar",
+      "submitting": "Enviando..."
+    },
+    "errors": {
+      "imageOnly": "Por favor carga un archivo de imagen.",
+      "fileSize": "La captura debe ser menor a 1.5MB.",
+      "fileRead": "No se pudo leer el archivo de captura.",
+      "messageRequired": "El mensaje es obligatorio.",
+      "submitFailed": "No se pudo enviar la retroalimentacion."
+    },
+    "success": "¡Gracias! Retroalimentacion enviada."
+  },
   "greeting": {
     "morning": "Buenos dias",
     "afternoon": "Buenas tardes",
-    "evening": "Buenas noches"
+    "evening": "Buenas noches",
+    "defaultName": "Amigo"
   },
   "clients": {
     "title": "Clientes",
@@ -549,6 +658,7 @@
       "save": "No se pudo guardar el cliente",
       "saveFallback": "Error al guardar cliente",
       "nameRequired": "El nombre del cliente es obligatorio",
+      "addressSelectionRequired": "Selecciona una direccion de la lista de sugerencias",
       "delete": "No se pudo eliminar el cliente",
       "deleteFallback": "Error al eliminar cliente"
     },
@@ -789,8 +899,33 @@
     },
     "weather": {
       "locationHint": "Se usa para obtener el pronóstico del tiempo para este trabajo",
+      "changeLocationLabel": "Cambiar ubicación",
+      "changeLocationPlaceholder": "Ciudad, pueblo, codigo postal o lat,lon",
+      "applyLocation": "Aplicar ubicación",
+      "activeLocation": "Ubicación actual",
       "outOfRange": "El pronóstico solo está disponible para los próximos 5 días",
-      "unavailable": "Clima no disponible"
+      "unavailable": "Clima no disponible",
+      "hourlyTitle": "Pronóstico por hora",
+      "noHourly": "No hay datos por hora para este día",
+      "checkingLocation": "Validando...",
+      "locationRequired": "Ingresa una ubicación para actualizar el pronóstico",
+      "locationInvalid": "No pudimos encontrar esa ubicación ahora. Prueba otra ciudad o código postal.",
+      "locationBestMatch": "Usando mejor coincidencia: {{location}}",
+      "locationFallbackNotice": "No pudimos ubicar ese lugar. Usaremos {{location}} por ahora.",
+      "locationSuggestionHint": "Empieza a escribir una ciudad o pueblo para ver sugerencias, o ingresa un codigo postal o coordenadas válidas.",
+      "scrollToCalendar": "Volver al calendario",
+      "fallbackLabel": "Respaldo",
+      "fallbackHint": "Usando datos de clima de respaldo",
+      "sectionTitle": "Pronóstico del clima",
+      "feelsLike": "Sensación: {{temp}}°F",
+      "humidity": "Humedad {{pct}}%",
+      "wind": "Viento {{speed}} mph",
+      "alertRain": "Probabilidad de lluvia — considerar reprogramar",
+      "alertStorm": "Tormenta esperada — se recomienda reprogramar",
+      "alertSnow": "Nieve esperada — verificar acceso al sitio de trabajo",
+      "alertHighWind": "Vientos fuertes — considerar reprogramar trabajo en exterior",
+      "alertMist": "Visibilidad reducida esperada",
+      "alertClear": "Cielo despejado — condiciones ideales"
     },
     "statusOptions": {
       "Scheduled": "Programada",
@@ -819,6 +954,9 @@
       "load": "Error al cargar calendario",
       "save": "No se pudo guardar la cita",
       "saveFallback": "Error al guardar cita",
+      "required": "Este campo es obligatorio",
+      "invalidDate": "La fecha debe estar en formato YYYY-MM-DD",
+      "pastDate": "No se puede programar en el pasado",
       "delete": "No se pudo eliminar la cita",
       "deleteFallback": "Error al eliminar cita"
     }
@@ -919,6 +1057,37 @@
       "reviewLineItems": "Revisa las partidas antes de continuar.",
       "missingUserContext": "Falta contexto de la cuenta. Recarga e intentalo de nuevo.",
       "createEstimate": "No se pudo crear el estimado"
+    }
+  },
+  "legal": {
+    "pageTitle": "Legal y Cumplimiento",
+    "version": "v1.0-abril-2026",
+    "updatedAt": "30 de abril de 2026",
+    "required": {
+      "heading": "Revisar y Aceptar los Terminos Legales",
+      "subheading": "Debes aceptar los Terminos Legales de FieldBase antes de acceder a la plataforma.",
+      "scrollHint": "Desplazate hacia abajo para leer todos los terminos antes de aceptar",
+      "checkbox": "He leido y acepto los Terminos Legales de FieldBase, incluyendo los Terminos de Servicio, Politica de Privacidad, Autorizacion de Pago, Consentimiento SMS y Terminos de Presupuesto/Factura.",
+      "accept": "Acepto \u2014 Continuar a la Plataforma",
+      "accepting": "Registrando aceptacion\u2026",
+      "alreadyAccepted": "Terminos ya aceptados. Redirigiendo\u2026",
+      "complianceNote": "Tu aceptacion queda registrada con fecha, hora, direccion IP e informacion del navegador para fines de cumplimiento."
+    },
+    "footer": {
+      "legal": "Legal y Cumplimiento",
+      "privacy": "Politica de Privacidad",
+      "terms": "Terminos de Servicio",
+      "sms": "Consentimiento SMS"
+    },
+    "acceptance": {
+      "heading": "Aceptar estos terminos",
+      "checkbox": "He leido y acepto todos los terminos de esta pagina.",
+      "submit": "Aceptar y continuar a la plataforma",
+      "submitting": "Guardando aceptacion\u2026",
+      "accepted": "Terminos aceptados. Redirigiendo\u2026",
+      "signInToAccept": "Inicia sesion para aceptar estos terminos.",
+      "signInLink": "Iniciar sesion",
+      "complianceNote": "Tu aceptacion queda registrada con fecha, hora y direccion IP para cumplimiento."
     }
   }
 }

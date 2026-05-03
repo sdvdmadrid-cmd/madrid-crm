@@ -1,3 +1,4 @@
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
@@ -94,6 +95,8 @@ export async function GET(request) {
 }
 
 export async function PATCH(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   try {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);

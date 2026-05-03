@@ -7,6 +7,7 @@ import {
   requireBillPaymentsAccess,
   serializeBill,
 } from "@/lib/bill-payments";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUuid } from "@/lib/supabase-db";
 
@@ -74,6 +75,8 @@ export async function GET(request, { params }) {
 }
 
 export async function PATCH(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "write");
   if (access.response) return access.response;
   const { context } = access;
@@ -149,6 +152,8 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "write");
   if (access.response) return access.response;
   const { context } = access;

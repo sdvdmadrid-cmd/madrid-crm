@@ -12,8 +12,11 @@ import { useEffect, useRef, useState } from "react";
  * Props:
  *   value        {string}   - Controlled input value (street only)
  *   onChange     {Function} - Called with the street string while typing / after select
- *   onSelect     {Function} - Called with { street, city, state, zip, placeId }
+ *   onSelect     {Function} - Called with { street, city, state, zip, formattedAddress,
+ *                             latitude, longitude, placeId }
  *                             after a suggestion is picked and details resolved
+ *   selectedValueKey {string} - Which value should be written into the input after
+ *                               selection: "street" (default) or "formattedAddress"
  *   placeholder  {string}
  *   inputStyle   {object}   - Inline styles forwarded to the <input>
  *   inputClass   {string}   - className forwarded to the <input>
@@ -24,6 +27,7 @@ export default function PlacesAutocomplete({
   value = "",
   onChange,
   onSelect,
+  selectedValueKey = "street",
   placeholder = "123 Main St, City, TX",
   inputStyle,
   inputClass,
@@ -118,7 +122,7 @@ export default function PlacesAutocomplete({
   }
 
   async function handleSelect(prediction) {
-    // Instantly show the street in the input so the UI feels snappy
+    // Instantly show partial result in the input so the UI feels snappy
     onChange?.(prediction.mainText);
     setSuggestions([]);
     setOpen(false);
@@ -135,29 +139,57 @@ export default function PlacesAutocomplete({
       const data = await res.json();
       if (data.success) {
         const street = data.street || prediction.mainText;
-        onChange?.(street);
+        const formattedAddress =
+          data.formattedAddress || prediction.description || street;
+        const selectedValue =
+          selectedValueKey === "formattedAddress" ? formattedAddress : street;
+
+        onChange?.(selectedValue);
         onSelect?.({
           street,
           city: data.city || "",
           state: data.state || "",
           zip: data.zip || "",
+          formattedAddress,
+          latitude:
+            typeof data.latitude === "number" ? data.latitude : null,
+          longitude:
+            typeof data.longitude === "number" ? data.longitude : null,
           placeId: prediction.placeId,
         });
       } else {
+        const formattedAddress = prediction.description || prediction.mainText;
+        const selectedValue =
+          selectedValueKey === "formattedAddress"
+            ? formattedAddress
+            : prediction.mainText;
+        onChange?.(selectedValue);
         onSelect?.({
           street: prediction.mainText,
           city: "",
           state: "",
           zip: "",
+          formattedAddress,
+          latitude: null,
+          longitude: null,
           placeId: prediction.placeId,
         });
       }
     } catch {
+      const formattedAddress = prediction.description || prediction.mainText;
+      const selectedValue =
+        selectedValueKey === "formattedAddress"
+          ? formattedAddress
+          : prediction.mainText;
+      onChange?.(selectedValue);
       onSelect?.({
         street: prediction.mainText,
         city: "",
         state: "",
         zip: "",
+        formattedAddress,
+        latitude: null,
+        longitude: null,
         placeId: prediction.placeId,
       });
     } finally {

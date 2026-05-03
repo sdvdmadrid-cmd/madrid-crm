@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+﻿import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthShell from "@/components/AuthShell";
 import InstantNavigation from "@/components/InstantNavigation";
@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "ContractorFlow",
+  title: "FieldBase",
   description:
     "Complete contractor management system for clients jobs invoices and contracts.",
 };

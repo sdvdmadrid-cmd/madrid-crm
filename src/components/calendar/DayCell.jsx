@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import WeatherBadge from "./WeatherBadge";
+import { parseYmdToLocalDate } from "@/lib/local-date";
 
 export default function DayCell({
   day,
   date,
+  dateKey,
   isCurrentMonth,
   isToday,
   appointments,
@@ -18,7 +20,8 @@ export default function DayCell({
   const [expandedEvents, setExpandedEvents] = useState(false);
 
   const dayAppointments = appointments.filter((apt) => {
-    const aptDate = new Date(apt.date);
+    const aptDate = parseYmdToLocalDate(apt.date);
+    if (!aptDate) return false;
     return (
       aptDate.getFullYear() === date.getFullYear() &&
       aptDate.getMonth() === date.getMonth() &&
@@ -40,8 +43,9 @@ export default function DayCell({
   return (
     <div
       onClick={() => isCurrentMonth && !expandedEvents && onClick(date)}
+      data-testid={dateKey ? `calendar-day-${dateKey}` : undefined}
       className={`
-        min-h-[110px] sm:min-h-[135px] lg:min-h-[170px] p-2 sm:p-3 border rounded-xl sm:rounded-2xl transition-all cursor-pointer
+        min-w-0 min-h-[80px] sm:min-h-[110px] lg:min-h-[150px] p-1.5 sm:p-2 md:p-3 border rounded-lg sm:rounded-xl md:rounded-2xl transition-all cursor-pointer
         ${isCurrentMonth ? "bg-white border-slate-200 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300" : "bg-slate-50/50 border-slate-200/70"}
         ${isToday ? "ring-2 ring-blue-500/60" : ""}
       `}

@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getTenantContext } from "@/lib/tenant";
+import { getAuthenticatedTenantContext } from "@/lib/tenant";
 
 function toTenantId(value) {
   return String(value || "default").trim() || "default";
@@ -55,7 +55,7 @@ async function readTenantRows(table, columns) {
 
 export async function GET(request) {
   try {
-    const { role, authenticated } = getTenantContext(request);
+    const { role, authenticated } = await getAuthenticatedTenantContext(request);
     if (!authenticated || role !== "super_admin") {
       return new Response(
         JSON.stringify({ success: false, error: "Forbidden" }),

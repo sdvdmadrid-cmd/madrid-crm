@@ -12,7 +12,6 @@ const CRITICAL_ROUTES = [
   "/jobs",
   "/invoices",
   "/estimates",
-  "/services-catalog",
   "/calendar",
 ];
 

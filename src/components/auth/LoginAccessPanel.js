@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useTranslation } from "react-i18next";
 
@@ -36,12 +36,15 @@ export default function LoginAccessPanel({
   pendingEmail,
   forgotPasswordEmail,
   loginForm,
+  registerForm,
   loginFailedAttempts,
   resetPasswordForm,
   onLoginFormChange,
+  onRegisterFormChange,
   onForgotPasswordEmailChange,
   onResetPasswordFormChange,
   onSubmitLogin,
+  onSubmitRegister,
   onSubmitForgotPassword,
   onSubmitResetPassword,
   onResendVerification,
@@ -190,6 +193,8 @@ export default function LoginAccessPanel({
       ? t("auth.forgotPassword")
       : mode === "reset-password"
         ? t("auth.resetPasswordTitle")
+        : mode === "register"
+          ? t("auth.createAccount")
         : mode === "verify-email"
           ? t("auth.checkYourEmail")
           : t("auth.welcomeBack");
@@ -199,6 +204,8 @@ export default function LoginAccessPanel({
       ? t("auth.forgotPasswordDesc")
       : mode === "reset-password"
         ? t("auth.resetPasswordDesc")
+        : mode === "register"
+          ? t("auth.createAccountDesc")
         : mode === "verify-email"
           ? t("auth.verificationSentTo", { email: pendingEmail || "..." })
           : t("auth.signInDesc");
@@ -221,7 +228,7 @@ export default function LoginAccessPanel({
                 fontSize: 15,
               }}
             >
-              CF
+              FB
             </div>
             <div>
               <div
@@ -231,7 +238,7 @@ export default function LoginAccessPanel({
                   letterSpacing: "-0.03em",
                 }}
               >
-                ContractorFlow
+                FieldBase
               </div>
               <div style={{ fontSize: 13, color: "rgba(248,250,252,0.74)" }}>
                 Secure access for your field operations
@@ -260,7 +267,7 @@ export default function LoginAccessPanel({
               }}
             >
               Password recovery, verification, and sign-in all stay inside the
-              same branded ContractorFlow access layer.
+              same branded FieldBase access layer.
             </div>
           </div>
         </div>
@@ -316,7 +323,7 @@ export default function LoginAccessPanel({
                 fontWeight: 700,
               }}
             >
-              ContractorFlow Access
+              FieldBase Access
             </div>
             <h1
               style={{
@@ -442,6 +449,163 @@ export default function LoginAccessPanel({
                   style={secondaryButtonStyle}
                 >
                   {t("auth.createAccountTab")}
+                </button>
+              </form>
+            : null}
+
+          {mode === "register"
+            ? <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onSubmitRegister();
+                }}
+                style={{ display: "grid", gap: 16 }}
+              >
+                <div>
+                  <label htmlFor="register-name" style={labelStyle}>
+                    {t("auth.fullNamePlaceholder")}
+                  </label>
+                  <input
+                    id="register-name"
+                    type="text"
+                    autoComplete="name"
+                    value={registerForm?.name || ""}
+                    onChange={(event) =>
+                      onRegisterFormChange({
+                        ...registerForm,
+                        name: event.target.value,
+                      })
+                    }
+                    placeholder={t("auth.fullNamePlaceholder")}
+                    required
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="register-company" style={labelStyle}>
+                    {t("auth.companyNamePlaceholder")}
+                  </label>
+                  <input
+                    id="register-company"
+                    type="text"
+                    autoComplete="organization"
+                    value={registerForm?.companyName || ""}
+                    onChange={(event) =>
+                      onRegisterFormChange({
+                        ...registerForm,
+                        companyName: event.target.value,
+                      })
+                    }
+                    placeholder={t("auth.companyNamePlaceholder")}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="register-email" style={labelStyle}>
+                    {t("auth.emailPlaceholder")}
+                  </label>
+                  <input
+                    id="register-email"
+                    type="email"
+                    autoComplete="email"
+                    value={registerForm?.email || ""}
+                    onChange={(event) =>
+                      onRegisterFormChange({
+                        ...registerForm,
+                        email: event.target.value,
+                      })
+                    }
+                    placeholder={t("auth.emailPlaceholder")}
+                    required
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="register-password" style={labelStyle}>
+                    {t("auth.passwordPlaceholder")}
+                  </label>
+                  <input
+                    id="register-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={registerForm?.password || ""}
+                    onChange={(event) =>
+                      onRegisterFormChange({
+                        ...registerForm,
+                        password: event.target.value,
+                      })
+                    }
+                    placeholder={t("auth.passwordPlaceholder")}
+                    required
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="register-industry" style={labelStyle}>
+                    {t("auth.industryPlaceholder")}
+                  </label>
+                  <select
+                    id="register-industry"
+                    value={registerForm?.industry || "landscaping_hardscaping"}
+                    onChange={(event) =>
+                      onRegisterFormChange({
+                        ...registerForm,
+                        industry: event.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="landscaping_hardscaping">{t("auth.industries.landscapingHardscaping")}</option>
+                    <option value="cleaning">{t("auth.industries.cleaning")}</option>
+                    <option value="construction">{t("auth.industries.construction")}</option>
+                    <option value="general_contractor">{t("auth.industries.generalContractor")}</option>
+                    <option value="electrical">{t("auth.industries.electrical")}</option>
+                    <option value="hvac">{t("auth.industries.hvac")}</option>
+                    <option value="handyman">{t("auth.industries.handyman")}</option>
+                    <option value="painting">{t("auth.industries.painting")}</option>
+                    <option value="plumbing">{t("auth.industries.plumbing")}</option>
+                    <option value="roofing">{t("auth.industries.roofing")}</option>
+                    <option value="tree_care">{t("auth.industries.treeCare")}</option>
+                    <option value="other">{t("auth.industries.other")}</option>
+                  </select>
+                </div>
+
+                {error
+                  ? <div
+                      style={{ ...alertBaseStyle, ...cardAlertStyles("error") }}
+                    >
+                      {error}
+                    </div>
+                  : null}
+                {notice
+                  ? <div
+                      style={{
+                        ...alertBaseStyle,
+                        ...cardAlertStyles("notice"),
+                      }}
+                    >
+                      {notice}
+                    </div>
+                  : null}
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={primaryButtonStyle}
+                >
+                  {submitting ? t("auth.creatingAccount") : t("auth.createAccountBtn")}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onBackToLogin}
+                  style={secondaryButtonStyle}
+                >
+                  {t("auth.backToLogin")}
                 </button>
               </form>
             : null}

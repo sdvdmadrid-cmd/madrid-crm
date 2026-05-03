@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isPastYmd, isValidYmd } from "@/lib/local-date";
+import { assertSafeText } from "@/lib/input-sanitizer";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canDelete,
   canWrite,
@@ -46,14 +49,24 @@ const serialize = (doc) => ({
 });
 
 const toAppointmentPatch = (body) => ({
-  title: body.title || "",
-  client: body.clientName || body.client || "",
+  title: assertSafeText("title", body.title || "", 200),
+  client: assertSafeText("client", body.clientName || body.client || "", 200),
   date: body.date || null,
   time: body.time || null,
-  location: body.location || "",
-  notes: body.notes || "",
+  location: assertSafeText("location", body.location || "", 300),
+  notes: assertSafeText("notes", body.notes || "", 2000),
   status: statusToDb(body.status),
 });
+
+function validateAppointmentBody(body) {
+  if (!String(body?.title || "").trim()) return "Title is required";
+  if (!String(body?.clientName || body?.client || "").trim()) return "Client name is required";
+  if (!String(body?.date || "").trim()) return "Date is required";
+  if (!isValidYmd(body.date)) return "Date must be in YYYY-MM-DD format";
+  if (isPastYmd(body.date)) return "Cannot schedule in the past";
+  if (!String(body?.time || "").trim()) return "Time is required";
+  return "";
+}
 
 function badId() {
   return new Response(
@@ -92,7 +105,7 @@ export async function GET(request, { params }) {
     const { data, error } = await query.maybeSingle();
     if (error) {
       console.error("[api/appointments/:id][GET] Supabase query error", error);
-      throw new Error(error.message);
+      throw new Error("Unable to load appointment");
     }
     if (!data) return notFound();
 
@@ -101,9 +114,9 @@ export async function GET(request, { params }) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("[api/appointments/:id][GET] Supabase error", error);
+    console.error("[api/appointments/:id][GET] error", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: "Unable to load appointment" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -114,6 +127,9 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
+
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
@@ -123,6 +139,16 @@ export async function PATCH(request, { params }) {
     if (!id) return badId();
 
     const body = await request.json();
+    const validationError = validateAppointmentBody(body);
+    if (validationError) {
+      return new Response(
+        JSON.stringify({ success: false, error: validationError }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     let query = supabaseAdmin
       .from("appointments")
@@ -147,7 +173,7 @@ export async function PATCH(request, { params }) {
         "[api/appointments/:id][PATCH] Supabase update error",
         error,
       );
-      throw new Error(error.message);
+      throw new Error("Unable to update appointment");
     }
     if (!data) return notFound();
 
@@ -159,9 +185,14 @@ export async function PATCH(request, { params }) {
       },
     );
   } catch (error) {
-    console.error("[api/appointments/:id][PATCH] Supabase error", error);
+    const isUserFacing = error.message && (
+      error.message === "Unable to update appointment" ||
+      error.message.startsWith("Unsafe") ||
+      error.message.startsWith("Payload")
+    );
+    console.error("[api/appointments/:id][PATCH] error", isUserFacing ? "" : error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: isUserFacing ? error.message : "Unable to update appointment" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -172,6 +203,9 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
+
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
@@ -191,7 +225,7 @@ export async function DELETE(request, { params }) {
         "[api/appointments/:id][DELETE] Supabase delete error",
         error,
       );
-      throw new Error(error.message);
+      throw new Error("Unable to delete appointment");
     }
     if (!data || data.length === 0) return notFound();
 
@@ -200,9 +234,9 @@ export async function DELETE(request, { params }) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("[api/appointments/:id][DELETE] Supabase error", error);
+    console.error("[api/appointments/:id][DELETE] error", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: "Unable to delete appointment" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },

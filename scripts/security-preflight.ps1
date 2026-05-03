@@ -147,7 +147,52 @@ if ([string]::IsNullOrWhiteSpace($supabaseServiceRole)) {
   Add-Pass "SUPABASE_SERVICE_ROLE_KEY is configured"
 }
 
-# 6) Optional quality gates
+# 6) CSRF same-origin guard tests
+#    We send a fake session cookie (non-blank, looks like a real cookie) + a cross-origin
+#    Origin header.  The guard should reject before auth runs, returning 403.
+$csrfEndpoints = @(
+  @{ Path = "/api/clients/00000000-0000-0000-0000-000000000001"; Method = "PATCH" },
+  @{ Path = "/api/jobs/00000000-0000-0000-0000-000000000001";    Method = "PATCH" },
+  @{ Path = "/api/invoices/00000000-0000-0000-0000-000000000001"; Method = "PATCH" }
+)
+
+foreach ($ep in $csrfEndpoints) {
+  try {
+    $xoHeaders = @{
+      "Content-Type" = "application/json"
+      "Cookie"       = "madrid_session=csrf-preflight-test-fake-token"
+      "Origin"       = "https://evil.attacker.example.com"
+    }
+    $xoBody = '{"__csrftest":true}'
+    $xoStatus = 0
+    try {
+      $xoResp = Invoke-WebRequest `
+        -Uri "$BaseUrl$($ep.Path)" `
+        -Method $ep.Method `
+        -Headers $xoHeaders `
+        -Body $xoBody `
+        -UseBasicParsing `
+        -TimeoutSec 10 `
+        -ErrorAction Stop
+      $xoStatus = [int]$xoResp.StatusCode
+    } catch {
+      if ($_.Exception.Response) {
+        $xoStatus = [int]$_.Exception.Response.StatusCode
+      }
+    }
+    if ($xoStatus -eq 403) {
+      Add-Pass "CSRF guard blocks cross-origin $($ep.Method) $($ep.Path) (403)"
+    } elseif ($xoStatus -eq 0) {
+      Add-Warn "CSRF test for $($ep.Path): no response (app may be down)"
+    } else {
+      Add-Fail "CSRF guard MISS on $($ep.Method) $($ep.Path): expected 403, got $xoStatus"
+    }
+  } catch {
+    Add-Warn "CSRF test for $($ep.Path) threw: $($_.Exception.Message)"
+  }
+}
+
+# 7) Optional quality gates
 if ($RunLint) {
   try {
     Write-Host "Running lint..." -ForegroundColor Cyan

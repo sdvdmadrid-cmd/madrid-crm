@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useStoredUiLanguage } from "@/lib/ui-language";
@@ -18,7 +19,7 @@ function dateLabel(value) {
 const UI_I18N = {
   en: {
     title: "Platform Dashboard",
-    description: "Global view of companies and ContractorFlow usage.",
+    description: "Global view of companies and FieldBase usage.",
     loading: "Loading data...",
     searchPlaceholder: "Search tenant, users or contractors",
     companiesTitle: "Companies",
@@ -61,7 +62,7 @@ const UI_I18N = {
   },
   es: {
     title: "Panel de plataforma",
-    description: "Vista global de empresas y uso de ContractorFlow.",
+    description: "Vista global de empresas y uso de FieldBase.",
     loading: "Cargando datos...",
     searchPlaceholder: "Buscar tenant, users o contractors",
     companiesTitle: "Empresas",
@@ -104,7 +105,7 @@ const UI_I18N = {
   },
   pl: {
     title: "Panel platformy",
-    description: "Globalny widok firm i wykorzystania ContractorFlow.",
+    description: "Globalny widok firm i wykorzystania FieldBase.",
     loading: "Ladowanie danych...",
     searchPlaceholder: "Szukaj tenant, users lub contractors",
     companiesTitle: "Firmy",
@@ -306,11 +307,35 @@ export default function PlatformPage() {
         margin: "0 auto",
       }}
     >
-      <header>
-        <h1 style={{ margin: 0, fontSize: 30 }}>{uiText.title}</h1>
-        <p style={{ margin: "8px 0 0 0", color: "#555" }}>
-          {uiText.description}
-        </p>
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0, fontSize: 30 }}>{uiText.title}</h1>
+          <p style={{ margin: "8px 0 0 0", color: "#555" }}>
+            {uiText.description}
+          </p>
+        </div>
+        <Link
+          href="/platform/feedback"
+          style={{
+            borderRadius: 999,
+            border: "1px solid rgba(15,23,42,0.14)",
+            background: "#fff",
+            color: "#0f172a",
+            padding: "8px 12px",
+            fontWeight: 700,
+            textDecoration: "none",
+          }}
+        >
+          Feedback Inbox
+        </Link>
       </header>
 
       {error

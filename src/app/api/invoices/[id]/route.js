@@ -3,6 +3,7 @@ import {
   normalizeMoney,
   normalizePaymentMethod,
 } from "@/lib/invoice-payments";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   logSupabaseError,
@@ -18,6 +19,14 @@ import {
 } from "@/lib/tenant";
 
 const INVOICES = "invoices";
+
+function normalizeBaseNumber(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
+  const compact = stripped.replace(/\s+/g, "");
+  return compact || raw;
+}
 
 function serialize(doc) {
   const amount = Number(
@@ -121,6 +130,9 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
+
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {
@@ -179,27 +191,48 @@ export async function PATCH(request, { params }) {
       total_cents: amountCents,
     };
 
-    // Auto-link: buscar estimate/quote por número si cambia invoiceNumber
+    // Auto-link by shared base number when invoiceNumber changes
     let estimateId = existing.estimate_id || null;
+    let quoteId = existing.quote_id || null;
+    let linkedClientId = "clientId" in body
+      ? normalizeUuid(body.clientId)
+      : existing.client_id || null;
     if ("invoiceNumber" in body && body.invoiceNumber) {
-      const invNum = String(body.invoiceNumber).trim();
+      const invNum = normalizeBaseNumber(body.invoiceNumber);
       if (invNum) {
         const { data: est, error: estErr } = await supabaseAdmin
           .from("estimate_builder")
-          .select("id,quote_number")
+          .select("id,quote_number,client_id")
           .eq("tenant_id", tenantDbId)
-          .or(`quote_number.eq.${invNum},id.eq.${invNum}`)
+          .eq("quote_number", invNum)
           .maybeSingle();
-        if (est && est.id) estimateId = est.id;
+
+        if (!estErr && est?.id) {
+          estimateId = est.id;
+          linkedClientId = linkedClientId || normalizeUuid(est.client_id);
+        }
+
+        const { data: quote, error: quoteErr } = await supabaseAdmin
+          .from("quotes")
+          .select("id,client_id")
+          .eq("tenant_id", tenantDbId)
+          .eq("quote_number", invNum)
+          .maybeSingle();
+
+        if (!quoteErr && quote?.id) {
+          quoteId = quote.id;
+          linkedClientId = linkedClientId || normalizeUuid(quote.client_id);
+        }
       }
     }
 
     if ("invoiceNumber" in body)
-      updateRow.invoice_number = String(body.invoiceNumber || "");
+      updateRow.invoice_number = normalizeBaseNumber(body.invoiceNumber);
     if ("invoiceTitle" in body)
       updateRow.invoice_title = String(body.invoiceTitle || "");
     if ("jobId" in body) updateRow.job_id = normalizeUuid(body.jobId);
-    if ("clientId" in body) updateRow.client_id = normalizeUuid(body.clientId);
+    if ("clientId" in body || "invoiceNumber" in body)
+      updateRow.client_id = linkedClientId;
     if ("clientName" in body)
       updateRow.client_name = String(body.clientName || "");
     if ("clientEmail" in body)
@@ -213,6 +246,7 @@ export async function PATCH(request, { params }) {
     if ("notes" in body) updateRow.notes = String(body.notes || "");
 
     updateRow.estimate_id = estimateId;
+    updateRow.quote_id = quoteId;
 
     let updateQuery = supabaseAdmin
       .from(INVOICES)
@@ -264,6 +298,9 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
+
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {

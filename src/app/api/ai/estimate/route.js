@@ -2,13 +2,13 @@ import { generateEstimateSuggestion } from "@/lib/estimate-ai";
 import {
   canWrite,
   forbiddenResponse,
-  getTenantContext,
+  getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
 export async function POST(request) {
   try {
-    const { role, authenticated } = getTenantContext(request);
+    const { role, authenticated } = await getAuthenticatedTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();
     }

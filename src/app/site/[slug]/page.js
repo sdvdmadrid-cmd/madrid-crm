@@ -1,5 +1,7 @@
-import { supabaseAdmin } from "@/lib/supabase-admin";
+﻿import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notFound } from "next/navigation";
+import RequestServiceForm from "@/components/site/RequestServiceForm";
+import { getIndustryProfile } from "@/lib/industry-profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,6 @@ export default async function PublicContractorSitePage({ params }) {
 
   if (!data) notFound();
 
-  const services = Array.isArray(data.services) ? data.services : [];
   const theme = data.theme_color || "#16a34a";
   const headline = data.headline || "";
   const subheadline = data.subheadline || "";
@@ -42,7 +43,7 @@ export default async function PublicContractorSitePage({ params }) {
   // Fetch company profile for contact details
   const { data: tenantProfile } = await supabaseAdmin
     .from("company_profiles")
-    .select("company_name, phone, business_address, logo_data_url")
+    .select("company_name, phone, business_address, logo_data_url, business_type")
     .eq("tenant_id", data.tenant_id)
     .maybeSingle();
 
@@ -50,6 +51,20 @@ export default async function PublicContractorSitePage({ params }) {
   const phone = tenantProfile?.phone || "";
   const address = tenantProfile?.business_address || "";
   const logoUrl = tenantProfile?.logo_data_url || "";
+  const industryProfile = getIndustryProfile(tenantProfile?.business_type || "");
+  const services =
+    Array.isArray(data.services) && data.services.length > 0
+      ? data.services
+      : (industryProfile.websiteServices || []).map((name) => ({
+          name,
+          description: "",
+          price: "",
+        }));
+
+  const galleryItems = services.slice(0, 6).map((service, index) => ({
+    title: service.name || `Project ${index + 1}`,
+    subtitle: service.description || "Recent completed service project.",
+  }));
 
   return (
     <>
@@ -57,9 +72,12 @@ export default async function PublicContractorSitePage({ params }) {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0f172a; background: #fff; }
-        .site-nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0,0,0,0.08); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+        .site-nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0,0,0,0.08); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .site-logo { font-weight: 800; font-size: 18px; color: #0f172a; letter-spacing: -0.4px; display: flex; align-items: center; gap: 10px; }
         .site-logo img { height: 36px; width: 36px; object-fit: contain; border-radius: 6px; }
+        .site-links { display: flex; align-items: center; gap: 14px; font-size: 13px; }
+        .site-links a { color: #334155; text-decoration: none; font-weight: 600; }
+        .site-links a:hover { color: var(--theme); }
         .site-cta-nav { background: var(--theme); color: #fff; border: none; border-radius: 999px; padding: 10px 22px; font-weight: 700; font-size: 15px; cursor: pointer; text-decoration: none; }
         .hero { background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, var(--theme-dark) 100%); color: #fff; padding: 100px 24px 80px; text-align: center; position: relative; overflow: hidden; }
         .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--theme) 25%, transparent), transparent 60%), radial-gradient(circle at 70% 80%, color-mix(in srgb, var(--theme) 15%, transparent), transparent 50%); }
@@ -83,6 +101,14 @@ export default async function PublicContractorSitePage({ params }) {
         .about-section { background: #f1f5f9; }
         .about-inner { max-width: 780px; }
         .about-inner p { font-size: 18px; line-height: 1.75; color: #334155; }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+        .gallery-card { border-radius: 14px; overflow: hidden; border: 1px solid #e2e8f0; background: #fff; }
+        .gallery-thumb { height: 140px; background: linear-gradient(140deg, color-mix(in srgb, var(--theme) 18%, #f8fafc), #e2e8f0); display: grid; place-items: center; color: #334155; font-size: 28px; }
+        .gallery-copy { padding: 14px; }
+        .gallery-copy strong { display: block; margin-bottom: 6px; color: #0f172a; font-size: 15px; }
+        .gallery-copy span { color: #64748b; font-size: 13px; line-height: 1.5; }
+        .contact-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px; margin-top: 20px; color: #334155; }
+        .contact-card h3 { margin-bottom: 10px; font-size: 20px; color: #0f172a; }
         .cta-section { background: linear-gradient(135deg, var(--theme-dark) 0%, var(--theme) 100%); color: #fff; text-align: center; padding: 80px 24px; }
         .cta-section h2 { font-size: clamp(1.8rem, 3.5vw, 3rem); font-weight: 900; letter-spacing: -1px; margin-bottom: 16px; }
         .cta-section p { font-size: 18px; opacity: 0.85; margin-bottom: 36px; }
@@ -92,6 +118,7 @@ export default async function PublicContractorSitePage({ params }) {
         footer a { color: rgba(255,255,255,0.7); text-decoration: none; }
         @media (max-width: 600px) {
           .site-nav { padding: 12px 16px; }
+          .site-links { display: none; }
           .hero { padding: 70px 16px 60px; }
           .section { padding: 60px 16px; }
           .services-grid { grid-template-columns: 1fr; }
@@ -104,6 +131,14 @@ export default async function PublicContractorSitePage({ params }) {
             {logoUrl && <img src={logoUrl} alt={companyName} />}
             <span>{companyName}</span>
           </div>
+          <div className="site-links">
+            <a href="#home">Home</a>
+            <a href="#services">Services</a>
+            <a href="#about">About</a>
+            <a href="#gallery">Gallery</a>
+            <a href="#contact">Contact</a>
+            <a href="#request-service">Request Service</a>
+          </div>
           {phone && (
             <a href={`tel:${phone}`} className="site-cta-nav">
               {phone}
@@ -112,7 +147,7 @@ export default async function PublicContractorSitePage({ params }) {
         </nav>
 
         {/* Hero */}
-        <section className="hero">
+        <section className="hero" id="home">
           <div className="hero-inner">
             <h1>{headline}</h1>
             <p>{subheadline}</p>
@@ -155,7 +190,7 @@ export default async function PublicContractorSitePage({ params }) {
 
         {/* About */}
         {aboutText && (
-          <div className="about-section">
+          <div className="about-section" id="about">
             <div className="section">
               <div className="about-inner">
                 <h2 className="section-title">About Us</h2>
@@ -165,22 +200,47 @@ export default async function PublicContractorSitePage({ params }) {
           </div>
         )}
 
-        {/* CTA / Contact */}
-        <section id="contact" className="cta-section">
-          <h2>{ctaText} — We&apos;re Ready</h2>
-          <p>Reach out today for a free estimate. No commitment required.</p>
-          {phone && (
-            <a href={`tel:${phone}`} className="cta-phone">{phone}</a>
-          )}
-          <div className="hero-btns" style={{ justifyContent: "center" }}>
-            {phone && (
-              <a href={`tel:${phone}`} className="btn-primary" style={{ background: "#fff", color: theme }}>
-                Call Now
-              </a>
-            )}
+        {/* Gallery */}
+        <div id="gallery" className="section">
+          <h2 className="section-title">Gallery</h2>
+          <p className="section-sub">Selected project snapshots from our recent work.</p>
+          <div className="gallery-grid">
+            {galleryItems.map((item, index) => (
+              <article key={`${item.title}-${index}`} className="gallery-card">
+                <div className="gallery-thumb">{["🏡", "🧰", "🛠️", "📐", "✅", "📸"][index % 6]}</div>
+                <div className="gallery-copy">
+                  <strong>{item.title}</strong>
+                  <span>{item.subtitle}</span>
+                </div>
+              </article>
+            ))}
           </div>
-          {address && (
-            <p style={{ marginTop: 28, opacity: 0.7, fontSize: 15 }}>{address}</p>
+        </div>
+
+        {/* Contact details */}
+        <div id="contact" className="section">
+          <h2 className="section-title">Contact</h2>
+          <p className="section-sub">Reach out directly and we&apos;ll help plan your service.</p>
+          <div className="contact-card">
+            <h3>{companyName}</h3>
+            {phone && <p><strong>Phone:</strong> <a href={`tel:${phone}`}>{phone}</a></p>}
+            {address && <p><strong>Address:</strong> {address}</p>}
+            <p><strong>Industry:</strong> {industryProfile.label}</p>
+          </div>
+        </div>
+
+        {/* CTA / Contact */}
+        <section id="request-service" className="cta-section">
+          <h2>Request Service</h2>
+          <p style={{ marginBottom: 40, marginTop: 0 }}>Tell us what you need. We&apos;ll create your lead, follow up, and prepare your estimate.</p>
+          <RequestServiceForm
+            slug={data.slug}
+            serviceOptions={industryProfile.requestServiceOptions || []}
+          />
+          {phone && (
+            <p style={{ marginTop: 28, opacity: 0.7, fontSize: 14 }}>
+              Prefer to call? <a href={`tel:${phone}`} style={{ color: "#fff", fontWeight: 600, textDecoration: "underline" }}>{phone}</a>
+            </p>
           )}
         </section>
 
@@ -188,8 +248,8 @@ export default async function PublicContractorSitePage({ params }) {
           <p>
             &copy; {new Date().getFullYear()} {companyName}.{" "}
             Powered by{" "}
-            <a href="https://contractorflow.app" rel="noopener noreferrer">
-              ContractorFlow
+            <a href="https://fieldbaseapp.net" rel="noopener noreferrer">
+              FieldBase
             </a>
           </p>
         </footer>

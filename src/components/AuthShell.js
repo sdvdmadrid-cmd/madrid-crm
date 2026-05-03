@@ -5,9 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import LoginAccessPanel from "@/components/auth/LoginAccessPanel";
-import OnboardingEntrySection from "@/components/auth/OnboardingEntrySection";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import "@/i18n";
+import AppFooter from "@/components/site/AppFooter";
 
 const initialLogin = {
   email: "",
@@ -28,13 +28,11 @@ const initialRegister = {
   industry: "landscaping_hardscaping",
 };
 
-const SERVICES_CATALOG_INDUSTRIES = new Set([
-  "",
-  "general",
-  "landscaping",
-  "hardscaping",
-  "landscaping_hardscaping",
-]);
+const FEEDBACK_TYPE_OPTIONS = [
+  { value: "suggestion" },
+  { value: "issue" },
+  { value: "improvement" },
+];
 
 function tenantLabel(value) {
   const normalized = String(value || "")
@@ -77,13 +75,16 @@ export default function AuthShell({ children }) {
     { value: "pl", label: "🇵🇱 Polski" },
   ];
   const isPublicQuotePage = pathname?.startsWith("/quote/");
-  const [loading, setLoading] = useState(!isPublicQuotePage);
+  const isPublicSitePage = pathname?.startsWith("/site/");
+  const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
+  const isMarketingHomePage = pathname === "/";
+  const isPublicPage = isPublicQuotePage || isPublicSitePage || isPublicLegalPage || isMarketingHomePage;
+  const [loading, setLoading] = useState(!isPublicPage);
   const authBootstrappedRef = useRef(false);
   const [authUser, setAuthUser] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [mode, setMode] = useState("register");
-  const [signupStage, setSignupStage] = useState("lead");
+  const [mode, setMode] = useState("login");
   const [pendingEmail, setPendingEmail] = useState("");
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [loginForm, setLoginForm] = useState(initialLogin);
@@ -91,6 +92,15 @@ export default function AuthShell({ children }) {
   const [resetPasswordForm, setResetPasswordForm] =
     useState(initialResetPassword);
   const [submitting, setSubmitting] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState("suggestion");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackScreenshotDataUrl, setFeedbackScreenshotDataUrl] =
+    useState("");
+  const [feedbackScreenshotName, setFeedbackScreenshotName] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackNotice, setFeedbackNotice] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -147,14 +157,39 @@ export default function AuthShell({ children }) {
     setNotice("");
     window.history.replaceState({}, "", window.location.pathname);
   }, [isResetPasswordPage, t]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get("email") || "";
+    if (!emailParam) return;
+    setLoginForm((current) => ({ ...current, email: emailParam }));
+    setRegisterForm((current) => ({ ...current, email: emailParam }));
+  }, [pathname]);
+
   useEffect(() => {
     if (isDedicatedLoginPage) {
-      setMode("login");
+      const params =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const modeParam = params?.get("mode") || "";
+      setMode(modeParam === "register" ? "register" : "login");
       return;
     }
 
-    setMode((current) => (current === "login" ? "register" : current));
-  }, [isDedicatedLoginPage]);
+    if (isResetPasswordPage) {
+      return;
+    }
+
+    setMode((current) => (
+      current === "verify-email" ||
+      current === "forgot-password" ||
+      current === "reset-password"
+    )
+      ? current
+      : "login");
+  }, [isDedicatedLoginPage, isResetPasswordPage]);
 
   const fetchMe = useCallback(async () => {
     try {
@@ -173,19 +208,16 @@ export default function AuthShell({ children }) {
     }
   }, []);
 
-  // Persist industry/name to localStorage so other components can read without an extra fetch
+  // Persist industry to localStorage so catalog pages can read it without an extra fetch
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (authUser?.industry !== undefined) {
       window.localStorage.setItem("user-industry", authUser.industry || "");
     }
-    if (authUser?.name !== undefined) {
-      window.localStorage.setItem("user-display-name", authUser.companyName || authUser.name || "");
-    }
   }, [authUser]);
 
   useEffect(() => {
-    if (isPublicQuotePage) {
+    if (isPublicPage) {
       setLoading(false);
       return;
     }
@@ -210,10 +242,10 @@ export default function AuthShell({ children }) {
     return () => {
       mounted = false;
     };
-  }, [isPublicQuotePage, fetchMe]);
+  }, [isPublicPage, fetchMe]);
 
   useEffect(() => {
-    if (isPublicQuotePage) {
+    if (isPublicPage) {
       return;
     }
 
@@ -229,9 +261,9 @@ export default function AuthShell({ children }) {
     window.addEventListener("auth:unauthorized", onUnauthorized);
     return () =>
       window.removeEventListener("auth:unauthorized", onUnauthorized);
-  }, [isPublicQuotePage, authUser, t]);
+  }, [isPublicPage, authUser, t]);
 
-  if (isPublicQuotePage) {
+  if (isPublicPage) {
     return children;
   }
 
@@ -289,7 +321,7 @@ export default function AuthShell({ children }) {
       }
       setLoginFailedAttempts(0);
       setAuthUser(payload.data);
-      router.replace("/");
+      router.replace("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err.message || t("auth.authError"));
@@ -353,6 +385,93 @@ export default function AuthShell({ children }) {
       setError(err.message || t("auth.resendFailed"));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const resetFeedbackModal = () => {
+    setFeedbackType("suggestion");
+    setFeedbackMessage("");
+    setFeedbackScreenshotDataUrl("");
+    setFeedbackScreenshotName("");
+    setFeedbackError("");
+    setFeedbackSubmitting(false);
+  };
+
+  const openFeedbackModal = () => {
+    resetFeedbackModal();
+    setFeedbackModalOpen(true);
+  };
+
+  const closeFeedbackModal = () => {
+    setFeedbackModalOpen(false);
+    resetFeedbackModal();
+  };
+
+  const handleFeedbackScreenshotChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setFeedbackScreenshotDataUrl("");
+      setFeedbackScreenshotName("");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setFeedbackError(t("feedback.errors.imageOnly"));
+      setFeedbackScreenshotDataUrl("");
+      setFeedbackScreenshotName("");
+      return;
+    }
+
+    if (file.size > 1_500_000) {
+      setFeedbackError(t("feedback.errors.fileSize"));
+      setFeedbackScreenshotDataUrl("");
+      setFeedbackScreenshotName("");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      setFeedbackScreenshotDataUrl(result);
+      setFeedbackScreenshotName(file.name || "screenshot");
+      setFeedbackError("");
+    };
+    reader.onerror = () => {
+      setFeedbackError(t("feedback.errors.fileRead"));
+      setFeedbackScreenshotDataUrl("");
+      setFeedbackScreenshotName("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submitFeedback = async () => {
+    const message = feedbackMessage.trim();
+    if (!message) {
+      setFeedbackError(t("feedback.errors.messageRequired"));
+      return;
+    }
+
+    setFeedbackSubmitting(true);
+    setFeedbackError("");
+    try {
+      const response = await apiFetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: feedbackType,
+          message,
+          screenshotDataUrl: feedbackScreenshotDataUrl || "",
+          currentPage: pathname || "",
+        }),
+      });
+      await getJsonOrThrow(response, t("feedback.errors.submitFailed"));
+      setFeedbackNotice(t("feedback.success"));
+      closeFeedbackModal();
+      window.setTimeout(() => setFeedbackNotice(""), 3500);
+    } catch (err) {
+      setFeedbackError(err.message || t("feedback.errors.submitFailed"));
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -444,52 +563,12 @@ export default function AuthShell({ children }) {
       setLoginForm(initialLogin);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("user-industry");
+        // Redirect to home page after logout
+        router.push("/");
       }
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const startTrialFromOnboarding = ({ companyName, email }) => {
-    setRegisterForm((current) => ({
-      ...current,
-      companyName,
-      email,
-    }));
-    setSignupStage("account");
-    setMode("register");
-    setError("");
-    setNotice("");
-
-    if (typeof window !== "undefined") {
-      window.requestAnimationFrame(() => {
-        document.getElementById("signup-card")?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-        document.getElementById("register-name-input")?.focus();
-      });
-    }
-  };
-
-  const updateRegisterField = (field, value) => {
-    setRegisterForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  const backToSignupSetup = () => {
-    setSignupStage("lead");
-    setMode("register");
-    setError("");
-    setNotice("");
-    setPendingEmail("");
-    setRegisterForm((current) => ({
-      ...current,
-      name: "",
-      password: "",
-    }));
   };
 
   if (loading) {
@@ -508,8 +587,8 @@ export default function AuthShell({ children }) {
             style={{
               width: 40,
               height: 40,
-              borderRadius: 10,
-              background: "#16a34a",
+              borderRadius: 12,
+              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -519,7 +598,7 @@ export default function AuthShell({ children }) {
               margin: "0 auto 16px",
             }}
           >
-            CF
+            FB
           </div>
           <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
             {t("auth.loading")}
@@ -530,74 +609,53 @@ export default function AuthShell({ children }) {
   }
 
   if (!authUser) {
-    if (
-      isDedicatedLoginPage ||
-      isResetPasswordPage ||
-      mode === "verify-email" ||
-      mode === "forgot-password" ||
-      mode === "reset-password"
-    ) {
-      return (
-        <LoginAccessPanel
-          error={error}
-          notice={notice}
-          mode={mode}
-          submitting={submitting}
-          pendingEmail={pendingEmail}
-          forgotPasswordEmail={forgotPasswordEmail}
-          loginForm={loginForm}
-          loginFailedAttempts={loginFailedAttempts}
-          resetPasswordForm={resetPasswordForm}
-          onLoginFormChange={setLoginForm}
-          onForgotPasswordEmailChange={setForgotPasswordEmail}
-          onResetPasswordFormChange={setResetPasswordForm}
-          onSubmitLogin={submitLogin}
-          onSubmitForgotPassword={submitForgotPassword}
-          onSubmitResetPassword={submitResetPassword}
-          onResendVerification={submitResendVerification}
-          onShowForgotPassword={() => {
-            setForgotPasswordEmail(loginForm.email || "");
-            setMode("forgot-password");
-            setError("");
-            setNotice("");
-          }}
-          onShowRegister={() => {
-            router.replace("/");
-          }}
-          onBackToLogin={() => {
-            setMode("login");
-            setError("");
-            setNotice("");
-            setResetPasswordForm(initialResetPassword);
-            if (typeof window !== "undefined") {
-              const targetPath = "/login";
-              window.history.replaceState({}, "", targetPath);
-            }
-          }}
-        />
-      );
+    if (isPublicPage) {
+      return children;
     }
 
     return (
-      <OnboardingEntrySection
-        initialValues={{
-          companyName: registerForm.companyName,
-          email: registerForm.email,
-        }}
-        registerValues={registerForm}
-        signupStage={signupStage}
-        mode={mode}
+      <LoginAccessPanel
         error={error}
+        notice={notice}
+        mode={mode}
         submitting={submitting}
         pendingEmail={pendingEmail}
-        onStartTrial={startTrialFromOnboarding}
-        onRegisterFieldChange={updateRegisterField}
+        forgotPasswordEmail={forgotPasswordEmail}
+        loginForm={loginForm}
+        registerForm={registerForm}
+        loginFailedAttempts={loginFailedAttempts}
+        resetPasswordForm={resetPasswordForm}
+        onLoginFormChange={setLoginForm}
+        onRegisterFormChange={setRegisterForm}
+        onForgotPasswordEmailChange={setForgotPasswordEmail}
+        onResetPasswordFormChange={setResetPasswordForm}
+        onSubmitLogin={submitLogin}
         onSubmitRegister={submitRegister}
-        onBackToSetup={backToSignupSetup}
+        onSubmitForgotPassword={submitForgotPassword}
+        onSubmitResetPassword={submitResetPassword}
         onResendVerification={submitResendVerification}
-        languageOptions={UI_LANGUAGE_OPTIONS}
-        selectedLanguage={i18n.language}
-        onLanguageChange={(value) => i18n.changeLanguage(value)}
+        onShowForgotPassword={() => {
+          setForgotPasswordEmail(loginForm.email || "");
+          setMode("forgot-password");
+          setError("");
+          setNotice("");
+        }}
+        onShowRegister={() => {
+          setMode("register");
+          setError("");
+          setNotice("");
+          router.replace("/login?mode=register");
+        }}
+        onBackToLogin={() => {
+          setMode("login");
+          setError("");
+          setNotice("");
+          setResetPasswordForm(initialResetPassword);
+          if (typeof window !== "undefined") {
+            const targetPath = "/login?mode=login";
+            window.history.replaceState({}, "", targetPath);
+          }
+        }}
       />
     );
   }
@@ -627,10 +685,6 @@ export default function AuthShell({ children }) {
     dashboard: [
       "M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z",
       "M9 22V12h6v10",
-    ],
-    revenue: [
-      "M3 3v18h18",
-      "M7 14l4-4 3 3 5-6",
     ],
     clients: [
       "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2",
@@ -665,6 +719,16 @@ export default function AuthShell({ children }) {
       "M3 8h18",
       "M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z",
     ],
+    websiteBuilder: [
+      "M4 4h16a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z",
+      "M8 20h8",
+      "M12 15v5",
+    ],
+    feedback: [
+      "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
+      "M8 9h8",
+      "M8 13h5",
+    ],
     smart: ["M13 2L3 14h9l-1 8 10-12h-9l1-8z"],
     services: [
       "M8 6h13",
@@ -689,21 +753,17 @@ export default function AuthShell({ children }) {
       "M16 17l5-5-5-5",
       "M21 12H9",
     ],
-    website: [
-      "M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z",
-      "M2 12h20",
-      "M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z",
-    ],
   };
 
   // ─── Nav groups ──────────────────────────────────────────────────────────
   const mainNavItems = [
-    { href: "/", label: t("sidebar.dashboard"), iconKey: "dashboard" },
+    { href: "/dashboard", label: t("sidebar.dashboard"), iconKey: "dashboard" },
     { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
     {
       href: "/estimates",
       label: t("sidebar.estimates"),
       iconKey: "estimates",
+      exact: true,
     },
     { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
     { href: "/invoices", label: t("sidebar.invoices"), iconKey: "invoices" },
@@ -717,29 +777,26 @@ export default function AuthShell({ children }) {
   const secondaryNavItems = [
     { href: "/calendar", label: t("sidebar.calendar"), iconKey: "calendar" },
     {
-      href: "/smart-estimator",
-      label: t("sidebar.insights"),
-      iconKey: "smart",
-    },
-    ...(SERVICES_CATALOG_INDUSTRIES.has(authUser.industry || "")
-      ? [
-          {
-            href: "/services-catalog",
-            label: t("sidebar.services"),
-            iconKey: "services",
-          },
-        ]
-      : []),
-    {
-      href: "/website-builder",
+      href: "/website",
       label: t("sidebar.websiteBuilder"),
-      iconKey: "website",
+      iconKey: "websiteBuilder",
+    },
+    {
+      id: "feedback",
+      label: t("sidebar.feedback"),
+      iconKey: "feedback",
+      onClick: openFeedbackModal,
     },
   ];
 
   const bottomNavItems = [
     ...(authUser.role === "super_admin"
       ? [
+          {
+            href: "/admin",
+            label: t("sidebar.ownerAdmin"),
+            iconKey: "platform",
+          },
           {
             href: "/platform",
             label: t("sidebar.platform"),
@@ -754,12 +811,13 @@ export default function AuthShell({ children }) {
     },
   ];
 
-  const isActive = (href) => {
+  const isActive = (href, exact = false) => {
+    if (exact) return pathname === href;
     if (href === "/") return pathname === "/";
     return pathname?.startsWith(href);
   };
 
-  const linkClass = (href) => `sb-link${isActive(href) ? " sb-active" : ""}`;
+  const linkClass = (href, exact = false) => `sb-link${isActive(href, exact) ? " sb-active" : ""}`;
 
   return (
     <div
@@ -776,18 +834,18 @@ export default function AuthShell({ children }) {
           top: 0,
           left: 0,
           bottom: 0,
-          width: 240,
-          background: "#1F2937",
+          width: 248,
+          background: "linear-gradient(180deg, #0f172a 0%, #111827 62%, #0b1220 100%)",
           display: "flex",
           flexDirection: "column",
           zIndex: 40,
           overflowY: "auto",
           overflowX: "hidden",
-          borderRight: "1px solid rgba(255,255,255,0.05)",
+          borderRight: "1px solid rgba(148,163,184,0.18)",
         }}
       >
         {/* Logo */}
-        <div style={{ padding: "20px 16px 16px" }}>
+        <div style={{ padding: "22px 16px 16px" }}>
           <div
             style={{
               display: "flex",
@@ -798,21 +856,16 @@ export default function AuthShell({ children }) {
           >
             <div
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 9,
-                background: "#16a34a",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 13,
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
+                position: "relative",
                 flexShrink: 0,
-                letterSpacing: "-0.3px",
               }}
             >
-              CF
+              <span style={{ position: "absolute", left: 8, top: 9, width: 20, height: 7, borderRadius: 999, background: "linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%)" }} />
+              <span style={{ position: "absolute", right: 8, bottom: 8, width: 7, height: 7, borderRadius: "50%", background: "#f59e0b" }} />
             </div>
             <span
               style={{
@@ -822,7 +875,7 @@ export default function AuthShell({ children }) {
                 letterSpacing: "-0.4px",
               }}
             >
-              ContractorFlow
+              FieldBase
             </span>
           </div>
 
@@ -830,9 +883,9 @@ export default function AuthShell({ children }) {
           <div
             style={{
               padding: "10px 12px",
-              borderRadius: 10,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12,
+              background: "rgba(148,163,184,0.12)",
+              border: "1px solid rgba(148,163,184,0.22)",
               display: "flex",
               alignItems: "center",
               gap: 10,
@@ -843,7 +896,7 @@ export default function AuthShell({ children }) {
                 width: 32,
                 height: 32,
                 borderRadius: "50%",
-                background: "#16a34a",
+                background: "linear-gradient(145deg, #1d4ed8 0%, #0c2461 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -913,12 +966,12 @@ export default function AuthShell({ children }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={linkClass(item.href)}
+                className={linkClass(item.href, item.exact)}
               >
                 <span
                   className="sb-icon"
                   style={{
-                    color: isActive(item.href) ? "#4ade80" : "#6B7280",
+                    color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
                     display: "flex",
                     flexShrink: 0,
                   }}
@@ -954,23 +1007,45 @@ export default function AuthShell({ children }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {secondaryNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={linkClass(item.href)}
-              >
-                <span
-                  className="sb-icon"
-                  style={{
-                    color: isActive(item.href) ? "#4ade80" : "#6B7280",
-                    display: "flex",
-                    flexShrink: 0,
-                  }}
+              item.onClick ? (
+                <button
+                  key={item.id || item.label}
+                  type="button"
+                  onClick={item.onClick}
+                  className={`sb-link${feedbackModalOpen ? " sb-active" : ""}`}
+                  style={{ width: "100%", textAlign: "left" }}
                 >
-                  <Icon d={icons[item.iconKey]} />
-                </span>
-                {item.label}
-              </Link>
+                  <span
+                    className="sb-icon"
+                    style={{
+                      color: feedbackModalOpen ? "#93c5fd" : "#64748b",
+                      display: "flex",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon d={icons[item.iconKey]} />
+                  </span>
+                  {item.label}
+                </button>
+              ) : (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={linkClass(item.href, item.exact)}
+                >
+                  <span
+                    className="sb-icon"
+                    style={{
+                      color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
+                      display: "flex",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon d={icons[item.iconKey]} />
+                  </span>
+                  {item.label}
+                </Link>
+              )
             ))}
           </div>
         </nav>
@@ -1001,12 +1076,12 @@ export default function AuthShell({ children }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={linkClass(item.href)}
+                className={linkClass(item.href, item.exact)}
               >
                 <span
                   className="sb-icon"
                   style={{
-                    color: isActive(item.href) ? "#4ade80" : "#6B7280",
+                    color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
                     display: "flex",
                     flexShrink: 0,
                   }}
@@ -1037,9 +1112,9 @@ export default function AuthShell({ children }) {
                   width: "100%",
                   padding: "7px 10px",
                   borderRadius: 8,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#D1D5DB",
+                  border: "1px solid rgba(148,163,184,0.24)",
+                  background: "rgba(148,163,184,0.12)",
+                  color: "#e2e8f0",
                   fontSize: 13,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -1061,7 +1136,7 @@ export default function AuthShell({ children }) {
               onClick={logout}
               disabled={submitting}
               className="sb-link"
-              style={{ color: "#6B7280" }}
+              style={{ color: "#94a3b8" }}
             >
               <span
                 className="sb-icon"
@@ -1080,10 +1155,11 @@ export default function AuthShell({ children }) {
       {/* ─── Main content area ────────────────────────────── */}
       <div
         style={{
-          marginLeft: 240,
+          marginLeft: 248,
           flex: 1,
+          minWidth: 0,
           minHeight: "100vh",
-          background: "#f4f5f7",
+          background: "#f3f5fa",
           display: "flex",
           flexDirection: "column",
         }}
@@ -1094,7 +1170,197 @@ export default function AuthShell({ children }) {
           t={t}
         />
         {children}
+        <AppFooter />
       </div>
+
+      {feedbackModalOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close feedback modal"
+            onClick={closeFeedbackModal}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(15,23,42,0.45)",
+              border: 0,
+              margin: 0,
+              padding: 0,
+              zIndex: 80,
+            }}
+          />
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Feedback"
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: "min(560px, calc(100vw - 32px))",
+              maxHeight: "calc(100vh - 40px)",
+              overflowY: "auto",
+              background: "#fff",
+              borderRadius: 16,
+              border: "1px solid rgba(15,23,42,0.10)",
+              boxShadow: "0 32px 80px rgba(15,23,42,0.22)",
+              padding: 18,
+              zIndex: 81,
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 22, color: "#0f172a" }}>
+                  {t("feedback.title")}
+                </h2>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 14 }}>
+                  {t("feedback.description")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeFeedbackModal}
+                style={{
+                  borderRadius: 10,
+                  border: "1px solid rgba(15,23,42,0.14)",
+                  background: "#fff",
+                  color: "#0f172a",
+                  padding: "6px 10px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {t("feedback.buttons.close")}
+              </button>
+            </div>
+
+            <select
+              value={feedbackType}
+              onChange={(event) => setFeedbackType(event.target.value)}
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(15,23,42,0.12)",
+                padding: "10px 12px",
+                background: "#fff",
+              }}
+            >
+              {FEEDBACK_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {t(`feedback.types.${option.value}`)}
+                </option>
+              ))}
+            </select>
+
+            <textarea
+              value={feedbackMessage}
+              onChange={(event) => setFeedbackMessage(event.target.value)}
+              placeholder={t("feedback.messagePlaceholder")}
+              rows={6}
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(15,23,42,0.12)",
+                padding: "10px 12px",
+                resize: "vertical",
+                fontFamily: "inherit",
+              }}
+            />
+
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>
+                {t("feedback.screenshotLabel")}
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFeedbackScreenshotChange}
+                style={{
+                  borderRadius: 10,
+                  border: "1px solid rgba(15,23,42,0.12)",
+                  padding: "8px 10px",
+                }}
+              />
+              {feedbackScreenshotName && (
+                <div style={{ fontSize: 13, color: "#0369a1" }}>
+                  {t("feedback.screenshotAttached", { name: feedbackScreenshotName })}
+                </div>
+              )}
+            </div>
+
+            {feedbackError && (
+              <div
+                style={{
+                  borderRadius: 10,
+                  border: "1px solid rgba(239,68,68,0.24)",
+                  background: "rgba(239,68,68,0.08)",
+                  color: "#991b1b",
+                  padding: "8px 10px",
+                  fontSize: 13,
+                }}
+              >
+                {feedbackError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={closeFeedbackModal}
+                style={{
+                  borderRadius: 999,
+                  border: "1px solid rgba(15,23,42,0.14)",
+                  background: "#fff",
+                  color: "#0f172a",
+                  padding: "9px 14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {t("feedback.buttons.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={submitFeedback}
+                disabled={feedbackSubmitting}
+                style={{
+                  border: 0,
+                  borderRadius: 999,
+                  background: "#0f766e",
+                  color: "#fff",
+                  padding: "9px 14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {feedbackSubmitting ? t("feedback.buttons.submitting") : t("feedback.buttons.submit")}
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {feedbackNotice && (
+        <div
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: 16,
+            borderRadius: 10,
+            border: "1px solid rgba(16,185,129,0.28)",
+            background: "rgba(16,185,129,0.94)",
+            color: "#ecfdf5",
+            padding: "10px 12px",
+            fontSize: 13,
+            fontWeight: 700,
+            zIndex: 90,
+            boxShadow: "0 14px 28px rgba(15,23,42,0.24)",
+          }}
+        >
+          {feedbackNotice}
+        </div>
+      )}
     </div>
   );
 }

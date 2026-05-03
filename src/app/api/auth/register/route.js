@@ -1,4 +1,4 @@
-import { normalizeAppRole } from "@/lib/access-control";
+﻿import { normalizeAppRole } from "@/lib/access-control";
 import { getSessionFromRequest } from "@/lib/auth";
 import { upsertCompanyProfileForTenant } from "@/lib/company-profile-store";
 import { sendEmail } from "@/lib/email";
@@ -179,7 +179,7 @@ export async function POST(request) {
       ? "super_admin"
       : normalizeAppRole(finalRole);
     const now = new Date();
-    const trialEnd = new Date(now.getTime() + 22 * 24 * 60 * 60 * 1000);
+    const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const authPayload = {
       email,
       password,
@@ -276,7 +276,7 @@ export async function POST(request) {
 
     const emailResult = await sendEmail({
       to: email,
-      subject: "Verify your ContractorFlow account",
+      subject: "Verify your FieldBase account",
       html: `<p>Hi ${name},</p><p>Click the link below to verify your email and activate your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
       text: `Hi ${name},\n\nVerify your account:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
       metadata: { tenantId: profileTenantId },

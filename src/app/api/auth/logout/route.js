@@ -1,7 +1,16 @@
 import { clearSessionCookie } from "@/lib/auth";
+import { invalidateCachedSession } from "@/lib/session-cache";
 
-export async function POST() {
+export async function POST(request) {
   try {
+    // Invalidate Redis session cache so token is rejected immediately
+    const cookie =
+      request.cookies.get("__Host-madrid_session")?.value ||
+      request.cookies.get("madrid_session")?.value;
+    if (cookie) {
+      await invalidateCachedSession(cookie);
+    }
+
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: {

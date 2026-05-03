@@ -62,13 +62,8 @@ export async function GET() {
         JSON.stringify({
           success: false,
           status: "degraded",
-          provider: "supabase",
           [dbLabel]: dbHealthy ? "ok" : "error",
           auth: authHealthy ? "ok" : "error",
-          error: dbHealthy ? null : dbStatus.reason,
-          checks: {
-            sessionSecret: secretHealth,
-          },
           responseMs: Date.now() - startedAt,
           timestamp: new Date().toISOString(),
         }),
@@ -83,12 +78,6 @@ export async function GET() {
       JSON.stringify({
         success: true,
         status: "ok",
-        provider: "supabase",
-        [dbLabel]: "ok",
-        auth: "ok",
-        checks: {
-          sessionSecret: secretHealth,
-        },
         uptimeSeconds: Math.floor(process.uptime()),
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
@@ -98,17 +87,11 @@ export async function GET() {
         headers: { "Content-Type": "application/json" },
       },
     );
-  } catch (error) {
+  } catch {
     return new Response(
       JSON.stringify({
         success: false,
         status: "degraded",
-        provider: "supabase",
-        auth: authHealthy ? "ok" : "error",
-        checks: {
-          sessionSecret: secretHealth,
-        },
-        error: error.message,
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
       }),

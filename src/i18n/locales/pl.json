@@ -25,6 +25,68 @@
     "noInvoices": "Brak faktur.",
     "invoiceWithoutNumber": "Faktura bez numeru"
   },
+  "dashboardControl": {
+    "operationsLabel": "Centrum operacyjne",
+    "title": "Panel",
+    "subtitle": "Tutaj widzisz swoja firme w jednym miejscu.",
+    "subtitleWithName": "Witaj ponownie, {{name}}. Tutaj widzisz swoja firme w jednym miejscu.",
+    "actions": {
+      "newEstimate": "Nowa wycena",
+      "newJob": "Nowe zlecenie",
+      "addClient": "Dodaj klienta"
+    },
+    "metrics": {
+      "revenue": "Przychod",
+      "revenueHint": "Suma z oplaconych zlecen i faktur",
+      "activeJobs": "Aktywne zlecenia",
+      "activeJobsHint": "Aktualnie w realizacji",
+      "pendingEstimates": "Oczekujace wyceny",
+      "pendingEstimatesHint": "Czekaja na odpowiedz klienta"
+    },
+    "sections": {
+      "performance": "Wydajnosc",
+      "revenueTrend": "Trend przychodu",
+      "lastPeriods": "Ostatnie 10 okresow",
+      "updates": "Aktualizacje",
+      "recentActivity": "Ostatnia aktywnosc",
+      "workspace": "Przestrzen robocza",
+      "coreModules": "Glowne moduly",
+      "financeStatus": "Status finansowy",
+      "collectionsHealth": "Kondycja naleznosci"
+    },
+    "chart": {
+      "outstanding": "Nalezne:",
+      "unpaidInvoices": "Nieoplacone faktury:"
+    },
+    "activity": {
+      "paymentRecorded": "Zarejestrowano platnosc {{amount}}",
+      "estimateAwaitingApproval": "Wycena oczekuje na akceptacje klienta",
+      "invoiceReminderScheduled": "Przypomnienie o fakturze zaplanowane",
+      "paymentReceivedCompletedJob": "Otrzymano platnosc za zakonczone zlecenie",
+      "today": "Dzis",
+      "yesterday": "Wczoraj",
+      "unknownDate": "Nieznana data"
+    },
+    "workspace": {
+      "clientsTitle": "Klienci",
+      "clientsDesc": "Zobacz historie klienta, notatki i dane kontaktowe.",
+      "clientsAction": "Zobacz klientow",
+      "estimatesTitle": "Wyceny",
+      "estimatesDesc": "Tworz profesjonalne wyceny i sledz akceptacje.",
+      "estimatesAction": "Utworz wycene",
+      "jobsTitle": "Zlecenia",
+      "jobsDesc": "Zarzadzaj aktywnymi zleceniami i postepem prac.",
+      "jobsAction": "Otworz zlecenia",
+      "invoicesTitle": "Faktury",
+      "invoicesDesc": "Wysylaj faktury, przyjmuj platnosci i kontroluj salda.",
+      "invoicesAction": "Zobacz faktury"
+    },
+    "statuses": {
+      "paid": "Oplacone",
+      "pending": "Oczekujace",
+      "overdue": "Po terminie"
+    }
+  },
   "sections": {
     "clients": "Klienci",
     "jobs": "Zlecenia",
@@ -209,7 +271,7 @@
     "websiteUrlPlaceholder": "https://twoja-witryna.com",
     "googleReviewsPlaceholder": "https://g.page/r/... (Opinie Google)",
     "phoneLabel": "Telefon kontaktowy",
-    "businessAddressLabel": "Adres firmy (opcjonalnie)",
+    "businessAddressLabel": "Adres firmy",
     "poBoxAddressLabel": "Adres skrytki pocztowej (opcjonalnie)",
     "legalFooterPlaceholder": "Tekst prawny w stopce",
     "saveSettings": "Zapisz ustawienia",
@@ -310,8 +372,11 @@
       "contractAi": "Nie udalo sie wygenerowac szkicu umowy przez AI",
       "contractAiFallback": "Blad podczas redagowania umowy przez AI",
       "invoiceNeedsJob": "Najpierw powiaz fakture ze zleceniem, aby wygenerowac umowe.",
-      "invalidLogoType": "Wybierz prawidlowy obraz logo.",
-      "invalidLogoSize": "Logo musi miec maksymalnie 2 MB.",
+      "businessAddressRequired": "Adres firmy jest wymagany.",
+      "phoneRequired": "Telefon kontaktowy jest wymagany.",
+      "invalidLogoType": "Wybierz plik PNG, JPG lub SVG jako logo.",
+      "invalidLogoSize": "Logo przekracza 2 MB i nie mozna go zapisac. Skompresuj je na squoosh.app lub tinypng.com i sprobuj ponownie.",
+      "logoSizeHint": "Plik zaakceptowany. Dla lepszej wydajnosci uzyj logo ponizej 500 KB — wiekszosc plikow dobrze sie kompresuje na squoosh.app.",
       "saveCompanyProfile": "Nie udalo sie zapisac profilu firmy",
       "saveCompanyProfileFallback": "Blad podczas zapisu profilu firmy",
       "quoteLink": "Nie udalo sie wygenerowac linku oferty",
@@ -362,7 +427,10 @@
     "calendar": "Kalendarz",
     "insights": "Statystyki",
     "services": "Uslugi",
-    "websiteBuilder": "Kreator Strony",
+    "websiteBuilder": "Strona",
+    "feedback": "Feedback",
+    "leadInbox": "Skrzynka Leadow",
+    "ownerAdmin": "Panel Wlasciciela",
     "platform": "Platforma",
     "settings": "Ustawienia",
     "logout": "Wyloguj",
@@ -371,7 +439,7 @@
   "auth": {
     "loading": "Ladowanie...",
     "welcomeBack": "Witaj ponownie",
-    "signInDesc": "Zaloguj sie do swojego konta ContractorFlow.",
+    "signInDesc": "Zaloguj sie do swojego konta FieldBase.",
     "createAccount": "Utworz konto",
     "createAccountDesc": "Zacznij zarzadzac swoim biznesem.",
     "checkYourEmail": "Sprawdz email",
@@ -426,7 +494,21 @@
     "invalidCredentials": "Nieprawidlowy email lub haslo",
     "authError": "Blad uwierzytelniania",
     "loginError": "Nie udalo sie zalogowac",
-    "registerError": "Nie udalo sie zarejestrowac"
+    "registerError": "Nie udalo sie zarejestrowac",
+    "industries": {
+      "landscapingHardscaping": "Ogrodnictwo / Architektura krajobrazu",
+      "cleaning": "Sprzatanie",
+      "construction": "Budownictwo",
+      "generalContractor": "Generalny Wykonawca",
+      "electrical": "Elektryka",
+      "hvac": "Klimatyzacja (HVAC)",
+      "handyman": "Konserwacja ogolna",
+      "painting": "Malarstwo",
+      "plumbing": "Hydraulika",
+      "roofing": "Dekarstwo",
+      "treeCare": "Pielegnacja drzew",
+      "other": "Inne"
+    }
   },
   "quote": {
     "loading": "Ladowanie wyceny...",
@@ -485,7 +567,7 @@
       "describeChanges": "Prosze opisac zadane zmiany.",
       "submit": "Cos poszlo nie tak. Sprobuj ponownie."
     },
-    "footer": "Wyslane przez ContractorFlow"
+    "footer": "Wyslane przez FieldBase"
   },
   "notifications": {
     "title": "Powiadomienia",
@@ -494,7 +576,7 @@
   },
   "verifyEmail": {
     "checkEmail": "Sprawdz email",
-    "checkEmailDesc": "Wyslalismy link weryfikacyjny na Twoj inbox. Kliknij go, aby aktywowac konto i rozpoczac 22-dniowy bezplatny okres probny.",
+    "checkEmailDesc": "Wyslalismy link weryfikacyjny na Twoj inbox. Kliknij go, aby aktywowac konto i rozpoczac 30-dniowy bezplatny okres probny.",
     "backToSignIn": "Powrot do logowania",
     "verifying": "Weryfikacja emaila...",
     "verifyingDesc": "Poczekaj, aktywujemy Twoje konto.",
@@ -502,15 +584,42 @@
     "resendPrompt": "Popros o nowy link weryfikacyjny:"
   },
   "trial": {
-    "expired": "Twoj okres probny zakonczyl sie. Zasubskrybuj, aby kontynuowac korzystanie z ContractorFlow.",
+    "expired": "Twoj okres probny zakonczyl sie. Zasubskrybuj, aby kontynuowac korzystanie z FieldBase.",
     "daysLeft": "Pozostal {{count}} dzien bezplatnego okresu probnego.",
     "daysLeft_other": "Pozostaly {{count}} dni bezplatnego okresu probnego.",
     "subscribe": "Zasubskrybuj teraz"
   },
+  "feedback": {
+    "title": "Opinia",
+    "description": "Podziel sie krotka notatka bez opuszczania swojego przeplywu pracy.",
+    "types": {
+      "suggestion": "Sugestia",
+      "issue": "Problem",
+      "improvement": "Ulepszenie"
+    },
+    "messagePlaceholder": "Powiedz nam, co by ci sie przydalo.",
+    "screenshotLabel": "Zrzut ekranu (opcjonalnie)",
+    "screenshotAttached": "Zalaczony: {{name}}",
+    "buttons": {
+      "close": "Zamknij",
+      "cancel": "Anuluj",
+      "submit": "Wyslij",
+      "submitting": "Wysylanie..."
+    },
+    "errors": {
+      "imageOnly": "Prosze przeslac plik obrazu.",
+      "fileSize": "Zrzut ekranu musi byc mniejszy niz 1.5MB.",
+      "fileRead": "Nie udalo sie przeczytac pliku zrzutu ekranu.",
+      "messageRequired": "Wiadomosc jest wymagana.",
+      "submitFailed": "Nie udalo sie wyslac opinii."
+    },
+    "success": "Dziekujemy! Opinia wyslana."
+  },
   "greeting": {
     "morning": "Dzien dobry",
     "afternoon": "Dzien dobry",
-    "evening": "Dobry wieczor"
+    "evening": "Dobry wieczor",
+    "defaultName": "Przyjacielu"
   },
   "clients": {
     "title": "Klienci",
@@ -549,6 +658,7 @@
       "save": "Nie udalo sie zapisac klienta",
       "saveFallback": "Blad podczas zapisu klienta",
       "nameRequired": "Nazwa klienta jest wymagana",
+      "addressSelectionRequired": "Wybierz adres z listy podpowiedzi",
       "delete": "Nie udalo sie usunac klienta",
       "deleteFallback": "Blad podczas usuwania klienta"
     },
@@ -789,8 +899,33 @@
     },
     "weather": {
       "locationHint": "Uzywane do pobierania prognozy pogody dla tej pracy",
+      "changeLocationLabel": "Zmien lokalizacje",
+      "changeLocationPlaceholder": "Miasto, miasteczko, kod pocztowy lub lat,lon",
+      "applyLocation": "Zastosuj lokalizacje",
+      "activeLocation": "Aktualna lokalizacja",
       "outOfRange": "Prognoza dostepna tylko dla najblizszych 5 dni",
-      "unavailable": "Pogoda niedostepna"
+      "unavailable": "Pogoda niedostepna",
+      "hourlyTitle": "Prognoza godzinowa",
+      "noHourly": "Brak danych godzinowych dla tego dnia",
+      "checkingLocation": "Sprawdzanie...",
+      "locationRequired": "Wpisz lokalizacje, aby zaktualizowac prognoze",
+      "locationInvalid": "Nie udalo sie teraz dopasowac lokalizacji. Sprobuj inne miasto lub kod pocztowy.",
+      "locationBestMatch": "Uzyto najlepszego dopasowania: {{location}}",
+      "locationFallbackNotice": "Nie znalezlismy tej lokalizacji. Tymczasowo uzyjemy {{location}}.",
+      "locationSuggestionHint": "Zacznij wpisywac miasto lub miasteczko, aby zobaczyc podpowiedzi, albo wpisz prawidlowy kod pocztowy lub wspolrzedne.",
+      "scrollToCalendar": "Wróć do kalendarza",
+      "fallbackLabel": "Zapas",
+      "fallbackHint": "Uzywane sa zapasowe dane pogodowe",
+      "sectionTitle": "Prognoza pogody",
+      "feelsLike": "Odczuwalna: {{temp}}°F",
+      "humidity": "Wilgotnosc {{pct}}%",
+      "wind": "Wiatr {{speed}} mph",
+      "alertRain": "Mozliwy deszcz — rozwazyc przelozenie terminu",
+      "alertStorm": "Burza — zalecane przelozenie terminu",
+      "alertSnow": "Snieg — sprawdz dostep do miejsca pracy",
+      "alertHighWind": "Silny wiatr — rozwazyc przelozenie prac na zewnatrz",
+      "alertMist": "Ograniczona widocznosc",
+      "alertClear": "Czyste niebo — idealne warunki"
     },
     "statusOptions": {
       "Scheduled": "Zaplanowana",
@@ -819,6 +954,9 @@
       "load": "Blad podczas ladowania kalendarza",
       "save": "Nie udalo sie zapisac wizyty",
       "saveFallback": "Blad podczas zapisu wizyty",
+      "required": "To pole jest wymagane",
+      "invalidDate": "Data musi miec format YYYY-MM-DD",
+      "pastDate": "Nie mozna zaplanowac terminu w przeszlosci",
       "delete": "Nie udalo sie usunac wizyty",
       "deleteFallback": "Blad podczas usuwania wizyty"
     }
@@ -919,6 +1057,37 @@
       "reviewLineItems": "Sprawdz pozycje przed kontynuowaniem.",
       "missingUserContext": "Brakuje danych konta. Odswiez strone i sprobuj ponownie.",
       "createEstimate": "Nie udalo sie utworzyc wyceny"
+    }
+  },
+  "legal": {
+    "pageTitle": "Regulamin i Zgodnosc",
+    "version": "v1.0-kwiecien-2026",
+    "updatedAt": "30 kwietnia 2026",
+    "required": {
+      "heading": "Przeczytaj i zaakceptuj warunki prawne",
+      "subheading": "Musisz zaakceptowac Warunki Prawne FieldBase przed uzyskaniem dostepu do platformy.",
+      "scrollHint": "Przewin w dol, aby przeczytac wszystkie warunki przed akceptacja",
+      "checkbox": "Przeczytalem i zgadzam sie na Warunki Prawne FieldBase, w tym Warunki Uslug, Polityke Prywatnosci, Autoryzacje Platnosci, Zgode SMS oraz Warunki Wycen i Faktur.",
+      "accept": "Akceptuje \u2014 Przejdz do Platformy",
+      "accepting": "Zapisywanie akceptacji\u2026",
+      "alreadyAccepted": "Warunki juz zaakceptowane. Przekierowywanie\u2026",
+      "complianceNote": "Twoja akceptacja jest rejestrowana ze znacznikiem czasu, adresem IP i informacjami o przegladarce dla celow zgodnosci."
+    },
+    "footer": {
+      "legal": "Regulamin i Zgodnosc",
+      "privacy": "Polityka Prywatnosci",
+      "terms": "Warunki Uslug",
+      "sms": "Zgoda SMS"
+    },
+    "acceptance": {
+      "heading": "Zaakceptuj te warunki",
+      "checkbox": "Przeczytalem i zgadzam sie na wszystkie warunki na tej stronie.",
+      "submit": "Akceptuje i przechodze do platformy",
+      "submitting": "Zapisywanie akceptacji\u2026",
+      "accepted": "Warunki zaakceptowane. Przekierowywanie\u2026",
+      "signInToAccept": "Zaloguj sie, aby zaakceptowac te warunki.",
+      "signInLink": "Zaloguj sie",
+      "complianceNote": "Twoja akceptacja jest rejestrowana ze znacznikiem czasu i adresem IP dla celow zgodnosci."
     }
   }
 }

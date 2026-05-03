@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { sendEmail } from "@/lib/email";
 import { logSupabaseError } from "@/lib/supabase-db";
@@ -27,7 +27,7 @@ function buildEmailTemplate({
   price,
   quoteUrl,
 }) {
-  const safeCompany = companyName || "ContractorFlow";
+  const safeCompany = companyName || "FieldBase";
   const safeClient = clientName || "Client";
   const safeJob = jobTitle || "your estimate";
   const priceDisplay = price ? `$${Number(price).toFixed(2)}` : null;
@@ -120,7 +120,7 @@ function buildEmailTemplate({
         <tr>
           <td style="padding:16px 32px;border-top:1px solid #f1f5f9;">
             <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
-              Sent by ${safeCompany} via ContractorFlow
+              Sent by ${safeCompany} via FieldBase
             </p>
           </td>
         </tr>
@@ -210,7 +210,7 @@ export async function POST(request, { params }) {
     const companyProfile = await getCompanyProfileByTenant({
       tenantId: tenantDbId,
     });
-    const companyName = companyProfile?.companyName || "ContractorFlow";
+    const companyName = companyProfile?.companyName || "FieldBase";
 
     const template = buildEmailTemplate({
       companyName,

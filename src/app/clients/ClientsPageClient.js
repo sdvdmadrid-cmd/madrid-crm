@@ -25,7 +25,7 @@ export default function ClientsPageClient() {
       const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
       setClients(data);
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("clients.errors.load"));
     } finally {
       setLoading(false);
@@ -58,8 +58,20 @@ export default function ClientsPageClient() {
         phone: form.phone,
         email: form.email,
         address: form.address,
+        city: form.city,
+        state: form.state,
+        zip: form.zip,
+        latitude: form.latitude,
+        longitude: form.longitude,
         notes: form.notes,
       };
+
+      const hasAddress = String(form.address || "").trim().length > 0;
+      if (hasAddress && !String(form.addressPlaceId || "").trim()) {
+        setError(t("clients.errors.addressSelectionRequired"));
+        setSaving(false);
+        return;
+      }
 
       const method = selectedId ? "PATCH" : "POST";
       const url = selectedId
@@ -86,7 +98,7 @@ export default function ClientsPageClient() {
 
       resetForm();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("clients.errors.saveFallback"));
     } finally {
       setSaving(false);
@@ -101,6 +113,16 @@ export default function ClientsPageClient() {
       email: client.email || "",
       phone: client.phone || "",
       address: client.address || "",
+      city: client.city || "",
+      state: client.state || "",
+      zip: client.zip || "",
+      latitude:
+        typeof client.latitude === "number" ? client.latitude : null,
+      longitude:
+        typeof client.longitude === "number" ? client.longitude : null,
+      // Existing records may predate place_id tracking.
+      // Keep them editable unless the address field is changed.
+      addressPlaceId: client.address ? "persisted" : "",
       notes: client.notes || "",
     });
     setSelectedId(client.id);
@@ -120,7 +142,7 @@ export default function ClientsPageClient() {
       setClients((prev) => prev.filter((client) => client.id !== id));
       if (selectedId === id) resetForm();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("clients.errors.deleteFallback"));
     }
   };

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -74,7 +74,7 @@ const UI_I18N = {
       describeChanges: "Please describe the changes you'd like.",
       submit: "Something went wrong. Please try again.",
     },
-    footer: "Sent via ContractorFlow",
+    footer: "Sent via FieldBase",
     shareQuote: "Share quote",
     shareHint: "Quick share via SMS, WhatsApp, email, or other apps.",
     linkCopied: "Link copied",
@@ -140,7 +140,7 @@ const UI_I18N = {
       describeChanges: "Por favor describe los cambios que deseas.",
       submit: "Algo salió mal. Intenta de nuevo.",
     },
-    footer: "Enviado con ContractorFlow",
+    footer: "Enviado con FieldBase",
     shareQuote: "Compartir cotización",
     shareHint:
       "Comparte rápido por SMS, WhatsApp, email u otras apps.",
@@ -208,7 +208,7 @@ const UI_I18N = {
       describeChanges: "Proszę opisać żądane zmiany.",
       submit: "Coś poszło nie tak. Spróbuj ponownie.",
     },
-    footer: "Wysłane przez ContractorFlow",
+    footer: "Wysłane przez FieldBase",
     shareQuote: "Udostępnij wycenę",
     shareHint:
       "Szybkie udostępnianie przez SMS, WhatsApp, email i inne aplikacje.",
@@ -431,7 +431,7 @@ export default function QuoteClientPage() {
     }
   };
 
-  const companyName = company.companyName || "ContractorFlow";
+  const companyName = company.companyName || "FieldBase";
   const shareTitle = `${companyName} - ${job.title || t.projectQuote}`;
   const shareText = `${t.projectQuote}: ${job.title || t.projectQuote} · ${money(financials.total)}`;
 

@@ -69,33 +69,45 @@ const UI_I18N = {
       addToEstimate: "Add",
       remove: "Remove",
       saveEstimate: "Save estimate",
+      saveProgress: "Save progress",
       updateEstimate: "Update estimate",
       newEstimate: "New estimate",
       load: "Load",
       delete: "Delete",
       sendEstimate: "Send Estimate",
+      convertToQuote: "Convert to Quote",
+      generateInvoice: "Generate Invoice",
       shareEstimate: "Share quote",
       saveOnly: "Save only",
       sending: "Sending\u2026",
       sentSuccess: "Quote created and sent",
       sentSuccessDetail: "Quote {n} sent to client",
       sendError: "Failed to send estimate",
+      workflowHint: "Next step: save progress, convert to quote, or generate invoice.",
+      invoiceReady: "Invoice generated and linked",
+      invoiceError: "Failed to generate invoice",
     },
     filters: {
       search: "Search catalog...",
       category: "Category:",
       allCategories: "All categories",
+      saveProgress: "Guardar progreso",
     },
     custom: {
       sectionTitle: "Custom Service",
       addButton: "+ Add Custom Service",
       catalogButton: "From Catalog",
+      convertToQuote: "Convertir a cotizacion",
+      generateInvoice: "Generar factura",
       namePlaceholder: "Service name",
       descriptionPlaceholder: "Description (optional)",
       pricePlaceholder: "Price / unit",
       unitPlaceholder: "Unit (e.g. hr, sqft)",
       addToEstimate: "Add to Estimate",
       errorName: "Name is required",
+      workflowHint: "Siguiente paso: guardar progreso, convertir a cotizacion o generar factura.",
+      invoiceReady: "Factura generada y vinculada",
+      invoiceError: "No se pudo generar la factura",
       errorPrice: "Price must be a positive number",
       globalSearch: "Search service or add custom...",
       globalSearchHint: 'Press Enter to add "{q}" as a custom item',
@@ -109,17 +121,23 @@ const UI_I18N = {
       fetchCatalog: "Unable to load catalog",
       fetchEstimates: "Unable to load saved estimates",
       save: "Unable to save estimate",
+      saveProgress: "Zapisz postep",
       delete: "Unable to delete estimate",
       ai: "Unable to generate description",
     },
     ai: {
       sectionTitle: "AI Description",
+      convertToQuote: "Konwertuj do oferty",
+      generateInvoice: "Generuj fakture",
       inputLabel: "Describe the project",
       inputPlaceholder:
         "e.g. Backyard renovation for the Smith family. Includes paver patio, retaining wall along the back fence, and re-seeding the lawn area...",
       generateButton: "Generate Professional Description",
       generatingButton: "Generating...",
       resultLabel: "Generated description",
+      workflowHint: "Nastepny krok: zapisz postep, konwertuj do oferty lub generuj fakture.",
+      invoiceReady: "Faktura wygenerowana i polaczona",
+      invoiceError: "Nie udalo sie wygenerowac faktury",
       copyButton: "Copy",
       copiedButton: "Copied!",
       hint: "Edit the text below before saving.",
@@ -728,6 +746,8 @@ export default function EstimateBuilderPage() {
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sentQuoteNumber, setSentQuoteNumber] = useState("");
+  const [workflowSuccess, setWorkflowSuccess] = useState("");
+  const [workflowError, setWorkflowError] = useState("");
 
   // AI description
   const [aiInput, setAiInput] = useState("");
@@ -944,7 +964,7 @@ export default function EstimateBuilderPage() {
   }, [lines]);
 
   // Save / update
-  const saveEstimate = async () => {
+  const saveEstimate = async (options = {}) => {
     setSaving(true);
     setSaveError("");
     try {
@@ -958,6 +978,7 @@ export default function EstimateBuilderPage() {
         totalFinal: totals.final,
         description: estimateDescription,
         clientId: clientId || null,
+        ...(options.removeQuoteSignature ? { removeQuoteSignature: true } : {}),
       };
 
       const method = editId ? "PATCH" : "POST";
@@ -983,6 +1004,16 @@ export default function EstimateBuilderPage() {
       // Return the saved id so callers can chain send
       return result.data._id;
     } catch (err) {
+      if (
+        !options.removeQuoteSignature &&
+        String(err?.message || "").toLowerCase().includes("signed and locked") &&
+        typeof window !== "undefined" &&
+        window.confirm(
+          "This quote is signed and locked. Remove the signature lock and continue editing?",
+        )
+      ) {
+        return saveEstimate({ removeQuoteSignature: true });
+      }
       setSaveError(err.message || t.errors.save);
       throw err;
     } finally {
@@ -994,6 +1025,8 @@ export default function EstimateBuilderPage() {
   const handleSaveAndSend = async () => {
     setSendError("");
     setSendSuccess(false);
+    setWorkflowError("");
+    setWorkflowSuccess("");
     setSentQuoteNumber("");
     setSending(true);
     try {
@@ -1017,6 +1050,27 @@ export default function EstimateBuilderPage() {
       }, 1500);
     } catch (err) {
       setSendError(err.message || t.buttons.sendError);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    setWorkflowError("");
+    setWorkflowSuccess("");
+    setSendError("");
+    setSending(true);
+    try {
+      const savedId = editId || (await saveEstimate());
+      const res = await apiFetch(`/api/estimate-builder/${savedId}/share-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ensureInvoice: true }),
+      });
+      await getJsonOrThrow(res, t.buttons.invoiceError);
+      setWorkflowSuccess(t.buttons.invoiceReady);
+    } catch (err) {
+      setWorkflowError(err.message || t.buttons.invoiceError);
     } finally {
       setSending(false);
     }
@@ -2602,15 +2656,26 @@ export default function EstimateBuilderPage() {
                               type="button"
                               onClick={() => deleteEstimate(est._id)}
                               style={{
-                                padding: "7px 14px",
-                                borderRadius: "7px",
-                                border: "none",
-                                background: "#d32f2f",
-                                color: "white",
+                                padding: "6px 10px",
+                                borderRadius: "999px",
+                                border: "1px solid #fecaca",
+                                background: "#fff5f5",
+                                color: "#b91c1c",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
                                 cursor: "pointer",
-                                fontSize: "13px",
+                                fontSize: "12px",
+                                fontWeight: 600,
                               }}
                             >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4h8v2" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                              </svg>
                               {t.buttons.delete}
                             </button>
                           : null}
@@ -2799,7 +2864,19 @@ export default function EstimateBuilderPage() {
               <div
                 style={{ display: "flex", flexDirection: "column", gap: "8px" }}
               >
-                {/* Primary: Save + Send */}
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#475569",
+                    background: "#eef2ff",
+                    border: "1px solid #c7d2fe",
+                    borderRadius: "8px",
+                    padding: "8px 10px",
+                  }}
+                >
+                  {t.buttons.workflowHint}
+                </div>
+                {/* Convert to quote */}
                 {capabilities.canSendExternalCommunications
                   ? <button
                       type="button"
@@ -2846,10 +2923,10 @@ export default function EstimateBuilderPage() {
                             : "0 4px 12px rgba(11,105,255,0.3)",
                       }}
                     >
-                      {sending ? t.buttons.sending : t.buttons.sendEstimate}
+                      {sending ? t.buttons.sending : t.buttons.convertToQuote}
                     </button>
                   : null}
-                {/* Secondary: Save without sending */}
+                {/* Save progress */}
                 <button
                   type="button"
                   onClick={saveEstimate}
@@ -2887,7 +2964,47 @@ export default function EstimateBuilderPage() {
                     fontWeight: 600,
                   }}
                 >
-                  {saving ? t.saving : t.buttons.saveOnly}
+                  {saving ? t.saving : t.buttons.saveProgress}
+                </button>
+                {/* Generate invoice */}
+                <button
+                  type="button"
+                  onClick={handleGenerateInvoice}
+                  disabled={
+                    saving ||
+                    sending ||
+                    lines.length === 0 ||
+                    !estimateName.trim() ||
+                    !clientId
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    border: "1px solid #bbf7d0",
+                    background: "#f0fdf4",
+                    cursor:
+                      saving ||
+                      sending ||
+                      lines.length === 0 ||
+                      !estimateName.trim() ||
+                      !clientId
+                        ? "default"
+                        : "pointer",
+                    fontSize: "13px",
+                    fontFamily: "inherit",
+                    color:
+                      saving ||
+                      sending ||
+                      lines.length === 0 ||
+                      !estimateName.trim() ||
+                      !clientId
+                        ? "#86a38f"
+                        : "#166534",
+                    fontWeight: 700,
+                  }}
+                >
+                  {t.buttons.generateInvoice}
                 </button>
                 {editId && (
                   <button
@@ -2908,6 +3025,16 @@ export default function EstimateBuilderPage() {
                     {t.buttons.newEstimate}
                   </button>
                 )}
+                {workflowSuccess ? (
+                  <p style={{ color: "#166534", margin: "2px 0 0", fontSize: "12px" }}>
+                    {workflowSuccess}
+                  </p>
+                ) : null}
+                {workflowError ? (
+                  <p style={{ color: "#b91c1c", margin: "2px 0 0", fontSize: "12px" }}>
+                    {workflowError}
+                  </p>
+                ) : null}
                 {sendSuccess && (
                   <p
                     style={{
@@ -3038,16 +3165,27 @@ export default function EstimateBuilderPage() {
                                 type="button"
                                 onClick={() => deleteEstimate(est._id)}
                                 style={{
-                                  padding: "4px 10px",
-                                  borderRadius: 6,
-                                  border: "none",
+                                  padding: "5px 9px",
+                                  borderRadius: 999,
+                                  border: "1px solid #fecaca",
                                   background: "#fee2e2",
-                                  color: "#dc2626",
+                                  color: "#b91c1c",
                                   cursor: "pointer",
                                   fontSize: 12,
+                                  fontWeight: 600,
                                   fontFamily: "inherit",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
                                 }}
                               >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M3 6h18" />
+                                  <path d="M8 6V4h8v2" />
+                                  <path d="M19 6l-1 14H6L5 6" />
+                                  <path d="M10 11v6" />
+                                  <path d="M14 11v6" />
+                                </svg>
                                 {t.buttons.delete}
                               </button>
                             : null}

@@ -7,7 +7,7 @@ const DETAILS_API_BASE =
  * GET /api/places/details?placeId=ChIJ...
  *
  * Server-side proxy to Google Place Details.
- * Returns parsed street, city, state, and zip from address_components.
+ * Returns formatted address, parsed city/state/zip, and coordinates.
  * Requires an authenticated session.
  */
 export async function GET(request) {
@@ -39,7 +39,7 @@ export async function GET(request) {
 
   const params = new URLSearchParams({
     place_id: placeId,
-    fields: "address_components",
+    fields: "formatted_address,address_components,geometry",
     key: apiKey,
   });
 
@@ -56,7 +56,8 @@ export async function GET(request) {
     }
 
     const data = await res.json();
-    const components = data.result?.address_components || [];
+    const result = data.result || {};
+    const components = result.address_components || [];
 
     // ── Parse address_components ─────────────────────────────────────────
     const get = (type, nameType = "long_name") => {
@@ -78,9 +79,21 @@ export async function GET(request) {
     const state = get("administrative_area_level_1", "short_name");
 
     const zip = get("postal_code");
+    const formattedAddress = result.formatted_address || "";
+    const latitude = result.geometry?.location?.lat ?? null;
+    const longitude = result.geometry?.location?.lng ?? null;
 
     return Response.json(
-      { success: true, street, city, state, zip },
+      {
+        success: true,
+        street,
+        city,
+        state,
+        zip,
+        formattedAddress,
+        latitude,
+        longitude,
+      },
       {
         status: 200,
         headers: { "Cache-Control": "private, max-age=300" },

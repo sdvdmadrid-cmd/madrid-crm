@@ -3,7 +3,7 @@
 
 create table if not exists public.contractor_websites (
   id             uuid primary key default gen_random_uuid(),
-  tenant_id      uuid not null references public.tenants(id) on delete cascade,
+  tenant_id      uuid not null,
   slug           text not null,
   headline       text not null default '',
   subheadline    text not null default '',
@@ -29,13 +29,9 @@ alter table public.contractor_websites enable row level security;
 create policy "Tenant can manage their own website"
   on public.contractor_websites
   for all
-  using (
-    tenant_id in (
-      select id from public.tenants where id = (
-        select tenant_id from public.users where id = auth.uid() limit 1
-      )
-    )
-  );
+  to authenticated
+  using (public.can_access_tenant(tenant_id))
+  with check (public.can_access_tenant(tenant_id));
 
 -- Public read for published sites (supports /site/[slug] route)
 create policy "Public can read published websites"

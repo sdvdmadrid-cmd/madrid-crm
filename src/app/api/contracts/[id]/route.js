@@ -1,3 +1,4 @@
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   canWrite,
@@ -26,6 +27,8 @@ const serialize = (doc) => ({
 });
 
 export async function PATCH(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   try {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
@@ -114,7 +117,7 @@ export async function PATCH(request, { params }) {
     if (error) {
       console.error("[api/contracts/:id][PATCH] Supabase update error", error);
       return Response.json(
-        { success: false, error: error.message },
+        { success: false, error: "Unable to update contract" },
         { status: 500 },
       );
     }
@@ -130,7 +133,7 @@ export async function PATCH(request, { params }) {
   } catch (error) {
     console.error("[api/contracts/:id][PATCH] error", error);
     return Response.json(
-      { success: false, error: error.message },
+      { success: false, error: "Unable to update contract" },
       { status: 500 },
     );
   }

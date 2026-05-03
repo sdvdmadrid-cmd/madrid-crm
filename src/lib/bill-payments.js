@@ -2,6 +2,10 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { getStripeServerClient } from "@/lib/stripe-payments";
+import {
+  getBillAccountNumberError,
+  normalizeBillAccountNumber,
+} from "@/lib/bill-payments-validation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   logSupabaseError,
@@ -17,6 +21,7 @@ import {
 } from "@/lib/tenant";
 import { getPlaidProcessorToken } from "@/lib/plaid-integration";
 import { attachPlaidBankAccountToStripeCustomer } from "@/lib/stripe-payments";
+import { encryptSensitive } from "@/lib/encryption";
 
 export const BILL_TABLE = "bills";
 export const BILL_PROVIDER_TABLE = "bill_providers";
@@ -258,7 +263,7 @@ export function serializeAutopayRule(row) {
 export function buildBillWritePayload(body, currentBill = null) {
   const providerName = normalizeText(body.providerName, 120);
   const accountLabel = normalizeText(body.accountLabel, 80);
-  const rawAccountReference = normalizeText(body.accountNumber, 80);
+  const rawAccountReference = normalizeBillAccountNumber(body.accountNumber);
   const amountDue = normalizeMoneyAmount(body.amountDue);
   const minimumAmount =
     body.minimumAmount === "" || body.minimumAmount == null
@@ -277,6 +282,10 @@ export function buildBillWritePayload(body, currentBill = null) {
   }
   if (!dueDate) {
     throw new Error("Due date is required");
+  }
+  const accountNumberError = getBillAccountNumberError(rawAccountReference);
+  if (accountNumberError) {
+    throw new Error(accountNumberError);
   }
 
   const categoryId = String(body.category || "general").trim().toLowerCase();
@@ -560,6 +569,68 @@ export async function createNotification({
   }
 }
 
+async function persistBillPaymentCustomer(existing, payload, logContext) {
+  const table = supabaseAdmin.from(BILL_PAYMENT_CUSTOMER_TABLE);
+
+  if (existing?.id) {
+    const { data, error } = await table
+      .update(payload)
+      .eq("id", existing.id)
+      .select("*")
+      .maybeSingle();
+
+    if (error) {
+      logSupabaseError("[bill-payments] customer update error", error, logContext);
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  const { data, error } = await table
+    .insert(payload)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("[bill-payments] customer insert error", error, logContext);
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
+async function persistBillPaymentMethod(existing, payload, logContext) {
+  const table = supabaseAdmin.from(BILL_PAYMENT_METHOD_TABLE);
+
+  if (existing?.id) {
+    const { data, error } = await table
+      .update(payload)
+      .eq("id", existing.id)
+      .select("*")
+      .maybeSingle();
+
+    if (error) {
+      logSupabaseError("[bill-payments] payment method update error", error, logContext);
+      throw new Error(error.message);
+    }
+
+    return data;
+  }
+
+  const { data, error } = await table
+    .insert(payload)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    logSupabaseError("[bill-payments] payment method insert error", error, logContext);
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
 export async function getOrCreateBillPaymentCustomer(context) {
   const { tenantDbId, userId, email, name } = context;
   const { data: existing, error: lookupError } = await supabaseAdmin
@@ -597,31 +668,21 @@ export async function getOrCreateBillPaymentCustomer(context) {
   });
 
   const nowIso = new Date().toISOString();
-  const { data, error } = await supabaseAdmin
-    .from(BILL_PAYMENT_CUSTOMER_TABLE)
-    .upsert(
-      {
-        tenant_id: tenantDbId,
-        user_id: userId,
-        stripe_customer_id: customer.id,
-        created_at: nowIso,
-        updated_at: nowIso,
-      },
-      { onConflict: "tenant_id,user_id" },
-    )
-    .select("*")
-    .maybeSingle();
-
-  if (error) {
-    logSupabaseError("[bill-payments] customer upsert error", error, {
+  return persistBillPaymentCustomer(
+    existing,
+    {
+      tenant_id: tenantDbId,
+      user_id: userId,
+      stripe_customer_id: customer.id,
+      created_at: existing?.created_at || nowIso,
+      updated_at: nowIso,
+    },
+    {
       tenantDbId,
       userId,
       stripeCustomerId: customer.id,
-    });
-    throw new Error(error.message);
-  }
-
-  return data;
+    },
+  );
 }
 
 export async function createBillPaymentSetupIntent(context, methodType) {
@@ -743,22 +804,35 @@ export async function syncBillPaymentMethod({
   });
   row.is_default = setDefault;
 
-  const { data, error } = await supabaseAdmin
+  const { data: existingMethod, error: existingMethodError } = await supabaseAdmin
     .from(BILL_PAYMENT_METHOD_TABLE)
-    .upsert(row, { onConflict: "stripe_payment_method_id" })
-    .select("*")
+    .select("id, created_at")
+    .eq("tenant_id", context.tenantDbId)
+    .eq("user_id", context.userId)
+    .eq("stripe_payment_method_id", paymentMethod.id)
     .maybeSingle();
 
-  if (error) {
-    logSupabaseError("[bill-payments] payment method upsert error", error, {
+  if (existingMethodError) {
+    logSupabaseError("[bill-payments] payment method lookup error", existingMethodError, {
       tenantDbId: context.tenantDbId,
       userId: context.userId,
       paymentMethodId,
     });
-    throw new Error(error.message);
+    throw new Error(existingMethodError.message);
   }
 
-  return data;
+  return persistBillPaymentMethod(
+    existingMethod,
+    {
+      ...row,
+      created_at: existingMethod?.created_at || new Date().toISOString(),
+    },
+    {
+      tenantDbId: context.tenantDbId,
+      userId: context.userId,
+      paymentMethodId,
+    },
+  );
 }
 
 export async function savePlaidPaymentMethod({
@@ -826,30 +900,44 @@ export async function savePlaidPaymentMethod({
       plaid_account_id: accountId,
       plaid_account_mask: last4,
       plaid_account_name: bankName,
-      plaid_access_token: String(accessToken || "").trim(),
+      plaid_access_token: encryptSensitive(String(accessToken || "").trim()),
       reconnect_required: false,
       access_token_present: Boolean(accessToken),
     },
     updated_at: nowIso,
   };
 
-  const { data, error } = await supabaseAdmin
+  const { data: existingMethod, error: existingMethodError } = await supabaseAdmin
     .from(BILL_PAYMENT_METHOD_TABLE)
-    .upsert(row, { onConflict: "stripe_payment_method_id" })
-    .select("*")
+    .select("id, created_at")
+    .eq("tenant_id", context.tenantDbId)
+    .eq("user_id", context.userId)
+    .eq("stripe_payment_method_id", syntheticPaymentMethodId)
     .maybeSingle();
 
-  if (error) {
-    logSupabaseError("[bill-payments] plaid payment method upsert error", error, {
+  if (existingMethodError) {
+    logSupabaseError("[bill-payments] plaid payment method lookup error", existingMethodError, {
       tenantDbId: context.tenantDbId,
       userId: context.userId,
       itemId,
       accountId,
     });
-    throw new Error(error.message);
+    throw new Error(existingMethodError.message);
   }
 
-  return data;
+  return persistBillPaymentMethod(
+    existingMethod,
+    {
+      ...row,
+      created_at: existingMethod?.created_at || nowIso,
+    },
+    {
+      tenantDbId: context.tenantDbId,
+      userId: context.userId,
+      itemId,
+      accountId,
+    },
+  );
 }
 
 export async function updateBillStatusesForTenant(tenantDbId) {

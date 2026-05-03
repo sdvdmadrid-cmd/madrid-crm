@@ -1,4 +1,4 @@
-import { sendEmail } from "@/lib/email";
+﻿import { sendEmail } from "@/lib/email";
 import {
   checkPasswordResetRateLimit,
   getRequestIp,
@@ -74,7 +74,7 @@ export async function POST(request) {
 
     const emailResult = await sendEmail({
       to: email,
-      subject: "Reset your ContractorFlow password",
+      subject: "Reset your FieldBase password",
       html: `<p>Hi,</p><p>We received a request to reset your password.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link can only be used once and expires shortly.</p><p>If you did not request this, you can ignore this email.</p>`,
       text: `Hi,\n\nWe received a request to reset your password.\n\n${resetUrl}\n\nThis link can only be used once and expires shortly.\nIf you did not request this, you can ignore this email.`,
       metadata: {

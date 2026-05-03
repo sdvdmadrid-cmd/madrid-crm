@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 
 import {
   BILL_PAYMENT_METHOD_TABLE,
@@ -106,7 +106,7 @@ export async function POST(request) {
     ipAddress: forwardedFor || "127.0.0.1",
     userAgent:
       String(request.headers.get("user-agent") || "").trim() ||
-      "ContractorFlow Bill Payments",
+      "FieldBase Bill Payments",
   };
 
   for (const bill of bills || []) {

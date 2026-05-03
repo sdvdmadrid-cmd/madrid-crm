@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useCallback, useEffect, useState } from "react";
 import UniversalShareButton from "@/components/UniversalShareButton";
 import { useTranslation } from "react-i18next";
@@ -100,6 +100,42 @@ const parseInvoiceLineItems = (value = "") =>
       };
     });
 
+const actionIconButtonStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  height: 30,
+  padding: "0 10px",
+  borderRadius: 999,
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  color: "#334155",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+function IconPencil() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
 export default function InvoicesPage() {
   const { t } = useTranslation();
   const { capabilities } = useCurrentUserAccess();
@@ -112,6 +148,14 @@ export default function InvoicesPage() {
   const [openPaymentFormId, setOpenPaymentFormId] = useState("");
   const [savingPaymentId, setSavingPaymentId] = useState("");
   const [error, setError] = useState("");
+
+  const escapeHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
   const openPrintableReceipt = (invoice, payment) => {
     if (typeof window === "undefined") return;
@@ -126,15 +170,15 @@ export default function InvoicesPage() {
       <style>body{font-family:Arial,sans-serif;padding:28px;color:#222}h1{margin:0 0 6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #ddd;padding:10px;text-align:left}th{background:#f5f5f5;width:35%}</style>
       </head><body>
       <h1>${t("invoices.receipt.title")}</h1>
-      <p>${t("invoices.receipt.invoice")} ${invoice.invoiceNumber || t("invoices.receipt.notAvailable")}</p>
+      <p>${t("invoices.receipt.invoice")} ${escapeHtml(invoice.invoiceNumber || t("invoices.receipt.notAvailable"))}</p>
       <table><tbody>
-      <tr><th>${t("invoices.receipt.client")}</th><td>${invoice.clientName || t("invoices.receipt.notAvailable")}</td></tr>
-      <tr><th>${t("invoices.receipt.invoiceTitle")}</th><td>${invoice.invoiceTitle || t("invoices.receipt.notAvailable")}</td></tr>
+      <tr><th>${t("invoices.receipt.client")}</th><td>${escapeHtml(invoice.clientName || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${t("invoices.receipt.invoiceTitle")}</th><td>${escapeHtml(invoice.invoiceTitle || t("invoices.receipt.notAvailable"))}</td></tr>
       <tr><th>${t("invoices.receipt.paymentAmount")}</th><td>$${Number(payment.amount || 0).toFixed(2)}</td></tr>
-      <tr><th>${t("invoices.receipt.method")}</th><td>${paymentMethodLabel(payment.method, t)}</td></tr>
-      <tr><th>${t("invoices.receipt.date")}</th><td>${payment.date || t("invoices.receipt.notAvailable")}</td></tr>
-      <tr><th>${t("invoices.receipt.reference")}</th><td>${payment.reference || t("invoices.receipt.notAvailable")}</td></tr>
-      <tr><th>${t("invoices.receipt.notes")}</th><td>${payment.notes || t("invoices.receipt.notAvailable")}</td></tr>
+      <tr><th>${t("invoices.receipt.method")}</th><td>${escapeHtml(paymentMethodLabel(payment.method, t))}</td></tr>
+      <tr><th>${t("invoices.receipt.date")}</th><td>${escapeHtml(payment.date || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${t("invoices.receipt.reference")}</th><td>${escapeHtml(payment.reference || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${t("invoices.receipt.notes")}</th><td>${escapeHtml(payment.notes || t("invoices.receipt.notAvailable"))}</td></tr>
       <tr><th>${t("invoices.receipt.paidTotal")}</th><td>$${Number(invoice.paidAmount || 0).toFixed(2)}</td></tr>
       <tr><th>${t("invoices.receipt.balanceDue")}</th><td>$${Number(invoice.balanceDue || 0).toFixed(2)}</td></tr>
       </tbody></table></body></html>`;
@@ -178,7 +222,7 @@ export default function InvoicesPage() {
       const data = await getJsonOrThrow(res, t("invoices.errors.fetch"));
       setInvoices(data);
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.load"));
     } finally {
       setLoading(false);
@@ -217,7 +261,7 @@ export default function InvoicesPage() {
       );
       resetForm();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.saveFallback"));
     }
   };
@@ -244,7 +288,7 @@ export default function InvoicesPage() {
         notes: result.data.notes || current.notes,
       }));
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.aiFallback"));
     } finally {
       setAiLoading(false);
@@ -275,7 +319,7 @@ export default function InvoicesPage() {
       setInvoices(invoices.filter((invoice) => invoice._id !== id));
       if (selectedId === id) resetForm();
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.deleteFallback"));
     }
   };
@@ -332,7 +376,7 @@ export default function InvoicesPage() {
         editInvoice(result.data);
       }
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.registerPaymentFallback"));
     } finally {
       setSavingPaymentId("");
@@ -364,7 +408,7 @@ export default function InvoicesPage() {
       const checkoutUrl = await getInvoiceCheckoutUrl(invoice);
       window.open(checkoutUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.openCheckoutFallback"));
     }
   };
@@ -412,7 +456,7 @@ export default function InvoicesPage() {
         window.alert(t("invoices.messages.invoiceSent", { email: sentTo }));
       }
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.sendInvoiceFallback"));
     }
   };
@@ -446,7 +490,7 @@ export default function InvoicesPage() {
         t("invoices.messages.invoiceTextOpened", { phone: recipientPhone }),
       );
     } catch (err) {
-      console.error(err);
+
       setError(err.message || t("invoices.errors.sendInvoiceTextFallback"));
     }
   };
@@ -692,7 +736,7 @@ export default function InvoicesPage() {
                     {invoice.invoiceNumber || t("invoices.labels.untitled")}
                   </h3>
                   <p style={{ margin: "8px 0 0 0", color: "#555" }}>
-                    {invoice.clientName} Â·{" "}
+                    {invoice.clientName} |{" "}
                     {t(`invoices.statusOptions.${invoice.status}`) ||
                       invoice.status}
                   </p>
@@ -706,7 +750,7 @@ export default function InvoicesPage() {
                   </p>
                   <p style={{ margin: "8px 0 0 0", color: "#777" }}>
                     {t("invoices.labels.paid")}: $
-                    {Number(invoice.paidAmount || 0).toFixed(2)} Â·
+                    {Number(invoice.paidAmount || 0).toFixed(2)} |
                     {t("invoices.labels.balance")}: $
                     {Number(invoice.balanceDue || invoice.amount || 0).toFixed(
                       2,
@@ -833,15 +877,9 @@ export default function InvoicesPage() {
                     ? <button
                         type="button"
                         onClick={() => editInvoice(invoice)}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#0b69ff",
-                          color: "white",
-                          cursor: "pointer",
-                        }}
+                        style={actionIconButtonStyle}
                       >
+                        <IconPencil />
                         {t("invoices.buttons.edit")}
                       </button>
                     : null}
@@ -850,14 +888,12 @@ export default function InvoicesPage() {
                         type="button"
                         onClick={() => deleteInvoice(invoice._id)}
                         style={{
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#d32f2f",
-                          color: "white",
-                          cursor: "pointer",
+                          ...actionIconButtonStyle,
+                          border: "1px solid #fecaca",
+                          color: "#b91c1c",
                         }}
                       >
+                        <IconTrash />
                         {t("invoices.buttons.delete")}
                       </button>
                     : null}

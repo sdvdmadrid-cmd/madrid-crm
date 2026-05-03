@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { getUsStateLabel, getUsStateTaxRate } from "@/lib/estimate-pricing";
+import { getIndustryProfile } from "@/lib/industry-profiles";
 import { supabase } from "@/lib/supabase";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -100,8 +101,15 @@ export default function NewEstimateForm({ onCreated }) {
     tenantId: "",
     email: "",
     name: "",
+    industry: "",
   });
+  const [industryDetails, setIndustryDetails] = useState({});
   const [form, setForm] = useState(createEmptyEstimate);
+
+  const industryProfile = useMemo(
+    () => getIndustryProfile(userContext.industry),
+    [userContext.industry],
+  );
 
   const selectedJob = useMemo(
     () => allJobs.find((job) => job.id === form.jobId) || null,
@@ -177,6 +185,11 @@ export default function NewEstimateForm({ onCreated }) {
           tenantId: mePayload?.data?.tenantId || "",
           email: mePayload?.data?.email || "",
           name: mePayload?.data?.name || "",
+          industry:
+            mePayload?.data?.industry ||
+            (typeof window !== "undefined"
+              ? window.localStorage.getItem("user-industry") || ""
+              : ""),
         });
 
         const [clientsRes, jobsRes] = await Promise.all([
@@ -214,6 +227,31 @@ export default function NewEstimateForm({ onCreated }) {
     if (!form.applyTax) return;
     setForm((prev) => ({ ...prev, taxRatePct: automaticTaxRate }));
   }, [automaticTaxRate, form.applyTax]);
+
+  useEffect(() => {
+    const nextDetails = {};
+    for (const field of industryProfile.estimateFields || []) {
+      nextDetails[field.key] = "";
+    }
+    setIndustryDetails(nextDetails);
+  }, [industryProfile]);
+
+  useEffect(() => {
+    if (!industryProfile?.estimateTemplate?.length) return;
+    const hasOnlySingleBlankRow =
+      form.items.length === 1 && !String(form.items[0]?.description || "").trim();
+    if (!hasOnlySingleBlankRow) return;
+
+    setForm((prev) => ({
+      ...prev,
+      items: industryProfile.estimateTemplate.map((item) => ({
+        id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    }));
+  }, [industryProfile, form.items]);
 
   const updateForm = (patch) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -323,7 +361,21 @@ export default function NewEstimateForm({ onCreated }) {
         subtotal,
         tax: taxAmount,
         total,
-        notes: form.notes.trim() || null,
+        notes:
+          [
+            form.notes.trim(),
+            Object.entries(industryDetails)
+              .filter(([, value]) => String(value || "").trim())
+              .map(([key, value]) => {
+                const field = (industryProfile.estimateFields || []).find(
+                  (item) => item.key === key,
+                );
+                return `${field?.label || key}: ${String(value || "").trim()}`;
+              })
+              .join("\n"),
+          ]
+            .filter(Boolean)
+            .join("\n") || null,
       };
 
       const { data, error } = await supabase
@@ -344,6 +396,11 @@ export default function NewEstimateForm({ onCreated }) {
         applyTax: prev.applyTax,
         taxRatePct: prev.applyTax ? automaticTaxRate : "0",
       }));
+      setIndustryDetails((prev) => {
+        const next = {};
+        for (const key of Object.keys(prev)) next[key] = "";
+        return next;
+      });
 
       if (typeof onCreated === "function") {
         onCreated(data);
@@ -506,6 +563,38 @@ export default function NewEstimateForm({ onCreated }) {
               />
             </div>
 
+            {/* Currency */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.82rem] font-semibold text-[#1d1d1f]">{t("estimateForm.fields.currency")}</label>
+              <select
+                value={form.currency}
+                onChange={(e) => updateForm({ currency: e.target.value })}
+                className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+              >
+                <option value="USD">USD — US Dollar</option>
+                <option value="CAD">CAD — Canadian Dollar</option>
+                <option value="MXN">MXN — Mexican Peso</option>
+              </select>
+            </div>
+
+            {(industryProfile.estimateFields || []).map((field) => (
+              <div className="flex flex-col gap-1.5" key={field.key}>
+                <label className="text-[0.82rem] font-semibold text-[#1d1d1f]">
+                  {field.label}
+                </label>
+                <input
+                  value={industryDetails[field.key] || ""}
+                  onChange={(e) =>
+                    setIndustryDetails((prev) => ({
+                      ...prev,
+                      [field.key]: e.target.value,
+                    }))
+                  }
+                  placeholder={field.placeholder}
+                  className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -551,7 +640,10 @@ export default function NewEstimateForm({ onCreated }) {
                       <input
                         value={item.description}
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
-                        placeholder={t("estimateForm.placeholders.lineItemDescription")}
+                        placeholder={
+                          industryProfile?.estimateTemplate?.[0]?.description ||
+                          t("estimateForm.placeholders.lineItemDescription")
+                        }
                         className="w-full rounded-lg border border-gray-200 bg-[#f9f9f9] px-3 py-2 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
                       />
                     </div>

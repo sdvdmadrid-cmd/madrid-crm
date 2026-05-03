@@ -1,234 +1,483 @@
 .page {
   min-height: 100%;
-  padding: 32px;
+  padding: 34px;
   background:
-    radial-gradient(circle at top left, rgba(22, 163, 74, 0.16), transparent 28%),
-    linear-gradient(180deg, #f7fbf8 0%, #eef4f0 100%);
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 36%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
-.hero {
-  margin: 0 auto 24px;
-  max-width: 1120px;
-  padding: 28px 30px;
+.topBar {
+  max-width: 1280px;
+  margin: 0 auto 26px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 26px;
+  border-radius: 22px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 24px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.9)),
-    #ffffff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  background: linear-gradient(160deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.06);
 }
 
 .eyebrow {
-  margin: 0 0 10px;
-  font-size: 12px;
+  margin: 0 0 8px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #15803d;
+  color: #64748b;
 }
 
 .title {
   margin: 0;
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
   color: #0f172a;
 }
 
 .subtitle {
-  max-width: 620px;
-  margin: 14px 0 0;
-  font-size: 16px;
-  color: #475569;
-}
-
-.metricsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  max-width: 1120px;
-  margin: 0 auto 24px;
-}
-
-.metricCard,
-.panel,
-.stateCard,
-.errorCard {
-  max-width: 1120px;
-  margin-left: auto;
-  margin-right: auto;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(10px);
-}
-
-.metricCard {
-  padding: 24px;
-  overflow: hidden;
-  position: relative;
-}
-
-.metricCard::after {
-  content: "";
-  position: absolute;
-  inset: auto -30px -30px auto;
-  width: 120px;
-  height: 120px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(22, 163, 74, 0.18), transparent 70%);
-}
-
-.metricLabel {
-  position: relative;
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  margin: 10px 0 0;
+  font-size: 15px;
   color: #64748b;
 }
 
-.metricValue {
-  position: relative;
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1;
+.quickActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.primaryAction,
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: -0.06em;
-  color: #0f172a;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 }
 
-.metricHint {
-  position: relative;
-  margin: 12px 0 0;
-  color: #475569;
+.primaryAction {
+  background: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(29, 78, 216, 0.28);
 }
 
-.panel,
-.stateCard,
-.errorCard {
-  padding: 24px;
+.primaryAction:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(29, 78, 216, 0.34);
 }
 
-.panelHeader {
+.secondaryAction {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #dbe3ef;
+}
+
+.secondaryAction:hover {
+  transform: translateY(-1px);
+  border-color: #b7c5de;
+}
+
+.actionIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.grid12 {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.span12 {
+  grid-column: span 12;
+}
+
+.span8 {
+  grid-column: span 8;
+}
+
+.span7 {
+  grid-column: span 7;
+}
+
+.span5 {
+  grid-column: span 5;
+}
+
+.span4 {
+  grid-column: span 4;
+}
+
+.panel {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  padding: 22px;
+}
+
+.sectionHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
-.panelEyebrow {
-  margin: 0 0 8px;
-  font-size: 12px;
+.sectionLabel {
+  margin: 0 0 7px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #15803d;
+  letter-spacing: 0.12em;
+  color: #64748b;
 }
 
-.panelTitle,
-.stateTitle {
+.sectionTitle {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.1;
+  font-size: 22px;
   letter-spacing: -0.03em;
   color: #0f172a;
 }
 
-.stateText {
-  margin: 10px 0 0;
-  color: #475569;
+.softBadge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #dbe5f5;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.list {
+.metricTopGrid {
   display: grid;
-  gap: 12px;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 14px;
 }
 
-.listRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 18px;
+.metricHero {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid #e3eaf7;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
-.rowAmount {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #0f172a;
+.metricRevenue {
+  background: linear-gradient(150deg, #1d4ed8 0%, #0f3cae 100%);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
-.rowMeta,
-.rowDate {
-  margin: 6px 0 0;
+.metricHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.metricLabel {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
   color: #64748b;
-  font-size: 14px;
+  font-weight: 700;
 }
 
-.rowDate {
+.metricRevenue .metricLabel,
+.metricRevenue .metricHint,
+.metricRevenue .metricHeroValue,
+.metricRevenue .cardIcon {
+  color: #ffffff;
+}
+
+.cardIcon {
+  width: 18px;
+  height: 18px;
+  color: #1d4ed8;
+}
+
+.metricHeroValue {
   margin: 0;
-  white-space: nowrap;
+  color: #0f172a;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  letter-spacing: -0.06em;
+  line-height: 1;
+  font-weight: 800;
 }
 
-.emptyState {
-  padding: 24px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 1px dashed rgba(100, 116, 139, 0.35);
+.metricValue {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-weight: 800;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
+.metricHint {
+  margin: 9px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.metricSkeletonGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 14px;
+}
+
+.skeletonCard {
+  height: 142px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #eef2f8 20%, #f7f9fc 50%, #eef2f8 80%);
+  background-size: 220% 100%;
+  animation: shimmer 1.1s infinite;
+}
+
+.skeletonLarge {
+  height: 160px;
+}
+
+.chartWrap {
+  height: 220px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid #e4eaf5;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.chartBarCol {
+  height: 100%;
+  display: flex;
+  align-items: end;
+}
+
+.chartBar {
+  width: 100%;
+  min-height: 16px;
+  border-radius: 9px 9px 4px 4px;
+  background: linear-gradient(180deg, #60a5fa 0%, #1d4ed8 100%);
+  box-shadow: 0 5px 14px rgba(29, 78, 216, 0.24);
+}
+
+.chartLegend {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.activityList {
+  display: grid;
+  gap: 10px;
+}
+
+.activityRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e7edf7;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.activityTextWrap {
+  min-width: 0;
+}
+
+.activityTitle {
+  margin: 0;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.activityMeta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
-  border: 3px solid rgba(22, 163, 74, 0.15);
-  border-top-color: #16a34a;
-  animation: spin 0.8s linear infinite;
+  margin-top: 4px;
+  flex-shrink: 0;
 }
 
-.errorCard {
-  border-color: rgba(220, 38, 38, 0.16);
-  background: linear-gradient(180deg, rgba(254, 242, 242, 0.96), #ffffff);
+.moduleGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+.moduleCard {
+  display: block;
+  text-decoration: none;
+  border: 1px solid #e3eaf5;
+  border-radius: 14px;
+  padding: 14px;
+  background: #ffffff;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.moduleCard:hover {
+  transform: translateY(-2px);
+  border-color: #bfd1f3;
+  box-shadow: 0 13px 24px rgba(29, 78, 216, 0.11);
+}
+
+.moduleIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: #eff6ff;
+  color: #1d4ed8;
+  margin-bottom: 10px;
+}
+
+.moduleTitle {
+  margin: 0;
+  font-size: 15px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.moduleDesc {
+  margin: 8px 0 12px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.42;
+}
+
+.moduleAction {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.healthStack {
+  display: grid;
+  gap: 10px;
+}
+
+.healthRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #e3eaf5;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status_paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status_pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status_overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 1200px) {
+  .metricTopGrid,
+  .metricSkeletonGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metricRevenue {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 980px) {
+  .span8,
+  .span7,
+  .span5,
+  .span4 {
+    grid-column: span 12;
+  }
+
+  .topBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quickActions {
+    flex-wrap: wrap;
   }
 }
 
 @media (max-width: 760px) {
   .page {
-    padding: 20px;
+    padding: 18px;
   }
 
-  .hero,
-  .panel,
-  .stateCard,
-  .errorCard,
-  .metricCard {
-    padding: 20px;
+  .topBar,
+  .panel {
+    padding: 18px;
   }
 
-  .metricsGrid {
+  .moduleGrid,
+  .metricTopGrid,
+  .metricSkeletonGrid {
     grid-template-columns: 1fr;
   }
 
-  .listRow {
-    align-items: flex-start;
-    flex-direction: column;
+  .metricRevenue {
+    grid-column: span 1;
   }
 
-  .rowDate {
-    white-space: normal;
+  .chartLegend {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

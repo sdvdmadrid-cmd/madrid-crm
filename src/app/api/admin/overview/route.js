@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getTenantContext } from "@/lib/tenant";
+import { getAuthenticatedTenantContext } from "@/lib/tenant";
 
 function parseRole(user) {
   return String(
@@ -16,7 +16,7 @@ function computeStatus(user) {
   const created = new Date(user?.created_at || 0).getTime();
   if (!Number.isFinite(created) || created <= 0) return "trial";
   const ageDays = (Date.now() - created) / (1000 * 60 * 60 * 24);
-  return ageDays > 15 ? "active" : "trial";
+  return ageDays > 30 ? "active" : "trial";
 }
 
 async function listAllAuthUsers() {
@@ -85,7 +85,7 @@ function serializeUser(user, estimateCount) {
 
 export async function GET(request) {
   try {
-    const { role, authenticated } = getTenantContext(request);
+    const { role, authenticated } = await getAuthenticatedTenantContext(request);
     if (!authenticated || role !== "super_admin") {
       return new Response(
         JSON.stringify({ success: false, error: "Forbidden" }),
