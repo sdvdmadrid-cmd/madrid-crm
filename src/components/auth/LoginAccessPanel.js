@@ -57,7 +57,7 @@ export default function LoginAccessPanel({
   const passwordStrong = isStrongPassword(resetPasswordForm?.newPassword);
 
   const shellStyle = {
-    minHeight: "100vh",
+    minHeight: "100dvh",
     display: "grid",
     gridTemplateColumns: "minmax(320px, 420px) minmax(0, 1fr)",
     background: "#f4f5f7",
@@ -78,7 +78,7 @@ export default function LoginAccessPanel({
   const panelStyle = {
     display: "grid",
     placeItems: "center",
-    padding: "32px 20px",
+    padding: "24px 20px",
     background:
       "radial-gradient(circle at top right, rgba(22,163,74,0.12), transparent 28%), #f4f5f7",
   };
@@ -90,14 +90,15 @@ export default function LoginAccessPanel({
     border: "1px solid #e5e7eb",
     borderRadius: 24,
     boxShadow: "0 24px 70px rgba(15, 23, 42, 0.10)",
-    padding: "32px",
+    padding: "28px",
     display: "grid",
-    gap: 18,
+    gap: 16,
   };
 
   const inputStyle = {
     width: "100%",
     padding: "14px 15px",
+    minHeight: 48,
     borderRadius: 12,
     border: "1px solid #d1d5db",
     background: "#fff",
@@ -118,6 +119,7 @@ export default function LoginAccessPanel({
   const primaryButtonStyle = {
     width: "100%",
     padding: "14px 18px",
+    minHeight: 48,
     borderRadius: 12,
     border: "1px solid #16a34a",
     background: submitting ? "#86efac" : "#16a34a",
@@ -131,6 +133,7 @@ export default function LoginAccessPanel({
   const secondaryButtonStyle = {
     width: "100%",
     padding: "13px 18px",
+    minHeight: 48,
     borderRadius: 12,
     border: "1px solid #d1d5db",
     background: "#fff",
@@ -212,10 +215,11 @@ export default function LoginAccessPanel({
 
   return (
     <div className="cf-access-shell" style={shellStyle}>
-      <aside style={sidebarStyle}>
-        <div style={{ display: "grid", gap: 28 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <aside style={sidebarStyle} className="cf-access-sidebar">
+        <div style={{ display: "grid", gap: 28 }} className="cf-access-sidebar-content">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }} className="cf-access-brand">
             <div
+              className="cf-access-brand-mark"
               style={{
                 width: 42,
                 height: 42,
@@ -232,6 +236,7 @@ export default function LoginAccessPanel({
             </div>
             <div>
               <div
+                className="cf-access-brand-title"
                 style={{
                   fontSize: 20,
                   fontWeight: 800,
@@ -240,13 +245,14 @@ export default function LoginAccessPanel({
               >
                 FieldBase
               </div>
-              <div style={{ fontSize: 13, color: "rgba(248,250,252,0.74)" }}>
+              <div className="cf-access-brand-subtitle" style={{ fontSize: 13, color: "rgba(248,250,252,0.74)" }}>
                 Secure access for your field operations
               </div>
             </div>
           </div>
 
           <div
+            className="cf-access-hero-card"
             style={{
               padding: 20,
               borderRadius: 18,
@@ -273,6 +279,7 @@ export default function LoginAccessPanel({
         </div>
 
         <div
+          className="cf-access-security-card"
           style={{
             padding: 18,
             borderRadius: 16,
@@ -306,10 +313,16 @@ export default function LoginAccessPanel({
         </div>
       </aside>
 
-      <main style={panelStyle}>
-        <div style={cardStyle}>
-          <div style={{ display: "grid", gap: 8 }}>
+      <main style={panelStyle} className="cf-access-main">
+        <div style={cardStyle} className={`cf-access-card cf-access-card--${mode}`}>
+          <div className="cf-access-mobile-brand" aria-hidden="true">
+            <div className="cf-access-mobile-brand-mark">FB</div>
+            <div className="cf-access-mobile-brand-text">FieldBase</div>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }} className="cf-access-header">
             <div
+              className="cf-access-badge"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -326,6 +339,7 @@ export default function LoginAccessPanel({
               FieldBase Access
             </div>
             <h1
+              className="cf-access-title"
               style={{
                 margin: 0,
                 fontSize: 32,
@@ -337,6 +351,7 @@ export default function LoginAccessPanel({
               {panelTitle}
             </h1>
             <p
+              className="cf-access-description"
               style={{
                 margin: 0,
                 color: "#64748b",
@@ -350,6 +365,7 @@ export default function LoginAccessPanel({
 
           {mode === "login"
             ? <form
+                className="cf-access-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   onSubmitLogin();
@@ -455,6 +471,7 @@ export default function LoginAccessPanel({
 
           {mode === "register"
             ? <form
+              className="cf-access-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   onSubmitRegister();
@@ -612,6 +629,7 @@ export default function LoginAccessPanel({
 
           {mode === "forgot-password"
             ? <form
+              className="cf-access-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   onSubmitForgotPassword();
@@ -673,6 +691,7 @@ export default function LoginAccessPanel({
 
           {mode === "reset-password"
             ? <form
+              className="cf-access-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   onSubmitResetPassword();
@@ -838,6 +857,172 @@ export default function LoginAccessPanel({
           @media (max-width: 920px) {
             .cf-access-shell {
               grid-template-columns: 1fr;
+            }
+
+            .cf-access-sidebar {
+              justify-content: flex-start;
+            }
+          }
+
+          @media (max-width: 768px) {
+            .cf-access-shell {
+              min-height: 100dvh;
+              grid-template-columns: 1fr;
+            }
+
+            .cf-access-sidebar {
+              display: none;
+            }
+
+            .cf-access-sidebar-content {
+              gap: 12px;
+            }
+
+            .cf-access-brand-mark {
+              width: 36px !important;
+              height: 36px !important;
+              border-radius: 10px !important;
+              font-size: 13px !important;
+            }
+
+            .cf-access-brand-title {
+              font-size: 17px !important;
+            }
+
+            .cf-access-brand-subtitle {
+              font-size: 12px !important;
+            }
+
+            .cf-access-hero-card {
+              padding: 12px !important;
+              gap: 8px !important;
+            }
+
+            .cf-access-hero-card > div:first-child {
+              font-size: 18px !important;
+              line-height: 1.25 !important;
+            }
+
+            .cf-access-hero-card > div:last-child {
+              display: none;
+            }
+
+            .cf-access-security-card {
+              display: none !important;
+            }
+
+            .cf-access-main {
+              padding: 16px;
+              min-height: 100dvh;
+              align-items: center;
+            }
+
+            .cf-access-card {
+              max-width: 100%;
+              border-radius: 18px;
+              padding: 20px 16px;
+              gap: 14px;
+            }
+
+            .cf-access-mobile-brand {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            }
+
+            .cf-access-mobile-brand-mark {
+              width: 32px;
+              height: 32px;
+              border-radius: 9px;
+              background: #16a34a;
+              color: #ffffff;
+              font-size: 12px;
+              font-weight: 800;
+              display: grid;
+              place-items: center;
+            }
+
+            .cf-access-mobile-brand-text {
+              font-size: 15px;
+              font-weight: 800;
+              color: #0f172a;
+              letter-spacing: -0.02em;
+            }
+
+            .cf-access-header {
+              gap: 6px !important;
+            }
+
+            .cf-access-badge {
+              font-size: 11px !important;
+              padding: 6px 10px !important;
+            }
+
+            .cf-access-title {
+              font-size: 26px !important;
+              line-height: 1.12 !important;
+              letter-spacing: -0.03em !important;
+            }
+
+            .cf-access-description {
+              font-size: 14px !important;
+              line-height: 1.5 !important;
+              max-width: 36ch;
+            }
+
+            .cf-access-form {
+              gap: 12px !important;
+            }
+          }
+
+          @media (max-width: 390px) {
+            .cf-access-main {
+              padding: 14px;
+            }
+
+            .cf-access-card {
+              padding: 18px 14px;
+            }
+
+            .cf-access-title {
+              font-size: 24px !important;
+            }
+
+            .cf-access-badge {
+              display: none !important;
+            }
+
+            .cf-access-card--register .cf-access-header {
+              gap: 4px !important;
+            }
+
+            .cf-access-card--register .cf-access-title {
+              font-size: 22px !important;
+            }
+
+            .cf-access-card--register .cf-access-description {
+              display: none;
+            }
+
+            .cf-access-card--register .cf-access-form {
+              gap: 10px !important;
+            }
+
+            .cf-access-card--register label {
+              margin-bottom: 6px !important;
+              font-size: 12px !important;
+            }
+
+            .cf-access-card--register input,
+            .cf-access-card--register select,
+            .cf-access-card--register button {
+              min-height: 44px !important;
+            }
+          }
+
+          @media (min-width: 769px) {
+            .cf-access-mobile-brand {
+              display: none;
             }
           }
         `}</style>
