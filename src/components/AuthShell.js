@@ -70,6 +70,34 @@ export default function AuthShell({ children }) {
       setTrialExpiredParam(params.get("trial_expired") === "1");
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isDedicatedLoginPage) return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const queryMode = searchParams.get("mode") || "";
+    const queryToken =
+      searchParams.get("token") ||
+      searchParams.get("reset_token") ||
+      searchParams.get("token_hash") ||
+      "";
+    const hashToken = hashParams.get("token") || hashParams.get("token_hash") || "";
+    const hashType = hashParams.get("type") || "";
+    const hasRecoveryHashSession =
+      hashType === "recovery" && Boolean(hashParams.get("access_token") || hashToken);
+    const hasRecoveryQueryToken =
+      queryMode === "reset-password" && Boolean(queryToken);
+
+    if (!hasRecoveryHashSession && !hasRecoveryQueryToken) {
+      return;
+    }
+
+    const target = `/reset-password${window.location.search}${window.location.hash}`;
+    window.location.replace(target);
+  }, [isDedicatedLoginPage]);
+
   const { t, i18n } = useTranslation();
   const UI_LANGUAGE_OPTIONS = [
     { value: "en", label: "🇺🇸 English" },
