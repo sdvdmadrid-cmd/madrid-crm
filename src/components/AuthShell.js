@@ -531,7 +531,18 @@ export default function AuthShell({ children }) {
         suppressUnauthorizedEvent: true,
         body: JSON.stringify({ email: forgotPasswordEmail }),
       });
-      const payload = await res.json().catch(() => null);
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const retryAfter = Number(payload?.retryAfterSeconds || 0);
+        if (res.status === 429 && retryAfter > 0) {
+          setError(`${payload?.error || t("auth.loginRateLimited")} (${retryAfter}s)`);
+        } else {
+          setError(payload?.error || t("auth.resetPasswordError"));
+        }
+        return;
+      }
+
       setNotice(
         payload?.message ||
           t("auth.resetLinkSent") ||
