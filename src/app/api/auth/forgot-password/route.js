@@ -106,18 +106,41 @@ export async function POST(request) {
 
     // Generate reset token via Supabase Admin API (no email sent by Supabase)
     // then send our own FieldBase-branded email via Resend.
-    const { resetUrl } = await generatePasswordRecoveryLink({ email, origin: APP_URL });
+    let resetUrl;
+    try {
+      const result = await generatePasswordRecoveryLink({ email, origin: APP_URL });
+      resetUrl = result.resetUrl;
+    } catch (linkErr) {
+      // If user doesn't exist or admin API fails, log it but return generic
+      // success to prevent email enumeration.
+      console.error("[api/auth/forgot-password] generateLink failed", {
+        error: linkErr?.message || "unknown",
+        email,
+      });
+      return createGenericResponse();
+    }
 
-    await sendEmail({
+    const emailResult = await sendEmail({
       to: email,
       subject: "Reset your FieldBase password",
       html: buildResetEmailHtml(resetUrl),
       text: `Reset your FieldBase password\n\nClick this link to reset your password (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
     });
 
+    if (!emailResult?.success) {
+      console.error("[api/auth/forgot-password] sendEmail failed", {
+        provider: emailResult?.provider,
+        error: emailResult?.error,
+        email,
+      });
+      // Email not delivered — throw so Vercel logs capture it,
+      // but still return generic response to the client.
+      throw new Error(`Email delivery failed: ${emailResult?.error || "unknown"}`);
+    }
+
     return createGenericResponse();
   } catch (error) {
-    console.error("[api/auth/forgot-password] delivery failure", {
+    console.error("[api/auth/forgot-password] unhandled error", {
       error: error?.message || "unknown",
     });
     // Keep a generic success response to avoid user enumeration leaks.
