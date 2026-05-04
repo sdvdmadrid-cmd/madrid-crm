@@ -6,6 +6,7 @@ const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "mock").toLowerCase();
 const EMAIL_FROM =
   process.env.EMAIL_FROM || "FieldBase <no-reply@example.com>";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESEND_TIMEOUT_MS = Number(process.env.RESEND_TIMEOUT_MS || 8000);
 const EMAIL_WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET || "";
 const ALLOW_INSECURE_DEV_WEBHOOKS =
   String(process.env.ALLOW_INSECURE_DEV_WEBHOOKS || "").trim().toLowerCase() ===
@@ -67,42 +68,62 @@ async function sendWithResend({ to, subject, html, text, metadata }) {
     };
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: EMAIL_FROM,
-      to: [to],
-      subject,
-      html,
-      text,
-      tags: [
-        { name: "tenantId", value: metadata?.tenantId || "default" },
-        ...(metadata?.campaignId
-          ? [{ name: "campaignId", value: String(metadata.campaignId) }]
-          : []),
-      ],
-    }),
-  });
+  const timeoutMs = Number.isFinite(RESEND_TIMEOUT_MS)
+    ? Math.max(1000, Math.min(RESEND_TIMEOUT_MS, 30000))
+    : 8000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const payload = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [to],
+        subject,
+        html,
+        text,
+        tags: [
+          { name: "tenantId", value: metadata?.tenantId || "default" },
+          ...(metadata?.campaignId
+            ? [{ name: "campaignId", value: String(metadata.campaignId) }]
+            : []),
+        ],
+      }),
+    });
 
-  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        provider: "resend",
+        error: payload?.message || `Resend error ${response.status}`,
+      };
+    }
+
+    return {
+      success: true,
+      provider: "resend",
+      providerMessageId: payload?.id || null,
+    };
+  } catch (error) {
+    const isTimeout = error?.name === "AbortError";
     return {
       success: false,
       provider: "resend",
-      error: payload?.message || `Resend error ${response.status}`,
+      error: isTimeout
+        ? `Resend request timed out after ${timeoutMs}ms`
+        : error?.message || "Resend request failed",
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return {
-    success: true,
-    provider: "resend",
-    providerMessageId: payload?.id || null,
-  };
 }
 
 function sendWithMock() {
