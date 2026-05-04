@@ -1,6 +1,7 @@
 ﻿import "server-only";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import { resolveSessionSecret } from "@/lib/session-secret";
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === "production"
@@ -9,24 +10,25 @@ const SESSION_COOKIE_NAME =
 const SESSION_TTL_SECONDS = Number(
   process.env.SESSION_TTL_SECONDS || 60 * 60 * 24 * 7,
 );
-const SESSION_SECRET = String(process.env.SESSION_SECRET || "").trim();
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const JWT_ISSUER = process.env.SESSION_JWT_ISSUER || "madrid-app";
 const JWT_AUDIENCE = process.env.SESSION_JWT_AUDIENCE || "madrid-app-users";
 
 function assertSessionSecret() {
-  if (!SESSION_SECRET) {
+  const resolved = resolveSessionSecret();
+  const secret = resolved.value;
+
+  if (!secret) {
     throw new Error("SESSION_SECRET must be configured");
   }
 
-  if (
-    process.env.NODE_ENV === "production" &&
-    SESSION_SECRET.length < MIN_SECRET_LENGTH
-  ) {
+  if (process.env.NODE_ENV === "production" && secret.length < MIN_SECRET_LENGTH) {
     throw new Error(
       `SESSION_SECRET must be at least ${MIN_SECRET_LENGTH} characters in production`,
     );
   }
+
+  return secret;
 }
 
 export function hashPassword(password) {
@@ -51,8 +53,8 @@ export function verifyPassword(password, stored) {
 }
 
 export function createSessionToken(payload) {
-  assertSessionSecret();
-  return jwt.sign(payload, SESSION_SECRET, {
+  const sessionSecret = assertSessionSecret();
+  return jwt.sign(payload, sessionSecret, {
     algorithm: "HS256",
     expiresIn: SESSION_TTL_SECONDS,
     issuer: JWT_ISSUER,
@@ -61,11 +63,11 @@ export function createSessionToken(payload) {
 }
 
 export function verifySessionToken(token) {
-  assertSessionSecret();
+  const sessionSecret = assertSessionSecret();
   if (!token || typeof token !== "string") return null;
 
   try {
-    const payload = jwt.verify(token, SESSION_SECRET, {
+    const payload = jwt.verify(token, sessionSecret, {
       algorithms: ["HS256"],
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,

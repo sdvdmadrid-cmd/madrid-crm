@@ -1,4 +1,5 @@
-const SESSION_SECRET = String(process.env.SESSION_SECRET || "").trim();
+import { getSessionSecretHealth } from "@/lib/session-secret";
+
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_PUBLISHABLE_KEY =
@@ -36,13 +37,7 @@ async function checkSupabase() {
 }
 
 function getSecretHealth() {
-  const isConfigured = SESSION_SECRET.length > 0;
-  const isStrong = SESSION_SECRET.length >= MIN_SECRET_LENGTH;
-  return {
-    configured: isConfigured,
-    strong: isStrong,
-    minLength: MIN_SECRET_LENGTH,
-  };
+  return getSessionSecretHealth(MIN_SECRET_LENGTH);
 }
 
 export async function GET() {
