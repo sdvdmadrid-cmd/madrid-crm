@@ -14,6 +14,9 @@ const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, 
 const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "resend")
   .trim()
   .toLowerCase();
+const SUPER_ADMIN_EMAIL = String(process.env.SUPER_ADMIN_EMAIL || "")
+  .trim()
+  .toLowerCase();
 
 function createGenericResponse() {
   return new Response(
@@ -84,6 +87,8 @@ export async function POST(request) {
     const email = String(body.email || "")
       .trim()
       .toLowerCase();
+    const isSuperAdminRequest =
+      Boolean(SUPER_ADMIN_EMAIL) && email === SUPER_ADMIN_EMAIL;
     const ip = getRequestIp(request);
 
     if (!isValidEmail(email)) {
@@ -112,6 +117,7 @@ export async function POST(request) {
     await recordPasswordResetAttempt({ email, ip });
 
     const origin = getRequestOrigin(request) || APP_URL;
+    let generatedResetUrl = "";
 
     // If custom provider is disabled, use Supabase native email directly.
     if (EMAIL_PROVIDER !== "resend") {
@@ -124,6 +130,27 @@ export async function POST(request) {
           email,
           provider: EMAIL_PROVIDER,
         });
+
+        if (isSuperAdminRequest) {
+          try {
+            const debugLink = await generatePasswordRecoveryLink({ email, origin });
+            return new Response(
+              JSON.stringify({
+                success: true,
+                message: "Email delivery failed. Use the direct reset link.",
+                delivery: "manual_link",
+                resetUrl: debugLink.resetUrl,
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          } catch {
+            // keep generic response below on any debug-link failure
+          }
+        }
+
         return createGenericResponse();
       }
     }
@@ -133,6 +160,7 @@ export async function POST(request) {
     try {
       const result = await generatePasswordRecoveryLink({ email, origin });
       const resetUrl = result.resetUrl;
+      generatedResetUrl = resetUrl;
 
       const emailResult = await sendEmail({
         to: email,
@@ -167,6 +195,21 @@ export async function POST(request) {
         error: fallbackErr?.message || "unknown",
         email,
       });
+    }
+
+    if (isSuperAdminRequest && generatedResetUrl) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Email delivery failed. Use the direct reset link.",
+          delivery: "manual_link",
+          resetUrl: generatedResetUrl,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     return createGenericResponse();

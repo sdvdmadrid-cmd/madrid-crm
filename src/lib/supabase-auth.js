@@ -258,17 +258,44 @@ export async function generatePasswordRecoveryLink({ email, origin }) {
 }
 
 export async function sendPasswordRecoveryEmailViaSupabase({ email, origin }) {
-  const redirectTo = `${origin}/reset-password`;
   const authClient = createSupabaseServerAuthClient();
-  const { error } = await authClient.auth.resetPasswordForEmail(email, {
-    redirectTo,
-  });
+  const errors = [];
 
-  if (error) {
-    throw new Error(error.message || "Supabase recovery email failed");
+  const normalizeUrl = (value) => String(value || "").trim().replace(/\/$/, "");
+  const redirectCandidates = [];
+
+  const requestOrigin = normalizeUrl(origin);
+  const appUrl = normalizeUrl(process.env.APP_URL);
+  const appBaseUrl = normalizeUrl(process.env.APP_BASE_URL);
+
+  for (const candidate of [requestOrigin, appUrl, appBaseUrl]) {
+    if (!candidate) continue;
+    const redirectTo = `${candidate}/reset-password`;
+    if (!redirectCandidates.includes(redirectTo)) {
+      redirectCandidates.push(redirectTo);
+    }
   }
 
-  return { success: true };
+  for (const redirectTo of redirectCandidates) {
+    const { error } = await authClient.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (!error) {
+      return { success: true, redirectTo };
+    }
+
+    errors.push(`redirect=${redirectTo} error=${error.message || "unknown"}`);
+  }
+
+  // Last fallback: let Supabase use its configured Site URL.
+  const { error: fallbackError } = await authClient.auth.resetPasswordForEmail(email);
+  if (!fallbackError) {
+    return { success: true, redirectTo: null };
+  }
+
+  errors.push(`default error=${fallbackError.message || "unknown"}`);
+  throw new Error(`Supabase recovery email failed: ${errors.join(" | ")}`);
 }
 
 export async function listAllAuthUsers() {
