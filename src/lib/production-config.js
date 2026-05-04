@@ -1,6 +1,6 @@
 import "server-only";
 
-const TEST_EMAIL_DOMAINS = new Set(["example.com"]);
+const TEST_EMAIL_DOMAINS = new Set(["example.com", "resend.dev"]);
 
 export function getSenderAddress(value) {
   const input = String(value || "").trim();

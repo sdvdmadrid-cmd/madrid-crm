@@ -9,14 +9,26 @@ import {
   sendPasswordRecoveryEmailViaSupabase,
 } from "@/lib/supabase-auth";
 import { sendEmail } from "@/lib/email";
+import { isTestEmailDomain } from "@/lib/production-config";
 
 const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "resend")
   .trim()
   .toLowerCase();
+const EMAIL_FROM = String(process.env.EMAIL_FROM || "").trim();
+const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
 const SUPER_ADMIN_EMAIL = String(process.env.SUPER_ADMIN_EMAIL || "sdvdmadrid@gmail.com")
   .trim()
   .toLowerCase();
+
+// Resend is only usable when: provider=resend, has API key, and EMAIL_FROM is a
+// verified domain (not a test domain like onboarding@resend.dev in production).
+function isResendUsable() {
+  if (EMAIL_PROVIDER !== "resend") return false;
+  if (!RESEND_API_KEY) return false;
+  if (process.env.NODE_ENV === "production" && isTestEmailDomain(EMAIL_FROM)) return false;
+  return true;
+}
 
 function createGenericResponse() {
   return new Response(
@@ -117,130 +129,67 @@ export async function POST(request) {
     await recordPasswordResetAttempt({ email, ip });
 
     const origin = getRequestOrigin(request) || APP_URL;
-    let generatedResetUrl = "";
 
-    // If custom provider is disabled, use Supabase native email directly.
-    if (EMAIL_PROVIDER !== "resend") {
+    // ── Admin: always return a direct reset link (no email needed) ────────────
+    if (isSuperAdminRequest) {
       try {
-        if (isSuperAdminRequest) {
-          const debugLink = await generatePasswordRecoveryLink({ email, origin });
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: "Admin direct reset link generated.",
-              delivery: "manual_link",
-              resetUrl: debugLink.resetUrl,
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            },
-          );
-        }
-
-        await sendPasswordRecoveryEmailViaSupabase({ email, origin });
-        return createGenericResponse();
-      } catch (supabaseErr) {
-        console.error("[api/auth/forgot-password] supabase direct failed", {
-          error: supabaseErr?.message || "unknown",
-          email,
-          provider: EMAIL_PROVIDER,
-        });
-
-        if (isSuperAdminRequest) {
-          try {
-            const debugLink = await generatePasswordRecoveryLink({ email, origin });
-            return new Response(
-              JSON.stringify({
-                success: true,
-                message: "Email delivery failed. Use the direct reset link.",
-                delivery: "manual_link",
-                resetUrl: debugLink.resetUrl,
-              }),
-              {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
-          } catch {
-            // keep generic response below on any debug-link failure
-          }
-        }
-
-        return createGenericResponse();
-      }
-    }
-
-    // Generate reset token via Supabase Admin API (no email sent by Supabase)
-    // then send our own FieldBase-branded email via Resend.
-    try {
-      const result = await generatePasswordRecoveryLink({ email, origin });
-      const resetUrl = result.resetUrl;
-      generatedResetUrl = resetUrl;
-
-      if (isSuperAdminRequest) {
+        const debugLink = await generatePasswordRecoveryLink({ email, origin });
         return new Response(
           JSON.stringify({
             success: true,
             message: "Admin direct reset link generated.",
             delivery: "manual_link",
-            resetUrl,
+            resetUrl: debugLink.resetUrl,
           }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          },
+          { status: 200, headers: { "Content-Type": "application/json" } },
         );
-      }
-
-      const emailResult = await sendEmail({
-        to: email,
-        subject: "Reset your FieldBase password",
-        html: buildResetEmailHtml(resetUrl),
-        text: `Reset your FieldBase password\n\nClick this link to reset your password (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
-      });
-
-      if (emailResult?.success) {
+      } catch (adminErr) {
+        console.error("[api/auth/forgot-password] admin link generation failed", {
+          error: adminErr?.message || "unknown",
+        });
         return createGenericResponse();
       }
-
-      console.error("[api/auth/forgot-password] sendEmail failed", {
-        provider: emailResult?.provider,
-        error: emailResult?.error,
-        email,
-      });
-    } catch (linkErr) {
-      console.error("[api/auth/forgot-password] custom flow failed", {
-        error: linkErr?.message || "unknown",
-        email,
-      });
     }
 
-    // Fallback path: ask Supabase to send the reset email directly.
-    // This keeps reset functional even if custom delivery has transient issues.
+    // ── Regular users ────────────────────────────────────────────────────────
+    // Path A: Resend with a verified sending domain → FieldBase-branded email.
+    if (isResendUsable()) {
+      try {
+        const result = await generatePasswordRecoveryLink({ email, origin });
+        const resetUrl = result.resetUrl;
+
+        const emailResult = await sendEmail({
+          to: email,
+          subject: "Reset your FieldBase password",
+          html: buildResetEmailHtml(resetUrl),
+          text: `Reset your FieldBase password\n\nClick this link to reset your password (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
+        });
+
+        if (emailResult?.success) {
+          return createGenericResponse();
+        }
+
+        console.error("[api/auth/forgot-password] Resend delivery failed", {
+          provider: emailResult?.provider,
+          error: emailResult?.error,
+        });
+        // Fall through to Supabase path below.
+      } catch (resendErr) {
+        console.error("[api/auth/forgot-password] Resend flow error", {
+          error: resendErr?.message || "unknown",
+        });
+        // Fall through to Supabase path below.
+      }
+    }
+
+    // Path B: Supabase native email (works without a verified custom domain).
     try {
       await sendPasswordRecoveryEmailViaSupabase({ email, origin });
       return createGenericResponse();
-    } catch (fallbackErr) {
-      console.error("[api/auth/forgot-password] supabase fallback failed", {
-        error: fallbackErr?.message || "unknown",
-        email,
+    } catch (supabaseErr) {
+      console.error("[api/auth/forgot-password] Supabase email failed", {
+        error: supabaseErr?.message || "unknown",
       });
-    }
-
-    if (isSuperAdminRequest && generatedResetUrl) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Email delivery failed. Use the direct reset link.",
-          delivery: "manual_link",
-          resetUrl: generatedResetUrl,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
     }
 
     return createGenericResponse();
