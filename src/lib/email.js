@@ -139,7 +139,23 @@ export async function sendEmail({ to, subject, html, text, metadata }) {
     return sendWithResend({ to, subject, html, text, metadata });
   }
 
-  return sendWithMock();
+  if (EMAIL_PROVIDER === "mock") {
+    if (process.env.NODE_ENV === "production") {
+      return {
+        success: false,
+        provider: "mock",
+        error: "EMAIL_PROVIDER=mock is not allowed in production",
+      };
+    }
+
+    return sendWithMock();
+  }
+
+  return {
+    success: false,
+    provider: EMAIL_PROVIDER,
+    error: `Unsupported email provider: ${EMAIL_PROVIDER}`,
+  };
 }
 
 export function isWebhookAuthorized(request) {

@@ -11,6 +11,9 @@ import {
 import { sendEmail } from "@/lib/email";
 
 const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "resend")
+  .trim()
+  .toLowerCase();
 
 function createGenericResponse() {
   return new Response(
@@ -109,6 +112,21 @@ export async function POST(request) {
     await recordPasswordResetAttempt({ email, ip });
 
     const origin = getRequestOrigin(request) || APP_URL;
+
+    // If custom provider is disabled, use Supabase native email directly.
+    if (EMAIL_PROVIDER !== "resend") {
+      try {
+        await sendPasswordRecoveryEmailViaSupabase({ email, origin });
+        return createGenericResponse();
+      } catch (supabaseErr) {
+        console.error("[api/auth/forgot-password] supabase direct failed", {
+          error: supabaseErr?.message || "unknown",
+          email,
+          provider: EMAIL_PROVIDER,
+        });
+        return createGenericResponse();
+      }
+    }
 
     // Generate reset token via Supabase Admin API (no email sent by Supabase)
     // then send our own FieldBase-branded email via Resend.
