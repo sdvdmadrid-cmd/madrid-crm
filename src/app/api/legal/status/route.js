@@ -1,4 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  buildLegalCookieValue,
+  LEGAL_COOKIE_MAX_AGE,
+  LEGAL_COOKIE_NAME,
+} from "@/lib/legal";
 import { getCurrentLegalVersionForTenant } from "@/lib/legal-versions";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
 
@@ -38,16 +43,27 @@ export async function GET(request) {
       );
     }
 
+    const accepted = !!acceptance;
+
+    // If accepted via DB but cookie is missing, repair it now so middleware
+    // stops redirecting the user back to /legal-required on every request.
+    const responseHeaders = {};
+    if (accepted) {
+      const isProduction = process.env.NODE_ENV === "production";
+      const cookiePayload = buildLegalCookieValue(scopedTenantId, current.version_name);
+      responseHeaders["Set-Cookie"] = `${LEGAL_COOKIE_NAME}=${encodeURIComponent(cookiePayload)}; Max-Age=${LEGAL_COOKIE_MAX_AGE}; Path=/; HttpOnly; SameSite=Strict${isProduction ? "; Secure" : ""}`;
+    }
+
     return Response.json(
       {
         success: true,
         data: {
-          accepted: !!acceptance,
+          accepted,
           version: current.version_name,
           acceptedAt: acceptance?.accepted_at || null,
         },
       },
-      { status: 200 },
+      { status: 200, headers: responseHeaders },
     );
   } catch (err) {
     console.error("[api/legal/status] error", err);
