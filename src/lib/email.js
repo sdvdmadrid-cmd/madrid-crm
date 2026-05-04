@@ -6,7 +6,7 @@ const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "mock").toLowerCase();
 const EMAIL_FROM =
   process.env.EMAIL_FROM || "FieldBase <no-reply@example.com>";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const RESEND_TIMEOUT_MS = Number(process.env.RESEND_TIMEOUT_MS || 8000);
+const RESEND_TIMEOUT_MS = Number(process.env.RESEND_TIMEOUT_MS || 4000);
 const EMAIL_WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET || "";
 const ALLOW_INSECURE_DEV_WEBHOOKS =
   String(process.env.ALLOW_INSECURE_DEV_WEBHOOKS || "").trim().toLowerCase() ===
@@ -70,7 +70,7 @@ async function sendWithResend({ to, subject, html, text, metadata }) {
 
   const timeoutMs = Number.isFinite(RESEND_TIMEOUT_MS)
     ? Math.max(1000, Math.min(RESEND_TIMEOUT_MS, 30000))
-    : 8000;
+    : 4000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
