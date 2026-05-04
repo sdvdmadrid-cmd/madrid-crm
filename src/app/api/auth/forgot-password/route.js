@@ -14,7 +14,7 @@ const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, 
 const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "resend")
   .trim()
   .toLowerCase();
-const SUPER_ADMIN_EMAIL = String(process.env.SUPER_ADMIN_EMAIL || "")
+const SUPER_ADMIN_EMAIL = String(process.env.SUPER_ADMIN_EMAIL || "sdvdmadrid@gmail.com")
   .trim()
   .toLowerCase();
 
