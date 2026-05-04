@@ -172,6 +172,10 @@ export function getRequestOrigin(request) {
   }
 
   const requestOrigin = normalizeOrigin(request?.url);
+  if (requestOrigin && process.env.NODE_ENV === "production") {
+    return requestOrigin;
+  }
+
   if (process.env.NODE_ENV !== "production" && isLocalOrigin(requestOrigin)) {
     return requestOrigin;
   }

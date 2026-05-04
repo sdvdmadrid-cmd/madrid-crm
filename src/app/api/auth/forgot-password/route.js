@@ -1,12 +1,9 @@
-﻿import { sendEmail } from "@/lib/email";
-import {
+﻿import {
   checkPasswordResetRateLimit,
   getRequestIp,
   recordPasswordResetAttempt,
 } from "@/lib/rate-limit";
 import {
-  findAuthUserByEmail,
-  generatePasswordRecoveryLink,
   getRequestOrigin,
   sendPasswordRecoveryEmailViaSupabase,
 } from "@/lib/supabase-auth";
@@ -62,44 +59,12 @@ export async function POST(request) {
 
     await recordPasswordResetAttempt({ email, ip });
 
-    const authUser = await findAuthUserByEmail(email);
-    if (!authUser) {
-      return createGenericResponse();
-    }
-
     const origin = getRequestOrigin(request);
     if (!origin) {
-      throw new Error("APP_URL must be configured for password recovery links");
+      throw new Error("Unable to resolve app origin for password recovery links");
     }
-    const { resetUrl } = await generatePasswordRecoveryLink({ email, origin });
-
-    const emailResult = await sendEmail({
-      to: email,
-      subject: "Reset your FieldBase password",
-      html: `<p>Hi,</p><p>We received a request to reset your password.</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link can only be used once and expires shortly.</p><p>If you did not request this, you can ignore this email.</p>`,
-      text: `Hi,\n\nWe received a request to reset your password.\n\n${resetUrl}\n\nThis link can only be used once and expires shortly.\nIf you did not request this, you can ignore this email.`,
-      metadata: {
-        tenantId:
-          authUser.app_metadata?.tenant_id ||
-          authUser.app_metadata?.tenantId ||
-          "default",
-      },
-    });
-
-    if (emailResult?.success && emailResult?.provider !== "mock") {
-      return createGenericResponse();
-    }
-
-    if (!emailResult?.success) {
-      console.error("Failed to send password reset email", {
-        provider: emailResult?.provider || "unknown",
-        error: emailResult?.error || "Unknown email provider error",
-        email,
-      });
-    }
-
-    // Fallback: send password recovery email through Supabase Auth when
-    // custom provider is unavailable or running in mock mode.
+    // Fast path: send recovery email directly via Supabase Auth.
+    // This avoids expensive user list scans and external provider delays.
     await sendPasswordRecoveryEmailViaSupabase({ email, origin });
 
     return createGenericResponse();
