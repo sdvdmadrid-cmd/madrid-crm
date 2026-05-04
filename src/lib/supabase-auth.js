@@ -163,20 +163,48 @@ function isLocalOrigin(origin) {
   }
 }
 
+function getForwardedRequestOrigin(request) {
+  const proto = String(request?.headers?.get("x-forwarded-proto") || "")
+    .trim()
+    .toLowerCase();
+  const host = String(request?.headers?.get("x-forwarded-host") || "")
+    .trim()
+    .toLowerCase();
+
+  if (!proto || !host) {
+    return "";
+  }
+
+  return normalizeOrigin(`${proto}://${host}`);
+}
+
 export function getRequestOrigin(request) {
+  const isProduction = process.env.NODE_ENV === "production";
   const configuredOrigin =
     normalizeOrigin(process.env.APP_URL) ||
     normalizeOrigin(process.env.APP_BASE_URL);
+
   if (configuredOrigin) {
-    return configuredOrigin;
+    if (isProduction && isLocalOrigin(configuredOrigin)) {
+      console.error(
+        "[supabase-auth] Ignoring localhost APP_URL/APP_BASE_URL in production",
+      );
+    } else {
+      return configuredOrigin;
+    }
+  }
+
+  const forwardedOrigin = getForwardedRequestOrigin(request);
+  if (forwardedOrigin) {
+    return forwardedOrigin;
   }
 
   const requestOrigin = normalizeOrigin(request?.url);
-  if (requestOrigin && process.env.NODE_ENV === "production") {
+  if (requestOrigin && isProduction) {
     return requestOrigin;
   }
 
-  if (process.env.NODE_ENV !== "production" && isLocalOrigin(requestOrigin)) {
+  if (!isProduction && requestOrigin) {
     return requestOrigin;
   }
 
