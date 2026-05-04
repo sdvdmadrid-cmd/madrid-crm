@@ -12,18 +12,7 @@ import { sendEmail } from "@/lib/email";
 
 const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 
-function isDebugRequest(request) {
-  const expected = String(process.env.DEBUG_SECRET || "").trim();
-  const provided = String(request.headers.get("x-debug-secret") || "").trim();
-  return Boolean(expected && provided && expected === provided);
-}
-
-function createGenericResponse({ debugEnabled = false, debugCode = "accepted" } = {}) {
-  const headers = { "Content-Type": "application/json" };
-  if (debugEnabled) {
-    headers["X-Reset-Debug"] = debugCode;
-  }
-
+function createGenericResponse() {
   return new Response(
     JSON.stringify({
       success: true,
@@ -32,7 +21,7 @@ function createGenericResponse({ debugEnabled = false, debugCode = "accepted" } 
     }),
     {
       status: 200,
-      headers,
+      headers: { "Content-Type": "application/json" },
     },
   );
 }
@@ -88,7 +77,6 @@ function buildResetEmailHtml(resetUrl) {
 
 export async function POST(request) {
   try {
-    const debugEnabled = isDebugRequest(request);
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || "")
       .trim()
@@ -96,7 +84,7 @@ export async function POST(request) {
     const ip = getRequestIp(request);
 
     if (!isValidEmail(email)) {
-      return createGenericResponse({ debugEnabled, debugCode: "invalid-email" });
+      return createGenericResponse();
     }
 
     const limitState = await checkPasswordResetRateLimit({ email, ip });
@@ -136,10 +124,7 @@ export async function POST(request) {
       });
 
       if (emailResult?.success) {
-        return createGenericResponse({
-          debugEnabled,
-          debugCode: "custom-email-sent",
-        });
+        return createGenericResponse();
       }
 
       console.error("[api/auth/forgot-password] sendEmail failed", {
@@ -158,10 +143,7 @@ export async function POST(request) {
     // This keeps reset functional even if custom delivery has transient issues.
     try {
       await sendPasswordRecoveryEmailViaSupabase({ email, origin });
-      return createGenericResponse({
-        debugEnabled,
-        debugCode: "supabase-fallback-sent",
-      });
+      return createGenericResponse();
     } catch (fallbackErr) {
       console.error("[api/auth/forgot-password] supabase fallback failed", {
         error: fallbackErr?.message || "unknown",
@@ -169,12 +151,12 @@ export async function POST(request) {
       });
     }
 
-    return createGenericResponse({ debugEnabled, debugCode: "all-delivery-failed" });
+    return createGenericResponse();
   } catch (error) {
     console.error("[api/auth/forgot-password] unhandled error", {
       error: error?.message || "unknown",
     });
     // Keep a generic success response to avoid user enumeration leaks.
-    return createGenericResponse({ debugCode: "unhandled-error" });
+    return createGenericResponse();
   }
 }

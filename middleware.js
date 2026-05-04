@@ -102,6 +102,8 @@ function rateLimitedResponse() {
 const PUBLIC_PATHS = [
   "/login",
   "/register",
+  "/reset-password",
+  "/verify-email",
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/register",
