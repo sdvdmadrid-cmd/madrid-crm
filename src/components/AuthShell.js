@@ -16,6 +16,8 @@ const initialLogin = {
 
 const initialResetPassword = {
   token: "",
+  accessToken: "",
+  refreshToken: "",
   newPassword: "",
   confirmPassword: "",
 };
@@ -124,15 +126,30 @@ export default function AuthShell({ children }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const authError = params.get("auth_error");
     const modeParam = params.get("mode");
-    const resetToken = params.get("token") || params.get("reset_token");
+    const resetToken =
+      params.get("token") ||
+      params.get("reset_token") ||
+      params.get("token_hash") ||
+      hashParams.get("token") ||
+      hashParams.get("token_hash");
+    const accessToken = hashParams.get("access_token") || "";
+    const refreshToken = hashParams.get("refresh_token") || "";
+    const hashType = hashParams.get("type") || "";
+    const hasRecoverySession = hashType === "recovery" && Boolean(accessToken);
 
-    if ((modeParam === "reset-password" || isResetPasswordPage) && resetToken) {
+    if (
+      (modeParam === "reset-password" || isResetPasswordPage || hasRecoverySession) &&
+      (resetToken || hasRecoverySession)
+    ) {
       setMode("reset-password");
       setResetPasswordForm((current) => ({
         ...current,
         token: resetToken,
+        accessToken,
+        refreshToken,
       }));
       setNotice("");
       setError("");
@@ -504,7 +521,7 @@ export default function AuthShell({ children }) {
     setError("");
     setNotice("");
 
-    if (!resetPasswordForm.token) {
+    if (!resetPasswordForm.token && !resetPasswordForm.accessToken) {
       setError(t("auth.noResetToken"));
       setSubmitting(false);
       return;
@@ -529,6 +546,8 @@ export default function AuthShell({ children }) {
         suppressUnauthorizedEvent: true,
         body: JSON.stringify({
           token: resetPasswordForm.token,
+          accessToken: resetPasswordForm.accessToken,
+          refreshToken: resetPasswordForm.refreshToken,
           newPassword: resetPasswordForm.newPassword,
         }),
       });
