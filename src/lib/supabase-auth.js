@@ -225,6 +225,20 @@ export async function generatePasswordRecoveryLink({ email, origin }) {
   };
 }
 
+export async function sendPasswordRecoveryEmailViaSupabase({ email, origin }) {
+  const redirectTo = `${origin}/reset-password`;
+  const authClient = createSupabaseServerAuthClient();
+  const { error } = await authClient.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Supabase recovery email failed");
+  }
+
+  return { success: true };
+}
+
 export async function listAllAuthUsers() {
   const users = [];
   const perPage = 200;

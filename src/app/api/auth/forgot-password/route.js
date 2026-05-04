@@ -8,6 +8,7 @@ import {
   findAuthUserByEmail,
   generatePasswordRecoveryLink,
   getRequestOrigin,
+  sendPasswordRecoveryEmailViaSupabase,
 } from "@/lib/supabase-auth";
 
 function createGenericResponse() {
@@ -85,17 +86,27 @@ export async function POST(request) {
       },
     });
 
+    if (emailResult?.success && emailResult?.provider !== "mock") {
+      return createGenericResponse();
+    }
+
     if (!emailResult?.success) {
       console.error("Failed to send password reset email", {
         provider: emailResult?.provider || "unknown",
         error: emailResult?.error || "Unknown email provider error",
         email,
       });
-      throw new Error("Password reset email delivery failed");
     }
 
+    // Fallback: send password recovery email through Supabase Auth when
+    // custom provider is unavailable or running in mock mode.
+    await sendPasswordRecoveryEmailViaSupabase({ email, origin });
+
     return createGenericResponse();
-  } catch {
+  } catch (error) {
+    console.error("[api/auth/forgot-password] delivery failure", {
+      error: error?.message || "unknown",
+    });
     // Keep a generic success response to avoid user enumeration leaks.
     return createGenericResponse();
   }
