@@ -46,7 +46,11 @@ export function normalizeAuthUser(user, profile = null) {
       user?.id ||
       null,
     role: normalizeAppRole(
-      profile?.role || appMetadata.role || userMetadata.role,
+      // app_metadata.role=super_admin always wins — profiles table constraint
+      // does not allow that value so it can only come from app_metadata.
+      appMetadata.role === "super_admin"
+        ? "super_admin"
+        : profile?.role || appMetadata.role || userMetadata.role,
     ),
     businessType: userMetadata.businessType || userMetadata.industry || "",
     isSubscribed: userMetadata.isSubscribed === true,
