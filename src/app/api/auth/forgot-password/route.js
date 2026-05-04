@@ -3,10 +3,10 @@
   getRequestIp,
   recordPasswordResetAttempt,
 } from "@/lib/rate-limit";
-import {
-  getRequestOrigin,
-  sendPasswordRecoveryEmailViaSupabase,
-} from "@/lib/supabase-auth";
+import { generatePasswordRecoveryLink } from "@/lib/supabase-auth";
+import { sendEmail } from "@/lib/email";
+
+const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 
 function createGenericResponse() {
   return new Response(
@@ -24,6 +24,51 @@ function createGenericResponse() {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function buildResetEmailHtml(resetUrl) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        <tr>
+          <td style="background:#16a34a;padding:28px 40px;text-align:center;">
+            <span style="font-size:26px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">FieldBase</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px;">
+            <h2 style="margin:0 0 12px;font-size:22px;color:#111827;">Reset your password</h2>
+            <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6;">
+              We received a request to reset the password for your FieldBase account.
+              Click the button below to choose a new password. This link expires in 1 hour.
+            </p>
+            <div style="text-align:center;margin:0 0 28px;">
+              <a href="${resetUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:6px;text-decoration:none;">
+                Reset Password
+              </a>
+            </div>
+            <p style="margin:0 0 8px;font-size:13px;color:#9ca3af;">
+              If you didn't request a password reset, you can safely ignore this email — your password won't change.
+            </p>
+            <p style="margin:0;font-size:12px;color:#d1d5db;word-break:break-all;">
+              Or copy this link: ${resetUrl}
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #f3f4f6;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">© ${new Date().getFullYear()} FieldBase. All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
 }
 
 export async function POST(request) {
@@ -59,13 +104,16 @@ export async function POST(request) {
 
     await recordPasswordResetAttempt({ email, ip });
 
-    const origin = getRequestOrigin(request);
-    if (!origin) {
-      throw new Error("Unable to resolve app origin for password recovery links");
-    }
-    // Fast path: send recovery email directly via Supabase Auth.
-    // This avoids expensive user list scans and external provider delays.
-    await sendPasswordRecoveryEmailViaSupabase({ email, origin });
+    // Generate reset token via Supabase Admin API (no email sent by Supabase)
+    // then send our own FieldBase-branded email via Resend.
+    const { resetUrl } = await generatePasswordRecoveryLink({ email, origin: APP_URL });
+
+    await sendEmail({
+      to: email,
+      subject: "Reset your FieldBase password",
+      html: buildResetEmailHtml(resetUrl),
+      text: `Reset your FieldBase password\n\nClick this link to reset your password (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
+    });
 
     return createGenericResponse();
   } catch (error) {
