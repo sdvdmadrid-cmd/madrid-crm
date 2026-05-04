@@ -915,13 +915,17 @@ export default function LoginAccessPanel({
               padding: 16px;
               min-height: 100dvh;
               align-items: center;
+              overflow: visible;
+              width: 100%;
             }
 
             .cf-access-card {
-              max-width: 100%;
+              width: 100%;
+              max-width: 100% !important;
               border-radius: 18px;
               padding: 20px 16px;
               gap: 14px;
+              box-sizing: border-box;
             }
 
             .cf-access-mobile-brand {
@@ -972,6 +976,13 @@ export default function LoginAccessPanel({
 
             .cf-access-form {
               gap: 12px !important;
+              width: 100%;
+              overflow: visible;
+            }
+
+            .cf-access-form button {
+              width: 100%;
+              overflow: visible;
             }
           }
 

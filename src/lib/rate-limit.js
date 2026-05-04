@@ -208,6 +208,12 @@ export async function clearLoginRateLimit({ email, ip }) {
 }
 
 export async function checkPasswordResetRateLimit({ email, ip }) {
+  const superAdminEmail = String(process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (superAdminEmail && normalizedEmail === superAdminEmail) {
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
   const checks = [
     { key: buildKey("reset:email", email) },
     { key: buildKey("reset:ip", ip) },
@@ -227,6 +233,12 @@ export async function checkPasswordResetRateLimit({ email, ip }) {
 }
 
 export async function recordPasswordResetAttempt({ email, ip }) {
+  const superAdminEmail = String(process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (superAdminEmail && normalizedEmail === superAdminEmail) {
+    return { allowed: true };
+  }
+
   const checks = [
     {
       key: buildKey("reset:email", email),
