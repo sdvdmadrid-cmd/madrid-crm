@@ -12,7 +12,18 @@ import { sendEmail } from "@/lib/email";
 
 const APP_URL = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
 
-function createGenericResponse() {
+function isDebugRequest(request) {
+  const expected = String(process.env.DEBUG_SECRET || "").trim();
+  const provided = String(request.headers.get("x-debug-secret") || "").trim();
+  return Boolean(expected && provided && expected === provided);
+}
+
+function createGenericResponse({ debugEnabled = false, debugCode = "accepted" } = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (debugEnabled) {
+    headers["X-Reset-Debug"] = debugCode;
+  }
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -21,7 +32,7 @@ function createGenericResponse() {
     }),
     {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers,
     },
   );
 }
@@ -77,6 +88,7 @@ function buildResetEmailHtml(resetUrl) {
 
 export async function POST(request) {
   try {
+    const debugEnabled = isDebugRequest(request);
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || "")
       .trim()
@@ -84,7 +96,7 @@ export async function POST(request) {
     const ip = getRequestIp(request);
 
     if (!isValidEmail(email)) {
-      return createGenericResponse();
+      return createGenericResponse({ debugEnabled, debugCode: "invalid-email" });
     }
 
     const limitState = await checkPasswordResetRateLimit({ email, ip });
@@ -124,7 +136,10 @@ export async function POST(request) {
       });
 
       if (emailResult?.success) {
-        return createGenericResponse();
+        return createGenericResponse({
+          debugEnabled,
+          debugCode: "custom-email-sent",
+        });
       }
 
       console.error("[api/auth/forgot-password] sendEmail failed", {
@@ -143,7 +158,10 @@ export async function POST(request) {
     // This keeps reset functional even if custom delivery has transient issues.
     try {
       await sendPasswordRecoveryEmailViaSupabase({ email, origin });
-      return createGenericResponse();
+      return createGenericResponse({
+        debugEnabled,
+        debugCode: "supabase-fallback-sent",
+      });
     } catch (fallbackErr) {
       console.error("[api/auth/forgot-password] supabase fallback failed", {
         error: fallbackErr?.message || "unknown",
@@ -151,12 +169,12 @@ export async function POST(request) {
       });
     }
 
-    return createGenericResponse();
+    return createGenericResponse({ debugEnabled, debugCode: "all-delivery-failed" });
   } catch (error) {
     console.error("[api/auth/forgot-password] unhandled error", {
       error: error?.message || "unknown",
     });
     // Keep a generic success response to avoid user enumeration leaks.
-    return createGenericResponse();
+    return createGenericResponse({ debugCode: "unhandled-error" });
   }
 }
