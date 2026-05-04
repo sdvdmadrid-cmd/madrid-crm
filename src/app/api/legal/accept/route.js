@@ -85,17 +85,14 @@ export async function POST(request) {
     });
 
     // Build response and set legal acceptance cookie
-    const response = Response.json(
-      { success: true, data: { version, acceptedAt: now } },
-      { status: 200 },
-    );
-
     const isProduction = process.env.NODE_ENV === "production";
     const cookiePayload = buildLegalCookieValue(scopedTenantId, version);
     const cookieValue = `${LEGAL_COOKIE_NAME}=${encodeURIComponent(cookiePayload)}; Max-Age=${LEGAL_COOKIE_MAX_AGE}; Path=/; HttpOnly; SameSite=Strict${isProduction ? "; Secure" : ""}`;
-    response.headers.set("Set-Cookie", cookieValue);
 
-    return response;
+    return Response.json(
+      { success: true, data: { version, acceptedAt: now } },
+      { status: 200, headers: { "Set-Cookie": cookieValue } },
+    );
   } catch (err) {
     console.error("[api/legal/accept] error", err);
     return Response.json(
