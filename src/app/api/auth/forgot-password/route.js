@@ -122,6 +122,22 @@ export async function POST(request) {
     // If custom provider is disabled, use Supabase native email directly.
     if (EMAIL_PROVIDER !== "resend") {
       try {
+        if (isSuperAdminRequest) {
+          const debugLink = await generatePasswordRecoveryLink({ email, origin });
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: "Admin direct reset link generated.",
+              delivery: "manual_link",
+              resetUrl: debugLink.resetUrl,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+
         await sendPasswordRecoveryEmailViaSupabase({ email, origin });
         return createGenericResponse();
       } catch (supabaseErr) {
@@ -161,6 +177,21 @@ export async function POST(request) {
       const result = await generatePasswordRecoveryLink({ email, origin });
       const resetUrl = result.resetUrl;
       generatedResetUrl = resetUrl;
+
+      if (isSuperAdminRequest) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: "Admin direct reset link generated.",
+            delivery: "manual_link",
+            resetUrl,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
 
       const emailResult = await sendEmail({
         to: email,

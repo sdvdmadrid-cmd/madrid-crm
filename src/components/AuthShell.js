@@ -543,6 +543,13 @@ export default function AuthShell({ children }) {
         return;
       }
 
+      if (payload?.resetUrl) {
+        if (typeof window !== "undefined") {
+          window.location.href = payload.resetUrl;
+        }
+        return;
+      }
+
       setNotice(
         payload?.message ||
           t("auth.resetLinkSent") ||
