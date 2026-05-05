@@ -59,7 +59,6 @@ export default function LoginAccessPanel({
   const shellStyle = {
     minHeight: "100dvh",
     display: "grid",
-    gridTemplateColumns: "minmax(320px, 420px) minmax(0, 1fr)",
     background: "#f4f5f7",
     fontFamily: "'Inter', system-ui, sans-serif",
   };
@@ -854,6 +853,10 @@ export default function LoginAccessPanel({
         </div>
 
         <style>{`
+          .cf-access-shell {
+            grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+          }
+
           @media (max-width: 920px) {
             .cf-access-shell {
               grid-template-columns: 1fr;
@@ -867,11 +870,11 @@ export default function LoginAccessPanel({
           @media (max-width: 768px) {
             .cf-access-shell {
               min-height: 100dvh;
-              grid-template-columns: 1fr;
+              grid-template-columns: 1fr !important;
             }
 
             .cf-access-sidebar {
-              display: none;
+              display: none !important;
             }
 
             .cf-access-sidebar-content {
