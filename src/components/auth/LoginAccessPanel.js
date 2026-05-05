@@ -219,19 +219,10 @@ export default function LoginAccessPanel({
           <div style={{ display: "flex", alignItems: "center", gap: 12 }} className="cf-access-brand">
             <div
               className="cf-access-brand-mark"
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 12,
-                background: "#16a34a",
-                display: "grid",
-                placeItems: "center",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 15,
-              }}
+              aria-hidden="true"
             >
-              FB
+              <span className="cf-logo-bar" />
+              <span className="cf-logo-dot" />
             </div>
             <div>
               <div
@@ -870,6 +861,15 @@ export default function LoginAccessPanel({
             }
           }
 
+          .cf-access-brand-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #0d4fd9 0%, #091220 100%);
+            position: relative;
+            flex-shrink: 0;
+          }
+
           @media (max-width: 768px) {
             .cf-access-shell {
               min-height: 100dvh;
@@ -888,7 +888,6 @@ export default function LoginAccessPanel({
               width: 36px !important;
               height: 36px !important;
               border-radius: 10px !important;
-              font-size: 13px !important;
             }
 
             .cf-access-brand-title {
