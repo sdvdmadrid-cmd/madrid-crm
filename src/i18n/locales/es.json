@@ -634,6 +634,13 @@
       "email": "Email",
       "phone": "Telefono",
       "address": "Direccion",
+      "city": "Ciudad",
+      "state": "Estado",
+      "zip": "Codigo postal",
+      "billingAddress": "Direccion de facturacion",
+      "billingCity": "Ciudad de facturacion",
+      "billingState": "Estado de facturacion",
+      "billingZip": "Codigo postal de facturacion",
       "service": "Servicio",
       "notes": "Notas",
       "price": "Precio"
@@ -641,7 +648,10 @@
     "labels": {
       "createdAt": "Creado",
       "company": "Empresa",
-      "notes": "Notas"
+      "notes": "Notas",
+      "serviceAddress": "Direccion de servicio",
+      "billingAddress": "Direccion de facturacion",
+      "billingSameAsService": "Igual que la direccion de servicio"
     },
     "buttons": {
       "saving": "Guardando...",
@@ -658,7 +668,6 @@
       "save": "No se pudo guardar el cliente",
       "saveFallback": "Error al guardar cliente",
       "nameRequired": "El nombre del cliente es obligatorio",
-      "addressSelectionRequired": "Selecciona una direccion de la lista de sugerencias",
       "delete": "No se pudo eliminar el cliente",
       "deleteFallback": "Error al eliminar cliente"
     },

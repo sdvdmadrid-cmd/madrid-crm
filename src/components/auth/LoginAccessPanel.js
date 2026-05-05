@@ -315,7 +315,10 @@ export default function LoginAccessPanel({
       <main style={panelStyle} className="cf-access-main">
         <div style={cardStyle} className={`cf-access-card cf-access-card--${mode}`}>
           <div className="cf-access-mobile-brand" aria-hidden="true">
-            <div className="cf-access-mobile-brand-mark">FB</div>
+            <div className="cf-access-mobile-brand-mark">
+              <span className="cf-logo-bar" />
+              <span className="cf-logo-dot" />
+            </div>
             <div className="cf-access-mobile-brand-text">FieldBase</div>
           </div>
 
@@ -938,15 +941,32 @@ export default function LoginAccessPanel({
             }
 
             .cf-access-mobile-brand-mark {
-              width: 32px;
-              height: 32px;
-              border-radius: 9px;
-              background: #16a34a;
-              color: #ffffff;
-              font-size: 12px;
-              font-weight: 800;
-              display: grid;
-              place-items: center;
+              width: 36px;
+              height: 36px;
+              border-radius: 12px;
+              background: linear-gradient(145deg, #0d4fd9 0%, #091220 100%);
+              position: relative;
+              flex-shrink: 0;
+            }
+
+            .cf-logo-bar {
+              position: absolute;
+              left: 8px;
+              top: 11px;
+              width: 20px;
+              height: 7px;
+              border-radius: 999px;
+              background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%);
+            }
+
+            .cf-logo-dot {
+              position: absolute;
+              right: 8px;
+              bottom: 8px;
+              width: 7px;
+              height: 7px;
+              border-radius: 50%;
+              background: #f59e0b;
             }
 
             .cf-access-mobile-brand-text {

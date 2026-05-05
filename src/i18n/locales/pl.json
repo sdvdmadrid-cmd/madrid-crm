@@ -634,6 +634,13 @@
       "email": "Email",
       "phone": "Telefon",
       "address": "Adres",
+      "city": "Miasto",
+      "state": "Stan",
+      "zip": "Kod pocztowy",
+      "billingAddress": "Adres rozliczeniowy",
+      "billingCity": "Miasto rozliczeniowe",
+      "billingState": "Stan rozliczeniowy",
+      "billingZip": "Kod pocztowy rozliczeniowy",
       "service": "Usluga",
       "notes": "Notatki",
       "price": "Cena"
@@ -641,7 +648,10 @@
     "labels": {
       "createdAt": "Utworzono",
       "company": "Firma",
-      "notes": "Notatki"
+      "notes": "Notatki",
+      "serviceAddress": "Adres uslugi",
+      "billingAddress": "Adres rozliczeniowy",
+      "billingSameAsService": "Taki sam jak adres uslugi"
     },
     "buttons": {
       "saving": "Zapisywanie...",
@@ -658,7 +668,6 @@
       "save": "Nie udalo sie zapisac klienta",
       "saveFallback": "Blad podczas zapisu klienta",
       "nameRequired": "Nazwa klienta jest wymagana",
-      "addressSelectionRequired": "Wybierz adres z listy podpowiedzi",
       "delete": "Nie udalo sie usunac klienta",
       "deleteFallback": "Blad podczas usuwania klienta"
     },

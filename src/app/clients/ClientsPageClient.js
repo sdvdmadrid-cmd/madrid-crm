@@ -66,12 +66,13 @@ export default function ClientsPageClient() {
         notes: form.notes,
       };
 
-      const hasAddress = String(form.address || "").trim().length > 0;
-      if (hasAddress && !String(form.addressPlaceId || "").trim()) {
-        setError(t("clients.errors.addressSelectionRequired"));
-        setSaving(false);
-        return;
-      }
+      Object.assign(payload, {
+        billing_address: form.billingSameAsService !== false ? "" : (form.billingAddress || ""),
+        billing_city: form.billingSameAsService !== false ? "" : (form.billingCity || ""),
+        billing_state: form.billingSameAsService !== false ? "" : (form.billingState || ""),
+        billing_zip: form.billingSameAsService !== false ? "" : (form.billingZip || ""),
+        billing_same_as_service: form.billingSameAsService !== false,
+      });
 
       const method = selectedId ? "PATCH" : "POST";
       const url = selectedId
@@ -124,6 +125,11 @@ export default function ClientsPageClient() {
       // Keep them editable unless the address field is changed.
       addressPlaceId: client.address ? "persisted" : "",
       notes: client.notes || "",
+      billingAddress: client.billing_address || "",
+      billingCity: client.billing_city || "",
+      billingState: client.billing_state || "",
+      billingZip: client.billing_zip || "",
+      billingSameAsService: client.billing_same_as_service !== false,
     });
     setSelectedId(client.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -176,11 +182,11 @@ export default function ClientsPageClient() {
         <div style={{ marginTop: "20px", color: "#b00020" }}>{error}</div>
       )}
       <div
+        className="cf-clients-layout"
         style={{
           marginTop: 24,
           display: "grid",
           gap: 16,
-          gridTemplateColumns: "minmax(280px, 380px) 1fr",
           alignItems: "start",
         }}
       >
@@ -203,6 +209,17 @@ export default function ClientsPageClient() {
           canDelete={capabilities.canDeleteRecords}
         />
       </div>
+      <style jsx>{`
+        .cf-clients-layout {
+          grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+        }
+
+        @media (max-width: 900px) {
+          .cf-clients-layout {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
+      `}</style>
     </main>
   );
 }

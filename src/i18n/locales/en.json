@@ -634,6 +634,13 @@
       "email": "Email",
       "phone": "Phone",
       "address": "Address",
+      "city": "City",
+      "state": "State",
+      "zip": "ZIP",
+      "billingAddress": "Billing address",
+      "billingCity": "Billing city",
+      "billingState": "Billing state",
+      "billingZip": "Billing ZIP",
       "service": "Service",
       "notes": "Notes",
       "price": "Price"
@@ -641,7 +648,10 @@
     "labels": {
       "createdAt": "Created",
       "company": "Company",
-      "notes": "Notes"
+      "notes": "Notes",
+      "serviceAddress": "Service address",
+      "billingAddress": "Billing address",
+      "billingSameAsService": "Same as service address"
     },
     "buttons": {
       "saving": "Saving...",
@@ -658,7 +668,6 @@
       "save": "Unable to save client",
       "saveFallback": "Error saving client",
       "nameRequired": "Client name is required",
-      "addressSelectionRequired": "Please select an address from the suggestions list",
       "delete": "Unable to delete client",
       "deleteFallback": "Error deleting client"
     },

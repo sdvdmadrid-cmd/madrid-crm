@@ -28,6 +28,11 @@ export const CLIENT_SELECT_COLUMNS = [
   "won_at",
   "created_at",
   "updated_at",
+  "billing_address",
+  "billing_city",
+  "billing_state",
+  "billing_zip",
+  "billing_same_as_service",
 ].join(", ");
 
 function toText(value) {
@@ -81,6 +86,11 @@ function normalizeClientBody(body = {}) {
     leadStatus: normalizeLeadStatus(body.leadStatus ?? body.lead_status),
     estimateSent: Boolean(body.estimateSent ?? body.estimate_sent),
     wonAt: toOptionalTimestamp(body.wonAt ?? body.won_at),
+    billingAddress: toText(body.billing_address ?? body.billingAddress),
+    billingCity: toText(body.billing_city ?? body.billingCity),
+    billingState: toText(body.billing_state ?? body.billingState),
+    billingZip: toText(body.billing_zip ?? body.billingZip),
+    billingSameAsService: (body.billing_same_as_service ?? body.billingSameAsService) !== false,
   };
 }
 
@@ -107,6 +117,11 @@ export function serializeClient(doc = {}) {
     wonAt: doc.won_at || doc.wonAt || null,
     createdAt: doc.created_at || null,
     updatedAt: doc.updated_at || null,
+    billing_address: doc.billing_address || "",
+    billing_city: doc.billing_city || "",
+    billing_state: doc.billing_state || "",
+    billing_zip: doc.billing_zip || "",
+    billing_same_as_service: doc.billing_same_as_service !== false,
   };
 }
 
@@ -133,6 +148,11 @@ export function buildClientInsertRow(body, { tenantId, userId }) {
     lead_status: normalized.leadStatus,
     estimate_sent: normalized.estimateSent,
     won_at: normalized.leadStatus === "won" ? normalized.wonAt || nowIso : null,
+    billing_address: normalized.billingAddress,
+    billing_city: normalized.billingCity,
+    billing_state: normalized.billingState,
+    billing_zip: normalized.billingZip,
+    billing_same_as_service: normalized.billingSameAsService,
     tenant_id: tenantId,
     user_id: userId || null,
     created_by: userId || null,
@@ -180,6 +200,11 @@ export function buildClientUpdateRow(body = {}) {
   if ("estimateSent" in body || "estimate_sent" in body) {
     updateRow.estimate_sent = normalized.estimateSent;
   }
+  if ("billing_address" in body || "billingAddress" in body) updateRow.billing_address = normalized.billingAddress;
+  if ("billing_city" in body || "billingCity" in body) updateRow.billing_city = normalized.billingCity;
+  if ("billing_state" in body || "billingState" in body) updateRow.billing_state = normalized.billingState;
+  if ("billing_zip" in body || "billingZip" in body) updateRow.billing_zip = normalized.billingZip;
+  if ("billing_same_as_service" in body || "billingSameAsService" in body) updateRow.billing_same_as_service = normalized.billingSameAsService;
   if ("leadStatus" in body || "lead_status" in body) {
     updateRow.lead_status = normalized.leadStatus;
     updateRow.won_at =

@@ -215,50 +215,93 @@ export function getRequestOrigin(request) {
   return "";
 }
 
-export async function generateSignupVerificationLink({ email, origin }) {
-  const redirectTo = `${origin}/verify-email`;
-  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "signup",
-    email,
-    options: { redirectTo },
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const tokenHash = data?.properties?.hashed_token;
-  if (!tokenHash) {
-    throw new Error("Supabase did not return a signup verification token");
-  }
-
-  return {
-    tokenHash,
-    verifyUrl: `${redirectTo}?token=${tokenHash}`,
+function buildOriginCandidates(origin) {
+  const candidates = [];
+  const push = (value) => {
+    const normalized = normalizeOrigin(value);
+    if (!normalized) return;
+    if (!candidates.includes(normalized)) {
+      candidates.push(normalized);
+    }
   };
+
+  push(origin);
+  push(process.env.APP_URL);
+  push(process.env.APP_BASE_URL);
+
+  return candidates;
+}
+
+export async function generateSignupVerificationLink({ email, origin }) {
+  const errors = [];
+  const candidates = buildOriginCandidates(origin);
+
+  for (const candidate of candidates) {
+    const redirectTo = `${candidate}/verify-email`;
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "signup",
+      email,
+      options: { redirectTo },
+    });
+
+    if (error) {
+      errors.push(`redirect=${redirectTo} error=${error.message || "unknown"}`);
+      continue;
+    }
+
+    const tokenHash = data?.properties?.hashed_token;
+    if (!tokenHash) {
+      errors.push(
+        `redirect=${redirectTo} error=Supabase did not return a signup verification token`,
+      );
+      continue;
+    }
+
+    return {
+      tokenHash,
+      verifyUrl: `${redirectTo}?token=${tokenHash}`,
+    };
+  }
+
+  throw new Error(
+    `Unable to generate signup verification link: ${errors.join(" | ") || "no valid origin candidates"}`,
+  );
 }
 
 export async function generatePasswordRecoveryLink({ email, origin }) {
-  const redirectTo = `${origin}/reset-password`;
-  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: { redirectTo },
-  });
+  const errors = [];
+  const candidates = buildOriginCandidates(origin);
 
-  if (error) {
-    throw new Error(error.message);
+  for (const candidate of candidates) {
+    const redirectTo = `${candidate}/reset-password`;
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
+
+    if (error) {
+      errors.push(`redirect=${redirectTo} error=${error.message || "unknown"}`);
+      continue;
+    }
+
+    const tokenHash = data?.properties?.hashed_token;
+    if (!tokenHash) {
+      errors.push(
+        `redirect=${redirectTo} error=Supabase did not return a recovery token`,
+      );
+      continue;
+    }
+
+    return {
+      tokenHash,
+      resetUrl: `${redirectTo}?token=${tokenHash}`,
+    };
   }
 
-  const tokenHash = data?.properties?.hashed_token;
-  if (!tokenHash) {
-    throw new Error("Supabase did not return a recovery token");
-  }
-
-  return {
-    tokenHash,
-    resetUrl: `${redirectTo}?token=${tokenHash}`,
-  };
+  throw new Error(
+    `Unable to generate password recovery link: ${errors.join(" | ") || "no valid origin candidates"}`,
+  );
 }
 
 export async function sendPasswordRecoveryEmailViaSupabase({ email, origin }) {
