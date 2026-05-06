@@ -1,5 +1,5 @@
-import { WorkspaceContent } from "@/app/page";
+import { redirect } from "next/navigation";
 
 export default function OwnerWorkspacePage() {
-  return <WorkspaceContent initialTab="branding" />;
+  redirect("/dashboard");
 }
