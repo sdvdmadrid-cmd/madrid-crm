@@ -40,7 +40,27 @@ const SESSION_COOKIE_MAX_AGE = Number(
 );
 
 function setSessionOnRedirect(target, sessionToken) {
-  const response = NextResponse.redirect(target);
+  // Safari (ITP) drops cookies set on HTTP 302/307 redirect responses.
+  // Returning a 200 HTML page that sets the cookie and uses JS to navigate
+  // guarantees the cookie is stored before the browser moves to the next page.
+  const destination = target.toString();
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="0;url=${destination}" />
+  <title>Redirecting…</title>
+</head>
+<body>
+  <p>Redirecting…</p>
+  <script>window.location.replace(${JSON.stringify(destination)});</script>
+</body>
+</html>`;
+
+  const response = new NextResponse(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
   response.cookies.set(SESSION_COOKIE_NAME, sessionToken, {
     path: "/",
     httpOnly: true,
