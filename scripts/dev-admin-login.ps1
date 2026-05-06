@@ -65,7 +65,7 @@ if (-not $BaseUrl) {
 $BaseUrl = Resolve-BaseUrl -RequestedBaseUrl $BaseUrl
 
 $tenantId = if ($env:DEV_ADMIN_TENANT_ID) { $env:DEV_ADMIN_TENANT_ID } else { "tenant-admin" }
-$email = if ($env:DEV_ADMIN_EMAIL) { $env:DEV_ADMIN_EMAIL } else { "admin@contractorflow.local" }
+$email = if ($env:DEV_ADMIN_EMAIL) { $env:DEV_ADMIN_EMAIL } else { "admin@fieldbase.local" }
 $password = if ($env:DEV_ADMIN_PASSWORD) { $env:DEV_ADMIN_PASSWORD } else { "" }
 
 if (-not $password) {

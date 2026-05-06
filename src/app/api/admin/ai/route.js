@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
 
 function parseRole(user) {
@@ -256,6 +257,17 @@ export async function POST(request) {
         JSON.stringify({ success: false, error: "Question is required" }),
         {
           status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const aiEnabled = await isPlatformFeatureEnabled("feature_admin_ai_assistant", true);
+    if (!aiEnabled) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Admin AI Assistant is currently disabled by feature flag" }),
+        {
+          status: 403,
           headers: { "Content-Type": "application/json" },
         },
       );

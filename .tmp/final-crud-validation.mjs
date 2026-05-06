@@ -30,7 +30,7 @@ function createSession() {
     userId,
     tenantId: userId,
     tenantDbId: userId,
-    email: "checkpoint-admin@contractorflow.local",
+    email: "checkpoint-admin@fieldbase.local",
     name: "Checkpoint Admin",
     role: "admin",
     businessType: "",

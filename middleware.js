@@ -1,7 +1,16 @@
 ﻿import { NextResponse } from "next/server";
 import { verifyEdgeSessionToken } from "./src/lib/auth-edge";
+import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
+
+const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+
+function cookieNames(request) {
+  return request.cookies.getAll().map((cookie) => cookie.name);
+}
 
 const LEGAL_COOKIE_NAME = "cf_legal";
+
+const AUTH_FLOW_BYPASS_PREFIXES = ["/auth", "/verify-email"];
 
 // ── Distributed Rate Limiter (Edge Runtime, Upstash Redis HTTP) ──────────────
 // Uses Upstash Redis when UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN
@@ -101,14 +110,19 @@ function rateLimitedResponse() {
 // Rutas públicas que no requieren autenticación
 const PUBLIC_PATHS = [
   "/login",
+  "/sign-in",
   "/register",
   "/reset-password",
   "/verify-email",
+  "/auth/callback",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/me",
   "/api/auth/register",
+  "/api/auth/sync",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
+  "/api/auth/verify-email",
   "/api/auth/resend-verification",
   "/api/health",
   "/api/payments/webhooks",
@@ -132,6 +146,8 @@ const LEGAL_BYPASS_PREFIXES = [
   "/register",
   "/reset-password",
   "/verify-email",
+  "/auth/callback",
+  "/sign-in",
   "/api/auth",
   "/api/legal",
   "/api/public",
@@ -146,6 +162,24 @@ const LEGAL_BYPASS_PREFIXES = [
 
 function isApiPath(pathname) {
   return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+function isAuthFlowBypassPath(pathname) {
+  return AUTH_FLOW_BYPASS_PREFIXES.some(
+    (prefix) =>
+      pathname === prefix ||
+      pathname.startsWith(prefix + "/") ||
+      pathname.startsWith(prefix + "?"),
+  );
+}
+
+function isAuthHydrationApiPath(pathname) {
+  return pathname === "/api/auth/me" || pathname === "/api/auth/sync";
+}
+
+function isStaticAssetPath(pathname) {
+  if (!pathname || isApiPath(pathname)) return false;
+  return /\.(?:ico|png|jpg|jpeg|svg|webp|avif|gif|txt|xml|json|webmanifest|css|js|map)$/i.test(pathname);
 }
 
 function isLegalBypassPath(pathname) {
@@ -229,51 +263,177 @@ function resolveWebsiteSlugFromHost(request) {
   return subdomain;
 }
 
+function notFoundResponse() {
+  return new NextResponse("Not Found", {
+    status: 404,
+    headers: {
+      "Cache-Control": "public, max-age=60",
+    },
+  });
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
+
+  if (AUTH_DEBUG) {
+    console.info("[middleware] entry", {
+      pathname,
+      method: request.method,
+      cookieNames: cookieNames(request),
+    });
+  }
+
+  if (isAuthFlowBypassPath(pathname)) {
+    console.info("[middleware] bypassing auth for auth-flow route", {
+      pathname,
+      note: "callback is never blocked by middleware before exchange",
+    });
+    return NextResponse.next();
+  }
+
+  const response = NextResponse.next();
+
+  const sessionCookie =
+    request.cookies.get("__Host-madrid_session")?.value ||
+    request.cookies.get("madrid_session")?.value;
+
+  let edgeSession = null;
+  if (sessionCookie) {
+    try {
+      edgeSession = await verifyEdgeSessionToken(sessionCookie);
+    } catch (edgeVerifyError) {
+      console.warn("[middleware] edge session verify threw", {
+        pathname,
+        error: edgeVerifyError?.message || String(edgeVerifyError),
+      });
+    }
+  }
+
+  let supabaseUser = null;
+  if (!edgeSession) {
+    try {
+      const supabase = createSupabaseMiddlewareClient(request, response);
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      supabaseUser = user || null;
+
+      console.info("[middleware] supabase hydration", {
+        pathname,
+        hasEdgeSession: Boolean(edgeSession),
+        hasCookie: Boolean(sessionCookie),
+        hasSupabaseUser: Boolean(supabaseUser),
+        supabaseError: error?.message || null,
+      });
+    } catch (supabaseError) {
+      console.warn("[middleware] supabase hydration threw", {
+        pathname,
+        error: supabaseError?.message || String(supabaseError),
+      });
+    }
+  }
+
+  const hasConfirmedSupabaseUser =
+    Boolean(supabaseUser?.id) && Boolean(supabaseUser?.email_confirmed_at);
+
+  if (["/verify-email", "/sign-in", "/login"].includes(pathname)) {
+    console.info("[middleware] login-page check", {
+      pathname,
+      hasCookie: Boolean(sessionCookie),
+      hasEdgeSession: Boolean(edgeSession),
+      hasConfirmedSupabaseUser,
+    });
+    if (edgeSession || hasConfirmedSupabaseUser) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      console.info("[middleware] redirect public auth page -> dashboard", {
+        pathname,
+        redirectDestination: url.pathname,
+        hasEdgeSession: Boolean(edgeSession),
+        hasConfirmedSupabaseUser,
+      });
+      return NextResponse.redirect(url);
+    }
+  }
 
   if (pathname === "/website-builder") {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/website";
+    if (AUTH_DEBUG) {
+      console.info("[middleware] redirect website-builder -> website", {
+        pathname,
+        redirectDestination: redirectUrl.pathname,
+      });
+    }
     return NextResponse.redirect(redirectUrl);
   }
 
   const subdomainSlug = resolveWebsiteSlugFromHost(request);
-  if (subdomainSlug && (pathname === "/" || pathname === "")) {
-    const rewriteUrl = request.nextUrl.clone();
-    rewriteUrl.pathname = `/site/${subdomainSlug}`;
-    return NextResponse.rewrite(rewriteUrl);
+  if (subdomainSlug) {
+    // Public tenant subdomains must only serve the published website.
+    // This prevents app/dashboard/API mixing on the public share URL.
+    if (isApiPath(pathname)) {
+      return notFoundResponse();
+    }
+
+    if (!isStaticAssetPath(pathname) && !pathname.startsWith("/_next")) {
+      const rewriteUrl = request.nextUrl.clone();
+      rewriteUrl.pathname = `/site/${subdomainSlug}`;
+      return NextResponse.rewrite(rewriteUrl);
+    }
   }
 
   // Permitir la raíz (landing page pública) y rutas públicas
-  if (pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+  if (
+    pathname === "/" ||
+    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
+    isStaticAssetPath(pathname)
+  ) {
+    return response;
   }
 
-  // Leer cookie de sesión
-  const cookie =
-    request.cookies.get("__Host-madrid_session")?.value ||
-    request.cookies.get("madrid_session")?.value;
-  if (!cookie) {
-    if (isApiPath(pathname)) {
-      return unauthenticatedApiResponse();
+  if (!edgeSession && hasConfirmedSupabaseUser) {
+    // Allow page navigation and auth hydration endpoints while app cookie sync completes.
+    if (!isApiPath(pathname) || isAuthHydrationApiPath(pathname)) {
+      console.info("[middleware] allowing request while auth loading", {
+        pathname,
+        userId: supabaseUser.id,
+      });
+      return response;
     }
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+  }
+
+  if (!sessionCookie) {
+    if (isApiPath(pathname)) {
+      console.info("[middleware] missing app session cookie on API route", {
+        pathname,
+        action: "defer_to_route_handler_auth",
+      });
+      return response;
+    }
+    console.info("[middleware] missing app session cookie on page route", {
+      pathname,
+      action: "allow_client_hydration",
+    });
+    return response;
   }
 
   // Validar token
-  const session = await verifyEdgeSessionToken(cookie);
+  const session = edgeSession;
   if (!session) {
     if (isApiPath(pathname)) {
-      return unauthenticatedApiResponse();
+      console.info("[middleware] invalid app session token on API route", {
+        pathname,
+        action: "defer_to_route_handler_auth",
+      });
+      return response;
     }
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+    console.info("[middleware] invalid app session token on page route", {
+      pathname,
+      action: "allow_client_hydration",
+    });
+    return response;
   }
 
   // Sesión válida, continuar
@@ -315,6 +475,12 @@ export async function middleware(request) {
       const url = request.nextUrl.clone();
       url.pathname = "/legal-required";
       url.searchParams.set("next", pathname);
+      if (AUTH_DEBUG) {
+        console.info("[middleware] redirect legal required", {
+          pathname,
+          redirectDestination: `${url.pathname}${url.search}`,
+        });
+      }
       return NextResponse.redirect(url);
     }
   }

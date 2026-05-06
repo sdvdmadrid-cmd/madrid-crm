@@ -3,6 +3,7 @@ import { resolveSessionSecret } from "@/lib/session-secret";
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const JWT_ISSUER = process.env.SESSION_JWT_ISSUER || "madrid-app";
 const JWT_AUDIENCE = process.env.SESSION_JWT_AUDIENCE || "madrid-app-users";
+const SESSION_VERSION = process.env.SESSION_VERSION || "2026-05-05-global-logout-1";
 
 const encoder = new TextEncoder();
 
@@ -103,6 +104,10 @@ export async function verifyEdgeSessionToken(token) {
     : audience === JWT_AUDIENCE;
 
   if (!hasAudience) {
+    return null;
+  }
+
+  if (payload.sv !== SESSION_VERSION) {
     return null;
   }
 

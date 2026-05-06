@@ -1,4 +1,5 @@
-const ADMIN_ROLES = new Set(["admin", "owner"]);
+const OWNER_ROLES = new Set(["owner"]);
+const ADMIN_ROLES = new Set(["admin"]);
 const WORKER_ROLES = new Set(["worker", "contractor"]);
 const VIEWER_ROLES = new Set(["viewer"]);
 
@@ -7,6 +8,7 @@ export function normalizeAppRole(role) {
     .trim()
     .toLowerCase();
   if (normalized === "super_admin") return "super_admin";
+  if (OWNER_ROLES.has(normalized)) return "owner";
   if (ADMIN_ROLES.has(normalized)) return "admin";
   if (WORKER_ROLES.has(normalized)) return "worker";
   if (VIEWER_ROLES.has(normalized)) return "viewer";
@@ -19,7 +21,7 @@ export function isSuperAdminRole(role) {
 
 export function isAdminRole(role) {
   const normalized = normalizeAppRole(role);
-  return normalized === "admin" || normalized === "super_admin";
+  return normalized === "owner" || normalized === "admin" || normalized === "super_admin";
 }
 
 export function isWorkerRole(role) {
@@ -29,6 +31,7 @@ export function isWorkerRole(role) {
 export function canReadTenantData(role) {
   const normalized = normalizeAppRole(role);
   return (
+    normalized === "owner" ||
     normalized === "admin" ||
     normalized === "worker" ||
     normalized === "super_admin"
@@ -38,6 +41,7 @@ export function canReadTenantData(role) {
 export function canWriteOperationalData(role) {
   const normalized = normalizeAppRole(role);
   return (
+    normalized === "owner" ||
     normalized === "admin" ||
     normalized === "worker" ||
     normalized === "super_admin"

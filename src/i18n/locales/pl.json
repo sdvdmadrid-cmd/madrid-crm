@@ -465,6 +465,7 @@
     "verificationInvalid": "Ten link weryfikacyjny jest nieprawidlowy. PoproÅ› o nowy.",
     "verificationMissing": "Nie znaleziono tokenu weryfikacyjnego. PoproÅ› o nowy link.",
     "verificationFailed": "Weryfikacja nie powiodla sie. PoproÅ› o nowy link.",
+      "emailVerifiedPleaseLogin": "Email zweryfikowany! Zaloguj sie, aby kontynuowac.",
     "verificationSentNew": "Nowy link weryfikacyjny wyslany. Sprawdz inbox.",
     "checkInboxLink": "Sprawdz inbox i kliknij link weryfikacyjny.",
     "verificationDeliveryIssue": "Nie udal sie teraz dostarczyc emaila weryfikacyjnego. Sprobuj ponownie pozniej.",

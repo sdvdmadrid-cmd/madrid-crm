@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">FieldBase Logo Mark</title>
-  <desc id="desc">Blue rounded square with FieldBase house icon.</desc>
+  <desc id="desc">Blue rounded square with FieldBase signature bar and accent dot.</desc>
   <rect x="32" y="32" width="448" height="448" rx="96" fill="#1d4ed8"/>
-  <path d="M116 226L256 118L396 226V384C396 404 380 420 360 420H152C132 420 116 404 116 384V226Z" fill="none" stroke="#1e293b" stroke-width="34" stroke-linejoin="round"/>
-  <path d="M208 420V274H304V420" fill="none" stroke="#1e293b" stroke-width="34" stroke-linejoin="round"/>
+  <rect x="118" y="194" width="276" height="96" rx="48" fill="#f8fafc"/>
+  <circle cx="366" cy="344" r="42" fill="#f59e0b"/>
+  <rect x="150" y="224" width="200" height="36" rx="18" fill="#dbeafe"/>
 </svg>

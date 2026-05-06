@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -34,6 +35,7 @@ function toCsvCell(value) {
 }
 
 export default function AdminDashboardTableClient({ rows }) {
+  const [tableRows, setTableRows] = useState(Array.isArray(rows) ? rows : []);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [trialFilter, setTrialFilter] = useState("all");
@@ -41,19 +43,24 @@ export default function AdminDashboardTableClient({ rows }) {
   const [selectedTenantId, setSelectedTenantId] = useState(
     Array.isArray(rows) && rows.length > 0 ? rows[0].id : "",
   );
+  const [actionLoading, setActionLoading] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [lastResetUrl, setLastResetUrl] = useState("");
+  const [trialDays, setTrialDays] = useState(30);
 
   const tenantOptions = useMemo(() => {
-    return rows.map((row) => ({
+    return tableRows.map((row) => ({
       id: row.id,
       label: `${row.companyName} (${row.email})`,
     }));
-  }, [rows]);
+  }, [tableRows]);
 
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
     const now = Date.now();
 
-    return rows.filter((row) => {
+    return tableRows.filter((row) => {
       const matchesSearch =
         !term ||
         String(row.name || "").toLowerCase().includes(term) ||
@@ -76,7 +83,7 @@ export default function AdminDashboardTableClient({ rows }) {
 
       return matchesSearch && matchesStatus && matchesTrial && matchesTenant;
     });
-  }, [rows, search, statusFilter, tenantFilter, trialFilter]);
+  }, [tableRows, search, statusFilter, tenantFilter, trialFilter]);
 
   const filteredTotals = useMemo(() => {
     return filteredRows.reduce(
@@ -181,6 +188,54 @@ export default function AdminDashboardTableClient({ rows }) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const runTenantAction = async (action, payload = {}, loadingKey = action) => {
+    if (!selectedTenant?.id || actionLoading) return;
+
+    setActionLoading(loadingKey);
+    setActionError("");
+    setActionNotice("");
+    setLastResetUrl("");
+    try {
+      const response = await apiFetch(`/api/admin/users/${selectedTenant.id}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      const result = await getJsonOrThrow(response, "Unable to run admin action");
+      const data = result?.data || {};
+
+      setTableRows((current) =>
+        current.map((row) =>
+          row.id === selectedTenant.id
+            ? {
+                ...row,
+                status: data.status || row.status,
+                trialEndDate:
+                  Object.prototype.hasOwnProperty.call(data, "trialEndDate")
+                    ? data.trialEndDate
+                    : row.trialEndDate,
+              }
+            : row,
+        ),
+      );
+
+      if (data.resetUrl && typeof window !== "undefined" && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(data.resetUrl);
+        setLastResetUrl(data.resetUrl);
+        setActionNotice(`${data.message || "Action completed."} Reset link copied to clipboard.`);
+      } else if (data.resetUrl) {
+        setLastResetUrl(data.resetUrl);
+        setActionNotice(`${data.message || "Action completed."} Copy the generated reset link below.`);
+      } else {
+        setActionNotice(data.message || "Action completed.");
+      }
+    } catch (error) {
+      setActionError(error?.message || "Unable to run admin action");
+    } finally {
+      setActionLoading("");
+    }
   };
 
   return (
@@ -366,6 +421,82 @@ export default function AdminDashboardTableClient({ rows }) {
                   <p className="mt-1 break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600">
                     {selectedTenant.id}
                   </p>
+                </div>
+
+                <div className="space-y-2 border-t border-slate-200 pt-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Owner actions</p>
+
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={trialDays}
+                      onChange={(event) => setTrialDays(Number(event.target.value || 30))}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={actionLoading !== ""}
+                      onClick={() => runTenantAction("extend_trial", { days: trialDays }, "extend_trial")}
+                      className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionLoading === "extend_trial" ? "Updating..." : "Extend trial"}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <button
+                      type="button"
+                      disabled={actionLoading !== ""}
+                      onClick={() =>
+                        runTenantAction("set_subscription", { subscribed: true }, "set_subscription_on")
+                      }
+                      className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionLoading === "set_subscription_on" ? "Updating..." : "Set subscribed"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionLoading !== ""}
+                      onClick={() =>
+                        runTenantAction("set_subscription", { subscribed: false }, "set_subscription_off")
+                      }
+                      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionLoading === "set_subscription_off" ? "Updating..." : "Remove subscription"}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={actionLoading !== ""}
+                    onClick={() => runTenantAction("password_reset_link", {}, "password_reset_link")}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {actionLoading === "password_reset_link"
+                      ? "Generating..."
+                      : "Generate password reset link"}
+                  </button>
+
+                  {actionError ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                      {actionError}
+                    </div>
+                  ) : null}
+
+                  {actionNotice ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                      {actionNotice}
+                    </div>
+                  ) : null}
+
+                  {lastResetUrl ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                      <p className="font-semibold text-slate-800">Generated reset link</p>
+                      <p className="mt-1 break-all">{lastResetUrl}</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

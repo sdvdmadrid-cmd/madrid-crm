@@ -28,6 +28,7 @@ export function getTenantContext(request) {
       userId: session.userId || "system",
       email: session.email || null,
       name: session.name || "",
+      companyName: session.companyName || "",
       businessType: session.businessType || session.industry || "",
       isSubscribed: session.isSubscribed === true,
       trialEndDate: session.trialEndDate || null,

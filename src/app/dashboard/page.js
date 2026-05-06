@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
@@ -71,6 +72,7 @@ function PlusIcon() {
 
 export default function RevenueDashboardPage() {
   const { t } = useTranslation();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
   const [metrics, setMetrics] = useState(null);
@@ -107,6 +109,11 @@ export default function RevenueDashboardPage() {
 
       if (sessionResult.status === "fulfilled" && sessionResult.value.ok) {
         const sessionPayload = await sessionResult.value.json().catch(() => null);
+        const sessionRole = String(sessionPayload?.data?.role || "").toLowerCase();
+        if (sessionRole === "super_admin") {
+          router.replace("/admin");
+          return;
+        }
         setUserName(String(sessionPayload?.data?.name || "").trim());
       }
 
@@ -140,7 +147,7 @@ export default function RevenueDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const activeJobs = metrics?.jobs?.active ?? 0;
   const pendingEstimates = metrics?.estimateRequests?.newCount ?? 0;

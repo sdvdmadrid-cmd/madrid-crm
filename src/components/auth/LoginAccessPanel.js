@@ -22,9 +22,9 @@ function cardAlertStyles(kind) {
   }
 
   return {
-    color: "#166534",
-    background: "#f0fdf4",
-    border: "1px solid #bbf7d0",
+    color: "#1e3a8a",
+    background: "#eff6ff",
+    border: "1px solid #bfdbfe",
   };
 }
 
@@ -65,7 +65,7 @@ export default function LoginAccessPanel({
 
   const sidebarStyle = {
     background:
-      "linear-gradient(180deg, #0f172a 0%, #16243b 45%, #1b4332 100%)",
+      "linear-gradient(180deg, #0f172a 0%, #16243b 45%, #0b1f4f 100%)",
     color: "#f8fafc",
     padding: "36px 28px",
     display: "flex",
@@ -79,7 +79,7 @@ export default function LoginAccessPanel({
     placeItems: "center",
     padding: "24px 20px",
     background:
-      "radial-gradient(circle at top right, rgba(22,163,74,0.12), transparent 28%), #f4f5f7",
+      "radial-gradient(circle at top right, rgba(29,78,216,0.12), transparent 28%), #f4f5f7",
   };
 
   const cardStyle = {
@@ -120,13 +120,13 @@ export default function LoginAccessPanel({
     padding: "14px 18px",
     minHeight: 48,
     borderRadius: 12,
-    border: "1px solid #16a34a",
-    background: submitting ? "#86efac" : "#16a34a",
+    border: "1px solid #1d4ed8",
+    background: submitting ? "#93c5fd" : "#1d4ed8",
     color: "#fff",
     fontSize: 15,
     fontWeight: 700,
     cursor: submitting ? "not-allowed" : "pointer",
-    boxShadow: "0 10px 24px rgba(22, 163, 74, 0.18)",
+    boxShadow: "0 10px 24px rgba(29, 78, 216, 0.24)",
   };
 
   const secondaryButtonStyle = {
@@ -146,15 +146,15 @@ export default function LoginAccessPanel({
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    color: shouldHighlightForgotPassword ? "#166534" : "#15803d",
+    color: shouldHighlightForgotPassword ? "#1e40af" : "#1d4ed8",
     textDecoration: "none",
     fontSize: 13,
     fontWeight: shouldHighlightForgotPassword ? 800 : 700,
     padding: shouldHighlightForgotPassword ? "10px 12px" : "0",
     borderRadius: 10,
-    background: shouldHighlightForgotPassword ? "#f0fdf4" : "transparent",
+    background: shouldHighlightForgotPassword ? "#eff6ff" : "transparent",
     border: shouldHighlightForgotPassword
-      ? "1px solid #bbf7d0"
+      ? "1px solid #bfdbfe"
       : "1px solid transparent",
     justifySelf: "start",
     cursor: "pointer",
@@ -285,7 +285,7 @@ export default function LoginAccessPanel({
               fontWeight: 700,
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: "#86efac",
+              color: "#93c5fd",
             }}
           >
             Security
@@ -323,8 +323,8 @@ export default function LoginAccessPanel({
                 width: "fit-content",
                 padding: "8px 12px",
                 borderRadius: 999,
-                background: "#f0fdf4",
-                color: "#166534",
+                background: "#eff6ff",
+                color: "#1e40af",
                 fontSize: 12,
                 fontWeight: 700,
               }}
@@ -738,9 +738,9 @@ export default function LoginAccessPanel({
                     padding: 14,
                     borderRadius: 14,
                     border: passwordStrong
-                      ? "1px solid #bbf7d0"
+                      ? "1px solid #bfdbfe"
                       : "1px solid #e5e7eb",
-                    background: passwordStrong ? "#f0fdf4" : "#f8fafc",
+                    background: passwordStrong ? "#eff6ff" : "#f8fafc",
                     display: "grid",
                     gap: 8,
                   }}
@@ -761,7 +761,7 @@ export default function LoginAccessPanel({
                       key={rule.label}
                       style={{
                         fontSize: 13,
-                        color: rule.ok ? "#166534" : "#64748b",
+                        color: rule.ok ? "#1e40af" : "#64748b",
                         fontWeight: rule.ok ? 700 : 500,
                       }}
                     >
@@ -870,6 +870,26 @@ export default function LoginAccessPanel({
             flex-shrink: 0;
           }
 
+          .cf-logo-bar {
+            position: absolute;
+            left: 8px;
+            top: 11px;
+            width: 20px;
+            height: 7px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%);
+          }
+
+          .cf-logo-dot {
+            position: absolute;
+            right: 8px;
+            bottom: 8px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #f59e0b;
+          }
+
           @media (max-width: 768px) {
             .cf-access-shell {
               min-height: 100dvh;
@@ -949,25 +969,6 @@ export default function LoginAccessPanel({
             }
 
             .cf-logo-bar {
-              position: absolute;
-              left: 8px;
-              top: 11px;
-              width: 20px;
-              height: 7px;
-              border-radius: 999px;
-              background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%);
-            }
-
-            .cf-logo-dot {
-              position: absolute;
-              right: 8px;
-              bottom: 8px;
-              width: 7px;
-              height: 7px;
-              border-radius: 50%;
-              background: #f59e0b;
-            }
-
             .cf-access-mobile-brand-text {
               font-size: 15px;
               font-weight: 800;

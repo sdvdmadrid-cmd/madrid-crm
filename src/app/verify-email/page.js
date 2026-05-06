@@ -1,22 +1,49 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { supabase } from "@/lib/supabase";
 import "@/i18n";
+
+const AUTH_DEBUG =
+  process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+
+function maskToken(value) {
+  const raw = String(value || "");
+  if (!raw) return null;
+  if (raw.length <= 12) return `${raw.slice(0, 2)}***${raw.slice(-2)}`;
+  return `${raw.slice(0, 6)}...${raw.slice(-6)}`;
+}
 
 const ERROR_KEYS = {
   expired_token: "auth.verificationExpired",
   invalid_token: "auth.verificationInvalid",
   missing_token: "auth.verificationMissing",
+  missing_code: "auth.verificationMissing",
+  exchange_failed: "auth.verificationFailed",
+  email_not_confirmed: "auth.verificationInvalid",
 };
 
-export default function VerifyEmailPage() {
+function hasVerificationParams(params) {
+  return Boolean(
+    params.get("code") ||
+      params.get("token_hash") ||
+      params.get("token") ||
+      params.get("access_token") ||
+      params.get("refresh_token"),
+  );
+}
+
+function VerifyEmailContent() {
   const { t } = useTranslation();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
-  const errorParam = searchParams.get("error");
+  const token = (searchParams.get("token") || "").trim();
+  const tokenHash = (searchParams.get("token_hash") || "").trim();
+  const code = (searchParams.get("code") || "").trim();
+  const type = (searchParams.get("type") || "").trim();
+  const errorParam = (searchParams.get("error") || searchParams.get("auth_error") || "").trim();
 
   const [state, setState] = useState("idle"); // idle | verifying | success | error
   const [errorMessage, setErrorMessage] = useState("");
@@ -25,19 +52,130 @@ export default function VerifyEmailPage() {
   const [resendDone, setResendDone] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (AUTH_DEBUG) {
+      console.info("[verify-email] mount", {
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      });
+    }
+
+    const hash = String(window.location.hash || "").replace(/^#/, "").trim();
+    if (!hash) return;
+
+    const hashParams = new URLSearchParams(hash);
+    if (!hasVerificationParams(hashParams)) return;
+
+    setState("verifying");
+    const callbackParams = new URLSearchParams(hashParams.toString());
+    if (AUTH_DEBUG) {
+      console.info("[verify-email] hash params -> callback redirect", {
+        pathname: window.location.pathname,
+        redirectTo: `/auth/callback?${callbackParams.toString()}`,
+      });
+    }
+    window.location.replace(`/auth/callback?${callbackParams.toString()}`);
+  }, []);
+
+  useEffect(() => {
+    if (errorParam) return;
+    if (hasVerificationParams(searchParams)) return;
+
+    let cancelled = false;
+
+    const resumeFromExistingSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (AUTH_DEBUG) {
+          console.info("[verify-email] getSession", {
+            pathname: window.location.pathname,
+            hasSession: Boolean(session),
+            userId: session?.user?.id || null,
+            accessToken: maskToken(session?.access_token),
+            refreshToken: maskToken(session?.refresh_token),
+          });
+        }
+
+        const user = session?.user || null;
+        if (!user?.email_confirmed_at) {
+          if (AUTH_DEBUG) {
+            console.info("[verify-email] session user not confirmed, staying idle", {
+              userId: user?.id || null,
+            });
+          }
+          return;
+        }
+
+        if (cancelled) return;
+        setState("verifying");
+
+        await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ trigger: "verify-email-idle-resume" }),
+        });
+
+        if (cancelled) return;
+        if (AUTH_DEBUG) {
+          console.info("[verify-email] idle resume -> redirect", {
+            pathname: window.location.pathname,
+            redirectTo: "/dashboard",
+          });
+        }
+        window.location.replace("/dashboard");
+      } catch {
+        // Keep idle view when no resumable session exists.
+      }
+    };
+
+    resumeFromExistingSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [errorParam, searchParams]);
+
+  useEffect(() => {
     if (errorParam) {
+      if (AUTH_DEBUG) {
+        console.info("[verify-email] auth error param", {
+          pathname:
+            typeof window !== "undefined" ? window.location.pathname : "/verify-email",
+          errorParam,
+        });
+      }
       setState("error");
       setErrorMessage(t(ERROR_KEYS[errorParam] || "auth.verificationFailed"));
       return;
     }
-    if (token) {
+
+    if (hasVerificationParams(searchParams)) {
       setState("verifying");
-      // Route through the app router so verification transitions do not force
-      // a hard browser navigation.
-      router.replace(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
+      // Supabase verification flow: exchange code/token_hash into a real session.
+      const params = new URLSearchParams(searchParams.toString());
+      if (token && !params.get("token_hash")) {
+        params.set("token_hash", token);
+        params.delete("token");
+      }
+      if (AUTH_DEBUG && typeof window !== "undefined") {
+        console.info("[verify-email] query params -> callback redirect", {
+          pathname: window.location.pathname,
+          hasCode: Boolean(params.get("code")),
+          hasTokenHash: Boolean(params.get("token_hash")),
+          hasAccessToken: Boolean(params.get("access_token")),
+          hasRefreshToken: Boolean(params.get("refresh_token")),
+          redirectTo: `/auth/callback?${params.toString()}`,
+        });
+      }
+      window.location.replace(`/auth/callback?${params.toString()}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errorParam, router, t, token]);
+  }, [code, errorParam, searchParams, t, token, tokenHash, type]);
 
   const handleResend = async () => {
     if (!resendEmail || resending) return;
@@ -186,7 +324,6 @@ export default function VerifyEmailPage() {
       </div>
     );
   }
-
   if (state === "error") {
     return (
       <div style={containerStyle}>
@@ -313,4 +450,12 @@ export default function VerifyEmailPage() {
   }
 
   return null;
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
 }

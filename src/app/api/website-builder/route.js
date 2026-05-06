@@ -10,13 +10,68 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const WEBSITE_TABLE = "contractor_websites";
 
-function getPublicWebsiteUrl(slug) {
-  const domain = (process.env.NEXT_PUBLIC_SITE_DOMAIN || "FieldBase.com")
+const DEFAULT_THEME_COLOR = "#1d4ed8";
+
+function buildDefaultWebsiteContent(companyProfile) {
+  const companyName = String(companyProfile?.companyName || "FieldBase").trim() || "FieldBase";
+
+  return {
+    headline: "Win more jobs. Get paid faster. Stay in control.",
+    subheadline:
+      "All-in-one platform for contractors, from first estimate to final payment, powered by AI and synced with Google Calendar.",
+    aboutText:
+      `${companyName} helps service businesses run smarter with AI estimates, calendar scheduling, automated follow-ups, and faster payments in one workspace.`,
+    ctaText: "Start Free - 30 Days",
+    themeColor: DEFAULT_THEME_COLOR,
+    services: [
+      {
+        name: "AI-Powered Estimates",
+        description: "Generate professional estimates in seconds from job details.",
+        price: "Included",
+      },
+      {
+        name: "Google Calendar + Weather",
+        description: "Schedule crews with live weather context to avoid costly delays.",
+        price: "Included",
+      },
+      {
+        name: "Branded Quotes",
+        description: "Send polished quotes clients can review and approve quickly.",
+        price: "Included",
+      },
+      {
+        name: "Fast Invoicing + Payments",
+        description: "Invoice on-site and collect payments without waiting days.",
+        price: "Included",
+      },
+      {
+        name: "Automated Follow-Ups",
+        description: "Keep leads warm and invoices moving with automatic reminders.",
+        price: "Included",
+      },
+      {
+        name: "Client CRM Timeline",
+        description: "Track quotes, jobs, notes, and invoices in one client view.",
+        price: "Included",
+      },
+    ],
+  };
+}
+
+function getPublicWebsiteUrl(slug, request) {
+  const domain = (process.env.NEXT_PUBLIC_SITE_DOMAIN || "")
     .trim()
     .replace(/^https?:\/\//i, "")
     .replace(/\/$/, "");
+
   if (!slug) return "";
-  return `https://${slug}.${domain}`;
+
+  if (domain) {
+    return `https://${slug}.${domain}`;
+  }
+
+  const origin = new URL(request.url).origin;
+  return `${origin}/site/${slug}`;
 }
 
 function generateSlug(companyName) {
@@ -72,27 +127,24 @@ export async function GET(request) {
 
   const row = await findOrCreateWebsite(access.tenantDbId, profile);
   const industryProfile = getIndustryProfile(profile.businessType || "");
+  const defaults = buildDefaultWebsiteContent(profile);
   const effectiveServices =
     Array.isArray(row.services) && row.services.length > 0
       ? row.services
-      : industryProfile.websiteServices.map((name) => ({
-          name,
-          description: "",
-          price: "",
-        }));
+      : defaults.services;
 
   return Response.json({
     success: true,
     data: {
       id: row.id,
       slug: row.slug,
-      publicUrl: getPublicWebsiteUrl(row.slug),
+      publicUrl: getPublicWebsiteUrl(row.slug, request),
       websitePath: `/site/${row.slug}`,
-      headline: row.headline || "",
-      subheadline: row.subheadline || "",
-      aboutText: row.about_text || "",
-      ctaText: row.cta_text || "",
-      themeColor: row.theme_color || "#16a34a",
+      headline: row.headline || defaults.headline,
+      subheadline: row.subheadline || defaults.subheadline,
+      aboutText: row.about_text || defaults.aboutText,
+      ctaText: row.cta_text || defaults.ctaText,
+      themeColor: row.theme_color || defaults.themeColor,
       services: effectiveServices,
       published: row.published === true,
       industry: industryProfile.key,
@@ -103,7 +155,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  try {
   const access = await getAuthenticatedTenantContext(request);
+  console.log("[api/website-builder][POST] access", { authenticated: access.authenticated, role: access.role, tenantDbId: access.tenantDbId });
   if (!access.authenticated) return unauthenticatedResponse();
   if (!canWrite(access.role)) return forbiddenResponse();
 
@@ -145,18 +199,22 @@ export async function POST(request) {
     return Response.json({ success: false, error: "Unable to save website" }, { status: 500 });
   }
 
-  return Response.json({
-    success: true,
-    data: {
-      id: data.id,
-      slug: data.slug,
-      headline: data.headline || "",
-      subheadline: data.subheadline || "",
-      aboutText: data.about_text || "",
-      ctaText: data.cta_text || "",
-      themeColor: data.theme_color || "#16a34a",
-      services: Array.isArray(data.services) ? data.services : [],
-      published: data.published === true,
-    },
-  });
+    return Response.json({
+      success: true,
+      data: {
+        id: data.id,
+        slug: data.slug,
+        headline: data.headline || "",
+        subheadline: data.subheadline || "",
+        aboutText: data.about_text || "",
+        ctaText: data.cta_text || "",
+        themeColor: data.theme_color || "#16a34a",
+        services: Array.isArray(data.services) ? data.services : [],
+        published: data.published === true,
+      },
+    });
+  } catch (err) {
+    console.error("[api/website-builder][POST] unhandled error", err);
+    return Response.json({ success: false, error: err?.message || "Unexpected server error" }, { status: 500 });
+  }
 }

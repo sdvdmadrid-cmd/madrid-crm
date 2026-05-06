@@ -1,11 +1,14 @@
 ﻿import "server-only";
 import crypto from "node:crypto";
 import { getSenderAddress, isTestEmailDomain } from "@/lib/production-config";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || "mock").toLowerCase();
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "mock")
+  .trim()
+  .toLowerCase();
 const EMAIL_FROM =
-  process.env.EMAIL_FROM || "FieldBase <no-reply@example.com>";
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+  String(process.env.EMAIL_FROM || "FieldBase <no-reply@example.com>").trim();
+const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
 const RESEND_TIMEOUT_MS = Number(process.env.RESEND_TIMEOUT_MS || 4000);
 const EMAIL_WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET || "";
 const ALLOW_INSECURE_DEV_WEBHOOKS =
@@ -156,6 +159,57 @@ export async function sendEmail({ to, subject, html, text, metadata }) {
     provider: EMAIL_PROVIDER,
     error: `Unsupported email provider: ${EMAIL_PROVIDER}`,
   };
+}
+
+export async function logEmailAttempt({
+  tenantId,
+  userId = null,
+  createdBy = null,
+  recipient,
+  provider,
+  providerMessageId = null,
+  success,
+  error = null,
+  eventType,
+  campaignId = null,
+  invoiceId = null,
+  invoiceNumber = null,
+}) {
+  const normalizedTenantId = String(tenantId || "").trim();
+  const normalizedRecipient = String(recipient || "").trim().toLowerCase();
+  const normalizedEventType = String(eventType || "").trim().toLowerCase();
+
+  if (!normalizedTenantId || !normalizedRecipient || !normalizedEventType) {
+    return;
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error: logError } = await supabaseAdmin.from("email_logs").insert({
+    tenant_id: normalizedTenantId,
+    user_id: userId || null,
+    created_by: createdBy || null,
+    campaign_id: campaignId,
+    invoice_id: invoiceId,
+    invoice_number: invoiceNumber,
+    recipient: normalizedRecipient,
+    provider: provider || EMAIL_PROVIDER || "unknown",
+    provider_message_id: providerMessageId || null,
+    status: success ? "sent" : "failed",
+    error: error || null,
+    event_type: normalizedEventType,
+    created_at: nowIso,
+    updated_at: nowIso,
+  });
+
+  if (logError) {
+    console.error("[email] failed to insert email log", {
+      tenantId: normalizedTenantId,
+      recipient: normalizedRecipient,
+      eventType: normalizedEventType,
+      provider: provider || EMAIL_PROVIDER || "unknown",
+      error: logError.message,
+    });
+  }
 }
 
 export function isWebhookAuthorized(request) {

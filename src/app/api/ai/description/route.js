@@ -4,6 +4,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 
 const SYSTEM_PROMPT =
   "You are a professional contractor assistant. " +
@@ -12,6 +13,14 @@ const SYSTEM_PROMPT =
 
 export async function POST(request) {
   try {
+    const descriptionEnabled = await isPlatformFeatureEnabled("feature_ai_description", true);
+    if (!descriptionEnabled) {
+      return new Response(
+        JSON.stringify({ success: false, error: "AI description generation is disabled by feature flag" }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const { role, authenticated } = await getAuthenticatedTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();

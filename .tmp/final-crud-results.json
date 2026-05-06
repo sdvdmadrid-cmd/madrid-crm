@@ -6,7 +6,7 @@
       "action": "READ",
       "success": true,
       "status": 200,
-      "body": "{\"success\":true,\"data\":{\"userId\":\"11111111-1111-1111-1111-111111111111\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"tenantDbId\":\"11111111-1111-1111-1111-111111111111\",\"email\":\"checkpoint-admin@contractorflow.local\",\"name\":\"Checkpoint Admin\",\"role\":\"admin\",\"capabilities\":{\"role\":\"admin\",\"isSuperAdmin\":false,\"isAdmin\":true,\"isWorker\":false,\"canReadTenantData\":true,\"canWriteOperationalData\":true,\"canDeleteRecords\":true,\"canManageSensitiveData\":true,\"canSendExternalCommunications\":true},\"businessType\":\"\",\"industry\":\"\",\"isSubscribed\":true,\"trialEndDate\":null}}"
+      "body": "{\"success\":true,\"data\":{\"userId\":\"11111111-1111-1111-1111-111111111111\",\"tenantId\":\"11111111-1111-1111-1111-111111111111\",\"tenantDbId\":\"11111111-1111-1111-1111-111111111111\",\"email\":\"checkpoint-admin@fieldbase.local\",\"name\":\"Checkpoint Admin\",\"role\":\"admin\",\"capabilities\":{\"role\":\"admin\",\"isSuperAdmin\":false,\"isAdmin\":true,\"isWorker\":false,\"canReadTenantData\":true,\"canWriteOperationalData\":true,\"canDeleteRecords\":true,\"canManageSensitiveData\":true,\"canSendExternalCommunications\":true},\"businessType\":\"\",\"industry\":\"\",\"isSubscribed\":true,\"trialEndDate\":null}}"
     },
     {
       "module": "Clients",

@@ -1,97 +1,32 @@
-import { buildSessionCookie, createSessionToken } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-import {
-  buildAppSessionFromSupabaseUser,
-  createSupabaseServerAuthClient,
-  getRequestOrigin,
-  normalizeAuthUser,
-  resolveProfileForUser,
-} from "@/lib/supabase-auth";
+import { NextResponse } from "next/server";
+import { getRequestOrigin } from "@/lib/supabase-auth";
 
 export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const token = (searchParams.get("token") || "").trim();
+  const url = new URL(request.url);
+  const origin = getRequestOrigin(request) || url.origin;
 
-    const origin = getRequestOrigin(request);
-    if (!origin) {
-      throw new Error("APP_URL must be configured for verification redirects");
-    }
+  const token = String(url.searchParams.get("token") || "").trim();
+  const tokenHash = String(url.searchParams.get("token_hash") || "").trim();
+  const code = String(url.searchParams.get("code") || "").trim();
+  const type = String(url.searchParams.get("type") || "").trim();
 
-    if (!token) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${origin}/verify-email?error=missing_token` },
-      });
-    }
+  const callbackUrl = new URL("/auth/callback", origin);
 
-    const authClient = createSupabaseServerAuthClient();
-    const { data, error } = await authClient.auth.verifyOtp({
-      token_hash: token,
-      type: "signup",
-    });
-
-    if (error || !data?.user) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `${origin}/verify-email?error=invalid_token` },
-      });
-    }
-
-    const now = new Date();
-    const normalized = normalizeAuthUser(data.user);
-    const hasTrial = Boolean(normalized.userMetadata.trialEndDate);
-    const trialStartDate = hasTrial
-      ? normalized.userMetadata.trialStartDate || now.toISOString()
-      : now.toISOString();
-    const trialEndDate = hasTrial
-      ? normalized.userMetadata.trialEndDate
-      : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-    const nextUserMetadata = {
-      ...normalized.userMetadata,
-      status: "active",
-      trialStartDate,
-      trialEndDate,
-    };
-
-    const { data: updatedUserData, error: updateError } =
-      await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
-        user_metadata: nextUserMetadata,
-      });
-
-    if (updateError) {
-      throw new Error(updateError.message);
-    }
-
-    const verifiedUser = updatedUserData.user || data.user;
-    const profile = await resolveProfileForUser(verifiedUser, {
-      tenantId: verifiedUser.id,
-      role: verifiedUser.app_metadata?.role,
-    });
-
-    const sessionUser = buildAppSessionFromSupabaseUser(
-      verifiedUser,
-      data.session,
-      profile,
-    );
-
-    const sessionToken = createSessionToken(sessionUser);
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: origin,
-        "Set-Cookie": buildSessionCookie(sessionToken),
-      },
-    });
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+  if (code) {
+    callbackUrl.searchParams.set("code", code);
   }
+
+  const normalizedTokenHash = tokenHash || token;
+  if (normalizedTokenHash) {
+    callbackUrl.searchParams.set("token_hash", normalizedTokenHash);
+    if (type) {
+      callbackUrl.searchParams.set("type", type);
+    }
+  }
+
+  if (!code && !normalizedTokenHash) {
+    return NextResponse.redirect(new URL("/verify-email?auth_error=missing_token", origin));
+  }
+
+  return NextResponse.redirect(callbackUrl);
 }

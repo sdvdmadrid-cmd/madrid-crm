@@ -1,4 +1,5 @@
 import { generateInvoiceAssistant } from "@/lib/document-ai";
+import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import {
   canWrite,
   forbiddenResponse,
@@ -8,6 +9,17 @@ import {
 
 export async function POST(request) {
   try {
+    const invoiceAiEnabled = await isPlatformFeatureEnabled("feature_ai_invoice_assistant", true);
+    if (!invoiceAiEnabled) {
+      return new Response(
+        JSON.stringify({ success: false, error: "AI invoice assistant is disabled by feature flag" }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const { role, authenticated } = await getAuthenticatedTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();

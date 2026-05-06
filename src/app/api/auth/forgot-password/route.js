@@ -17,7 +17,7 @@ const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "resend")
   .toLowerCase();
 const EMAIL_FROM = String(process.env.EMAIL_FROM || "").trim();
 const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
-const SUPER_ADMIN_EMAIL = String(process.env.SUPER_ADMIN_EMAIL || "sdvdmadrid@gmail.com")
+const SUPER_ADMIN_EMAIL = String(process.env.SUPER_ADMIN_EMAIL || "")
   .trim()
   .toLowerCase();
 

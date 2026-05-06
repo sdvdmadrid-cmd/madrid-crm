@@ -7,7 +7,9 @@ create table if not exists public.auth_rate_limits (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-alter table public.auth_rate_limits disable row level security;
+-- RLS enabled: this table is server-only (service_role bypasses RLS).
+-- No policies are defined, so anon and authenticated users have zero access.
+alter table public.auth_rate_limits enable row level security;
 
 create index if not exists auth_rate_limits_blocked_until_idx
   on public.auth_rate_limits (blocked_until);

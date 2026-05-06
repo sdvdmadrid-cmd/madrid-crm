@@ -82,6 +82,7 @@
 ## 7) Security gate (must pass)
 
 - [ ] Verify unauthenticated access to protected pages redirects to `/login`.
+- [ ] Verify Supabase Auth Redirect URL includes exactly `https://fieldbaseapp.net/auth/callback` (no localhost or variant domains).
 - [ ] Verify tenant/user isolation with A/B test: user B cannot view or edit user A data.
 - [ ] Verify input sanitization blocks unsafe payloads (for example `<script>`, `javascript:`, SQL-like injection strings).
 - [ ] Verify protected APIs return 401/403 as expected when auth is missing or role is insufficient.

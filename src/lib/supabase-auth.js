@@ -97,6 +97,7 @@ export function buildAppSessionFromSupabaseUser(
     tenantDbId: normalized.tenantDbId,
     email: normalized.email,
     name: normalized.name,
+    companyName: normalized.companyName || "",
     role: normalized.role,
     businessType: normalized.businessType,
     industry: normalized.businessType,
@@ -190,9 +191,13 @@ export function getRequestOrigin(request) {
 
   if (configuredOrigin) {
     if (isProduction && isLocalOrigin(configuredOrigin)) {
+      // In production, never use a localhost URL
       console.error(
         "[supabase-auth] Ignoring localhost APP_URL/APP_BASE_URL in production",
       );
+    } else if (!isProduction && !isLocalOrigin(configuredOrigin)) {
+      // In development, ignore a production URL — use the actual request origin instead
+      // so verification links point to localhost, not the production server.
     } else {
       return configuredOrigin;
     }
@@ -217,9 +222,12 @@ export function getRequestOrigin(request) {
 
 function buildOriginCandidates(origin) {
   const candidates = [];
+  const isProduction = process.env.NODE_ENV === "production";
   const push = (value) => {
     const normalized = normalizeOrigin(value);
     if (!normalized) return;
+    // In development, skip production (non-local) URLs so links point to localhost
+    if (!isProduction && !isLocalOrigin(normalized)) return;
     if (!candidates.includes(normalized)) {
       candidates.push(normalized);
     }
@@ -232,40 +240,32 @@ function buildOriginCandidates(origin) {
   return candidates;
 }
 
-export async function generateSignupVerificationLink({ email, origin }) {
-  const errors = [];
-  const candidates = buildOriginCandidates(origin);
-
-  for (const candidate of candidates) {
-    const redirectTo = `${candidate}/verify-email`;
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "signup",
-      email,
-      options: { redirectTo },
-    });
-
-    if (error) {
-      errors.push(`redirect=${redirectTo} error=${error.message || "unknown"}`);
-      continue;
-    }
-
-    const tokenHash = data?.properties?.hashed_token;
-    if (!tokenHash) {
-      errors.push(
-        `redirect=${redirectTo} error=Supabase did not return a signup verification token`,
-      );
-      continue;
-    }
-
-    return {
-      tokenHash,
-      verifyUrl: `${redirectTo}?token=${tokenHash}`,
-    };
+export function getAuthCallbackUrl(origin) {
+  const productionCallback = "https://fieldbaseapp.net/auth/callback";
+  if (process.env.NODE_ENV === "production") {
+    return productionCallback;
   }
 
-  throw new Error(
-    `Unable to generate signup verification link: ${errors.join(" | ") || "no valid origin candidates"}`,
-  );
+  const candidates = buildOriginCandidates(origin);
+  const baseOrigin = candidates[0] || "http://localhost:3000";
+  return `${baseOrigin}/auth/callback`;
+}
+
+export async function generateSignupVerificationLink({ email, origin, userId }) {
+  if (!userId) {
+    throw new Error("userId is required to generate a signed verification token");
+  }
+
+  // Use our own HMAC-signed JWT for email verification.
+  // This bypasses the fragile verifyOtp / token_hash / SSR-cookie flow entirely.
+  // The callback verifies this token, confirms the user via admin API, and builds
+  // the app session directly — no Supabase SSR client involved.
+  const { createEmailConfirmToken } = await import("@/lib/auth");
+  const callbackUrl = getAuthCallbackUrl(origin);
+  const confirmToken = createEmailConfirmToken(userId, email);
+  const verifyUrl = `${callbackUrl}?vt=${encodeURIComponent(confirmToken)}`;
+
+  return { verifyUrl, callbackUrl };
 }
 
 export async function generatePasswordRecoveryLink({ email, origin }) {

@@ -1,4 +1,4 @@
-﻿import { sendEmail } from "@/lib/email";
+﻿import { logEmailAttempt, sendEmail } from "@/lib/email";
 import {
   findAuthUserByEmail,
   generateSignupVerificationLink,
@@ -37,6 +37,7 @@ export async function POST(request) {
     const { verifyUrl } = await generateSignupVerificationLink({
       email,
       origin,
+      userId: user.id,
     });
     const normalized = normalizeAuthUser(user);
 
@@ -46,6 +47,27 @@ export async function POST(request) {
       html: `<p>Hi ${normalized.name || "there"},</p><p>Click the link below to verify your email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 24 hours.</p>`,
       text: `Hi ${normalized.name || "there"},\n\nVerify your account:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
       metadata: { tenantId: normalized.tenantId },
+    });
+
+    await logEmailAttempt({
+      tenantId: normalized.tenantId,
+      userId: normalized.id || null,
+      recipient: email,
+      provider: emailResult?.provider || "unknown",
+      providerMessageId: emailResult?.providerMessageId || null,
+      success: emailResult?.success === true,
+      error: emailResult?.error || null,
+      eventType: "signup_verification_resend",
+    });
+
+    console.info("[api/auth/resend-verification] verification email attempt", {
+      userId: normalized.id || null,
+      tenantId: normalized.tenantId,
+      email,
+      provider: emailResult?.provider || "unknown",
+      providerMessageId: emailResult?.providerMessageId || null,
+      success: emailResult?.success === true,
+      error: emailResult?.error || null,
     });
 
     if (!emailResult?.success) {

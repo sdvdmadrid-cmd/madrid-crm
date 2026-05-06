@@ -4,10 +4,27 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { getIndustryProfile } from "@/lib/industry-profiles";
 
 export async function POST(request) {
+  const websiteBuilderEnabled = await isPlatformFeatureEnabled("feature_website_builder", true);
+  if (!websiteBuilderEnabled) {
+    return Response.json(
+      { success: false, error: "Website Builder is currently disabled by feature flag." },
+      { status: 403 },
+    );
+  }
+
+  const aiDescriptionEnabled = await isPlatformFeatureEnabled("feature_ai_description", true);
+  if (!aiDescriptionEnabled) {
+    return Response.json(
+      { success: false, error: "AI description generation is disabled by feature flag." },
+      { status: 403 },
+    );
+  }
+
   const access = await getAuthenticatedTenantContext(request);
   if (!access.authenticated) return unauthenticatedResponse();
   if (!canWrite(access.role)) return forbiddenResponse();

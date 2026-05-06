@@ -465,6 +465,7 @@
     "verificationInvalid": "Ese enlace de verificacion no es valido. Solicita uno nuevo.",
     "verificationMissing": "No se encontro el token de verificacion. Solicita un nuevo enlace.",
     "verificationFailed": "Error de verificacion. Solicita un nuevo enlace.",
+      "emailVerifiedPleaseLogin": "Email verificado! Inicia sesion para continuar.",
     "verificationSentNew": "Nuevo enlace de verificacion enviado. Revisa tu inbox.",
     "checkInboxLink": "Revisa tu inbox y haz clic en el enlace de verificacion.",
     "verificationDeliveryIssue": "No pudimos entregar el email de verificacion en este momento. Intenta mas tarde.",

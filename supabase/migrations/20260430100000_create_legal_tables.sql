@@ -65,7 +65,7 @@ begin
     select
       'default',
       'v1.0-April-2026',
-      'ContractorFlow Legal & Compliance Terms v1.0 — April 30, 2026. Full content available at /legal.',
+      'FieldBase Legal & Compliance Terms v1.0 — April 30, 2026. Full content available at /legal.',
       true
     where not exists (
       select 1
@@ -77,7 +77,7 @@ begin
     insert into public.legal_versions (version_name, content_snapshot, is_current)
     select
       'v1.0-April-2026',
-      'ContractorFlow Legal & Compliance Terms v1.0 — April 30, 2026. Full content available at /legal.',
+      'FieldBase Legal & Compliance Terms v1.0 — April 30, 2026. Full content available at /legal.',
       true
     where not exists (
       select 1

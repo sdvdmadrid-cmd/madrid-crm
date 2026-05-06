@@ -6,8 +6,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import LoginAccessPanel from "@/components/auth/LoginAccessPanel";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
+
+const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+
+function maskToken(value) {
+  const raw = String(value || "");
+  if (!raw) return null;
+  if (raw.length <= 12) return `${raw.slice(0, 2)}***${raw.slice(-2)}`;
+  return `${raw.slice(0, 6)}...${raw.slice(-6)}`;
+}
 
 const initialLogin = {
   email: "",
@@ -29,12 +39,6 @@ const initialRegister = {
   password: "",
   industry: "landscaping_hardscaping",
 };
-
-const FEEDBACK_TYPE_OPTIONS = [
-  { value: "suggestion" },
-  { value: "issue" },
-  { value: "improvement" },
-];
 
 function tenantLabel(value) {
   const normalized = String(value || "")
@@ -61,6 +65,7 @@ export default function AuthShell({ children }) {
   const pathname = usePathname();
   const isDedicatedLoginPage = pathname === "/login";
   const isResetPasswordPage = pathname === "/reset-password";
+  const isVerifyEmailPage = pathname === "/verify-email";
   const [trialExpiredParam, setTrialExpiredParam] = useState(false);
   const [loginFailedAttempts, setLoginFailedAttempts] = useState(0);
 
@@ -108,8 +113,14 @@ export default function AuthShell({ children }) {
   const isPublicSitePage = pathname?.startsWith("/site/");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";
-  const isPublicPage = isPublicQuotePage || isPublicSitePage || isPublicLegalPage || isMarketingHomePage;
+  const isPublicPage =
+    isPublicQuotePage ||
+    isPublicSitePage ||
+    isPublicLegalPage ||
+    isMarketingHomePage ||
+    isVerifyEmailPage;
   const [loading, setLoading] = useState(!isPublicPage);
+  const [authHydrating, setAuthHydrating] = useState(!isPublicPage);
   const authBootstrappedRef = useRef(false);
   const [authUser, setAuthUser] = useState(null);
   const [error, setError] = useState("");
@@ -122,15 +133,227 @@ export default function AuthShell({ children }) {
   const [resetPasswordForm, setResetPasswordForm] =
     useState(initialResetPassword);
   const [submitting, setSubmitting] = useState(false);
-  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [feedbackType, setFeedbackType] = useState("suggestion");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [feedbackScreenshotDataUrl, setFeedbackScreenshotDataUrl] =
-    useState("");
-  const [feedbackScreenshotName, setFeedbackScreenshotName] = useState("");
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [feedbackError, setFeedbackError] = useState("");
-  const [feedbackNotice, setFeedbackNotice] = useState("");
+  const [platformFlags, setPlatformFlags] = useState({
+    featureWebsiteBuilder: true,
+    featureEstimateBuilder: true,
+    featureAiDescription: true,
+    featureAiInvoiceAssistant: true,
+    featureAdminAiAssistant: true,
+  });
+
+  useEffect(() => {
+    if (isPublicPage) return;
+
+    let cancelled = false;
+
+    const loadFlags = async () => {
+      try {
+        const res = await apiFetch("/api/feature-flags", { suppressUnauthorizedEvent: true });
+        if (!res.ok) return;
+        const payload = await res.json().catch(() => null);
+        if (!payload?.success || !payload?.data || cancelled) return;
+        setPlatformFlags((prev) => ({ ...prev, ...payload.data }));
+      } catch {
+        // Non-blocking: keep defaults when flags endpoint is unavailable.
+      }
+    };
+
+    loadFlags();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPublicPage]);
+
+  useEffect(() => {
+    if (isPublicPage) {
+      setAuthHydrating(false);
+      return;
+    }
+
+    setAuthHydrating(true);
+
+    // Listen for Supabase browser-side SIGNED_IN events (password login, token refresh).
+    // Only sync when Supabase has an ACTIVE session — never call sync with null to
+    // avoid any chance of wiping the app cookie set by the server callback.
+    const syncServerSession = async (trigger, event, session) => {
+      if (AUTH_DEBUG) {
+        console.info("[auth:onAuthStateChange] event", {
+          pathname,
+          trigger,
+          event,
+          hasSession: Boolean(session),
+          userId: session?.user?.id || null,
+          accessToken: maskToken(session?.access_token),
+          refreshToken: maskToken(session?.refresh_token),
+        });
+      }
+
+      if (!session) {
+        // No Supabase browser session — this is normal after email-verification
+        // callback (session is server-side only). Signal hydration done.
+        setAuthHydrating(false);
+        return;
+      }
+      try {
+        const syncRes = await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ trigger, event, hasSession: true }),
+        });
+        if (AUTH_DEBUG) {
+          console.info("[auth:onAuthStateChange] sync response", {
+            pathname,
+            status: syncRes.status,
+            ok: syncRes.ok,
+          });
+        }
+      } catch (syncError) {
+        console.error("[auth:onAuthStateChange] sync failed", {
+          trigger,
+          event,
+          error: syncError?.message || "unknown_error",
+        });
+      } finally {
+        setAuthHydrating(false);
+      }
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      syncServerSession("listener", event, session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [isPublicPage]);
+
+  useEffect(() => {
+    if (!AUTH_DEBUG) return;
+    if (typeof window === "undefined") return;
+    if (isPublicPage) return;
+
+    const run = async () => {
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+        console.info("[authshell] supabase.getSession", {
+          pathname,
+          hasSession: Boolean(session),
+          userId: session?.user?.id || null,
+          accessToken: maskToken(session?.access_token),
+          refreshToken: maskToken(session?.refresh_token),
+          error: sessionError?.message || null,
+        });
+
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        console.info("[authshell] supabase.getUser", {
+          pathname,
+          hasUser: Boolean(user),
+          userId: user?.id || null,
+          emailConfirmedAt: user?.email_confirmed_at || null,
+          error: userError?.message || null,
+        });
+      } catch (error) {
+        console.warn("[authshell] supabase session debug failed", {
+          pathname,
+          error: error?.message || "unknown_error",
+        });
+      }
+    };
+
+    run();
+  }, [isPublicPage, pathname]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    if (!isDedicatedLoginPage && !isResetPasswordPage) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const redirectParam = (params.get("redirect") || "").trim();
+    const safeRedirect = redirectParam.startsWith("/")
+      ? redirectParam
+      : "/dashboard";
+
+    router.replace(safeRedirect);
+  }, [authUser, isDedicatedLoginPage, isResetPasswordPage, router]);
+
+  const detectMobileViewport = useCallback(() => {
+    if (typeof window === "undefined") return false;
+
+    const candidateWidths = [
+      window.innerWidth,
+      window.visualViewport?.width,
+      document?.documentElement?.clientWidth,
+    ].filter((value) => Number.isFinite(value) && value > 0);
+
+    const viewportWidth =
+      candidateWidths.length > 0 ? Math.min(...candidateWidths) : 1440;
+    const coarsePointer =
+      window.matchMedia?.("(pointer: coarse)")?.matches || false;
+    const touchCapable =
+      coarsePointer ||
+      (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+
+    // Treat phones and touch-first small tablets as mobile navigation mode.
+    return viewportWidth <= 1200 || (touchCapable && viewportWidth <= 1366);
+  }, []);
+
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    detectMobileViewport(),
+  );
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateViewport = () => {
+      setIsMobileViewport(detectMobileViewport());
+    };
+
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    window.addEventListener("orientationchange", updateViewport);
+
+    const mediaQuery = window.matchMedia?.("(max-width: 1200px)");
+    const onMediaChange = () => updateViewport();
+    if (mediaQuery?.addEventListener) {
+      mediaQuery.addEventListener("change", onMediaChange);
+    } else if (mediaQuery?.addListener) {
+      mediaQuery.addListener(onMediaChange);
+    }
+
+    const visualViewport = window.visualViewport;
+    if (visualViewport) {
+      visualViewport.addEventListener("resize", updateViewport);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      window.removeEventListener("orientationchange", updateViewport);
+      if (mediaQuery?.removeEventListener) {
+        mediaQuery.removeEventListener("change", onMediaChange);
+      } else if (mediaQuery?.removeListener) {
+        mediaQuery.removeListener(onMediaChange);
+      }
+      if (visualViewport) {
+        visualViewport.removeEventListener("resize", updateViewport);
+      }
+    };
+  }, [detectMobileViewport]);
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -192,6 +415,22 @@ export default function AuthShell({ children }) {
     }
 
     if (!authError) return;
+    // ?verified=1: session creation failed but email IS confirmed — no loop
+    const verifiedParam = params.get("verified");
+    if (verifiedParam === "1") {
+      setMode("login");
+      setNotice(t("auth.emailVerifiedPleaseLogin") || "✓ Email verified! Please sign in.");
+      setError("");
+      const prefilledEmail = params.get("email") || "";
+      if (prefilledEmail) {
+        setLoginForm((prev) => ({ ...prev, email: prefilledEmail }));
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+
+    if (!authError) return;
+
     const messages = {
       expired_token: t("auth.verificationExpired"),
       invalid_token: t("auth.verificationInvalid"),
@@ -242,16 +481,31 @@ export default function AuthShell({ children }) {
         cache: "no-store",
         suppressUnauthorizedEvent: true,
       });
+      if (AUTH_DEBUG) {
+        console.info("[dashboard-load] /api/auth/me response", {
+          pathname,
+          status: res.status,
+          ok: res.ok,
+        });
+      }
       if (!res.ok) {
         setAuthUser(null);
         return;
       }
       const payload = await res.json();
+      if (AUTH_DEBUG) {
+        console.info("[dashboard-load] /api/auth/me payload", {
+          pathname,
+          hasUser: Boolean(payload?.data?.userId),
+          userId: payload?.data?.userId || null,
+          role: payload?.data?.role || null,
+        });
+      }
       setAuthUser(payload?.data || null);
     } catch {
       setAuthUser(null);
     }
-  }, []);
+  }, [pathname]);
 
   // Persist industry to localStorage so catalog pages can read it without an extra fetch
   useEffect(() => {
@@ -270,16 +524,27 @@ export default function AuthShell({ children }) {
     let mounted = true;
     const run = async () => {
       if (!authBootstrappedRef.current) {
+        console.info("[dashboard-protection] loading auth context", {
+          pathname,
+          loading: true,
+          authHydrating,
+        });
         setLoading(true);
         await fetchMe();
         if (!mounted) return;
         authBootstrappedRef.current = true;
-        setLoading(false);
+        setLoading(authHydrating);
+        console.info("[dashboard-protection] auth context loaded", {
+          pathname,
+          loading: authHydrating,
+        });
         return;
       }
 
       // Keep current UI visible and refresh auth context in the background.
       await fetchMe();
+      if (!mounted) return;
+      setLoading(authHydrating);
     };
 
     run();
@@ -287,7 +552,14 @@ export default function AuthShell({ children }) {
     return () => {
       mounted = false;
     };
-  }, [isPublicPage, fetchMe]);
+  }, [isPublicPage, fetchMe, pathname, authHydrating]);
+
+  useEffect(() => {
+    if (isPublicPage) return;
+    if (!authHydrating && authBootstrappedRef.current) {
+      setLoading(false);
+    }
+  }, [isPublicPage, authHydrating]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -430,93 +702,6 @@ export default function AuthShell({ children }) {
       setError(err.message || t("auth.resendFailed"));
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const resetFeedbackModal = () => {
-    setFeedbackType("suggestion");
-    setFeedbackMessage("");
-    setFeedbackScreenshotDataUrl("");
-    setFeedbackScreenshotName("");
-    setFeedbackError("");
-    setFeedbackSubmitting(false);
-  };
-
-  const openFeedbackModal = () => {
-    resetFeedbackModal();
-    setFeedbackModalOpen(true);
-  };
-
-  const closeFeedbackModal = () => {
-    setFeedbackModalOpen(false);
-    resetFeedbackModal();
-  };
-
-  const handleFeedbackScreenshotChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setFeedbackScreenshotDataUrl("");
-      setFeedbackScreenshotName("");
-      return;
-    }
-
-    if (!file.type.startsWith("image/")) {
-      setFeedbackError(t("feedback.errors.imageOnly"));
-      setFeedbackScreenshotDataUrl("");
-      setFeedbackScreenshotName("");
-      return;
-    }
-
-    if (file.size > 1_500_000) {
-      setFeedbackError(t("feedback.errors.fileSize"));
-      setFeedbackScreenshotDataUrl("");
-      setFeedbackScreenshotName("");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      setFeedbackScreenshotDataUrl(result);
-      setFeedbackScreenshotName(file.name || "screenshot");
-      setFeedbackError("");
-    };
-    reader.onerror = () => {
-      setFeedbackError(t("feedback.errors.fileRead"));
-      setFeedbackScreenshotDataUrl("");
-      setFeedbackScreenshotName("");
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const submitFeedback = async () => {
-    const message = feedbackMessage.trim();
-    if (!message) {
-      setFeedbackError(t("feedback.errors.messageRequired"));
-      return;
-    }
-
-    setFeedbackSubmitting(true);
-    setFeedbackError("");
-    try {
-      const response = await apiFetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: feedbackType,
-          message,
-          screenshotDataUrl: feedbackScreenshotDataUrl || "",
-          currentPage: pathname || "",
-        }),
-      });
-      await getJsonOrThrow(response, t("feedback.errors.submitFailed"));
-      setFeedbackNotice(t("feedback.success"));
-      closeFeedbackModal();
-      window.setTimeout(() => setFeedbackNotice(""), 3500);
-    } catch (err) {
-      setFeedbackError(err.message || t("feedback.errors.submitFailed"));
-    } finally {
-      setFeedbackSubmitting(false);
     }
   };
 
@@ -725,6 +910,43 @@ export default function AuthShell({ children }) {
     );
   }
 
+  if (isDedicatedLoginPage || isResetPasswordPage) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#f4f5f7",
+          fontFamily: "'Inter', system-ui, sans-serif",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontWeight: 800,
+              fontSize: 16,
+              margin: "0 auto 16px",
+            }}
+          >
+            FB
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
+            {t("auth.loading")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // ─── SVG icon helpers ────────────────────────────────────────────────────
   const Icon = ({ d, size = 16 }) => (
     <svg
@@ -789,11 +1011,6 @@ export default function AuthShell({ children }) {
       "M8 20h8",
       "M12 15v5",
     ],
-    feedback: [
-      "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z",
-      "M8 9h8",
-      "M8 13h5",
-    ],
     smart: ["M13 2L3 14h9l-1 8 10-12h-9l1-8z"],
     services: [
       "M8 6h13",
@@ -820,55 +1037,75 @@ export default function AuthShell({ children }) {
     ],
   };
 
-  // ─── Nav groups ──────────────────────────────────────────────────────────
-  const mainNavItems = [
-    { href: "/dashboard", label: t("sidebar.dashboard"), iconKey: "dashboard" },
-    { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
-    {
-      href: "/estimates",
-      label: t("sidebar.estimates"),
-      iconKey: "estimates",
-      exact: true,
-    },
-    { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
-    { href: "/invoices", label: t("sidebar.invoices"), iconKey: "invoices" },
-    {
-      href: "/bill-payments",
-      label: t("sidebar.billPayments"),
-      iconKey: "billPayments",
-    },
-  ];
+  const isSuperAdminRole =
+    String(authUser?.role || "").toLowerCase() === "super_admin";
 
-  const secondaryNavItems = [
-    { href: "/calendar", label: t("sidebar.calendar"), iconKey: "calendar" },
-    {
-      href: "/website",
-      label: t("sidebar.websiteBuilder"),
-      iconKey: "websiteBuilder",
-    },
-    {
-      id: "feedback",
-      label: t("sidebar.feedback"),
-      iconKey: "feedback",
-      onClick: openFeedbackModal,
-    },
-  ];
+  // ─── Nav groups ──────────────────────────────────────────────────────────
+  const mainNavItems = isSuperAdminRole
+    ? [
+        {
+          href: "/admin",
+          label: t("sidebar.platform"),
+          iconKey: "platform",
+        },
+      ]
+    : [
+        {
+          href: "/dashboard",
+          label: t("sidebar.dashboard"),
+          iconKey: "dashboard",
+        },
+        { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
+        {
+          href: "/estimates",
+          label: t("sidebar.estimates"),
+          iconKey: "estimates",
+          exact: true,
+        },
+        { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
+        {
+          href: "/invoices",
+          label: t("sidebar.invoices"),
+          iconKey: "invoices",
+        },
+        {
+          href: "/bill-payments",
+          label: t("sidebar.billPayments"),
+          iconKey: "billPayments",
+        },
+      ];
+
+  const secondaryNavItems = isSuperAdminRole
+    ? [
+        ...(platformFlags.featureWebsiteBuilder
+          ? [
+              {
+                href: "/website",
+                label: t("sidebar.websiteBuilder"),
+                iconKey: "websiteBuilder",
+              },
+            ]
+          : []),
+      ]
+    : [
+        {
+          href: "/calendar",
+          label: t("sidebar.calendar"),
+          iconKey: "calendar",
+        },
+        {
+          href: "/services-catalog",
+          label: t("sidebar.services"),
+          iconKey: "services",
+        },
+        {
+          href: "/lead-inbox",
+          label: t("sidebar.leadInbox"),
+          iconKey: "insights",
+        },
+      ];
 
   const bottomNavItems = [
-    ...(authUser.role === "super_admin"
-      ? [
-          {
-            href: "/admin",
-            label: t("sidebar.ownerAdmin"),
-            iconKey: "platform",
-          },
-          {
-            href: "/platform",
-            label: t("sidebar.platform"),
-            iconKey: "platform",
-          },
-        ]
-      : []),
     {
       href: "/workspace-owner",
       label: t("sidebar.settings"),
@@ -884,29 +1121,131 @@ export default function AuthShell({ children }) {
 
   const linkClass = (href, exact = false) => `sb-link${isActive(href, exact) ? " sb-active" : ""}`;
 
+  const onNavigationItemClick = () => {
+    if (isMobileViewport) {
+      setMobileSidebarOpen(false);
+    }
+  };
+
   return (
     <div
+      className="auth-shell"
       style={{
         display: "flex",
         minHeight: "100vh",
         fontFamily: "'Inter', system-ui, sans-serif",
+        position: "relative",
       }}
     >
+      <header
+        className="auth-shell-mobile-header"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 64,
+          background: "linear-gradient(180deg, #0f172a 0%, #111827 100%)",
+          borderBottom: "1px solid rgba(148,163,184,0.2)",
+          display: isMobileViewport ? "flex" : "none",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 14px",
+          zIndex: 60,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+          }}
+        >
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 10,
+              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
+              position: "relative",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ position: "absolute", left: 7, top: 8, width: 16, height: 6, borderRadius: 999, background: "linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%)" }} />
+            <span style={{ position: "absolute", right: 7, bottom: 7, width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} />
+          </div>
+          <span
+            style={{
+              color: "#F9FAFB",
+              fontWeight: 700,
+              fontSize: 15,
+              letterSpacing: "-0.3px",
+            }}
+          >
+            FieldBase
+          </span>
+        </div>
+
+        <button
+          type="button"
+          aria-label={mobileSidebarOpen ? "Close menu" : "Open menu"}
+          onClick={() => setMobileSidebarOpen((current) => !current)}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 10,
+            border: "1px solid rgba(148,163,184,0.3)",
+            background: "rgba(148,163,184,0.12)",
+            color: "#e2e8f0",
+            display: "grid",
+            placeItems: "center",
+            cursor: "pointer",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d={mobileSidebarOpen ? "M6 6l12 12M18 6L6 18" : "M4 7h16M4 12h16M4 17h16"} />
+          </svg>
+        </button>
+      </header>
+
+      {mobileSidebarOpen && (
+        <button
+          className="auth-shell-backdrop"
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMobileSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(2,6,23,0.58)",
+            border: 0,
+            padding: 0,
+            margin: 0,
+            zIndex: 45,
+          }}
+        />
+      )}
+
       {/* ─── Fixed left sidebar ───────────────────────────── */}
       <aside
+        className={`auth-shell-aside${mobileSidebarOpen ? " auth-shell-aside--open" : ""}`}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           bottom: 0,
-          width: 248,
+          width: isMobileViewport ? "min(86vw, 320px)" : 248,
           background: "linear-gradient(180deg, #0f172a 0%, #111827 62%, #0b1220 100%)",
           display: "flex",
           flexDirection: "column",
-          zIndex: 40,
+          zIndex: 50,
           overflowY: "auto",
           overflowX: "hidden",
           borderRight: "1px solid rgba(148,163,184,0.18)",
+          transform: isMobileViewport
+            ? (mobileSidebarOpen ? "translateX(0)" : "translateX(-102%)")
+            : "translateX(0)",
+          transition: "transform 0.22s ease",
         }}
       >
         {/* Logo */}
@@ -972,7 +1311,7 @@ export default function AuthShell({ children }) {
                 textTransform: "uppercase",
               }}
             >
-              {(authUser.name || "?").charAt(0)}
+              {(authUser.companyName || authUser.name || "?").charAt(0).toUpperCase()}
             </div>
             <div style={{ overflow: "hidden", flex: 1 }}>
               <div
@@ -986,7 +1325,7 @@ export default function AuthShell({ children }) {
                   letterSpacing: "-0.2px",
                 }}
               >
-                {authUser.name}
+                {authUser.companyName || authUser.name}
               </div>
               <div
                 style={{
@@ -998,7 +1337,7 @@ export default function AuthShell({ children }) {
                   marginTop: 1,
                 }}
               >
-                {authUser.role} · {tenantLabel(authUser.tenantId)}
+                {authUser.name} · {authUser.role}
               </div>
             </div>
           </div>
@@ -1031,6 +1370,7 @@ export default function AuthShell({ children }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigationItemClick}
                 className={linkClass(item.href, item.exact)}
               >
                 <span
@@ -1072,45 +1412,24 @@ export default function AuthShell({ children }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {secondaryNavItems.map((item) => (
-              item.onClick ? (
-                <button
-                  key={item.id || item.label}
-                  type="button"
-                  onClick={item.onClick}
-                  className={`sb-link${feedbackModalOpen ? " sb-active" : ""}`}
-                  style={{ width: "100%", textAlign: "left" }}
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigationItemClick}
+                className={linkClass(item.href, item.exact)}
+              >
+                <span
+                  className="sb-icon"
+                  style={{
+                    color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
+                    display: "flex",
+                    flexShrink: 0,
+                  }}
                 >
-                  <span
-                    className="sb-icon"
-                    style={{
-                      color: feedbackModalOpen ? "#93c5fd" : "#64748b",
-                      display: "flex",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon d={icons[item.iconKey]} />
-                  </span>
-                  {item.label}
-                </button>
-              ) : (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={linkClass(item.href, item.exact)}
-                >
-                  <span
-                    className="sb-icon"
-                    style={{
-                      color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
-                      display: "flex",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon d={icons[item.iconKey]} />
-                  </span>
-                  {item.label}
-                </Link>
-              )
+                  <Icon d={icons[item.iconKey]} />
+                </span>
+                {item.label}
+              </Link>
             ))}
           </div>
         </nav>
@@ -1141,6 +1460,7 @@ export default function AuthShell({ children }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNavigationItemClick}
                 className={linkClass(item.href, item.exact)}
               >
                 <span
@@ -1219,14 +1539,16 @@ export default function AuthShell({ children }) {
 
       {/* ─── Main content area ────────────────────────────── */}
       <div
+        className="auth-shell-main"
         style={{
-          marginLeft: 248,
+          marginLeft: isMobileViewport ? 0 : 248,
           flex: 1,
           minWidth: 0,
           minHeight: "100vh",
           background: "#f3f5fa",
           display: "flex",
           flexDirection: "column",
+          paddingTop: isMobileViewport ? 64 : 0,
         }}
       >
         <TrialBanner
@@ -1238,194 +1560,29 @@ export default function AuthShell({ children }) {
         <AppFooter />
       </div>
 
-      {feedbackModalOpen && (
-        <>
-          <button
-            type="button"
-            aria-label="Close feedback modal"
-            onClick={closeFeedbackModal}
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(15,23,42,0.45)",
-              border: 0,
-              margin: 0,
-              padding: 0,
-              zIndex: 80,
-            }}
-          />
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label="Feedback"
-            style={{
-              position: "fixed",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "min(560px, calc(100vw - 32px))",
-              maxHeight: "calc(100vh - 40px)",
-              overflowY: "auto",
-              background: "#fff",
-              borderRadius: 16,
-              border: "1px solid rgba(15,23,42,0.10)",
-              boxShadow: "0 32px 80px rgba(15,23,42,0.22)",
-              padding: 18,
-              zIndex: 81,
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 22, color: "#0f172a" }}>
-                  {t("feedback.title")}
-                </h2>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 14 }}>
-                  {t("feedback.description")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeFeedbackModal}
-                style={{
-                  borderRadius: 10,
-                  border: "1px solid rgba(15,23,42,0.14)",
-                  background: "#fff",
-                  color: "#0f172a",
-                  padding: "6px 10px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {t("feedback.buttons.close")}
-              </button>
-            </div>
+      <style jsx global>{`
+        @media (max-width: 1200px) {
+          .auth-shell-main {
+            margin-left: 0 !important;
+            padding-top: 64px !important;
+          }
 
-            <select
-              value={feedbackType}
-              onChange={(event) => setFeedbackType(event.target.value)}
-              style={{
-                borderRadius: 10,
-                border: "1px solid rgba(15,23,42,0.12)",
-                padding: "10px 12px",
-                background: "#fff",
-              }}
-            >
-              {FEEDBACK_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {t(`feedback.types.${option.value}`)}
-                </option>
-              ))}
-            </select>
+          .auth-shell-mobile-header {
+            display: flex !important;
+          }
 
-            <textarea
-              value={feedbackMessage}
-              onChange={(event) => setFeedbackMessage(event.target.value)}
-              placeholder={t("feedback.messagePlaceholder")}
-              rows={6}
-              style={{
-                borderRadius: 10,
-                border: "1px solid rgba(15,23,42,0.12)",
-                padding: "10px 12px",
-                resize: "vertical",
-                fontFamily: "inherit",
-              }}
-            />
+          .auth-shell-aside {
+            width: min(86vw, 320px) !important;
+            transform: translateX(-102%) !important;
+            transition: transform 0.22s ease !important;
+          }
 
-            <div style={{ display: "grid", gap: 6 }}>
-              <label style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>
-                {t("feedback.screenshotLabel")}
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFeedbackScreenshotChange}
-                style={{
-                  borderRadius: 10,
-                  border: "1px solid rgba(15,23,42,0.12)",
-                  padding: "8px 10px",
-                }}
-              />
-              {feedbackScreenshotName && (
-                <div style={{ fontSize: 13, color: "#0369a1" }}>
-                  {t("feedback.screenshotAttached", { name: feedbackScreenshotName })}
-                </div>
-              )}
-            </div>
+          .auth-shell-aside.auth-shell-aside--open {
+            transform: translateX(0) !important;
+          }
+        }
+      `}</style>
 
-            {feedbackError && (
-              <div
-                style={{
-                  borderRadius: 10,
-                  border: "1px solid rgba(239,68,68,0.24)",
-                  background: "rgba(239,68,68,0.08)",
-                  color: "#991b1b",
-                  padding: "8px 10px",
-                  fontSize: 13,
-                }}
-              >
-                {feedbackError}
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={closeFeedbackModal}
-                style={{
-                  borderRadius: 999,
-                  border: "1px solid rgba(15,23,42,0.14)",
-                  background: "#fff",
-                  color: "#0f172a",
-                  padding: "9px 14px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                {t("feedback.buttons.cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={submitFeedback}
-                disabled={feedbackSubmitting}
-                style={{
-                  border: 0,
-                  borderRadius: 999,
-                  background: "#0f766e",
-                  color: "#fff",
-                  padding: "9px 14px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                {feedbackSubmitting ? t("feedback.buttons.submitting") : t("feedback.buttons.submit")}
-              </button>
-            </div>
-          </section>
-        </>
-      )}
-
-      {feedbackNotice && (
-        <div
-          style={{
-            position: "fixed",
-            right: 16,
-            bottom: 16,
-            borderRadius: 10,
-            border: "1px solid rgba(16,185,129,0.28)",
-            background: "rgba(16,185,129,0.94)",
-            color: "#ecfdf5",
-            padding: "10px 12px",
-            fontSize: 13,
-            fontWeight: 700,
-            zIndex: 90,
-            boxShadow: "0 14px 28px rgba(15,23,42,0.24)",
-          }}
-        >
-          {feedbackNotice}
-        </div>
-      )}
     </div>
   );
 }

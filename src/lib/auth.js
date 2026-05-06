@@ -13,6 +13,7 @@ const SESSION_TTL_SECONDS = Number(
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const JWT_ISSUER = process.env.SESSION_JWT_ISSUER || "madrid-app";
 const JWT_AUDIENCE = process.env.SESSION_JWT_AUDIENCE || "madrid-app-users";
+const SESSION_VERSION = process.env.SESSION_VERSION || "2026-05-05-global-logout-1";
 
 function assertSessionSecret() {
   const resolved = resolveSessionSecret();
@@ -54,7 +55,7 @@ export function verifyPassword(password, stored) {
 
 export function createSessionToken(payload) {
   const sessionSecret = assertSessionSecret();
-  return jwt.sign(payload, sessionSecret, {
+  return jwt.sign({ ...payload, sv: SESSION_VERSION }, sessionSecret, {
     algorithm: "HS256",
     expiresIn: SESSION_TTL_SECONDS,
     issuer: JWT_ISSUER,
@@ -72,6 +73,9 @@ export function verifySessionToken(token) {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     });
+    if (!payload || payload.sv !== SESSION_VERSION) {
+      return null;
+    }
     return payload && typeof payload === "object" ? payload : null;
   } catch {
     return null;
@@ -121,4 +125,39 @@ export function buildSessionCookie(token) {
 export function clearSessionCookie() {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+// ---------------------------------------------------------------------------
+// Email confirmation tokens — HMAC-signed JWTs using SESSION_SECRET.
+// These are self-contained and do NOT rely on Supabase OTP.
+// ---------------------------------------------------------------------------
+const EMAIL_CONFIRM_TTL_SECONDS = 60 * 60 * 24; // 24 hours
+
+export function createEmailConfirmToken(userId, email) {
+  const secret = assertSessionSecret();
+  return jwt.sign(
+    { sub: userId, email, purpose: "email-confirm" },
+    secret,
+    { algorithm: "HS256", expiresIn: EMAIL_CONFIRM_TTL_SECONDS },
+  );
+}
+
+export function verifyEmailConfirmToken(token) {
+  const secret = assertSessionSecret();
+  if (!token || typeof token !== "string") return null;
+  try {
+    const payload = jwt.verify(token, secret, { algorithms: ["HS256"] });
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      payload.purpose !== "email-confirm" ||
+      !payload.sub ||
+      !payload.email
+    ) {
+      return null;
+    }
+    return { userId: payload.sub, email: payload.email };
+  } catch {
+    return null;
+  }
 }

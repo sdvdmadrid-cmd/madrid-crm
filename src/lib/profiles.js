@@ -5,6 +5,13 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const PROFILES = "profiles";
 
+function toPersistedProfileRole(role) {
+  const normalized = normalizeAppRole(role);
+  if (normalized === "super_admin") return "admin";
+  if (normalized === "admin") return "admin";
+  return "worker";
+}
+
 function mapProfile(row) {
   if (!row) return null;
   return {
@@ -59,7 +66,8 @@ export async function upsertProfile({ id, tenantId, role }) {
       {
         id,
         tenant_id: tenantId,
-        role: normalizeAppRole(role),
+        // profiles.role only supports admin/worker in current DB constraint.
+        role: toPersistedProfileRole(role),
       },
       { onConflict: "id" },
     )

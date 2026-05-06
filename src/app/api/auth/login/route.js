@@ -122,8 +122,19 @@ export async function POST(request) {
       },
     });
   } catch (error) {
+    const rawMessage =
+      error instanceof Error ? String(error.message || "") : "";
+    const isConstraintError =
+      rawMessage.toLowerCase().includes("violates check constraint") ||
+      rawMessage.toLowerCase().includes("profiles_role_check");
+
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: isConstraintError
+          ? "Unable to sign in right now. Please try again in a moment."
+          : rawMessage || "Unable to sign in right now.",
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
