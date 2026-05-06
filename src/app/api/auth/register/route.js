@@ -207,7 +207,7 @@ export async function POST(request) {
           return new Response(
             JSON.stringify({
               success: true,
-              requiresVerification: true,
+              data: { requiresVerification: true, email: existingUser.email },
               message:
                 "This email is already registered but not verified. A new verification link was sent.",
             }),
