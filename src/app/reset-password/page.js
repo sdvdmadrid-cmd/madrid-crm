@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -64,7 +64,6 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const supabase = createSupabaseBrowserClient();
 
       // Exchange token for session
       const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
