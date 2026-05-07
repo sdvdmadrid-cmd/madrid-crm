@@ -11,7 +11,7 @@ alter table if exists public.invoices
 update public.invoices as i
 set quote_number = q.quote_number
 from public.quotes as q
-where i.tenant_id = q.tenant_id
+where i.tenant_id::text = q.tenant_id::text
   and coalesce(i.quote_number, '') = ''
   and coalesce(i.invoice_number, '') <> ''
   and q.quote_number = i.invoice_number;
@@ -20,7 +20,7 @@ where i.tenant_id = q.tenant_id
 update public.invoices as i
 set quote_id = q.id
 from public.quotes as q
-where i.tenant_id = q.tenant_id
+where i.tenant_id::text = q.tenant_id::text
   and i.quote_id is null
   and coalesce(i.quote_number, '') <> ''
   and q.quote_number = i.quote_number;
