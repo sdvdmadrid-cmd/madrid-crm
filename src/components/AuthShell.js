@@ -1088,6 +1088,15 @@ export default function AuthShell({ children }) {
           : []),
       ]
     : [
+        ...(platformFlags.featureWebsiteBuilder
+          ? [
+              {
+                href: "/website-builder",
+                label: t("sidebar.websiteBuilder"),
+                iconKey: "websiteBuilder",
+              },
+            ]
+          : []),
         {
           href: "/calendar",
           label: t("sidebar.calendar"),
