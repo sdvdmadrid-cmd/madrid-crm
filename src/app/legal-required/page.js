@@ -43,11 +43,9 @@ function LegalRequiredInner() {
       .then((data) => {
         if (data?.data?.accepted) {
           setAlreadyAccepted(true);
-          // Redirect after short delay so user sees the confirmation
-          setTimeout(() => {
-            const safe = normalizeSafeRedirect(nextPath);
-            router.replace(safe);
-          }, 800);
+          // Redirect immediately without delay
+          const safe = normalizeSafeRedirect(nextPath);
+          router.replace(safe);
         }
       })
       .catch(() => {
@@ -111,21 +109,7 @@ function LegalRequiredInner() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="text-green-600"
-              aria-hidden="true"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-          <p className="text-gray-700 font-medium">Terms already accepted. Redirecting…</p>
+          <p className="text-gray-500 text-sm">Redirecting…</p>
         </div>
       </div>
     );
