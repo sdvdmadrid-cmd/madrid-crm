@@ -10,6 +10,7 @@ const initialInvoice = {
   invoiceNumber: "",
   clientName: "",
   invoiceTitle: "",
+  quoteNumber: "",
   amount: "",
   dueDate: "",
   status: "Unpaid",
@@ -300,6 +301,7 @@ export default function InvoicesPage() {
       invoiceNumber: invoice.invoiceNumber || "",
       clientName: invoice.clientName || "",
       invoiceTitle: invoice.invoiceTitle || "",
+      quoteNumber: invoice.quoteNumber || "",
       amount: invoice.amount || "",
       dueDate: invoice.dueDate || "",
       status: invoice.status || "Unpaid",
@@ -599,6 +601,18 @@ export default function InvoicesPage() {
                 }}
               />
               <input
+                placeholder="Quote ID"
+                value={form.quoteNumber}
+                onChange={(e) =>
+                  setForm({ ...form, quoteNumber: e.target.value })
+                }
+                style={{
+                  padding: "12px",
+                  borderRadius: "10px",
+                  border: "1px solid #ccc",
+                }}
+              />
+              <input
                 placeholder={t("invoices.placeholders.amount")}
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
@@ -743,6 +757,11 @@ export default function InvoicesPage() {
                   {invoice.invoiceTitle
                     ? <p style={{ margin: "8px 0 0 0", color: "#444" }}>
                         {invoice.invoiceTitle}
+                      </p>
+                    : null}
+                  {invoice.quoteNumber
+                    ? <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                        Quote ID: {invoice.quoteNumber}
                       </p>
                     : null}
                   <p style={{ margin: "8px 0 0 0", color: "#777" }}>
