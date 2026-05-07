@@ -24,6 +24,18 @@ function LegalRequiredInner() {
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/dashboard";
 
+  const redirectImmediately = useCallback(
+    (path) => {
+      const safe = normalizeSafeRedirect(path);
+      if (typeof window !== "undefined") {
+        window.location.replace(safe);
+        return;
+      }
+      router.replace(safe);
+    },
+    [router],
+  );
+
   const [checked, setChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -43,15 +55,13 @@ function LegalRequiredInner() {
       .then((data) => {
         if (data?.data?.accepted) {
           setAlreadyAccepted(true);
-          // Redirect immediately without delay
-          const safe = normalizeSafeRedirect(nextPath);
-          router.replace(safe);
+          redirectImmediately(nextPath);
         }
       })
       .catch(() => {
         // Ignore — let user accept manually
       });
-  }, [nextPath, router]);
+  }, [nextPath, redirectImmediately]);
 
   useEffect(() => {
     apiFetch("/api/legal/version", { suppressUnauthorizedEvent: true })
@@ -97,8 +107,7 @@ function LegalRequiredInner() {
         return;
       }
 
-      const safe = normalizeSafeRedirect(nextPath);
-      router.replace(safe);
+      redirectImmediately(nextPath);
     } catch {
       setError("Network error. Please try again.");
       setSubmitting(false);
