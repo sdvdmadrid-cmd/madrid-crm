@@ -1057,11 +1057,6 @@ export default function AuthShell({ children }) {
         },
         { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
         {
-          href: "/website-builder",
-          label: t("sidebar.websiteBuilder"),
-          iconKey: "websiteBuilder",
-        },
-        {
           href: "/estimates",
           label: t("sidebar.estimates"),
           iconKey: "estimates",
