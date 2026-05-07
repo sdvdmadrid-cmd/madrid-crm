@@ -37,6 +37,8 @@ function serialize(doc) {
     userId: doc.user_id || null,
     invoiceNumber: doc.invoice_number || "",
     invoiceTitle: doc.invoice_title || "",
+    quoteId: doc.quote_id || null,
+    quoteNumber: doc.quote_number || "",
     jobId: doc.job_id || "",
     clientId: doc.client_id || "",
     clientName: doc.client_name || "",
@@ -166,38 +168,63 @@ export async function POST(request) {
     const lineItems = Array.isArray(body.lineItems) ? body.lineItems : [];
     const amount = normalizeMoney(body.amount);
     const amountCents = Math.round(amount * 100);
+    const submittedQuoteId = normalizeUuid(body.quoteId);
+    const submittedQuoteNumber = normalizeBaseNumber(body.quoteNumber);
 
     const invoiceNumber =
       normalizeBaseNumber(body.invoiceNumber) ||
       (await nextInvoiceNumber(tenantDbId));
 
-    // Auto-link by shared base number
+    // Auto-link quote/estimate using explicit quote fields first, then invoice number.
     let estimateId = null;
-    let quoteId = null;
+    let quoteId = submittedQuoteId || null;
+    let quoteNumber = submittedQuoteNumber || "";
     let linkedClientId = normalizeUuid(body.clientId);
-    if (invoiceNumber) {
+
+    if (quoteId) {
+      const { data: quoteById, error: quoteByIdErr } = await supabaseAdmin
+        .from("quotes")
+        .select("id,quote_number,client_id")
+        .eq("tenant_id", tenantDbId)
+        .eq("id", quoteId)
+        .maybeSingle();
+
+      if (!quoteByIdErr && quoteById?.id) {
+        quoteNumber = normalizeBaseNumber(quoteById.quote_number);
+        linkedClientId = linkedClientId || normalizeUuid(quoteById.client_id);
+      } else {
+        quoteId = null;
+      }
+    }
+
+    const quoteLookupNumber = quoteNumber || invoiceNumber;
+    if (!quoteId && quoteLookupNumber) {
+      const { data: quote, error: quoteErr } = await supabaseAdmin
+        .from("quotes")
+        .select("id,quote_number,client_id")
+        .eq("tenant_id", tenantDbId)
+        .eq("quote_number", quoteLookupNumber)
+        .maybeSingle();
+
+      if (!quoteErr && quote?.id) {
+        quoteId = quote.id;
+        quoteNumber = normalizeBaseNumber(quote.quote_number) || quoteLookupNumber;
+        linkedClientId = linkedClientId || normalizeUuid(quote.client_id);
+      }
+    }
+
+    const estimateLookupNumber = quoteNumber || invoiceNumber;
+    if (estimateLookupNumber) {
       const { data: est, error: estErr } = await supabaseAdmin
         .from("estimate_builder")
         .select("id,quote_number,client_id")
         .eq("tenant_id", tenantDbId)
-        .eq("quote_number", invoiceNumber)
+        .eq("quote_number", estimateLookupNumber)
         .maybeSingle();
 
       if (!estErr && est?.id) {
         estimateId = est.id;
         linkedClientId = linkedClientId || normalizeUuid(est.client_id);
-      }
-
-      const { data: quote, error: quoteErr } = await supabaseAdmin
-        .from("quotes")
-        .select("id,client_id")
-        .eq("tenant_id", tenantDbId)
-        .eq("quote_number", invoiceNumber)
-        .maybeSingle();
-
-      if (!quoteErr && quote?.id) {
-        quoteId = quote.id;
-        linkedClientId = linkedClientId || normalizeUuid(quote.client_id);
       }
     }
 
@@ -234,6 +261,7 @@ export async function POST(request) {
       updated_at: nowIso,
       estimate_id: estimateId,
       quote_id: quoteId,
+      quote_number: quoteNumber,
     };
 
     const { data, error } = await supabaseAdmin

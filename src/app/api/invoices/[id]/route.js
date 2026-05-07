@@ -39,6 +39,8 @@ function serialize(doc) {
     userId: doc.user_id || null,
     invoiceNumber: doc.invoice_number || "",
     invoiceTitle: doc.invoice_title || "",
+    quoteId: doc.quote_id || null,
+    quoteNumber: doc.quote_number || "",
     jobId: doc.job_id || "",
     clientId: doc.client_id || "",
     clientName: doc.client_name || "",
@@ -191,37 +193,74 @@ export async function PATCH(request, { params }) {
       total_cents: amountCents,
     };
 
-    // Auto-link by shared base number when invoiceNumber changes
+    // Auto-link quote/estimate when invoice or quote references change.
     let estimateId = existing.estimate_id || null;
     let quoteId = existing.quote_id || null;
+    let quoteNumber = normalizeBaseNumber(existing.quote_number || "");
     let linkedClientId = "clientId" in body
       ? normalizeUuid(body.clientId)
       : existing.client_id || null;
-    if ("invoiceNumber" in body && body.invoiceNumber) {
-      const invNum = normalizeBaseNumber(body.invoiceNumber);
-      if (invNum) {
+    const hasLinkInput =
+      "invoiceNumber" in body || "quoteNumber" in body || "quoteId" in body;
+
+    if (hasLinkInput) {
+      const invNum = "invoiceNumber" in body
+        ? normalizeBaseNumber(body.invoiceNumber)
+        : normalizeBaseNumber(existing.invoice_number || "");
+      const requestedQuoteId = "quoteId" in body
+        ? normalizeUuid(body.quoteId)
+        : quoteId;
+      const requestedQuoteNumber = "quoteNumber" in body
+        ? normalizeBaseNumber(body.quoteNumber)
+        : quoteNumber;
+
+      quoteId = requestedQuoteId || null;
+      quoteNumber = requestedQuoteNumber || "";
+
+      if (quoteId) {
+        const { data: quoteById, error: quoteByIdErr } = await supabaseAdmin
+          .from("quotes")
+          .select("id,quote_number,client_id")
+          .eq("tenant_id", tenantDbId)
+          .eq("id", quoteId)
+          .maybeSingle();
+
+        if (!quoteByIdErr && quoteById?.id) {
+          quoteNumber = normalizeBaseNumber(quoteById.quote_number);
+          linkedClientId = linkedClientId || normalizeUuid(quoteById.client_id);
+        } else {
+          quoteId = null;
+        }
+      }
+
+      const quoteLookupNumber = quoteNumber || invNum;
+      if (!quoteId && quoteLookupNumber) {
+        const { data: quote, error: quoteErr } = await supabaseAdmin
+          .from("quotes")
+          .select("id,quote_number,client_id")
+          .eq("tenant_id", tenantDbId)
+          .eq("quote_number", quoteLookupNumber)
+          .maybeSingle();
+
+        if (!quoteErr && quote?.id) {
+          quoteId = quote.id;
+          quoteNumber = normalizeBaseNumber(quote.quote_number) || quoteLookupNumber;
+          linkedClientId = linkedClientId || normalizeUuid(quote.client_id);
+        }
+      }
+
+      const estimateLookupNumber = quoteNumber || invNum;
+      if (estimateLookupNumber) {
         const { data: est, error: estErr } = await supabaseAdmin
           .from("estimate_builder")
           .select("id,quote_number,client_id")
           .eq("tenant_id", tenantDbId)
-          .eq("quote_number", invNum)
+          .eq("quote_number", estimateLookupNumber)
           .maybeSingle();
 
         if (!estErr && est?.id) {
           estimateId = est.id;
           linkedClientId = linkedClientId || normalizeUuid(est.client_id);
-        }
-
-        const { data: quote, error: quoteErr } = await supabaseAdmin
-          .from("quotes")
-          .select("id,client_id")
-          .eq("tenant_id", tenantDbId)
-          .eq("quote_number", invNum)
-          .maybeSingle();
-
-        if (!quoteErr && quote?.id) {
-          quoteId = quote.id;
-          linkedClientId = linkedClientId || normalizeUuid(quote.client_id);
         }
       }
     }
@@ -247,6 +286,7 @@ export async function PATCH(request, { params }) {
 
     updateRow.estimate_id = estimateId;
     updateRow.quote_id = quoteId;
+    updateRow.quote_number = quoteNumber;
 
     let updateQuery = supabaseAdmin
       .from(INVOICES)
