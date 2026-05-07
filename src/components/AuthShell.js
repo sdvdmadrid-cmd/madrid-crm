@@ -1118,6 +1118,16 @@ export default function AuthShell({ children }) {
     },
   ];
 
+  // Defensive guard: keep Website Builder only in Secondary for contractor/admin users
+  // and prevent accidental duplicate entries across nav groups.
+  const normalizedMainNavItems = isSuperAdminRole
+    ? mainNavItems
+    : mainNavItems.filter((item) => item.href !== "/website-builder");
+  const normalizedSecondaryNavItems = secondaryNavItems.filter(
+    (item, index, arr) =>
+      arr.findIndex((candidate) => candidate.href === item.href) === index,
+  );
+
   const isActive = (href, exact = false) => {
     if (exact) return pathname === href;
     if (href === "/") return pathname === "/";
@@ -1371,7 +1381,7 @@ export default function AuthShell({ children }) {
             {t("sidebar.main")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {mainNavItems.map((item) => (
+            {normalizedMainNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -1416,7 +1426,7 @@ export default function AuthShell({ children }) {
             {t("sidebar.secondary")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {secondaryNavItems.map((item) => (
+            {normalizedSecondaryNavItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
