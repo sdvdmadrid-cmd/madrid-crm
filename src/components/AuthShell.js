@@ -1107,7 +1107,7 @@ export default function AuthShell({ children }) {
 
   const bottomNavItems = [
     {
-      href: "/workspace-owner",
+      href: isSuperAdminRole ? "/admin/settings" : "/workspace-owner",
       label: t("sidebar.settings"),
       iconKey: "settings",
     },
