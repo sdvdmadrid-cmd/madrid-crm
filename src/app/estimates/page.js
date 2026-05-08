@@ -42,6 +42,7 @@ export default function EstimatesPage() {
   const [pipelineBusyId, setPipelineBusyId] = useState("");
   const [pendingStatusAction, setPendingStatusAction] = useState(null);
   const [selectedEstimate, setSelectedEstimate] = useState(null);
+  const [sendingEmailId, setSendingEmailId] = useState("");
 
   const kanbanColumns = useMemo(() => {
     const cols = { draft: [], sent: [], changes_requested: [], approved: [], declined: [] };
@@ -118,6 +119,34 @@ export default function EstimatesPage() {
     setPendingStatusAction(null);
   }
 
+  async function sendEstimateEmail(estimate) {
+    if (!estimate?.id) return;
+    if (!estimate.clientEmail) {
+      setStatusMessage("This estimate has no client email. Edit the estimate to add one.");
+      return;
+    }
+    setSendingEmailId(estimate.id);
+    setStatusMessage("");
+    try {
+      const response = await apiFetch(`/api/estimates/${estimate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "sent",
+          sendChannels: { email: true, text: false },
+          currentStatus: estimate.status || "draft",
+        }),
+      });
+      await getJsonOrThrow(response, "Unable to send estimate.");
+      setStatusMessage(`Estimate sent to ${estimate.clientEmail}`);
+      await loadEstimates();
+    } catch (error) {
+      setStatusMessage(error.message || "Failed to send estimate.");
+    } finally {
+      setSendingEmailId("");
+    }
+  }
+
   const KANBAN_COLS = [
     { key: "draft",             label: "Draft",    headerCls: "border-slate-300 bg-slate-50",    dotCls: "bg-slate-400" },
     { key: "sent",              label: "Sent",     headerCls: "border-blue-200 bg-blue-50",       dotCls: "bg-blue-500" },
@@ -153,6 +182,9 @@ export default function EstimatesPage() {
       </div>
 
       {/* ── Kanban board + Detail panel ── */}
+      {!selectedEstimate && statusMessage ? (
+        <div className="flex-shrink-0 bg-blue-50 px-6 py-2 text-sm text-blue-700">{statusMessage}</div>
+      ) : null}
       <div className="flex flex-1 min-h-0 gap-0">
         {/* Kanban board */}
         <div className="flex-1 overflow-hidden flex flex-col">
@@ -209,152 +241,175 @@ export default function EstimatesPage() {
           </div>
         </div>
 
-        {/* ── Detail panel (responsive) ── */}
-        {selectedEstimate ? (
-          <div className="hidden lg:flex w-80 flex-shrink-0 flex-col border-l border-slate-200 bg-white shadow-lg">
-            {/* Panel header */}
-            <div className="flex items-start justify-between border-b border-slate-200 px-4 py-3 flex-shrink-0">
-              <div>
-                <div className="text-sm font-bold text-slate-900">{selectedEstimate.clientName || "Unnamed client"}</div>
-                <div className="mt-0.5 text-xs text-slate-500">{selectedEstimate.address || "No address"}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedEstimate(null)}
-                className="ml-2 mt-0.5 flex-shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Panel body */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">
-              {/* Status badge */}
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE_STYLES[String(selectedEstimate.status || "draft").toLowerCase()] || STATUS_BADGE_STYLES.draft}`}>
-                {STATUS_LABELS[String(selectedEstimate.status || "draft").toLowerCase()] || "Draft"}
-              </span>
-
-              {/* Financials */}
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>Subtotal</span>
-                  <span>{formatMoney(selectedEstimate.subtotal ?? selectedEstimate.total)}</span>
+        {/* ── Detail panel: side panel on lg+, full-screen overlay on smaller ── */}
+        {selectedEstimate && (
+          <>
+            {/* Backdrop for small/medium screens */}
+            <div
+              className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+              onClick={() => setSelectedEstimate(null)}
+              aria-hidden="true"
+            />
+            <div className="fixed inset-y-0 right-0 z-30 flex w-full max-w-sm flex-col bg-white shadow-2xl lg:relative lg:inset-auto lg:z-auto lg:flex lg:w-80 lg:flex-shrink-0 lg:border-l lg:border-slate-200 lg:shadow-lg">
+              {/* Panel header */}
+              <div className="flex items-start justify-between border-b border-slate-200 px-4 py-3 flex-shrink-0">
+                <div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {selectedEstimate.estimateNumber ? (
+                      <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-mono text-slate-600">{selectedEstimate.estimateNumber}</span>
+                    ) : null}
+                    {selectedEstimate.clientName || "Unnamed client"}
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">{selectedEstimate.address || "No address"}</div>
                 </div>
-                {Number(selectedEstimate.tax || 0) > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedEstimate(null)}
+                  className="ml-2 mt-0.5 flex-shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Panel body */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 text-sm">
+                {/* Status badge */}
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE_STYLES[String(selectedEstimate.status || "draft").toLowerCase()] || STATUS_BADGE_STYLES.draft}`}>
+                  {STATUS_LABELS[String(selectedEstimate.status || "draft").toLowerCase()] || "Draft"}
+                </span>
+
+                {/* Financials */}
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex justify-between text-xs text-slate-500">
-                    <span>Tax</span>
-                    <span>{formatMoney(selectedEstimate.tax)}</span>
+                    <span>Subtotal</span>
+                    <span>{formatMoney(selectedEstimate.subtotal ?? selectedEstimate.total)}</span>
+                  </div>
+                  {Number(selectedEstimate.tax || 0) > 0 ? (
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Tax</span>
+                      <span>{formatMoney(selectedEstimate.tax)}</span>
+                    </div>
+                  ) : null}
+                  <div className="mt-1 flex justify-between text-sm font-bold text-slate-900">
+                    <span>Total</span>
+                    <span>{formatMoney(selectedEstimate.total)}</span>
+                  </div>
+                </div>
+
+                {/* Contact */}
+                {selectedEstimate.clientEmail || selectedEstimate.clientPhone ? (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Client Contact</div>
+                    {selectedEstimate.clientEmail ? (
+                      <div className="text-xs text-slate-700">Email: {selectedEstimate.clientEmail}</div>
+                    ) : null}
+                    {selectedEstimate.clientPhone ? (
+                      <div className="text-xs text-slate-700">Phone: {selectedEstimate.clientPhone}</div>
+                    ) : null}
                   </div>
                 ) : null}
-                <div className="mt-1 flex justify-between text-sm font-bold text-slate-900">
-                  <span>Total</span>
-                  <span>{formatMoney(selectedEstimate.total)}</span>
+
+                {/* Services */}
+                {Array.isArray(selectedEstimate.services) && selectedEstimate.services.length > 0 ? (
+                  <div className="mt-3">
+                    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Services</div>
+                    <div className="space-y-1">
+                      {selectedEstimate.services.map((service, idx) => (
+                        <div key={service.id || idx} className="flex justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+                          <span className="font-medium text-slate-800">{service.name}</span>
+                          <span className="text-slate-600">{formatMoney(service.price)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Notes / Job description */}
+                {selectedEstimate.notes ? (
+                  <div className="mt-3">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Job Description</div>
+                    <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap">{selectedEstimate.notes}</p>
+                  </div>
+                ) : null}
+
+                {/* Audit trail */}
+                <div className="mt-3">
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline</div>
+                  <div className="space-y-1 text-[11px] text-slate-500">
+                    {selectedEstimate.audit?.sentAt ? <div>Sent: {formatDateTime(selectedEstimate.audit.sentAt)}</div> : null}
+                    {selectedEstimate.audit?.changesRequestedAt ? <div>Changes requested: {formatDateTime(selectedEstimate.audit.changesRequestedAt)}</div> : null}
+                    {selectedEstimate.audit?.resentAt ? <div>Resent ({selectedEstimate.audit.resendCount}x): {formatDateTime(selectedEstimate.audit.resentAt)}</div> : null}
+                    {selectedEstimate.audit?.approvedAt ? <div className="font-semibold text-emerald-600">Approved: {formatDateTime(selectedEstimate.audit.approvedAt)}</div> : null}
+                    {selectedEstimate.audit?.declinedAt ? <div className="font-semibold text-rose-600">Declined: {formatDateTime(selectedEstimate.audit.declinedAt)}</div> : null}
+                  </div>
                 </div>
               </div>
 
-              {/* Contact */}
-              {selectedEstimate.clientEmail || selectedEstimate.clientPhone ? (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Client Contact</div>
-                  {selectedEstimate.clientEmail ? (
-                    <div className="text-xs text-slate-700">Email: {selectedEstimate.clientEmail}</div>
-                  ) : null}
-                  {selectedEstimate.clientPhone ? (
-                    <div className="text-xs text-slate-700">Phone: {selectedEstimate.clientPhone}</div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {/* Services */}
-              {Array.isArray(selectedEstimate.services) && selectedEstimate.services.length > 0 ? (
-                <div className="mt-3">
-                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Services</div>
-                  <div className="space-y-1">
-                    {selectedEstimate.services.map((service, idx) => (
-                      <div key={service.id || idx} className="flex justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
-                        <span className="font-medium text-slate-800">{service.name}</span>
-                        <span className="text-slate-600">{formatMoney(service.price)}</span>
-                      </div>
-                    ))}
+              {/* Panel actions */}
+              <div className="border-t border-slate-200 px-4 py-3">
+                {statusMessage ? (
+                  <div className="mb-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">{statusMessage}</div>
+                ) : null}
+                {pendingStatusAction && pendingStatusAction.estimateId === selectedEstimate.id ? (
+                  <div className="rounded-xl border border-slate-300 bg-slate-50 p-3">
+                    <div className="text-xs font-semibold text-slate-700">
+                      Move to {STATUS_LABELS[pendingStatusAction.nextStatus]}?
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await confirmPendingStatusAction();
+                          setSelectedEstimate(null);
+                        }}
+                        className="flex-1 rounded-lg bg-slate-900 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingStatusAction(null)}
+                        className="flex-1 rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700 hover:bg-white"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : null}
-
-              {/* Notes / Job description */}
-              {selectedEstimate.notes ? (
-                <div className="mt-3">
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Job Description</div>
-                  <p className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap">{selectedEstimate.notes}</p>
-                </div>
-              ) : null}
-
-              {/* Audit trail */}
-              <div className="mt-3">
-                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline</div>
-                <div className="space-y-1 text-[11px] text-slate-500">
-                  {selectedEstimate.audit?.sentAt ? <div>Sent: {formatDateTime(selectedEstimate.audit.sentAt)}</div> : null}
-                  {selectedEstimate.audit?.changesRequestedAt ? <div>Changes requested: {formatDateTime(selectedEstimate.audit.changesRequestedAt)}</div> : null}
-                  {selectedEstimate.audit?.resentAt ? <div>Resent ({selectedEstimate.audit.resendCount}x): {formatDateTime(selectedEstimate.audit.resentAt)}</div> : null}
-                  {selectedEstimate.audit?.approvedAt ? <div className="font-semibold text-emerald-600">Approved: {formatDateTime(selectedEstimate.audit.approvedAt)}</div> : null}
-                  {selectedEstimate.audit?.declinedAt ? <div className="font-semibold text-rose-600">Declined: {formatDateTime(selectedEstimate.audit.declinedAt)}</div> : null}
-                </div>
-              </div>
-            </div>
-
-            {/* Panel actions */}
-            <div className="border-t border-slate-200 px-4 py-3">
-              {pendingStatusAction && pendingStatusAction.estimateId === selectedEstimate.id ? (
-                <div className="rounded-xl border border-slate-300 bg-slate-50 p-3">
-                  <div className="text-xs font-semibold text-slate-700">
-                    Move to {STATUS_LABELS[pendingStatusAction.nextStatus]}?
-                  </div>
-                  <div className="mt-2 flex gap-2">
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Send to client email */}
                     <button
                       type="button"
-                      onClick={async () => {
-                        await confirmPendingStatusAction();
-                        setSelectedEstimate(null);
-                      }}
-                      className="flex-1 rounded-lg bg-slate-900 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                      onClick={() => sendEstimateEmail(selectedEstimate)}
+                      disabled={sendingEmailId === selectedEstimate.id}
+                      className="col-span-2 rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-60"
                     >
-                      Confirm
+                      {sendingEmailId === selectedEstimate.id ? "Sending…" : selectedEstimate.audit?.sentAt ? "✉ Resend to Client" : "✉ Send to Client"}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPendingStatusAction(null)}
-                      className="flex-1 rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700 hover:bg-white"
+                      onClick={() => queueStatusAction(selectedEstimate, "approved")}
+                      disabled={pipelineBusyId === selectedEstimate.id}
+                      className="rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                     >
-                      Cancel
+                      Approve
                     </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => queueStatusAction(selectedEstimate, "approved")}
-                    disabled={pipelineBusyId === selectedEstimate.id}
-                    className="rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => queueStatusAction(selectedEstimate, "declined")}
-                    disabled={pipelineBusyId === selectedEstimate.id}
-                    className="rounded-lg bg-rose-600 py-2 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
-                  >
-                    Decline
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => queueStatusAction(selectedEstimate, "changes_requested")}
-                    disabled={pipelineBusyId === selectedEstimate.id}
-                    className="col-span-2 rounded-lg bg-amber-500 py-2 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
-                  >
-                    Request Changes
-                  </button>
-                  {String(selectedEstimate.status || "").toLowerCase() === "changes_requested" ? (
+                    <button
+                      type="button"
+                      onClick={() => queueStatusAction(selectedEstimate, "declined")}
+                      disabled={pipelineBusyId === selectedEstimate.id}
+                      className="rounded-lg bg-rose-600 py-2 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-60"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => queueStatusAction(selectedEstimate, "changes_requested")}
+                      disabled={pipelineBusyId === selectedEstimate.id}
+                      className="col-span-2 rounded-lg bg-amber-500 py-2 text-xs font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
+                    >
+                      Request Changes
+                    </button>
                     <button
                       type="button"
                       onClick={() => { router.push(`/estimates/new?edit=${selectedEstimate.id}`); setSelectedEstimate(null); }}
@@ -362,35 +417,31 @@ export default function EstimatesPage() {
                     >
                       Edit Estimate
                     </button>
-                  ) : null}
+                  </div>
+                )}
+                {/* Print + share link */}
+                <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+                  <a
+                    href={`/estimate/${selectedEstimate.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    🔗 Client Link
+                  </a>
+                  <a
+                    href={`/estimate/${selectedEstimate.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => { e.preventDefault(); const w = window.open(`/estimate/${selectedEstimate.id}`, "_blank"); w?.addEventListener("load", () => w.print()); }}
+                    className="flex-1 rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    🖨 Print / PDF
+                  </a>
                 </div>
-              )}
-              {/* Print + share link */}
-              <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
-                <a
-                  href={`/estimate/${selectedEstimate.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  🔗 Client Link
-                </a>
-                <a
-                  href={`/estimate/${selectedEstimate.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => { e.preventDefault(); const w = window.open(`/estimate/${selectedEstimate.id}`, "_blank"); w?.addEventListener("load", () => w.print()); }}
-                  className="flex-1 rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                >
-                  🖨 Print / PDF
-                </a>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="hidden lg:flex w-80 flex-shrink-0 items-center justify-center border-l border-slate-200 bg-slate-50">
-            <p className="text-center text-sm text-slate-400">Select an estimate to view details</p>
-          </div>
+          </>
         )}
       </div>
 

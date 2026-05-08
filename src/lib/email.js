@@ -87,7 +87,7 @@ async function sendWithResend({ to, subject, html, text, metadata }) {
       signal: controller.signal,
       body: JSON.stringify({
         from: EMAIL_FROM,
-        to: [to],
+        to: Array.isArray(to) ? to : [to],
         subject,
         html,
         text,
