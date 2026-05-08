@@ -68,7 +68,7 @@ export async function POST(request, { params }) {
     const action = String(body.action || "")
       .trim()
       .toLowerCase();
-    if (!["approve", "sign"].includes(action)) {
+    if (!["approve", "sign", "decline"].includes(action)) {
       return new Response(
         JSON.stringify({ success: false, error: "Invalid action" }),
         {
@@ -121,10 +121,14 @@ export async function POST(request, { params }) {
       }
 
       const nowIso = new Date().toISOString();
-      const nextStatus = action === "sign" ? "signed" : "approved";
+      const nextStatus = action === "sign"
+        ? "signed"
+        : action === "decline"
+          ? "declined"
+          : "approved";
       const update = {
         status: nextStatus,
-        approved_at: quoteRow.approved_at || nowIso,
+        approved_at: action === "decline" ? quoteRow.approved_at || null : quoteRow.approved_at || nowIso,
         updated_at: nowIso,
       };
 
@@ -146,7 +150,7 @@ export async function POST(request, { params }) {
           success: true,
           data: {
             quoteStatus: nextStatus,
-            quoteApprovedAt: update.approved_at,
+            quoteApprovedAt: update.approved_at || "",
             quoteSignedAt: action === "sign" ? nowIso : "",
             quoteApprovedByName: contactName || "",
             quoteApprovedByEmail: contactEmail || "",
@@ -203,13 +207,13 @@ export async function POST(request, { params }) {
 
     const now = new Date();
     const update = {
-      quote_status: action === "sign" ? "signed" : "approved",
-      quote_approved_at: job.quote_approved_at || now.toISOString(),
+      quote_status: action === "sign" ? "signed" : action === "decline" ? "declined" : "approved",
+      quote_approved_at: action === "decline" ? job.quote_approved_at || null : job.quote_approved_at || now.toISOString(),
       quote_approved_by_name: contactName || job.quote_approved_by_name || "",
       quote_approved_by_email:
         contactEmail || job.quote_approved_by_email || "",
       updated_at: now.toISOString(),
-      status: "Active",
+      status: action === "decline" ? "Pending" : "Active",
     };
 
     if (action === "sign") {
@@ -242,7 +246,7 @@ export async function POST(request, { params }) {
           quoteApprovedAt:
             update.quote_approved_at instanceof Date
               ? update.quote_approved_at.toISOString()
-              : update.quote_approved_at,
+              : update.quote_approved_at || "",
           quoteSignedAt:
             update.quote_signed_at instanceof Date
               ? update.quote_signed_at.toISOString()

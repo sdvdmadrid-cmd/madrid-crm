@@ -133,6 +133,8 @@ const PUBLIC_PATHS = [
   "/robots.txt",
   "/public",
   "/api/public",
+  "/quote",
+  "/estimate",
   "/site",
   "/legal",
   "/legal-required",
@@ -151,6 +153,8 @@ const LEGAL_BYPASS_PREFIXES = [
   "/api/auth",
   "/api/legal",
   "/api/public",
+  "/quote",
+  "/estimate",
   "/api/health",
   "/api/payments/webhooks",
   "/api/email",
@@ -274,6 +278,18 @@ function notFoundResponse() {
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
+
+  // Legacy public quote links may use /quotes/<token>. Redirect those to /quote/<token>
+  // so clients never land on authenticated dashboard routes.
+  if (pathname.startsWith("/quotes/")) {
+    const maybeToken = String(pathname.split("/")[2] || "").trim();
+    const isTokenLike = /^[a-zA-Z0-9_]{24,}$/.test(maybeToken);
+    if (isTokenLike) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = `/quote/${maybeToken}`;
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
 
   if (AUTH_DEBUG) {
     console.info("[middleware] entry", {

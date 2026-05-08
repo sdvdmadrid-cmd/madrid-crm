@@ -110,11 +110,13 @@ export default function AuthShell({ children }) {
     { value: "pl", label: "🇵🇱 Polski" },
   ];
   const isPublicQuotePage = pathname?.startsWith("/quote/");
+  const isPublicEstimatePage = pathname?.startsWith("/estimate/");
   const isPublicSitePage = pathname?.startsWith("/site/");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";
   const isPublicPage =
     isPublicQuotePage ||
+    isPublicEstimatePage ||
     isPublicSitePage ||
     isPublicLegalPage ||
     isMarketingHomePage ||

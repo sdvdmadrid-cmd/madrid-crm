@@ -23,13 +23,17 @@ const UI_I18N = {
     balanceDue: "Balance due",
     scopeDetails: "Scope of Work",
     acceptQuote: "Accept Quote",
+    declineQuote: "Decline Quote",
     requestChanges: "Request Changes",
     approveSection: "Accept this quote",
     approveDesc:
       "Enter your name to confirm acceptance. Add a digital signature if required.",
     requestSection: "Request changes",
+    declineSection: "Decline this quote",
     requestDesc:
       "Describe what you'd like changed and we'll review it promptly.",
+    declineDesc:
+      "If this quote does not work for you, you can decline it now.",
     yourName: "Your full name",
     yourEmail: "Your email (optional)",
     yourSignature: "Type your signature (optional)",
@@ -42,6 +46,7 @@ const UI_I18N = {
     processing: "Processing…",
     confirmApprove: "Confirm acceptance",
     confirmSign: "Confirm & sign",
+    confirmDecline: "Confirm decline",
     sendRequest: "Send request",
     successApproved: "Quote accepted successfully!",
     successSigned: "Quote signed successfully!",
@@ -49,10 +54,13 @@ const UI_I18N = {
       "The contractor has been notified. We'll be in touch with next steps.",
     successSignedSub:
       "Thank you for signing. The contractor has been notified.",
+    successDeclined: "Quote declined",
+    successDeclinedSub: "We've recorded your response. Thank you.",
     successRequestSub: "We'll review your request and get back to you soon.",
     successRequest: "Request sent successfully!",
     alreadyApproved: "This quote has been accepted",
     alreadySigned: "This quote has been signed",
+    alreadyDeclined: "This quote has been declined",
     changesRequested: "Changes have been requested",
     approvedBy: "Accepted by",
     signedBy: "Signed by",
@@ -91,12 +99,16 @@ const UI_I18N = {
     balanceDue: "Saldo a pagar",
     scopeDetails: "Alcance del trabajo",
     acceptQuote: "Aceptar cotización",
+    declineQuote: "Rechazar cotización",
     requestChanges: "Solicitar cambios",
     approveSection: "Aceptar esta cotización",
     approveDesc:
       "Ingresa tu nombre para confirmar. Opcionalmente puedes agregar una firma digital.",
     requestSection: "Solicitar cambios",
+    declineSection: "Rechazar esta cotización",
     requestDesc: "Describe lo que deseas cambiar y lo revisaremos pronto.",
+    declineDesc:
+      "Si esta cotización no te funciona, puedes rechazarla ahora.",
     yourName: "Tu nombre completo",
     yourEmail: "Tu email (opcional)",
     yourSignature: "Escribe tu firma (opcional)",
@@ -109,16 +121,20 @@ const UI_I18N = {
     processing: "Procesando…",
     confirmApprove: "Confirmar aceptación",
     confirmSign: "Confirmar y firmar",
+    confirmDecline: "Confirmar rechazo",
     sendRequest: "Enviar solicitud",
     successApproved: "¡Cotización aceptada con éxito!",
     successSigned: "¡Cotización firmada con éxito!",
     successApprovedSub:
       "El contratista fue notificado. Te contactaremos con los próximos pasos.",
     successSignedSub: "Gracias por firmar. El contratista fue notificado.",
+    successDeclined: "Cotización rechazada",
+    successDeclinedSub: "Registramos tu respuesta. Gracias.",
     successRequestSub: "Revisaremos tu solicitud y te contactaremos pronto.",
     successRequest: "¡Solicitud enviada con éxito!",
     alreadyApproved: "Esta cotización ya fue aceptada",
     alreadySigned: "Esta cotización ya fue firmada",
+    alreadyDeclined: "Esta cotización fue rechazada",
     changesRequested: "Se solicitaron cambios",
     approvedBy: "Aceptado por",
     signedBy: "Firmado por",
@@ -158,12 +174,16 @@ const UI_I18N = {
     balanceDue: "Pozostałe saldo",
     scopeDetails: "Zakres prac",
     acceptQuote: "Akceptuj wycenę",
+    declineQuote: "Odrzuć wycenę",
     requestChanges: "Poproś o zmiany",
     approveSection: "Zaakceptuj tę wycenę",
     approveDesc:
       "Wpisz imię, aby potwierdzić akceptację. Możesz też dodać podpis cyfrowy.",
     requestSection: "Poproś o zmiany",
+    declineSection: "Odrzuć tę wycenę",
     requestDesc: "Opisz co chcesz zmienić, a my to przejrzymy.",
+    declineDesc:
+      "Jeśli ta wycena Ci nie odpowiada, możesz ją teraz odrzucić.",
     yourName: "Twoje imię i nazwisko",
     yourEmail: "Twój email (opcjonalnie)",
     yourSignature: "Wpisz podpis (opcjonalnie)",
@@ -176,6 +196,7 @@ const UI_I18N = {
     processing: "Przetwarzanie…",
     confirmApprove: "Potwierdź akceptację",
     confirmSign: "Potwierdź i podpisz",
+    confirmDecline: "Potwierdź odrzucenie",
     sendRequest: "Wyślij prośbę",
     successApproved: "Wycena zaakceptowana pomyślnie!",
     successSigned: "Wycena podpisana pomyślnie!",
@@ -183,10 +204,13 @@ const UI_I18N = {
       "Wykonawca został powiadomiony. Wkrótce się skontaktujemy.",
     successSignedSub:
       "Dziękujemy za podpisanie. Wykonawca został powiadomiony.",
+    successDeclined: "Wycena odrzucona",
+    successDeclinedSub: "Zapisaliśmy Twoją odpowiedź. Dziękujemy.",
     successRequestSub: "Przejrzymy Twoją prośbę i wkrótce się odezwiemy.",
     successRequest: "Prośba wysłana pomyślnie!",
     alreadyApproved: "Ta wycena została zaakceptowana",
     alreadySigned: "Ta wycena została podpisana",
+    alreadyDeclined: "Ta wycena została odrzucona",
     changesRequested: "Zgłoszono prośbę o zmiany",
     approvedBy: "Zaakceptował",
     signedBy: "Podpisał",
@@ -265,7 +289,7 @@ export default function QuoteClientPage() {
 
   const [activePanel, setActivePanel] = useState(null); // null | "approve" | "changes"
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(""); // "" | "approved" | "signed" | "changes"
+  const [success, setSuccess] = useState(""); // "" | "approved" | "signed" | "declined" | "changes"
   const [formError, setFormError] = useState("");
 
   const [approvalForm, setApprovalForm] = useState({
@@ -351,13 +375,13 @@ export default function QuoteClientPage() {
   );
 
   const quoteStatus = String(job.quoteStatus || "sent").toLowerCase();
-  const isFinalized = quoteStatus === "approved" || quoteStatus === "signed";
+  const isFinalized = quoteStatus === "approved" || quoteStatus === "signed" || quoteStatus === "declined";
   const isSigned = quoteStatus === "signed";
   const changesWereRequested = quoteStatus === "changes_requested";
 
   const submitApproval = async (action) => {
     setFormError("");
-    if (!approvalForm.contactName.trim()) {
+    if (action !== "decline" && !approvalForm.contactName.trim()) {
       setFormError(t.errors.nameRequired);
       return;
     }
@@ -382,7 +406,7 @@ export default function QuoteClientPage() {
         ...prev,
         job: { ...(prev?.job || {}), ...data.data },
       }));
-      setSuccess(action === "sign" ? "signed" : "approved");
+      setSuccess(action === "sign" ? "signed" : action === "decline" ? "declined" : "approved");
       setActivePanel(null);
     } catch (err) {
       setFormError(err.message || t.errors.submit);
@@ -515,7 +539,8 @@ export default function QuoteClientPage() {
 
   // ── Post-action success screen ─────────────────────────────────────────────
   if (success) {
-    const isGreen = success !== "changes";
+    const isGreen = success !== "changes" && success !== "declined";
+    const isDeclined = success === "declined";
     return (
       <div
         style={{
@@ -547,7 +572,7 @@ export default function QuoteClientPage() {
               width: 72,
               height: 72,
               borderRadius: "50%",
-              background: isGreen ? "#dcfce7" : "#fef3c7",
+              background: isDeclined ? "#ffe4e6" : isGreen ? "#dcfce7" : "#fef3c7",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -555,7 +580,7 @@ export default function QuoteClientPage() {
               fontSize: 32,
             }}
           >
-            {isGreen ? "✓" : "✎"}
+            {isDeclined ? "!" : isGreen ? "✓" : "✎"}
           </div>
           <div
             style={{
@@ -569,6 +594,8 @@ export default function QuoteClientPage() {
               ? t.successApproved
               : success === "signed"
                 ? t.successSigned
+                : success === "declined"
+                  ? t.successDeclined
                 : t.successRequest}
           </div>
           <div
@@ -583,6 +610,8 @@ export default function QuoteClientPage() {
               ? t.successApprovedSub
               : success === "signed"
                 ? t.successSignedSub
+                : success === "declined"
+                  ? t.successDeclinedSub
                 : t.successRequestSub}
           </div>
           <div
@@ -612,6 +641,7 @@ export default function QuoteClientPage() {
   const statusColors = {
     approved: { bg: "#f0fdf4", border: "#bbf7d0", text: "#166534", icon: "✓" },
     signed: { bg: "#f0fdf4", border: "#bbf7d0", text: "#166534", icon: "✓" },
+    declined: { bg: "#fff1f2", border: "#fecdd3", text: "#9f1239", icon: "!" },
     changes_requested: {
       bg: "#fffbeb",
       border: "#fde68a",
@@ -758,7 +788,9 @@ export default function QuoteClientPage() {
                       color: statusInfo.text,
                     }}
                   >
-                    {isSigned
+                    {quoteStatus === "declined"
+                      ? t.alreadyDeclined
+                      : isSigned
                       ? t.alreadySigned
                       : isFinalized
                         ? t.alreadyApproved
@@ -1017,6 +1049,17 @@ export default function QuoteClientPage() {
                     }}
                   >
                     ✓ {t.acceptQuote}
+                  </button>
+                  <button
+                    type="button"
+                    className="q-btn-changes"
+                    onClick={() => {
+                      setActivePanel(null);
+                      setFormError("");
+                      submitApproval("decline");
+                    }}
+                  >
+                    ! {t.declineQuote}
                   </button>
                   {!changesWereRequested && (
                     <button
