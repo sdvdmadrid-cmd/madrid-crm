@@ -8,6 +8,16 @@ import {
 
 // Tabla relacional: estimate_builder
 
+async function nextEstimateBuilderNumber(tenantId) {
+  const { count, error } = await supabaseAdmin
+    .from("estimate_builder")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+
+  if (error) throw new Error(error.message);
+  return `EST-${String(Number(count || 0) + 1).padStart(4, "0")}`;
+}
+
 const serialize = (doc) => {
   const createdAt = doc.created_at || doc.createdAt || null;
   const updatedAt = doc.updated_at || doc.updatedAt || null;
@@ -76,8 +86,12 @@ export async function POST(request) {
     const body = await request.json();
     const nowIso = new Date().toISOString();
 
+    const estimateNumber = String(body.estimate_number || body.estimateNumber || "").trim() ||
+      await nextEstimateBuilderNumber(tenantDbId);
+
     const toInsert = {
       ...body,
+      estimate_number: estimateNumber,
       tenant_id: tenantDbId,
       user_id: userId || null,
       created_by: userId || null,

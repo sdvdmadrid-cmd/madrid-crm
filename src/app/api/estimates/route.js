@@ -171,6 +171,16 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
+async function nextEstimateNumber(tenantId) {
+  const { count, error } = await supabaseAdmin
+    .from(ESTIMATES_TABLE)
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+
+  if (error) throw new Error(error.message);
+  return `EST-${String(Number(count || 0) + 1).padStart(4, "0")}`;
+}
+
 export async function GET(request) {
   try {
     const { tenantDbId, role, authenticated } =
@@ -218,7 +228,7 @@ export async function POST(request) {
     }
 
     const estimateNumber = String(body.estimateNumber || "").trim() ||
-      `EST-${String(Date.now()).slice(-6)}`;
+      await nextEstimateNumber(tenantDbId);
 
     const { data, error } = await supabaseAdmin
       .from(ESTIMATES_TABLE)

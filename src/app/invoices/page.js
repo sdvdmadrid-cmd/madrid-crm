@@ -152,6 +152,8 @@ export default function InvoicesPage() {
   const [openPaymentFormId, setOpenPaymentFormId] = useState("");
   const [savingPaymentId, setSavingPaymentId] = useState("");
   const [error, setError] = useState("");
+  const [quoteLookup, setQuoteLookup] = useState(null);
+  const [quoteLookupLoading, setQuoteLookupLoading] = useState(false);
 
   const mapUiError = (err, fallbackText) => {
     const raw = String(err?.message || "").trim();
@@ -251,6 +253,7 @@ export default function InvoicesPage() {
   const resetForm = () => {
     setForm(initialInvoice);
     setSelectedId(null);
+    setQuoteLookup(null);
   };
 
   const saveInvoice = async () => {
@@ -323,6 +326,7 @@ export default function InvoicesPage() {
       notes: invoice.notes || "",
     });
     setSelectedId(invoice._id);
+    setQuoteLookup(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -522,6 +526,24 @@ export default function InvoicesPage() {
     [getInvoiceCheckoutUrl, t],
   );
 
+  const lookupEstimate = useCallback(async (rawValue) => {
+    const q = String(rawValue || "").trim();
+    if (!q) { setQuoteLookup(null); return; }
+    setQuoteLookupLoading(true);
+    setQuoteLookup(null);
+    try {
+      const res = await apiFetch(`/api/estimates/lookup?q=${encodeURIComponent(q)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setQuoteLookup(json.data || null);
+      }
+    } catch {
+      // silent — lookup is optional
+    } finally {
+      setQuoteLookupLoading(false);
+    }
+  }, []);
+
   return (
     <main
       style={{
@@ -610,17 +632,67 @@ export default function InvoicesPage() {
                 }}
               />
               <input
-                placeholder="Quote ID"
+                placeholder="Estimate / Quote # (e.g. EST-0002 or #2)"
                 value={form.quoteNumber}
                 onChange={(e) =>
                   setForm({ ...form, quoteNumber: e.target.value })
                 }
+                onBlur={(e) => lookupEstimate(e.target.value)}
                 style={{
                   padding: "12px",
                   borderRadius: "10px",
                   border: "1px solid #ccc",
                 }}
               />
+              {quoteLookupLoading && (
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: -6 }}>
+                  Searching estimates…
+                </div>
+              )}
+              {quoteLookup && (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  background: "#f0fdf4",
+                  border: "1px solid #86efac",
+                  borderRadius: "8px",
+                  padding: "8px 12px",
+                  fontSize: 13,
+                  marginTop: -6,
+                }}>
+                  <span>
+                    ✓ <strong>{quoteLookup.estimateNumber}</strong> — {quoteLookup.clientName || "Unknown client"}
+                    {quoteLookup.total > 0 && ` · $${Number(quoteLookup.total).toFixed(2)}`}
+                  </span>
+                  {quoteLookup.clientName && !form.clientName && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(f => ({
+                          ...f,
+                          clientName: quoteLookup.clientName,
+                          quoteNumber: quoteLookup.estimateNumber,
+                        }));
+                        setQuoteLookup(null);
+                      }}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        border: "1px solid #22c55e",
+                        background: "#fff",
+                        color: "#16a34a",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontSize: 12,
+                      }}
+                    >
+                      Use client
+                    </button>
+                  )}
+                </div>
+              )}
               <input
                 placeholder={t("invoices.placeholders.amount")}
                 value={form.amount}
