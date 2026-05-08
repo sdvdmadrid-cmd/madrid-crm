@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
-const ALLOWED_ACTIONS = new Set(["approved", "changes_requested"]);
+const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 
 function parseNotes(notes) {
   const raw = String(notes || "").trim();
@@ -33,10 +33,11 @@ function parseNotes(notes) {
   };
 }
 
-function stringifyNotes({ address = "", noteText = "", clientEmail = "", audit = {} }) {
+function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", requestedItems = null, audit = {} }) {
   return JSON.stringify({
     kind: "estimate_pipeline",
-    address, noteText, clientEmail,
+    address, noteText, clientEmail, clientPhone,
+    ...(requestedItems !== null ? { requestedItems } : {}),
     audit: {
       sentAt: String(audit.sentAt || ""),
       approvedAt: String(audit.approvedAt || ""),
@@ -68,7 +69,7 @@ export async function POST(request, { params }) {
 
   const action = String(body.action || "").trim().toLowerCase();
   if (!ALLOWED_ACTIONS.has(action)) {
-    return json({ success: false, error: "Invalid action. Use 'approved' or 'changes_requested'" }, 400);
+    return json({ success: false, error: "Invalid action. Use 'approved', 'declined', or 'changes_requested'" }, 400);
   }
 
   const { data: existing, error: fetchErr } = await supabaseAdmin
@@ -88,13 +89,26 @@ export async function POST(request, { params }) {
   const parsedNotes = parseNotes(existing.notes);
   const audit = { ...parsedNotes.audit };
   if (action === "approved") audit.approvedAt = nowIso;
+  if (action === "declined") audit.declinedAt = nowIso;
   if (action === "changes_requested") audit.changesRequestedAt = nowIso;
+
+  // Store client note and requested item changes (add/remove)
+  const clientNote = String(body.note || "").trim();
+  const requestedItems = Array.isArray(body.requestedItems) ? body.requestedItems : null;
+  const updatedNoteText = clientNote
+    ? (parsedNotes.noteText ? `${parsedNotes.noteText}\n\nClient note: ${clientNote}` : `Client note: ${clientNote}`)
+    : parsedNotes.noteText;
 
   const { error: updateErr } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
     .update({
       status: action,
-      notes: stringifyNotes({ ...parsedNotes, audit }),
+      notes: stringifyNotes({
+        ...parsedNotes,
+        noteText: updatedNoteText,
+        requestedItems,
+        audit,
+      }),
       updated_at: nowIso,
     })
     .eq("id", id);
