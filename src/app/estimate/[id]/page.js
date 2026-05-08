@@ -114,7 +114,7 @@ export default function EstimateClientPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-sm text-slate-500">Loading estimateâ€¦</div>
+        <div className="text-sm text-slate-500">Loading estimate...</div>
       </div>
     );
   }
@@ -180,7 +180,7 @@ export default function EstimateClientPage() {
                 const total = Number(s.price ?? (qty * unit));
                 return (
                   <div key={s.id || i} className="grid grid-cols-[1fr_60px_90px_80px] gap-2 text-sm text-slate-800">
-                    <span className="font-medium">{s.name || "â€”"}</span>
+                    <span className="font-medium">{s.name || "-"}</span>
                     <span className="text-right text-slate-600">{qty}</span>
                     <span className="text-right text-slate-600">{formatMoney(unit)}</span>
                     <span className="text-right font-semibold">{formatMoney(total)}</span>
@@ -268,7 +268,7 @@ export default function EstimateClientPage() {
                         onClick={() => removeNewItem(idx)}
                         className="ml-2 text-rose-500 hover:text-rose-700 font-bold text-lg leading-none"
                       >
-                        Ã—
+                        x
                       </button>
                     </div>
                   ))}
@@ -304,7 +304,7 @@ export default function EstimateClientPage() {
                   <textarea
                     value={changesNote}
                     onChange={(e) => setChangesNote(e.target.value)}
-                    placeholder="Describe any other changes you'd likeâ€¦"
+                    placeholder="Describe any other changes you'd like..."
                     rows={3}
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500"
                   />
@@ -319,7 +319,7 @@ export default function EstimateClientPage() {
                     disabled={actionLoading}
                     className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white hover:bg-amber-400 disabled:opacity-60"
                   >
-                    {actionLoading ? "Sendingâ€¦" : "Send Change Request"}
+                    {actionLoading ? "Sending..." : "Send Change Request"}
                   </button>
                   <button
                     type="button"
@@ -338,7 +338,7 @@ export default function EstimateClientPage() {
                   disabled={actionLoading}
                   className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                 >
-                  {actionLoading ? "Processingâ€¦" : "âœ“ Approve Estimate"}
+                  {actionLoading ? "Processing..." : "Approve Estimate"}
                 </button>
                 <button
                   type="button"
@@ -346,7 +346,7 @@ export default function EstimateClientPage() {
                   disabled={actionLoading}
                   className="w-full rounded-xl border border-amber-400 py-3 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
                 >
-                  âœ Request Changes / Modify Items
+                  Request Changes / Modify Items
                 </button>
                 <button
                   type="button"
@@ -354,7 +354,7 @@ export default function EstimateClientPage() {
                   disabled={actionLoading}
                   className="w-full rounded-xl border border-rose-300 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60"
                 >
-                  {actionLoading ? "Processingâ€¦" : "âœ• Decline Estimate"}
+                  {actionLoading ? "Processing..." : "Decline Estimate"}
                 </button>
                 {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
               </div>
@@ -376,7 +376,7 @@ export default function EstimateClientPage() {
               : actionDone === "declined" ? "text-rose-700"
               : "text-amber-700"
             }`}>
-              {actionDone === "approved" ? "âœ“ Estimate Approved!"
+              {actionDone === "approved" ? "Estimate Approved!"
                 : actionDone === "declined" ? "Estimate Declined"
                 : "Changes Requested"}
             </div>
@@ -397,7 +397,7 @@ export default function EstimateClientPage() {
             onClick={() => window.print()}
             className="text-xs text-slate-400 hover:text-slate-600"
           >
-            ðŸ–¨ Print / Save as PDF
+            Print / Save as PDF
           </button>
         </div>
       </div>

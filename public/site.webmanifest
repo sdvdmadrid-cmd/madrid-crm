@@ -8,24 +8,24 @@
   "theme_color": "#0f172a",
   "icons": [
     {
-      "src": "/apple-touch-icon-v3.png",
+      "src": "/apple-touch-icon.png?v=4",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/apple-touch-icon-v3.png",
+      "src": "/apple-touch-icon.png?v=4",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/favicon-32x32.png?v=3",
+      "src": "/favicon-32x32.png?v=4",
       "sizes": "32x32",
       "type": "image/png"
     },
     {
-      "src": "/favicon-16x16.png?v=3",
+      "src": "/favicon-16x16.png?v=4",
       "sizes": "16x16",
       "type": "image/png"
     }
