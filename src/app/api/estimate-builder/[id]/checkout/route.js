@@ -187,7 +187,10 @@ export async function POST(request, { params }) {
 
     if (!getStripeSecretKey()) {
       await supabaseAdmin.from(INVOICES).delete().eq("id", createdInvoiceId);
-      return jsonResponse({ success: false, error: "Missing STRIPE_SECRET_KEY" }, 500);
+      return jsonResponse(
+        { success: false, error: "Online payments are not configured" },
+        503,
+      );
     }
 
     const checkout = await createStripeCheckoutSessionForAccess({

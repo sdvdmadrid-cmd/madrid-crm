@@ -60,7 +60,11 @@ function isSuperAdmin(role) {
 }
 
 function buildResourceError(message, status = 409) {
-  return jsonResponse({ success: false, error: message }, status);
+  const normalizedMessage =
+    String(message || "") === "Missing STRIPE_SECRET_KEY"
+      ? "Online payments are not configured"
+      : message;
+  return jsonResponse({ success: false, error: normalizedMessage }, status);
 }
 
 function loadLocalEnvMap() {

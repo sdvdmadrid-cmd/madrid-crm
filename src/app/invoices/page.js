@@ -140,6 +140,9 @@ function IconTrash() {
 export default function InvoicesPage() {
   const { t } = useTranslation();
   const { capabilities } = useCurrentUserAccess();
+  const stripePublishableConfigured = Boolean(
+    String(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim(),
+  );
   const [invoices, setInvoices] = useState([]);
   const [form, setForm] = useState(initialInvoice);
   const [selectedId, setSelectedId] = useState(null);
@@ -149,6 +152,18 @@ export default function InvoicesPage() {
   const [openPaymentFormId, setOpenPaymentFormId] = useState("");
   const [savingPaymentId, setSavingPaymentId] = useState("");
   const [error, setError] = useState("");
+
+  const mapUiError = (err, fallbackText) => {
+    const raw = String(err?.message || "").trim();
+    if (!raw) return fallbackText;
+    if (
+      /missing\s+stripe_secret_key/i.test(raw) ||
+      /online payments are not configured/i.test(raw)
+    ) {
+      return t("invoices.errors.stripeCheckoutMissing");
+    }
+    return raw;
+  };
 
   const escapeHtml = (value) =>
     String(value ?? "")
@@ -223,8 +238,7 @@ export default function InvoicesPage() {
       const data = await getJsonOrThrow(res, t("invoices.errors.fetch"));
       setInvoices(data);
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.load"));
+      setError(mapUiError(err, t("invoices.errors.load")));
     } finally {
       setLoading(false);
     }
@@ -262,8 +276,7 @@ export default function InvoicesPage() {
       );
       resetForm();
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.saveFallback"));
+      setError(mapUiError(err, t("invoices.errors.saveFallback")));
     }
   };
 
@@ -289,8 +302,7 @@ export default function InvoicesPage() {
         notes: result.data.notes || current.notes,
       }));
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.aiFallback"));
+      setError(mapUiError(err, t("invoices.errors.aiFallback")));
     } finally {
       setAiLoading(false);
     }
@@ -321,8 +333,7 @@ export default function InvoicesPage() {
       setInvoices(invoices.filter((invoice) => invoice._id !== id));
       if (selectedId === id) resetForm();
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.deleteFallback"));
+      setError(mapUiError(err, t("invoices.errors.deleteFallback")));
     }
   };
 
@@ -378,8 +389,9 @@ export default function InvoicesPage() {
         editInvoice(result.data);
       }
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.registerPaymentFallback"));
+      setError(
+        mapUiError(err, t("invoices.errors.registerPaymentFallback")),
+      );
     } finally {
       setSavingPaymentId("");
     }
@@ -410,8 +422,7 @@ export default function InvoicesPage() {
       const checkoutUrl = await getInvoiceCheckoutUrl(invoice);
       window.open(checkoutUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.openCheckoutFallback"));
+      setError(mapUiError(err, t("invoices.errors.openCheckoutFallback")));
     }
   };
 
@@ -458,8 +469,7 @@ export default function InvoicesPage() {
         window.alert(t("invoices.messages.invoiceSent", { email: sentTo }));
       }
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.sendInvoiceFallback"));
+      setError(mapUiError(err, t("invoices.errors.sendInvoiceFallback")));
     }
   };
 
@@ -492,8 +502,7 @@ export default function InvoicesPage() {
         t("invoices.messages.invoiceTextOpened", { phone: recipientPhone }),
       );
     } catch (err) {
-
-      setError(err.message || t("invoices.errors.sendInvoiceTextFallback"));
+      setError(mapUiError(err, t("invoices.errors.sendInvoiceTextFallback")));
     }
   };
 
@@ -860,7 +869,8 @@ export default function InvoicesPage() {
                       }}
                     />
                   ) : null}
-                  {capabilities.canManageSensitiveData
+                  {capabilities.canManageSensitiveData &&
+                    stripePublishableConfigured
                     ? <button
                         type="button"
                         onClick={() => payOnline(invoice)}
