@@ -180,13 +180,13 @@ const TESTIMONIALS = [
   {
     quote: "I went from 5 customers to over 40. All my paperwork is digital now — I don't worry about losing anything.",
     name: "Carlos M.",
-    company: "CM Pro Landscaping",
+    company: "Independent contractor",
     avatar: "C",
   },
   {
     quote: "FieldBase made my business look professional from day one. My clients love being able to approve quotes online.",
     name: "Sarah L.",
-    company: "Bright Clean Services",
+    company: "Small business owner",
     avatar: "S",
   },
 ];
