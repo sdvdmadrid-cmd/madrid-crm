@@ -2,6 +2,7 @@ import "server-only";
 
 import { logEmailAttempt, sendEmail } from "@/lib/email";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+const PUBLIC_BILLING_NAME = String(process.env.PUBLIC_BILLING_NAME || "FieldBase").trim();
 
 /**
  * Send subscription confirmation email
@@ -28,7 +29,7 @@ export async function sendSubscriptionConfirmationEmail({
     day: "numeric",
   });
 
-  const subject = `Welcome to ${planName} on FieldBase`;
+  const subject = `Your ${PUBLIC_BILLING_NAME} subscription is active`;
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -41,14 +42,14 @@ export async function sendSubscriptionConfirmationEmail({
         <p style="margin: 0 0 16px 0; font-size: 14px; color: #666;">Hi ${tenantName || "there"},</p>
         
         <p style="margin: 0 0 16px 0; font-size: 14px; color: #666;">
-          Your subscription to <strong>${planName}</strong> is now active! You have full access to all features.
+          Your <strong>${PUBLIC_BILLING_NAME}</strong> subscription is now active! You have full access to all features.
         </p>
 
         <div style="background: white; border-left: 4px solid #667eea; padding: 16px; margin: 24px 0; border-radius: 4px;">
           <p style="margin: 0; font-size: 14px; color: #333;">
             <strong>Trial Period:</strong> ${trialDays} days free<br />
             <strong>Trial Ends:</strong> ${trialEndFormatted}<br />
-            <strong>Plan:</strong> ${planName}<br />
+            <strong>Plan:</strong> ${PUBLIC_BILLING_NAME}<br />
             <strong>Price:</strong> $35/month after trial
           </p>
         </div>
@@ -64,7 +65,7 @@ export async function sendSubscriptionConfirmationEmail({
         </ul>
 
         <p style="margin: 0 0 16px 0; font-size: 14px; color: #666;">
-          At the end of your trial, your subscription will automatically renew at the regular rate of $35/month. You can cancel anytime from your subscription settings.
+          At the end of your trial, your ${PUBLIC_BILLING_NAME} subscription will automatically renew at the regular rate of $35/month. You can cancel anytime from your subscription settings.
         </p>
 
         <p style="margin: 0; font-size: 14px; color: #666;">
@@ -79,21 +80,21 @@ export async function sendSubscriptionConfirmationEmail({
       </div>
 
       <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">
-        © 2026 FieldBase. All rights reserved.
+        © 2026 ${PUBLIC_BILLING_NAME}. All rights reserved.
       </p>
     </div>
   `;
 
-  const text = `Welcome to FieldBase!
+  const text = `Welcome to ${PUBLIC_BILLING_NAME}!
 
 Hi ${tenantName || "there"},
 
-Your subscription to ${planName} is now active! You have full access to all features.
+Your ${PUBLIC_BILLING_NAME} subscription is now active! You have full access to all features.
 
 SUBSCRIPTION DETAILS:
 - Trial Period: ${trialDays} days free
 - Trial Ends: ${trialEndFormatted}
-- Plan: ${planName}
+- Plan: ${PUBLIC_BILLING_NAME}
 - Price: $35/month after trial
 
 WHAT'S INCLUDED:
@@ -104,11 +105,11 @@ WHAT'S INCLUDED:
 • Mobile app access
 • Priority support
 
-At the end of your trial, your subscription will automatically renew at the regular rate of $35/month. You can cancel anytime from your subscription settings.
+At the end of your trial, your ${PUBLIC_BILLING_NAME} subscription will automatically renew at the regular rate of $35/month. You can cancel anytime from your subscription settings.
 
 If you have any questions or need help getting started, please reach out to our support team.
 
-© 2026 FieldBase. All rights reserved.`;
+© 2026 ${PUBLIC_BILLING_NAME}. All rights reserved.`;
 
   const emailResult = await sendEmail({
     to: email,

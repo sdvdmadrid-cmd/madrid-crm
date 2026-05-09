@@ -21,6 +21,11 @@ const CLIENTS = "clients";
 const INVOICES = "invoices";
 const JOBS = "jobs";
 const PAYMENTS = "payments";
+const PUBLIC_BILLING_NAME = String(process.env.PUBLIC_BILLING_NAME || "FieldBase").trim();
+
+function getStatementDescriptorSuffix() {
+  return PUBLIC_BILLING_NAME.replace(/[^A-Za-z0-9 .*-]/g, "").slice(0, 22) || "FieldBase";
+}
 
 let cachedLocalEnv = null;
 
@@ -134,6 +139,7 @@ export async function createPaymentIntent(amount, currency, metadata) {
       amount,
       currency,
       metadata,
+      statement_descriptor_suffix: getStatementDescriptorSuffix(),
     });
     return paymentIntent;
   } catch (error) {
@@ -527,6 +533,9 @@ export async function createStripeCheckoutSessionForAccess({
         mode: "payment",
         success_url: `${safeBase}/invoices?payment=success&invoiceId=${access.invoice.id}`,
         cancel_url: `${safeBase}/invoices?payment=cancel&invoiceId=${access.invoice.id}`,
+        payment_intent_data: {
+          statement_descriptor_suffix: getStatementDescriptorSuffix(),
+        },
         customer_email:
           String(access.invoice.client_email || "")
             .trim()
@@ -598,8 +607,8 @@ export async function createStripeCheckoutSessionForAccess({
       logSupabaseError(
         "[stripe-payments] payment session update error",
         paymentUpdateError,
-        {
-          invoiceId: access.invoice.id,
+                name: PUBLIC_BILLING_NAME,
+                description: plan.description || `${PUBLIC_BILLING_NAME} subscription`,
           paymentId,
           tenantId: access.invoice.tenant_id,
         },
