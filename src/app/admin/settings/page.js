@@ -145,7 +145,7 @@ export default function PlatformSettingsPage() {
                     color: "#475569",
                   }}
                 >
-                  {settings.emailFrom || "noreply@fieldbaseapp.net"}
+                  {settings.emailFrom || "FieldBase <no-reply@fieldbaseapp.net>"}
                 </div>
               </div>
             </div>

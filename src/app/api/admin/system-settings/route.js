@@ -41,7 +41,7 @@ export async function GET(request) {
     // Gather system settings
     const settings = {
       emailProvider: process.env.EMAIL_PROVIDER || "resend",
-      emailFrom: process.env.EMAIL_FROM || "noreply@fieldbaseapp.net",
+      emailFrom: process.env.EMAIL_FROM || "FieldBase <no-reply@fieldbaseapp.net>",
       stripeApiKey: process.env.STRIPE_SECRET_KEY ? "***configured***" : "⚠ missing",
       sessionSecretStatus: process.env.SESSION_SECRET ? "✓ Configured" : "⚠ Missing",
       lastHealthCheck: new Date().toISOString(),
@@ -105,7 +105,7 @@ export async function POST(request) {
     // In a real system, you'd update environment variables or database
     const settings = {
       emailProvider: process.env.EMAIL_PROVIDER || "resend",
-      emailFrom: process.env.EMAIL_FROM || "noreply@fieldbaseapp.net",
+      emailFrom: process.env.EMAIL_FROM || "FieldBase <no-reply@fieldbaseapp.net>",
       stripeApiKey: process.env.STRIPE_SECRET_KEY ? "***configured***" : "⚠ missing",
       sessionSecretStatus: process.env.SESSION_SECRET ? "✓ Configured" : "⚠ Missing",
       lastHealthCheck: new Date().toISOString(),

@@ -7,7 +7,7 @@ const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "mock")
   .trim()
   .toLowerCase();
 const EMAIL_FROM =
-  String(process.env.EMAIL_FROM || "FieldBase <no-reply@example.com>").trim();
+  String(process.env.EMAIL_FROM || "FieldBase <no-reply@fieldbaseapp.net>").trim();
 const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
 const RESEND_TIMEOUT_MS = Number(process.env.RESEND_TIMEOUT_MS || 4000);
 const EMAIL_WEBHOOK_SECRET = process.env.EMAIL_WEBHOOK_SECRET || "";
