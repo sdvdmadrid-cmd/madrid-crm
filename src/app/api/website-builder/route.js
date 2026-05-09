@@ -13,7 +13,9 @@ const WEBSITE_TABLE = "contractor_websites";
 const DEFAULT_THEME_COLOR = "#1d4ed8";
 
 function buildDefaultWebsiteContent(companyProfile) {
-  const companyName = String(companyProfile?.companyName || "FieldBase").trim() || "FieldBase";
+  const companyName = String(
+    companyProfile?.publicDisplayName || companyProfile?.companyName || "FieldBase",
+  ).trim() || "FieldBase";
 
   return {
     headline: "Win more jobs. Get paid faster. Stay in control.",

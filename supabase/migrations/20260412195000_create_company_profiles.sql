@@ -3,6 +3,7 @@ begin;
 create table if not exists public.company_profiles (
   tenant_id text primary key,
   company_name text not null default '',
+  public_display_name text not null default '',
   business_type text not null default '',
   logo_data_url text not null default '',
   website_url text not null default '',

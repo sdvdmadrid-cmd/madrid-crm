@@ -155,7 +155,8 @@ export async function POST(request, { params }) {
     });
 
     const template = buildInvoiceEmailTemplate({
-      companyName: companyProfile?.companyName || "FieldBase",
+      companyName:
+        companyProfile?.publicDisplayName || companyProfile?.companyName || "FieldBase",
       clientName: invoice.client_name || "Client",
       invoiceNumber: invoice.invoice_number || "Invoice",
       invoiceTitle: invoice.invoice_title || "Service invoice",

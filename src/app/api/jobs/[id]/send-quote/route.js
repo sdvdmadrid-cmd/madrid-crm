@@ -210,7 +210,8 @@ export async function POST(request, { params }) {
     const companyProfile = await getCompanyProfileByTenant({
       tenantId: tenantDbId,
     });
-    const companyName = companyProfile?.companyName || "FieldBase";
+    const companyName =
+      companyProfile?.publicDisplayName || companyProfile?.companyName || "FieldBase";
 
     const template = buildEmailTemplate({
       companyName,

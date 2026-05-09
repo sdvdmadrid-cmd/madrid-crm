@@ -44,7 +44,7 @@ export async function POST(request) {
     tenantId: access.tenantDbId,
   });
 
-  const companyName = profile.companyName || "Our Company";
+  const companyName = profile.publicDisplayName || profile.companyName || "Our Company";
   const businessType = profile.businessType || "contractor";
   const industryProfile = getIndustryProfile(businessType);
   const phone = profile.phone || "";

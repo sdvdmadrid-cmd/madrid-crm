@@ -112,11 +112,11 @@ export default async function PublicContractorSitePage({ params }) {
   // Fetch company profile for contact details
   const { data: tenantProfile } = await supabaseAdmin
     .from("company_profiles")
-    .select("company_name, phone, business_address, logo_data_url, business_type")
+    .select("company_name, public_display_name, phone, business_address, logo_data_url, business_type")
     .eq("tenant_id", data.tenant_id)
     .maybeSingle();
 
-  const companyName = tenantProfile?.company_name || "";
+  const companyName = tenantProfile?.public_display_name || tenantProfile?.company_name || "";
   const phone = tenantProfile?.phone || "";
   const address = tenantProfile?.business_address || "";
   const logoUrl = tenantProfile?.logo_data_url || "";

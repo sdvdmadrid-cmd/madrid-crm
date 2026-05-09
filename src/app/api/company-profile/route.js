@@ -172,6 +172,10 @@ export async function PATCH(request) {
 
     const update = {
       companyName: toLimitedText(body.companyName, 120),
+      publicDisplayName: toLimitedText(
+        body.publicDisplayName || body.publicName,
+        120,
+      ),
       businessType: toLimitedText(body.businessType || body.industry, 80),
       logoDataUrl: sanitizeLogo(body.logoDataUrl),
       websiteUrl: normalizeUrl(body.websiteUrl),

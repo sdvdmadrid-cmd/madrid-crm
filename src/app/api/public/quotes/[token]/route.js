@@ -211,7 +211,11 @@ export async function GET(_request, { params }) {
             quoteSignatureText: job.quote_signature_text || "",
           },
           companyProfile: {
-            companyName: companyProfile?.companyName || "FieldBase",
+            companyName:
+              companyProfile?.publicDisplayName ||
+              companyProfile?.companyName ||
+              "FieldBase",
+            publicDisplayName: companyProfile?.publicDisplayName || "",
             logoDataUrl: companyProfile?.logoDataUrl || "",
             websiteUrl: companyProfile?.websiteUrl || "",
             googleReviewsUrl: companyProfile?.googleReviewsUrl || "",

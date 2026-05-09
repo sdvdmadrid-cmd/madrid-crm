@@ -684,7 +684,7 @@ export default function WebsiteBuilderPage() {
                       <path d="M9 22V12h6v10" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
                     </svg>
                   </div>
-                  {companyProfile?.companyName || "Your Company"}
+                  {companyProfile?.publicDisplayName || companyProfile?.companyName || "Your Company"}
                 </div>
                 <div className="preview-nav-links">
                   <span>Services</span>
@@ -788,7 +788,7 @@ export default function WebsiteBuilderPage() {
               {/* About */}
               {form.aboutText && (
                 <div className="preview-about">
-                  <h2>About {companyProfile?.companyName || "Us"}</h2>
+                  <h2>About {companyProfile?.publicDisplayName || companyProfile?.companyName || "Us"}</h2>
                   <p>{form.aboutText}</p>
                 </div>
               )}
@@ -839,7 +839,7 @@ export default function WebsiteBuilderPage() {
               </div>
 
               <div className="preview-footer">
-                &copy; {new Date().getFullYear()} {companyProfile?.companyName || "Your Company"}. Powered by{" "}
+                &copy; {new Date().getFullYear()} {companyProfile?.publicDisplayName || companyProfile?.companyName || "Your Company"}. Powered by{" "}
                 <a href="https://fieldbaseapp.net" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.7)" }}>FieldBase</a>
               </div>
             </div>

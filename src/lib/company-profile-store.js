@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: "",
+  publicDisplayName: "",
   businessType: "",
   logoDataUrl: "",
   websiteUrl: "",
@@ -23,6 +24,7 @@ function mapSupabaseRow(row = {}) {
   return {
     tenantId: row?.tenant_id || "",
     companyName: row?.company_name || "",
+    publicDisplayName: row?.public_display_name || "",
     businessType: row?.business_type || "",
     logoDataUrl: row?.logo_data_url || "",
     websiteUrl: row?.website_url || "",
@@ -48,6 +50,8 @@ function toSupabaseRow(tenantId, profile = {}, userId) {
   return {
     tenant_id: tenantId,
     company_name: profile.companyName || "",
+    public_display_name:
+      profile.publicDisplayName || profile.companyName || "",
     business_type: profile.businessType || "",
     logo_data_url: profile.logoDataUrl || "",
     website_url: profile.websiteUrl || "",
