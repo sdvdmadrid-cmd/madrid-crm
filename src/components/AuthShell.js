@@ -1075,6 +1075,11 @@ export default function AuthShell({ children }) {
           label: t("sidebar.billPayments"),
           iconKey: "billPayments",
         },
+        {
+          href: "/subscriptions",
+          label: t("sidebar.subscriptions"),
+          iconKey: "subscriptions",
+        },
       ];
 
   const secondaryNavItems = isSuperAdminRole

@@ -1,0 +1,267 @@
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.header p {
+  font-size: 1rem;
+  color: var(--color-text-secondary, #666);
+  margin: 0;
+}
+
+.errorBanner {
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: #c33;
+  font-size: 0.95rem;
+}
+
+.card {
+  background: white;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.card h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.cardHeader h2 {
+  margin: 0;
+}
+
+.noSubscriptionContent {
+  text-align: center;
+}
+
+.noSubscriptionContent h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.75rem;
+}
+
+.noSubscriptionContent p {
+  font-size: 1.1rem;
+  color: var(--color-text-secondary, #666);
+  margin: 0 0 2rem 0;
+}
+
+.features {
+  background: #f5f5f5;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  text-align: left;
+}
+
+.features h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+}
+
+.features ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.features li {
+  padding: 0.5rem 0;
+  color: var(--color-text-secondary, #666);
+}
+
+.subscriptionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .subscriptionGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.subscriptionDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+.detailRow:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: var(--color-text-secondary, #666);
+  font-weight: 500;
+}
+
+.value {
+  color: var(--color-text-primary, #1a1a1a);
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-info {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.badge-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.badge-warning {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.badge-danger {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.badge-secondary {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.invoicesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.invoiceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #fafafa;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, #e0e0e0);
+}
+
+.invoiceInfo {
+  flex: 1;
+}
+
+.invoiceDate {
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  margin-bottom: 0.25rem;
+}
+
+.invoicePeriod {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #666);
+}
+
+.invoiceAmount {
+  margin: 0 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1a1a1a);
+  min-width: 100px;
+  text-align: right;
+}
+
+.emptyState {
+  text-align: center;
+  color: var(--color-text-secondary, #666);
+  padding: 2rem 0;
+  margin: 0;
+}
+
+.buttonPrimary,
+.buttonDanger {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.buttonPrimary {
+  background-color: #007bff;
+  color: white;
+  margin-top: 1rem;
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.buttonPrimary:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.buttonDanger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.buttonDanger:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.buttonDanger:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-text-secondary, #666);
+  font-size: 1.1rem;
+}

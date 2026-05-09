@@ -657,3 +657,236 @@ export async function attachPlaidBankAccountToStripeCustomer(
 
   return bankAccount;
 }
+
+/**
+ * Get or create a Stripe customer for a tenant
+ */
+export async function getOrCreateStripeCustomer(tenantId, email, name) {
+  const stripe = requireStripeClient();
+
+  // Check if customer already exists in our database
+  const { data: existing, error: queryError } = await supabaseAdmin
+    .from("bill_payment_customers")
+    .select("stripe_customer_id")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (queryError) {
+    throw new Error(`Error querying existing customer: ${queryError.message}`);
+  }
+
+  if (existing?.stripe_customer_id) {
+    return existing.stripe_customer_id;
+  }
+
+  // Create new customer
+  const customer = await stripe.customers.create({
+    email,
+    name,
+    metadata: {
+      tenant_id: tenantId,
+    },
+  });
+
+  // Save to our database
+  const { error: insertError } = await supabaseAdmin
+    .from("bill_payment_customers")
+    .insert({
+      tenant_id: tenantId,
+      stripe_customer_id: customer.id,
+    });
+
+  if (insertError) {
+    console.error("Error saving Stripe customer:", insertError);
+  }
+
+  return customer.id;
+}
+
+/**
+ * Create a subscription for a tenant
+ */
+export async function createContractorSubscription({
+  tenantId,
+  planId,
+  email,
+  name,
+  trialDays = 30,
+}) {
+  const stripe = requireStripeClient();
+
+  // Get or create Stripe customer
+  const stripeCustomerId = await getOrCreateStripeCustomer(
+    tenantId,
+    email,
+    name,
+  );
+
+  // Get the plan details
+  const { data: plan, error: planError } = await supabaseAdmin
+    .from("subscription_plans")
+    .select("*")
+    .eq("id", planId)
+    .single();
+
+  if (planError || !plan) {
+    throw new Error("Subscription plan not found");
+  }
+
+  // Create the subscription with free trial
+  const priceInCents = Math.round(plan.price_monthly * 100);
+
+  const subscription = await stripe.subscriptions.create({
+    customer: stripeCustomerId,
+    items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: plan.name,
+            description: plan.description,
+            metadata: {
+              plan_id: planId,
+            },
+          },
+          unit_amount: priceInCents,
+          recurring: {
+            interval: "month",
+            interval_count: 1,
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    trial_period_days: trialDays,
+    metadata: {
+      tenant_id: tenantId,
+      plan_id: planId,
+    },
+  });
+
+  // Save subscription to database
+  const trialEndsAt = new Date();
+  trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
+
+  const { data: dbSubscription, error: dbError } = await supabaseAdmin
+    .from("contractor_subscriptions")
+    .insert({
+      tenant_id: tenantId,
+      plan_id: planId,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: stripeCustomerId,
+      status: subscription.status || "trialing",
+      trial_ends_at: trialEndsAt.toISOString(),
+      current_period_start: subscription.current_period_start
+        ? new Date(subscription.current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null,
+      metadata: {
+        created_from_api: true,
+      },
+    })
+    .select()
+    .single();
+
+  if (dbError) {
+    throw new Error(`Error saving subscription: ${dbError.message}`);
+  }
+
+  return dbSubscription;
+}
+
+/**
+ * Get current subscription for a tenant
+ */
+export async function getContractorSubscription(tenantId) {
+  const { data, error } = await supabaseAdmin
+    .from("contractor_subscriptions")
+    .select(
+      `
+      id,
+      tenant_id,
+      plan_id,
+      stripe_subscription_id,
+      status,
+      trial_ends_at,
+      current_period_start,
+      current_period_end,
+      cancelled_at,
+      created_at,
+      updated_at,
+      subscription_plans (
+        id,
+        name,
+        price_monthly,
+        features
+      )
+    `,
+    )
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Error fetching subscription: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Cancel a subscription
+ */
+export async function cancelContractorSubscription(subscriptionId) {
+  const stripe = requireStripeClient();
+
+  const { data: subscription, error: queryError } = await supabaseAdmin
+    .from("contractor_subscriptions")
+    .select("stripe_subscription_id")
+    .eq("id", subscriptionId)
+    .single();
+
+  if (queryError) {
+    throw new Error(`Error finding subscription: ${queryError.message}`);
+  }
+
+  // Cancel in Stripe
+  await stripe.subscriptions.del(subscription.stripe_subscription_id);
+
+  // Update in database
+  const { error: updateError } = await supabaseAdmin
+    .from("contractor_subscriptions")
+    .update({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", subscriptionId);
+
+  if (updateError) {
+    throw new Error(`Error updating subscription: ${updateError.message}`);
+  }
+
+  return true;
+}
+
+/**
+ * Get subscription invoices history
+ */
+export async function getSubscriptionInvoices(tenantId, limit = 12) {
+  const { data, error } = await supabaseAdmin
+    .from("subscription_invoices")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Error fetching invoices: ${error.message}`);
+  }
+
+  return data || [];
+}

@@ -16,8 +16,213 @@ import { logSupabaseError } from "@/lib/supabase-db";
 const PAYMENTS = "payments";
 const BILL_PAYMENT_TRANSACTIONS = "bill_payment_transactions";
 const BILLS = "bills";
+const CONTRACTOR_SUBSCRIPTIONS = "contractor_subscriptions";
+const SUBSCRIPTION_INVOICES = "subscription_invoices";
 
 export const runtime = "nodejs";
+
+function getBillPaymentStatusFromEvent(eventType) {
+  if (eventType === "payment_intent.succeeded") return "paid";
+  if (eventType === "payment_intent.processing") return "processing";
+  if (
+    eventType === "payment_intent.payment_failed" ||
+    eventType === "payment_intent.canceled"
+  ) {
+    return "failed";
+  }
+  return "processing";
+}
+
+/**
+ * Handle Stripe subscription events (customer.subscription.*, invoice.*)
+ */
+async function handleSubscriptionEvent(event) {
+  try {
+    if (event.type === "customer.subscription.updated") {
+      const subscription = event.data.object;
+      const metadata = subscription.metadata || {};
+      const tenantId = String(metadata.tenant_id || "");
+
+      if (!tenantId) {
+        return null;
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from(CONTRACTOR_SUBSCRIPTIONS)
+        .update({
+          status: subscription.status,
+          current_period_start: subscription.current_period_start
+            ? new Date(subscription.current_period_start * 1000).toISOString()
+            : null,
+          current_period_end: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_subscription_id", subscription.id);
+
+      if (updateError) {
+        logSupabaseError(
+          "[api/payments/webhooks/stripe][customer.subscription.updated]",
+          updateError,
+          { subscriptionId: subscription.id, tenantId },
+        );
+      }
+      return null;
+    }
+
+    if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object;
+      const metadata = subscription.metadata || {};
+      const tenantId = String(metadata.tenant_id || "");
+
+      if (!tenantId) {
+        return null;
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from(CONTRACTOR_SUBSCRIPTIONS)
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_subscription_id", subscription.id);
+
+      if (updateError) {
+        logSupabaseError(
+          "[api/payments/webhooks/stripe][customer.subscription.deleted]",
+          updateError,
+          { subscriptionId: subscription.id, tenantId },
+        );
+      }
+      return null;
+    }
+
+    if (event.type === "invoice.payment_succeeded") {
+      const invoice = event.data.object;
+      const metadata = invoice.metadata || {};
+      const subscriptionId = String(invoice.subscription || "");
+      const tenantId = String(metadata.tenant_id || "");
+
+      if (!subscriptionId || !tenantId) {
+        return null;
+      }
+
+      // Get subscription to find tenant_id if not in metadata
+      if (!tenantId) {
+        const { data: subscription, error: subError } = await supabaseAdmin
+          .from(CONTRACTOR_SUBSCRIPTIONS)
+          .select("tenant_id")
+          .eq("stripe_subscription_id", subscriptionId)
+          .single();
+
+        if (subError || !subscription) {
+          return null;
+        }
+      }
+
+      const paidAtTimestamp = invoice.paid_at
+        ? new Date(invoice.paid_at * 1000).toISOString()
+        : new Date().toISOString();
+
+      const { error: invoiceInsertError } = await supabaseAdmin
+        .from(SUBSCRIPTION_INVOICES)
+        .upsert(
+          {
+            tenant_id: tenantId,
+            subscription_id: subscriptionId,
+            stripe_invoice_id: invoice.id,
+            amount: invoice.amount_paid / 100,
+            currency: invoice.currency,
+            status: "paid",
+            period_start: invoice.period_start
+              ? new Date(invoice.period_start * 1000).toISOString()
+              : null,
+            period_end: invoice.period_end
+              ? new Date(invoice.period_end * 1000).toISOString()
+              : null,
+            paid_at: paidAtTimestamp,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "stripe_invoice_id" },
+        );
+
+      if (invoiceInsertError) {
+        logSupabaseError(
+          "[api/payments/webhooks/stripe][invoice.payment_succeeded]",
+          invoiceInsertError,
+          { invoiceId: invoice.id, subscriptionId },
+        );
+      }
+      return null;
+    }
+
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object;
+      const subscriptionId = String(invoice.subscription || "");
+      const metadata = invoice.metadata || {};
+      const tenantId = String(metadata.tenant_id || "");
+
+      if (!subscriptionId) {
+        return null;
+      }
+
+      // Get subscription to find tenant_id if not in metadata
+      let actualTenantId = tenantId;
+      if (!actualTenantId) {
+        const { data: subscription, error: subError } = await supabaseAdmin
+          .from(CONTRACTOR_SUBSCRIPTIONS)
+          .select("tenant_id")
+          .eq("stripe_subscription_id", subscriptionId)
+          .single();
+
+        if (subError || !subscription) {
+          return null;
+        }
+        actualTenantId = subscription.tenant_id;
+      }
+
+      const { error: invoiceInsertError } = await supabaseAdmin
+        .from(SUBSCRIPTION_INVOICES)
+        .upsert(
+          {
+            tenant_id: actualTenantId,
+            subscription_id: subscriptionId,
+            stripe_invoice_id: invoice.id,
+            amount: invoice.amount_due / 100,
+            currency: invoice.currency,
+            status: "failed",
+            period_start: invoice.period_start
+              ? new Date(invoice.period_start * 1000).toISOString()
+              : null,
+            period_end: invoice.period_end
+              ? new Date(invoice.period_end * 1000).toISOString()
+              : null,
+            due_at: invoice.due_date
+              ? new Date(invoice.due_date * 1000).toISOString()
+              : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "stripe_invoice_id" },
+        );
+
+      if (invoiceInsertError) {
+        logSupabaseError(
+          "[api/payments/webhooks/stripe][invoice.payment_failed]",
+          invoiceInsertError,
+          { invoiceId: invoice.id, subscriptionId },
+        );
+      }
+      return null;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("[api/payments/webhooks/stripe] subscription event error:", error);
+    return null;
+  }
+}
 
 function getBillPaymentStatusFromEvent(eventType) {
   if (eventType === "payment_intent.succeeded") return "paid";
@@ -266,10 +471,27 @@ export async function POST(request) {
         "payment_intent.processing",
         "payment_intent.payment_failed",
         "payment_intent.canceled",
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
+        "invoice.payment_succeeded",
+        "invoice.payment_failed",
       ].includes(event.type)
     ) {
       return new Response(
         JSON.stringify({ success: true, ignored: true, eventType: event.type }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Handle subscription events
+    if (
+      event.type.startsWith("customer.subscription.") ||
+      event.type.startsWith("invoice.")
+    ) {
+      await handleSubscriptionEvent(event);
+      return new Response(
+        JSON.stringify({ success: true, eventType: event.type }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }

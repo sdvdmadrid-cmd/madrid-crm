@@ -86,3 +86,75 @@ export async function POST(request) {
     );
   }
 }
+
+export async function POST(request) {
+  try {
+    const descriptionEnabled = await isPlatformFeatureEnabled("feature_ai_description", true);
+    if (!descriptionEnabled) {
+      return new Response(
+        JSON.stringify({ success: false, error: "AI description generation is disabled by feature flag" }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const { role, authenticated } = await getAuthenticatedTenantContext(request);
+    if (!authenticated) {
+      return unauthenticatedResponse();
+    }
+
+    if (!canWrite(role)) {
+      return forbiddenResponse();
+    }
+
+    const body = await request.json();
+    const input = String(body.input || "").trim();
+
+    if (!input) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Input is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    let description;
+    try {
+      description = await geminiGenerate({
+        userPrompt: `Rewrite this into a professional contractor estimate description: ${input}`,
+        maxTokens: 200,
+        temperature: 0.6,
+      });
+    } catch (aiErr) {
+      if (aiErr instanceof GeminiConfigError) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Gemini API key is not configured" }),
+          { status: 503, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (aiErr instanceof GeminiApiError) {
+        return new Response(
+          JSON.stringify({ success: false, error: aiErr.message }),
+          { status: 502, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw aiErr;
+    }
+
+    if (!description) {
+      return new Response(
+        JSON.stringify({ success: false, error: "No description returned from AI" }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data: { description } }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  } catch (error) {
+    console.error("[api/generate-description][POST] error", error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+}
