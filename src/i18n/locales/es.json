@@ -94,6 +94,14 @@
     "contracts": "Contratos",
     "branding": "Configuracion de la compania"
   },
+  "platformSettings": {
+    "publicBrandingTitle": "Marca publica",
+    "publicBrandingDescription": "Este nombre se muestra a los contratistas en cotizaciones, paginas del sitio y correos salientes. El nombre legal de la empresa se mantiene privado en el backend.",
+    "publicDisplayNameLabel": "Nombre publico",
+    "publicDisplayNamePlaceholder": "FieldBase",
+    "saveBranding": "Guardar marca",
+    "saving": "Guardando..."
+  },
   "actions": {
     "hideForm": "Ocultar formulario",
     "newClient": "+ Nuevo cliente",

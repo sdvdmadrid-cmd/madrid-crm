@@ -8,6 +8,7 @@ import "@/i18n";
 export default function PlatformSettingsPage() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState({});
+  const [companyProfile, setCompanyProfile] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState({});
@@ -20,9 +21,20 @@ export default function PlatformSettingsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/admin/system-settings");
-      const data = await getJsonOrThrow(res, "Failed to fetch settings");
-      setSettings(data?.data || {});
+      const [systemRes, profileRes] = await Promise.all([
+        apiFetch("/api/admin/system-settings"),
+        apiFetch("/api/company-profile"),
+      ]);
+
+      const systemData = await getJsonOrThrow(systemRes, "Failed to fetch settings");
+      setSettings(systemData?.data || {});
+
+      if (profileRes.ok) {
+        const profileData = await getJsonOrThrow(profileRes, "Failed to fetch company profile");
+        setCompanyProfile(profileData?.data || {});
+      } else {
+        setCompanyProfile({});
+      }
     } catch (err) {
       setError(err.message || "Failed to load settings");
     } finally {
@@ -43,6 +55,24 @@ export default function PlatformSettingsPage() {
       setSettings(data?.data || {});
     } catch (err) {
       setError(err.message || "Failed to update setting");
+    } finally {
+      setSaving((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const updateCompanyProfile = async (key, value) => {
+    setSaving((prev) => ({ ...prev, [key]: true }));
+    setError("");
+    try {
+      const res = await apiFetch("/api/company-profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      const data = await getJsonOrThrow(res, "Failed to update branding");
+      setCompanyProfile(data?.data || {});
+    } catch (err) {
+      setError(err.message || "Failed to update branding");
     } finally {
       setSaving((prev) => ({ ...prev, [key]: false }));
     }
@@ -87,6 +117,84 @@ export default function PlatformSettingsPage() {
 
       {!loading && (
         <div style={{ display: "grid", gap: "20px" }}>
+          {/* Public Branding */}
+          <section
+            style={{
+              padding: "20px",
+              border: "1px solid #e2e8f0",
+              borderRadius: "12px",
+              background: "#fff",
+            }}
+          >
+            <h2 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#0f172a" }}>
+              {t("platformSettings.publicBrandingTitle", "Public branding")}
+            </h2>
+            <p style={{ margin: "0 0 16px 0", fontSize: "13px", color: "#64748b" }}>
+              {t(
+                "platformSettings.publicBrandingDescription",
+                "This name is shown to contractors on quotes, site pages, and outgoing emails. The legal company name stays private in the backend.",
+              )}
+            </p>
+            <div style={{ display: "grid", gap: "12px", maxWidth: 560 }}>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "#334155",
+                    marginBottom: "6px",
+                  }}
+                >
+                  {t("platformSettings.publicDisplayNameLabel", "Public display name")}
+                </label>
+                <input
+                  type="text"
+                  value={companyProfile.publicDisplayName || ""}
+                  onChange={(e) =>
+                    setCompanyProfile((prev) => ({
+                      ...prev,
+                      publicDisplayName: e.target.value,
+                    }))
+                  }
+                  placeholder={t(
+                    "platformSettings.publicDisplayNamePlaceholder",
+                    "FieldBase",
+                  )}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "14px",
+                    color: "#0f172a",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => updateCompanyProfile("publicDisplayName", companyProfile.publicDisplayName || "")}
+                  disabled={Boolean(saving.publicDisplayName)}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    border: 0,
+                    background: "#0f172a",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: saving.publicDisplayName ? "wait" : "pointer",
+                  }}
+                >
+                  {saving.publicDisplayName
+                    ? t("platformSettings.saving", "Saving...")
+                    : t("platformSettings.saveBranding", "Save branding")}
+                </button>
+              </div>
+            </div>
+          </section>
+
           {/* Email Configuration */}
           <section
             style={{

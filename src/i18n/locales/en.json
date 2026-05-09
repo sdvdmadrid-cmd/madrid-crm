@@ -94,6 +94,14 @@
     "contracts": "Contracts",
     "branding": "Company settings"
   },
+  "platformSettings": {
+    "publicBrandingTitle": "Public branding",
+    "publicBrandingDescription": "This name is shown to contractors on quotes, site pages, and outgoing emails. The legal company name stays private in the backend.",
+    "publicDisplayNameLabel": "Public display name",
+    "publicDisplayNamePlaceholder": "FieldBase",
+    "saveBranding": "Save branding",
+    "saving": "Saving..."
+  },
   "actions": {
     "hideForm": "Hide form",
     "newClient": "+ New client",

@@ -94,6 +94,14 @@
     "contracts": "Umowy",
     "branding": "Ustawienia firmy"
   },
+  "platformSettings": {
+    "publicBrandingTitle": "Marka publiczna",
+    "publicBrandingDescription": "Ta nazwa jest widoczna dla wykonawców na wycenach, stronach serwisu i w wiadomościach wychodzących. Prawna nazwa firmy pozostaje prywatna w backendzie.",
+    "publicDisplayNameLabel": "Publiczna nazwa",
+    "publicDisplayNamePlaceholder": "FieldBase",
+    "saveBranding": "Zapisz marke",
+    "saving": "Zapisywanie..."
+  },
   "actions": {
     "hideForm": "Ukryj formularz",
     "newClient": "+ Nowy klient",
