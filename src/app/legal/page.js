@@ -64,10 +64,10 @@ export default function LegalPage() {
             FieldBase
           </Link>
           <span className="text-sm text-gray-500">
-            Legal &amp; Compliance — {VERSION}
+                  href="mailto:legal@fieldbaseapp.net"
           </span>
         </div>
-      </header>
+                  legal@fieldbaseapp.net
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 flex flex-col lg:flex-row gap-10">
         {/* Sidebar navigation */}
@@ -578,10 +578,10 @@ export default function LegalPage() {
               <p className="mt-1">
                 Email:{" "}
                 <a
-                  href="mailto:legal@FieldBase.io"
+                  href="mailto:legal@fieldbaseapp.net"
                   className="text-blue-700 underline"
                 >
-                  legal@FieldBase.io
+                  legal@fieldbaseapp.net
                 </a>
               </p>
             </div>

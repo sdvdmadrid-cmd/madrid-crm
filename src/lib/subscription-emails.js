@@ -3,6 +3,9 @@ import "server-only";
 import { logEmailAttempt, sendEmail } from "@/lib/email";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 const PUBLIC_BILLING_NAME = String(process.env.PUBLIC_BILLING_NAME || "FieldBase").trim();
+const PUBLIC_APP_BASE_URL = String(
+  process.env.APP_BASE_URL || process.env.APP_URL || "https://fieldbaseapp.net",
+).replace(/\/$/, "");
 
 /**
  * Send subscription confirmation email
@@ -74,7 +77,7 @@ export async function sendSubscriptionConfirmationEmail({
       </div>
 
       <div style="background: #667eea; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;">
-        <a href="https://fieldbase.io/subscriptions" style="display: inline-block; background: white; color: #667eea; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; font-size: 14px;">
+        <a href="${PUBLIC_APP_BASE_URL}/subscriptions" style="display: inline-block; background: white; color: #667eea; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; font-size: 14px;">
           Manage Your Subscription
         </a>
       </div>
