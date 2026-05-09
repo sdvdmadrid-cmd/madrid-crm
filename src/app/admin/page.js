@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import AdminDashboardTableClient from "@/components/admin/AdminDashboardTableClient";
 import AdminAiAssistantClient from "@/components/admin/AdminAiAssistantClient";
 import AdminEmailDeliveryClient from "@/components/admin/AdminEmailDeliveryClient";
+import AdminSubscriptionsClient from "@/components/admin/AdminSubscriptionsClient";
 import AdminFeatureFlagsClient from "@/components/admin/AdminFeatureFlagsClient";
 import { verifySessionToken } from "@/lib/auth";
 import { getPlatformFeatureFlagMap } from "@/lib/platform-feature-flags";
@@ -949,6 +950,12 @@ export default async function AdminPage() {
           </div>
           ) : null}
         </section>
+
+        {isModuleEnabled("platform_subscriptions_dashboard", true) ? (
+        <section className="mb-6">
+          <AdminSubscriptionsClient />
+        </section>
+        ) : null}
 
         {isModuleEnabled("platform_stripe_overview", true) ? (
         <section id="stripe-overview" className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-black/20">

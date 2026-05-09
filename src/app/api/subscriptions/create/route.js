@@ -10,6 +10,7 @@ import {
   createContractorSubscription,
   getStripeServerClient,
 } from "@/lib/stripe-payments";
+import { sendSubscriptionConfirmationEmail } from "@/lib/subscription-emails";
 
 /**
  * POST /api/subscriptions/create
@@ -101,6 +102,23 @@ export async function POST(request) {
       name: tenantData.tenant_name || "Contractor",
       trialDays: 30,
     });
+
+    // Send confirmation email
+    const planData = await supabaseAdmin
+      .from("subscription_plans")
+      .select("name, price_monthly")
+      .eq("id", plan.id)
+      .single();
+
+    if (planData.data) {
+      await sendSubscriptionConfirmationEmail({
+        tenantId: context.tenantDbId,
+        email: tenantData.email || context.userEmail,
+        tenantName: tenantData.tenant_name || "Contractor",
+        planName: planData.data.name,
+        trialDays: 30,
+      });
+    }
 
     return new Response(
       JSON.stringify({
