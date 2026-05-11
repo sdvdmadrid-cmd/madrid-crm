@@ -283,6 +283,18 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
   }
 
   const nextStatus = getBillPaymentStatusFromEvent(eventType);
+  const fundingStatus =
+    nextStatus === "paid"
+      ? "funded"
+      : nextStatus === "failed"
+        ? "failed"
+        : "processing";
+  const remittanceStatus =
+    fundingStatus === "funded"
+      ? "pending_submission"
+      : fundingStatus === "failed"
+        ? "blocked"
+        : "pending_funding";
   const nowIso = new Date().toISOString();
   const failureReason =
     intent.last_payment_error?.message ||
@@ -302,6 +314,12 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
       processed_at: nextStatus === "paid" ? nowIso : transaction.processed_at,
       failed_at: nextStatus === "failed" ? nowIso : null,
       failure_reason: nextStatus === "failed" ? failureReason : "",
+      metadata: {
+        funding_status: fundingStatus,
+        remittance_status: remittanceStatus,
+        remittance_channel: "manual_portal",
+        remittance_reference: "",
+      },
       updated_at: nowIso,
     })
     .eq("id", transaction.id)
@@ -323,7 +341,7 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
 
   const nextBillStatus =
     nextStatus === "paid"
-      ? "paid"
+      ? "processing"
       : nextStatus === "processing"
         ? "processing"
         : computeBillStatus({ ...bill, status: "open" });
@@ -332,7 +350,7 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
     .from(BILLS)
     .update({
       status: nextBillStatus,
-      last_paid_at: nextStatus === "paid" ? nowIso : bill.last_paid_at,
+      last_paid_at: bill.last_paid_at,
       last_payment_id: transaction.id,
       updated_at: nowIso,
     })
@@ -363,13 +381,13 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
           : "bill_payment_processing",
     title:
       nextStatus === "paid"
-        ? "Bill payment completed"
+        ? "Funding captured, remittance pending"
         : nextStatus === "failed"
           ? "Bill payment failed"
           : "Bill payment processing",
     message:
       nextStatus === "paid"
-        ? `${bill.provider_name} payment completed successfully.`
+        ? `${bill.provider_name} funding captured. Remittance status: pending submission.`
         : nextStatus === "failed"
           ? `${bill.provider_name} payment failed. ${failureReason}`.trim()
           : `${bill.provider_name} payment is still processing.`,
@@ -377,6 +395,8 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
       billId: bill.id,
       transactionId: transaction.id,
       stripePaymentIntentId: intent.id,
+      fundingStatus,
+      remittanceStatus,
     },
   });
 
@@ -388,8 +408,8 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
       },
       bill: {
         ...bill,
-        status: "paid",
-        last_paid_at: nowIso,
+        status: "processing",
+        last_paid_at: bill.last_paid_at,
         last_payment_id: transaction.id,
       },
     });

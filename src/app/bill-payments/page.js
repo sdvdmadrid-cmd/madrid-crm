@@ -49,6 +49,7 @@ const initialBillForm = {
   providerName: "",
   accountLabel: "",
   accountNumber: "",
+  providerIdentifiers: {},
   amountDue: "",
   minimumAmount: "",
   dueDate: "",
@@ -65,6 +66,15 @@ const REQUIRED_BILL_FIELD_MESSAGES = {
   amountDue: "Amount due is required",
   dueDate: "Due date is required",
 };
+
+function normalizeIdentifierKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 50);
+}
 
 const initialAutopayDraft = {
   enabled: false,
@@ -341,6 +351,24 @@ export default function BillPaymentsPage() {
     () => getBillAccountNumberError(billForm.accountNumber),
     [billForm.accountNumber],
   );
+  const selectedProvider = useMemo(
+    () =>
+      providers.find((provider) => provider.id === billForm.providerId) ||
+      providers.find(
+        (provider) =>
+          String(provider.providerName || "").trim().toLowerCase() ===
+          String(billForm.providerName || "").trim().toLowerCase(),
+      ) ||
+      null,
+    [providers, billForm.providerId, billForm.providerName],
+  );
+  const requiredProviderFields = useMemo(
+    () =>
+      Array.isArray(selectedProvider?.requiredFields)
+        ? selectedProvider.requiredFields
+        : [],
+    [selectedProvider],
+  );
 
   function formatSelectedPaymentMethodLabel(method) {
     if (!method) return "Choose payment method";
@@ -376,6 +404,17 @@ export default function BillPaymentsPage() {
       nextErrors.accountNumber = currentAccountNumberError;
     }
 
+    for (const field of requiredProviderFields) {
+      if (!field?.required) continue;
+      const key = normalizeIdentifierKey(field.key);
+      if (!key || key === "account_number") continue;
+      const value = String(currentForm.providerIdentifiers?.[key] || "").trim();
+      if (!value) {
+        nextErrors[`providerIdentifiers.${key}`] =
+          `${field.label || key} is required`;
+      }
+    }
+
     return nextErrors;
   }
 
@@ -399,6 +438,20 @@ export default function BillPaymentsPage() {
     setBillFormErrors((current) => ({
       ...current,
       accountNumber: "",
+    }));
+  }
+
+  function handleProviderIdentifierChange(key, value) {
+    setBillForm((current) => ({
+      ...current,
+      providerIdentifiers: {
+        ...(current.providerIdentifiers || {}),
+        [key]: value,
+      },
+    }));
+    setBillFormErrors((current) => ({
+      ...current,
+      [`providerIdentifiers.${key}`]: "",
     }));
   }
 
@@ -739,6 +792,7 @@ export default function BillPaymentsPage() {
       providerName: bill.providerName || "",
       accountLabel: bill.accountLabel || "",
       accountNumber: "",
+      providerIdentifiers: bill.providerIdentifiers || {},
       amountDue: String(bill.amountDue || ""),
       minimumAmount:
         bill.minimumAmount == null ? "" : String(bill.minimumAmount),
@@ -786,6 +840,7 @@ export default function BillPaymentsPage() {
               .filter(Boolean),
             isRecurring: billForm.isRecurring,
             frequency: billForm.isRecurring ? billForm.frequency : null,
+            providerIdentifiers: billForm.providerIdentifiers || {},
           }),
         },
       );
@@ -1837,12 +1892,20 @@ export default function BillPaymentsPage() {
                 <input
                   value={billForm.providerName}
                   onChange={(event) => {
+                    const query = event.target.value;
                     setBillForm((current) => ({
                       ...current,
-                      providerName: event.target.value,
+                      providerName: query,
                       providerId: "",
                     }));
+                    setProviderQuery(query);
+                    setProviderPickerOpen(query.trim().length >= 2);
                     setBillFormErrors((current) => ({ ...current, providerName: "" }));
+                  }}
+                  onFocus={() => {
+                    if (providerQuery.trim().length >= 2) {
+                      setProviderPickerOpen(true);
+                    }
                   }}
                   placeholder="Provider / Payee"
                   style={{
@@ -1853,9 +1916,74 @@ export default function BillPaymentsPage() {
                     padding: "12px 14px",
                   }}
                 />
+                {providerPickerOpen && providers.length > 0 && (
+                  <div
+                    style={{
+                      border: "1px solid rgba(15,23,42,0.12)",
+                      borderRadius: 12,
+                      background: "#fff",
+                      maxHeight: 210,
+                      overflowY: "auto",
+                      marginTop: -2,
+                    }}
+                  >
+                    {providers.slice(0, 10).map((provider) => (
+                      <button
+                        key={provider.id}
+                        type="button"
+                        onClick={() => {
+                          setBillForm((current) => ({
+                            ...current,
+                            providerId: provider.id,
+                            providerName: provider.providerName,
+                            category: provider.category || current.category,
+                          }));
+                          setProviderQuery(provider.providerName || "");
+                          setProviderPickerOpen(false);
+                          setBillFormErrors((current) => ({
+                            ...current,
+                            providerName: "",
+                          }));
+                        }}
+                        style={{
+                          width: "100%",
+                          border: 0,
+                          background: "#fff",
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid rgba(15,23,42,0.06)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, color: "#0f172a" }}>
+                          {provider.providerName}
+                        </div>
+                        <div style={{ color: "#64748b", fontSize: 12 }}>
+                          {(provider.category || "general").replace(/_/g, " ")}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {billFormErrors.providerName && (
                   <div style={{ color: "#b91c1c", fontSize: 13, marginTop: -2 }}>
                     {billFormErrors.providerName}
+                  </div>
+                )}
+
+                {selectedProvider?.settlementSupport && (
+                  <div
+                    style={{
+                      borderRadius: 10,
+                      border: "1px solid rgba(14,116,144,0.22)",
+                      background: "rgba(14,116,144,0.08)",
+                      color: "#0c4a6e",
+                      padding: "8px 10px",
+                      fontSize: 12,
+                    }}
+                  >
+                    Remittance: {selectedProvider.remittanceChannel || "manual_portal"} · Support: {selectedProvider.settlementSupport}
+                    {selectedProvider.remittanceNotes ? ` · ${selectedProvider.remittanceNotes}` : ""}
                   </div>
                 )}
 
@@ -1895,6 +2023,40 @@ export default function BillPaymentsPage() {
                     {accountNumberError}
                   </div>
                 )}
+
+                {requiredProviderFields
+                  .filter((field) => normalizeIdentifierKey(field.key) !== "account_number")
+                  .map((field) => {
+                    const key = normalizeIdentifierKey(field.key);
+                    const fieldError = billFormErrors[`providerIdentifiers.${key}`] || "";
+                    return (
+                      <div key={key} style={{ display: "grid", gap: 6 }}>
+                        <label style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>
+                          {field.label || key}
+                          {field.required ? " *" : ""}
+                        </label>
+                        <input
+                          value={billForm.providerIdentifiers?.[key] || ""}
+                          onChange={(event) =>
+                            handleProviderIdentifierChange(key, event.target.value)
+                          }
+                          placeholder={field.hint || field.label || key}
+                          style={{
+                            borderRadius: 12,
+                            border: fieldError
+                              ? "1px solid #dc2626"
+                              : "1px solid rgba(15,23,42,0.12)",
+                            padding: "12px 14px",
+                          }}
+                        />
+                        {fieldError && (
+                          <div style={{ color: "#b91c1c", fontSize: 12 }}>
+                            {fieldError}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <input

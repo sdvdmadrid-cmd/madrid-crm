@@ -3,9 +3,11 @@ import {
   BILL_TABLE,
   buildBillWritePayload,
   computeBillStatus,
+  findBillProvider,
   maybeCreateNextRecurringBill,
   requireBillPaymentsAccess,
   serializeBill,
+  validateProviderRequirementValues,
 } from "@/lib/bill-payments";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -117,6 +119,18 @@ export async function PATCH(request, { params }) {
 
   const body = await request.json().catch(() => ({}));
   try {
+    const provider = await findBillProvider({
+      providerId: body.providerId || currentBill.provider_id,
+      providerName: body.providerName || currentBill.provider_name,
+    });
+    validateProviderRequirementValues({
+      provider,
+      accountNumber:
+        body.accountNumber || currentBill.account_reference_masked || "",
+      providerIdentifiers:
+        body.providerIdentifiers || currentBill.provider_identifiers || {},
+    });
+
     const payload = buildBillWritePayload(body, currentBill);
     payload.status = computeBillStatus({ ...currentBill, ...payload });
     if (payload.status === "paid") {

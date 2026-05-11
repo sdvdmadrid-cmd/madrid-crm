@@ -1,7 +1,7 @@
 export const BILL_ACCOUNT_NUMBER_MIN_LENGTH = 4;
 export const BILL_ACCOUNT_NUMBER_MAX_LENGTH = 25;
 
-const BILL_ACCOUNT_NUMBER_ALLOWED_CHARS = /^\d+$/;
+const BILL_ACCOUNT_NUMBER_ALLOWED_CHARS = /^[A-Za-z0-9-]+$/;
 
 export function normalizeBillAccountNumber(value) {
   return String(value || "")
@@ -29,7 +29,7 @@ export function getBillAccountNumberError(value) {
   if (!normalized) return "";
 
   if (!BILL_ACCOUNT_NUMBER_ALLOWED_CHARS.test(normalized)) {
-    return "Account number must contain digits only";
+    return "Account number can only contain letters, numbers, and dashes";
   }
 
   const comparable = getComparableBillAccountNumber(normalized);

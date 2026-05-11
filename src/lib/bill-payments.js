@@ -31,6 +31,23 @@ export const BILL_PAYMENT_TRANSACTION_TABLE = "bill_payment_transactions";
 export const BILL_AUTOPAY_RULE_TABLE = "bill_autopay_rules";
 export const NOTIFICATIONS_TABLE = "notifications";
 
+const DEFAULT_PROVIDER_REQUIRED_FIELDS = [
+  {
+    key: "account_number",
+    label: "Account number",
+    required: true,
+    hint: "Use the account number exactly as it appears on the bill.",
+  },
+];
+
+const DEFAULT_PROVIDER_REQUIREMENT_PROFILE = {
+  requiredFields: DEFAULT_PROVIDER_REQUIRED_FIELDS,
+  remittanceChannel: "manual_portal",
+  settlementSupport: "funding_only",
+  remittanceNotes:
+    "Funds are captured in-app. Remittance posting to external billers requires biller-network integration.",
+};
+
 export const BILL_STATUSES = new Set([
   "upcoming",
   "open",
@@ -136,7 +153,138 @@ function normalizeStatus(value, allowed, fallback) {
   return allowed.has(normalized) ? normalized : fallback;
 }
 
+function normalizeIdentifierKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 50);
+}
+
+function normalizeProviderRequiredFields(value) {
+  if (!Array.isArray(value)) {
+    return DEFAULT_PROVIDER_REQUIREMENT_PROFILE.requiredFields;
+  }
+
+  const normalized = value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const key = normalizeIdentifierKey(entry.key);
+      if (!key) return null;
+      return {
+        key,
+        label: normalizeText(entry.label || key, 80),
+        required: entry.required !== false,
+        hint: normalizeText(entry.hint || "", 200),
+      };
+    })
+    .filter(Boolean);
+
+  return normalized.length
+    ? normalized
+    : DEFAULT_PROVIDER_REQUIREMENT_PROFILE.requiredFields;
+}
+
+function normalizeProviderRequirementProfile(row) {
+  if (!row || typeof row !== "object") {
+    return DEFAULT_PROVIDER_REQUIREMENT_PROFILE;
+  }
+
+  const requiredFields = normalizeProviderRequiredFields(row.required_fields);
+  const remittanceChannel =
+    normalizeText(row.remittance_channel || "manual_portal", 40) ||
+    DEFAULT_PROVIDER_REQUIREMENT_PROFILE.remittanceChannel;
+  const settlementSupport =
+    normalizeText(row.settlement_support || "funding_only", 40) ||
+    DEFAULT_PROVIDER_REQUIREMENT_PROFILE.settlementSupport;
+  const remittanceNotes =
+    normalizeText(
+      row.remittance_notes || DEFAULT_PROVIDER_REQUIREMENT_PROFILE.remittanceNotes,
+      400,
+    ) || DEFAULT_PROVIDER_REQUIREMENT_PROFILE.remittanceNotes;
+
+  return {
+    requiredFields,
+    remittanceChannel,
+    settlementSupport,
+    remittanceNotes,
+  };
+}
+
+export function normalizeProviderIdentifiers(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const output = {};
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    const key = normalizeIdentifierKey(rawKey);
+    if (!key) continue;
+    const normalized = normalizeText(rawValue, 120);
+    if (!normalized) continue;
+    output[key] = normalized;
+  }
+
+  return output;
+}
+
+export function validateProviderRequirementValues({
+  provider,
+  accountNumber,
+  providerIdentifiers,
+}) {
+  const profile = normalizeProviderRequirementProfile(provider);
+  const identifiers = normalizeProviderIdentifiers(providerIdentifiers);
+  const missing = [];
+
+  for (const field of profile.requiredFields) {
+    if (!field.required) continue;
+    if (field.key === "account_number") {
+      if (!String(accountNumber || "").trim()) {
+        missing.push(field.label || "Account number");
+      }
+      continue;
+    }
+    if (!String(identifiers[field.key] || "").trim()) {
+      missing.push(field.label || field.key);
+    }
+  }
+
+  if (missing.length) {
+    throw new Error(`Missing required bill identifiers: ${missing.join(", ")}`);
+  }
+
+  return profile;
+}
+
+export async function findBillProvider({ providerId, providerName }) {
+  const normalizedId = normalizeUuid(providerId);
+  if (normalizedId) {
+    const { data } = await supabaseAdmin
+      .from(BILL_PROVIDER_TABLE)
+      .select("*")
+      .eq("id", normalizedId)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  const normalizedName = String(providerName || "")
+    .trim()
+    .toLowerCase();
+  if (!normalizedName) return null;
+
+  const { data } = await supabaseAdmin
+    .from(BILL_PROVIDER_TABLE)
+    .select("*")
+    .eq("normalized_name", normalizedName)
+    .maybeSingle();
+
+  return data || null;
+}
+
 export function serializeBillProvider(row) {
+  const profile = normalizeProviderRequirementProfile(row);
   return {
     id: row.id,
     providerName: row.provider_name || "",
@@ -144,6 +292,10 @@ export function serializeBillProvider(row) {
     websiteUrl: row.website_url || "",
     supportPhone: row.support_phone || "",
     searchTerms: Array.isArray(row.search_terms) ? row.search_terms : [],
+    requiredFields: profile.requiredFields,
+    remittanceChannel: profile.remittanceChannel,
+    settlementSupport: profile.settlementSupport,
+    remittanceNotes: profile.remittanceNotes,
   };
 }
 
@@ -158,6 +310,10 @@ export function serializeBill(row, autopayRule = null) {
     providerName: row.provider_name || "",
     accountLabel: row.account_label || "",
     accountReferenceMasked: row.account_reference_masked || "",
+    providerIdentifiers:
+      row.provider_identifiers && typeof row.provider_identifiers === "object"
+        ? row.provider_identifiers
+        : {},
     amountDue: Number(row.amount_due || 0),
     minimumAmount:
       row.minimum_amount == null ? null : Number(row.minimum_amount || 0),
@@ -212,6 +368,9 @@ export function serializeBillPaymentMethod(row) {
 }
 
 export function serializeBillPaymentTransaction(row) {
+  const metadata = row.metadata && typeof row.metadata === "object"
+    ? row.metadata
+    : {};
   return {
     _id: row.id,
     id: row.id,
@@ -231,6 +390,19 @@ export function serializeBillPaymentTransaction(row) {
     processedAt: row.processed_at || null,
     failedAt: row.failed_at || null,
     failureReason: row.failure_reason || "",
+    fundingStatus:
+      String(metadata.funding_status || "").trim() ||
+      (row.status === "paid"
+        ? "funded"
+        : row.status === "failed"
+          ? "failed"
+          : row.status),
+    remittanceStatus:
+      String(metadata.remittance_status || "").trim() ||
+      (row.status === "paid" ? "pending_submission" : "not_started"),
+    remittanceChannel: String(metadata.remittance_channel || "").trim() || "",
+    remittanceReference:
+      String(metadata.remittance_reference || "").trim() || "",
     createdAt: row.created_at || null,
     updatedAt: row.updated_at || null,
   };
@@ -289,10 +461,12 @@ export function buildBillWritePayload(body, currentBill = null) {
   }
 
   const categoryId = String(body.category || "general").trim().toLowerCase();
+  const providerIdentifiers = normalizeProviderIdentifiers(body.providerIdentifiers);
 
   const payload = {
     provider_id: normalizeUuid(body.providerId),
     provider_name: providerName,
+    provider_identifiers: providerIdentifiers,
     account_label: accountLabel,
     amount_due: amountDue,
     minimum_amount: minimumAmount,
@@ -1023,6 +1197,12 @@ export async function createBillPaymentTransaction({
       source: source || "manual",
       bulk_batch_id: bulkBatchId,
       stripe_payment_method_id: paymentMethod?.stripe_payment_method_id || null,
+      metadata: {
+        funding_status: scheduledFor ? "scheduled" : "processing",
+        remittance_status: "not_started",
+        remittance_channel: "manual_portal",
+        remittance_reference: "",
+      },
       scheduled_for: scheduledFor,
       created_at: nowIso,
       updated_at: nowIso,
@@ -1211,6 +1391,19 @@ export async function processBillPayment({
             ? "failed"
             : "processing";
 
+    const fundingStatus =
+      nextStatus === "paid"
+        ? "funded"
+        : nextStatus === "failed"
+          ? "failed"
+          : "processing";
+    const remittanceStatus =
+      fundingStatus === "funded"
+        ? "pending_submission"
+        : fundingStatus === "failed"
+          ? "blocked"
+          : "pending_funding";
+
     const nowIso = new Date().toISOString();
     const { error: updateError } = await supabaseAdmin
       .from(BILL_PAYMENT_TRANSACTION_TABLE)
@@ -1218,6 +1411,12 @@ export async function processBillPayment({
         stripe_payment_intent_id: intent.id,
         status: nextStatus,
         processed_at: nextStatus === "paid" ? nowIso : null,
+        metadata: {
+          funding_status: fundingStatus,
+          remittance_status: remittanceStatus,
+          remittance_channel: "manual_portal",
+          remittance_reference: "",
+        },
         updated_at: nowIso,
       })
       .eq("id", transaction.id)
@@ -1235,13 +1434,12 @@ export async function processBillPayment({
       throw new Error(updateError.message);
     }
 
-    const billStatus = nextStatus === "paid" ? "paid" : "processing";
+    const billStatus = nextStatus === "failed" ? computeBillStatus(bill) : "processing";
     const { error: billUpdateError } = await supabaseAdmin
       .from(BILL_TABLE)
       .update({
         status: billStatus,
-        last_paid_at:
-          nextStatus === "paid" ? nowIso : bill.last_paid_at || null,
+        last_paid_at: bill.last_paid_at || null,
         last_payment_id: transaction.id,
         updated_at: nowIso,
       })
@@ -1268,16 +1466,18 @@ export async function processBillPayment({
           : "bill_payment_processing",
       title:
         nextStatus === "paid"
-          ? "Bill payment submitted"
+          ? "Funding captured, remittance pending"
           : "Bill payment processing",
       message:
         nextStatus === "paid"
-          ? `${bill.provider_name} was paid for $${amount.toFixed(2)}.`
-          : `${bill.provider_name} payment is processing for $${amount.toFixed(2)}.`,
+          ? `${bill.provider_name} funding captured for $${amount.toFixed(2)}. Remittance status: pending submission.`
+          : `${bill.provider_name} payment funding is processing for $${amount.toFixed(2)}.`,
       metadata: {
         billId: bill.id,
         transactionId: transaction.id,
         stripePaymentIntentId: intent.id,
+        fundingStatus,
+        remittanceStatus,
       },
     });
 
@@ -1286,8 +1486,8 @@ export async function processBillPayment({
         context,
         bill: {
           ...bill,
-          status: "paid",
-          last_paid_at: nowIso,
+          status: "processing",
+          last_paid_at: bill.last_paid_at || null,
           last_payment_id: transaction.id,
         },
       });
@@ -1298,6 +1498,11 @@ export async function processBillPayment({
       stripe_payment_intent_id: intent.id,
       status: nextStatus,
       processed_at: nextStatus === "paid" ? nowIso : null,
+      metadata: {
+        funding_status: fundingStatus,
+        remittance_status: remittanceStatus,
+        remittance_channel: "manual_portal",
+      },
     };
   } catch (error) {
     const nowIso = new Date().toISOString();
@@ -1309,6 +1514,12 @@ export async function processBillPayment({
         status: "failed",
         failed_at: nowIso,
         failure_reason: message,
+        metadata: {
+          funding_status: "failed",
+          remittance_status: "blocked",
+          remittance_channel: "manual_portal",
+          remittance_reference: "",
+        },
         updated_at: nowIso,
       })
       .eq("id", transaction.id)

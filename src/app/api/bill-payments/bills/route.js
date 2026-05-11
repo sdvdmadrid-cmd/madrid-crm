@@ -4,11 +4,13 @@ import {
   BILL_TABLE,
   buildBillWritePayload,
   computeBillStatus,
+  findBillProvider,
   requireBillPaymentsAccess,
   serializeAutopayRule,
   serializeBill,
   serializeBillPaymentTransaction,
   updateBillStatusesForTenant,
+  validateProviderRequirementValues,
 } from "@/lib/bill-payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -81,6 +83,16 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
 
   try {
+    const provider = await findBillProvider({
+      providerId: body.providerId,
+      providerName: body.providerName,
+    });
+    validateProviderRequirementValues({
+      provider,
+      accountNumber: body.accountNumber,
+      providerIdentifiers: body.providerIdentifiers,
+    });
+
     const payload = buildBillWritePayload(body);
     payload.tenant_id = context.tenantDbId;
     payload.user_id = context.userId;

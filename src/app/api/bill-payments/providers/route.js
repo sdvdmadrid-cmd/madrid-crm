@@ -18,7 +18,7 @@ export async function GET(request) {
     .from(BILL_PROVIDER_TABLE)
     .select("*")
     .order("provider_name", { ascending: true })
-    .limit(25);
+    .limit(100);
 
   if (query) {
     providerQuery = providerQuery.or(
