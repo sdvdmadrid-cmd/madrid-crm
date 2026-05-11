@@ -74,7 +74,7 @@ Generate professional website content for this contractor. Return ONLY a valid J
   "headline": "Short punchy hero headline (max 10 words)",
   "subheadline": "Supporting sentence that builds trust and describes the business (max 25 words)",
   "aboutText": "2-3 sentence professional about paragraph (max 80 words)",
-  "ctaText": "Call to action button text (max 5 words, e.g. 'Get a Free Quote')",
+  "ctaText": "Call to action button text (max 5 words, e.g. 'Request Estimate')",
   "services": [
     { "name": "Service name", "description": "1-2 sentence description" }
   ]
@@ -143,7 +143,7 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text.
       headline: String(parsed.headline || "").slice(0, 200),
       subheadline: String(parsed.subheadline || "").slice(0, 300),
       aboutText: String(parsed.aboutText || "").slice(0, 2000),
-      ctaText: String(parsed.ctaText || "Get a Free Quote").slice(0, 100),
+      ctaText: String(parsed.ctaText || "Request Estimate").slice(0, 100),
       services: Array.isArray(parsed.services)
         ? parsed.services.slice(0, 8).map((s) => ({
             name: String(s.name || "").slice(0, 100),

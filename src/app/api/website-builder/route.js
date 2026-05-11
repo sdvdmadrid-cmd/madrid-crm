@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 const WEBSITE_TABLE = "contractor_websites";
 
 const DEFAULT_THEME_COLOR = "#1d4ed8";
-const DEFAULT_CTA_TEXT = "Get Your Website";
+const DEFAULT_CTA_TEXT = "Request Estimate";
 
 function normalizeWebsiteCta(value, fallback = DEFAULT_CTA_TEXT) {
   const trimmed = String(value || "").trim();
@@ -22,13 +22,12 @@ function normalizeWebsiteCta(value, fallback = DEFAULT_CTA_TEXT) {
     .replace(/[—–]/g, "-")
     .replace(/\s+/g, " ");
 
-  const looksLikeLegacyMarketingCta =
-    compact === "start free - 30 days" ||
-    compact === "start free -- 30 days" ||
-    compact === "start free trial" ||
-    (compact.includes("start free") && (compact.includes("30 days") || compact.includes("trial")));
+  const looksLikeMarketingTrialCta =
+    compact.includes("trial") ||
+    compact.includes("start now") ||
+    (compact.includes("free") && compact.includes("day"));
 
-  return looksLikeLegacyMarketingCta ? fallback : trimmed;
+  return looksLikeMarketingTrialCta ? fallback : trimmed;
 }
 
 function buildDefaultWebsiteContent(companyProfile) {

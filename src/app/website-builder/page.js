@@ -566,7 +566,7 @@ export default function WebsiteBuilderPage() {
                 type="text"
                 value={form.ctaText}
                 maxLength={100}
-                placeholder="Get Your Website"
+                placeholder="Request Estimate"
                 onChange={(e) => setField("ctaText", e.target.value)}
               />
             </div>
@@ -706,7 +706,7 @@ export default function WebsiteBuilderPage() {
                     <p className="preview-hero-pill">🎉 Free estimates — same-day response</p>
                     <div className="preview-hero-actions">
                       <button type="button" className="preview-btn-primary" tabIndex={-1}>
-                        {form.ctaText || "Get a Free Quote"}
+                        {form.ctaText || "Request Estimate"}
                       </button>
                       <button type="button" className="preview-btn-secondary" tabIndex={-1}>
                         Our Services
@@ -834,7 +834,7 @@ export default function WebsiteBuilderPage() {
                   <span className="preview-cta-phone">{companyProfile.phone}</span>
                 )}
                 <button type="button" className="preview-cta-btn" tabIndex={-1}>
-                  {form.ctaText || "Get a Free Quote"}
+                  {form.ctaText || "Request Estimate"}
                 </button>
               </div>
 

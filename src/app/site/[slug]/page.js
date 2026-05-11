@@ -60,7 +60,7 @@ const HERO_PHOTOS = [
 ];
 
 function normalizePublicCta(value) {
-  const fallback = "Get Your Website";
+  const fallback = "Request Estimate";
   const trimmed = String(value || "").trim();
   if (!trimmed) return fallback;
 
@@ -69,13 +69,12 @@ function normalizePublicCta(value) {
     .replace(/[—–]/g, "-")
     .replace(/\s+/g, " ");
 
-  const looksLikeLegacyMarketingCta =
-    compact === "start free - 30 days" ||
-    compact === "start free -- 30 days" ||
-    compact === "start free trial" ||
-    (compact.includes("start free") && (compact.includes("30 days") || compact.includes("trial")));
+  const looksLikeMarketingTrialCta =
+    compact.includes("trial") ||
+    compact.includes("start now") ||
+    (compact.includes("free") && compact.includes("day"));
 
-  return looksLikeLegacyMarketingCta ? fallback : trimmed;
+  return looksLikeMarketingTrialCta ? fallback : trimmed;
 }
 
 // ─── Wave divider (same as landing) ───────────────────────────────────
@@ -302,7 +301,7 @@ export default async function PublicContractorSitePage({ params }) {
               <p className="s-hero-sub">{subheadline || `Quality ${industryProfile.label.toLowerCase()} services you can count on. Licensed, insured, and trusted by local homeowners and businesses.`}</p>
               <p className="s-hero-pill">🎉 Free estimates — no obligation, same-day response</p>
               <div className="s-hero-btns">
-                <a href="#request-service" className="s-btn-primary">{ctaText || "Get a Free Quote"}</a>
+                <a href="#request-service" className="s-btn-primary">{ctaText || "Request Estimate"}</a>
                 <a href="#services" className="s-btn-secondary">Our Services</a>
               </div>
               <div className="s-hero-proof">
