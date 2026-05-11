@@ -55,14 +55,6 @@ create table if not exists public.subscription_invoices (
 do $$
 begin
   if not exists (
-    select 1 from pg_constraint where conname = 'contractor_subscriptions_tenant_id_fkey'
-  ) then
-    alter table public.contractor_subscriptions
-      add constraint contractor_subscriptions_tenant_id_fkey
-      foreign key (tenant_id) references public.tenants(id) on delete cascade;
-  end if;
-
-  if not exists (
     select 1 from pg_constraint where conname = 'contractor_subscriptions_plan_id_fkey'
   ) then
     alter table public.contractor_subscriptions
@@ -78,13 +70,6 @@ begin
       foreign key (subscription_id) references public.contractor_subscriptions(id) on delete cascade;
   end if;
 
-  if not exists (
-    select 1 from pg_constraint where conname = 'subscription_invoices_tenant_id_fkey'
-  ) then
-    alter table public.subscription_invoices
-      add constraint subscription_invoices_tenant_id_fkey
-      foreign key (tenant_id) references public.tenants(id) on delete cascade;
-  end if;
 end $$;
 
 -- Create indexes
@@ -101,55 +86,52 @@ alter table public.contractor_subscriptions enable row level security;
 alter table public.subscription_invoices enable row level security;
 
 -- subscription_plans: anyone can read active plans
+drop policy if exists "plans_read_all" on public.subscription_plans;
 create policy "plans_read_all" on public.subscription_plans
   for select using (is_active = true);
 
 -- contractor_subscriptions: tenants can only see their own
+drop policy if exists "subscriptions_read_own" on public.contractor_subscriptions;
 create policy "subscriptions_read_own" on public.contractor_subscriptions
   for select using (
-    auth.uid() is not null
-    and tenant_id in (
-      select id from public.tenants
-      where id = contractor_subscriptions.tenant_id
-        and auth.uid() = any(member_ids)
-    )
+    public.can_access_tenant(tenant_id)
   );
 
+drop policy if exists "subscriptions_create_own" on public.contractor_subscriptions;
 create policy "subscriptions_create_own" on public.contractor_subscriptions
   for insert with check (
-    auth.uid() is not null
-    and tenant_id in (
-      select id from public.tenants
-      where auth.uid() = any(member_ids)
-    )
+    public.can_access_tenant(tenant_id)
   );
 
+drop policy if exists "subscriptions_update_own" on public.contractor_subscriptions;
 create policy "subscriptions_update_own" on public.contractor_subscriptions
   for update using (
-    auth.uid() is not null
-    and tenant_id in (
-      select id from public.tenants
-      where auth.uid() = any(member_ids)
-    )
+    public.can_access_tenant(tenant_id)
+  )
+  with check (
+    public.can_access_tenant(tenant_id)
   );
 
 -- subscription_invoices: tenants can only see their own
+drop policy if exists "invoices_read_own" on public.subscription_invoices;
 create policy "invoices_read_own" on public.subscription_invoices
   for select using (
-    auth.uid() is not null
-    and tenant_id in (
-      select id from public.tenants
-      where auth.uid() = any(member_ids)
-    )
+    public.can_access_tenant(tenant_id)
   );
 
+drop policy if exists "invoices_create_own" on public.subscription_invoices;
 create policy "invoices_create_own" on public.subscription_invoices
   for insert with check (
-    auth.uid() is not null
-    and tenant_id in (
-      select id from public.tenants
-      where auth.uid() = any(member_ids)
-    )
+    public.can_access_tenant(tenant_id)
+  );
+
+drop policy if exists "invoices_update_own" on public.subscription_invoices;
+create policy "invoices_update_own" on public.subscription_invoices
+  for update using (
+    public.can_access_tenant(tenant_id)
+  )
+  with check (
+    public.can_access_tenant(tenant_id)
   );
 
 -- Insert default subscription plan
