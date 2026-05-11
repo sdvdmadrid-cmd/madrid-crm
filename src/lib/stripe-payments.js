@@ -607,8 +607,9 @@ export async function createStripeCheckoutSessionForAccess({
       logSupabaseError(
         "[stripe-payments] payment session update error",
         paymentUpdateError,
-                name: PUBLIC_BILLING_NAME,
-                description: plan.description || `${PUBLIC_BILLING_NAME} subscription`,
+        {
+          name: PUBLIC_BILLING_NAME,
+          description: plan.description || `${PUBLIC_BILLING_NAME} subscription`,
           paymentId,
           tenantId: access.invoice.tenant_id,
         },

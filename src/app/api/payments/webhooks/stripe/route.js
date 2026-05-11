@@ -224,18 +224,6 @@ async function handleSubscriptionEvent(event) {
   }
 }
 
-function getBillPaymentStatusFromEvent(eventType) {
-  if (eventType === "payment_intent.succeeded") return "paid";
-  if (eventType === "payment_intent.processing") return "processing";
-  if (
-    eventType === "payment_intent.payment_failed" ||
-    eventType === "payment_intent.canceled"
-  ) {
-    return "failed";
-  }
-  return "processing";
-}
-
 async function handleBillPaymentIntentEvent(intent, eventType) {
   const metadata = intent.metadata || {};
   if (String(metadata.source || "") !== "bill_payment") {

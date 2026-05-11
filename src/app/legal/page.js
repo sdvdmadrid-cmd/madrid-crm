@@ -63,11 +63,14 @@ export default function LegalPage() {
           >
             FieldBase
           </Link>
-          <span className="text-sm text-gray-500">
-                  href="mailto:legal@fieldbaseapp.net"
-          </span>
+          <a
+            href="mailto:legal@fieldbaseapp.net"
+            className="text-sm text-gray-500 hover:text-blue-700 transition-colors"
+          >
+            legal@fieldbaseapp.net
+          </a>
         </div>
-                  legal@fieldbaseapp.net
+      </header>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 flex flex-col lg:flex-row gap-10">
         {/* Sidebar navigation */}
