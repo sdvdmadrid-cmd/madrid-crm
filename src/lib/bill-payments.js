@@ -21,7 +21,7 @@ import {
 } from "@/lib/tenant";
 import { getPlaidProcessorToken } from "@/lib/plaid-integration";
 import { attachPlaidBankAccountToStripeCustomer } from "@/lib/stripe-payments";
-import { encryptSensitive } from "@/lib/encryption";
+import { decryptSensitive, encryptSensitive } from "@/lib/encryption";
 
 export const BILL_TABLE = "bills";
 export const BILL_PROVIDER_TABLE = "bill_providers";
@@ -1056,9 +1056,14 @@ export async function processBillPayment({
     String(paymentMethod?.stripe_payment_method_id || "").startsWith("plaid:");
 
   if (isPlaidLinkedMethod) {
-    const plaidAccessToken = String(
+    const storedPlaidAccessToken = String(
       paymentMethod?.metadata?.plaid_access_token || "",
     ).trim();
+    const plaidAccessToken = storedPlaidAccessToken
+      ? storedPlaidAccessToken.includes("::")
+        ? decryptSensitive(storedPlaidAccessToken)
+        : storedPlaidAccessToken
+      : "";
     const plaidAccountId = String(
       paymentMethod?.metadata?.plaid_account_id || "",
     ).trim();

@@ -320,7 +320,13 @@ export default function BillPaymentsPage() {
   const bills = dashboard.bills || [];
   const recentTransactions = dashboard.recentTransactions || [];
   const executablePaymentMethods = useMemo(
-    () => paymentMethods.filter((method) => method.provider !== "plaid"),
+    () =>
+      paymentMethods.filter(
+        (method) =>
+          !["failed", "blocked", "inactive"].includes(
+            String(method.status || "").toLowerCase(),
+          ),
+      ),
     [paymentMethods],
   );
   const selectedPaymentMethod = useMemo(
