@@ -107,7 +107,7 @@ export default async function PublicContractorSitePage({ params }) {
   const headline = data.headline || "";
   const subheadline = data.subheadline || "";
   const aboutText = data.about_text || "";
-  const ctaText = data.cta_text || "Start Free - 30 Days";
+  const ctaText = data.cta_text || "Get Your Website";
 
   // Fetch company profile for contact details
   const { data: tenantProfile } = await supabaseAdmin

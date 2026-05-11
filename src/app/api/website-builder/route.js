@@ -23,7 +23,7 @@ function buildDefaultWebsiteContent(companyProfile) {
       "All-in-one platform for contractors, from first estimate to final payment, powered by AI and synced with Google Calendar.",
     aboutText:
       `${companyName} helps service businesses run smarter with AI estimates, calendar scheduling, automated follow-ups, and faster payments in one workspace.`,
-    ctaText: "Start Free - 30 Days",
+    ctaText: "Get Your Website",
     themeColor: DEFAULT_THEME_COLOR,
     services: [
       {

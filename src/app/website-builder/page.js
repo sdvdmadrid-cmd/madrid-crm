@@ -566,7 +566,7 @@ export default function WebsiteBuilderPage() {
                 type="text"
                 value={form.ctaText}
                 maxLength={100}
-                placeholder="Start Free - 30 Days"
+                placeholder="Get Your Website"
                 onChange={(e) => setField("ctaText", e.target.value)}
               />
             </div>
