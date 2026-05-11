@@ -59,6 +59,25 @@ const HERO_PHOTOS = [
   { src: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=280&fit=crop", alt: "Home services professional" },
 ];
 
+function normalizePublicCta(value) {
+  const fallback = "Get Your Website";
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return fallback;
+
+  const compact = trimmed
+    .toLowerCase()
+    .replace(/[—–]/g, "-")
+    .replace(/\s+/g, " ");
+
+  const looksLikeLegacyMarketingCta =
+    compact === "start free - 30 days" ||
+    compact === "start free -- 30 days" ||
+    compact === "start free trial" ||
+    (compact.includes("start free") && (compact.includes("30 days") || compact.includes("trial")));
+
+  return looksLikeLegacyMarketingCta ? fallback : trimmed;
+}
+
 // ─── Wave divider (same as landing) ───────────────────────────────────
 function WaveDivider({ fromColor, toColor }) {
   return (
@@ -107,7 +126,7 @@ export default async function PublicContractorSitePage({ params }) {
   const headline = data.headline || "";
   const subheadline = data.subheadline || "";
   const aboutText = data.about_text || "";
-  const ctaText = data.cta_text || "Get Your Website";
+  const ctaText = normalizePublicCta(data.cta_text);
 
   // Fetch company profile for contact details
   const { data: tenantProfile } = await supabaseAdmin

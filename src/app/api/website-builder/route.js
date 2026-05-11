@@ -11,6 +11,25 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 const WEBSITE_TABLE = "contractor_websites";
 
 const DEFAULT_THEME_COLOR = "#1d4ed8";
+const DEFAULT_CTA_TEXT = "Get Your Website";
+
+function normalizeWebsiteCta(value, fallback = DEFAULT_CTA_TEXT) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return fallback;
+
+  const compact = trimmed
+    .toLowerCase()
+    .replace(/[—–]/g, "-")
+    .replace(/\s+/g, " ");
+
+  const looksLikeLegacyMarketingCta =
+    compact === "start free - 30 days" ||
+    compact === "start free -- 30 days" ||
+    compact === "start free trial" ||
+    (compact.includes("start free") && (compact.includes("30 days") || compact.includes("trial")));
+
+  return looksLikeLegacyMarketingCta ? fallback : trimmed;
+}
 
 function buildDefaultWebsiteContent(companyProfile) {
   const companyName = String(
@@ -23,7 +42,7 @@ function buildDefaultWebsiteContent(companyProfile) {
       "All-in-one platform for contractors, from first estimate to final payment, powered by AI and synced with Google Calendar.",
     aboutText:
       `${companyName} helps service businesses run smarter with AI estimates, calendar scheduling, automated follow-ups, and faster payments in one workspace.`,
-    ctaText: "Get Your Website",
+    ctaText: DEFAULT_CTA_TEXT,
     themeColor: DEFAULT_THEME_COLOR,
     services: [
       {
@@ -127,9 +146,24 @@ export async function GET(request) {
     tenantId: access.tenantDbId,
   });
 
-  const row = await findOrCreateWebsite(access.tenantDbId, profile);
+  let row = await findOrCreateWebsite(access.tenantDbId, profile);
   const industryProfile = getIndustryProfile(profile.businessType || "");
   const defaults = buildDefaultWebsiteContent(profile);
+  const normalizedCtaText = normalizeWebsiteCta(row.cta_text, defaults.ctaText);
+
+  if (typeof row.cta_text === "string" && normalizedCtaText !== row.cta_text) {
+    const { data: patchedRow } = await supabaseAdmin
+      .from(WEBSITE_TABLE)
+      .update({ cta_text: normalizedCtaText, updated_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .select("*")
+      .maybeSingle();
+
+    if (patchedRow) {
+      row = patchedRow;
+    }
+  }
+
   const effectiveServices =
     Array.isArray(row.services) && row.services.length > 0
       ? row.services
@@ -145,7 +179,7 @@ export async function GET(request) {
       headline: row.headline || defaults.headline,
       subheadline: row.subheadline || defaults.subheadline,
       aboutText: row.about_text || defaults.aboutText,
-      ctaText: row.cta_text || defaults.ctaText,
+      ctaText: normalizeWebsiteCta(row.cta_text, defaults.ctaText),
       themeColor: row.theme_color || defaults.themeColor,
       services: effectiveServices,
       published: row.published === true,
@@ -168,6 +202,7 @@ export async function POST(request) {
   const profile = await getCompanyProfileByTenant({
     tenantId: access.tenantDbId,
   });
+  const defaults = buildDefaultWebsiteContent(profile);
 
   const row = await findOrCreateWebsite(access.tenantDbId, profile);
 
@@ -175,7 +210,9 @@ export async function POST(request) {
   if (typeof body.headline === "string") patch.headline = body.headline.slice(0, 200);
   if (typeof body.subheadline === "string") patch.subheadline = body.subheadline.slice(0, 300);
   if (typeof body.aboutText === "string") patch.about_text = body.aboutText.slice(0, 2000);
-  if (typeof body.ctaText === "string") patch.cta_text = body.ctaText.slice(0, 100);
+  if (typeof body.ctaText === "string") {
+    patch.cta_text = normalizeWebsiteCta(body.ctaText, defaults.ctaText).slice(0, 100);
+  }
   if (typeof body.themeColor === "string" && /^#[0-9a-fA-F]{6}$/.test(body.themeColor)) {
     patch.theme_color = body.themeColor;
   }
@@ -209,7 +246,7 @@ export async function POST(request) {
         headline: data.headline || "",
         subheadline: data.subheadline || "",
         aboutText: data.about_text || "",
-        ctaText: data.cta_text || "",
+        ctaText: normalizeWebsiteCta(data.cta_text, defaults.ctaText),
         themeColor: data.theme_color || "#16a34a",
         services: Array.isArray(data.services) ? data.services : [],
         published: data.published === true,
