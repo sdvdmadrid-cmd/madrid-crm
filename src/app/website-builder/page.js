@@ -857,7 +857,7 @@ export default function WebsiteBuilderPage() {
                         href="#preview-request-form"
                         className="preview-btn-primary"
                       >
-                        {form.ctaText || "Request Estimate"}
+                        {form.ctaText || "Get a quote, enter details"}
                       </a>
                       <a href="#preview-services" className="preview-btn-secondary">
                         Our Services
@@ -922,7 +922,7 @@ export default function WebsiteBuilderPage() {
                         </div>
                         <div className="preview-feat-title">{s.name || "Service"}</div>
                         {s.description && <div className="preview-feat-desc">{s.description}</div>}
-                        <a href="#preview-request-form" className="preview-feat-link">Get a quote →</a>
+                        <a href="#preview-request-form" className="preview-feat-link">Get a quote, enter details →</a>
                       </div>
                     ))}
                   </div>
@@ -1000,7 +1000,7 @@ export default function WebsiteBuilderPage() {
                   <span className="preview-cta-phone">{companyProfile.phone}</span>
                 )}
                 <a href="#preview-request-form" className="preview-cta-btn">
-                  {form.ctaText || "Request Estimate"}
+                  {form.ctaText || "Get a quote, enter details"}
                 </a>
               </div>
 
