@@ -148,6 +148,9 @@ export default async function PublicContractorSitePage({ params }) {
           description: "",
           price: "",
         }));
+  const galleryPhotos = Array.isArray(data.gallery_photos)
+    ? data.gallery_photos.filter((photo) => String(photo?.src || "").startsWith("data:image/"))
+    : [];
 
   // Pad services to at least 3, max 6
   const displayServices = services.slice(0, 6);
@@ -220,6 +223,13 @@ export default async function PublicContractorSitePage({ params }) {
         .s-about-inner { max-width: 800px; }
         .s-about-inner p { font-size: 18px; line-height: 1.8; color: #334155; }
 
+        .s-gallery { background: #ffffff; padding: 24px 24px 80px; }
+        .s-gallery-inner { max-width: 1200px; margin: 0 auto; }
+        .s-gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .s-gallery-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
+        .s-gallery-photo { position: relative; padding-bottom: 78%; background: #e2e8f0; }
+        .s-gallery-caption { padding: 14px 16px; color: #334155; font-size: 14px; font-weight: 600; }
+
         /* ── Testimonials (identical to landing) ── */
         .s-testimonials { background: #eff6ff; padding: 16px 24px 80px; }
         .s-test-grid { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
@@ -253,12 +263,14 @@ export default async function PublicContractorSitePage({ params }) {
           .s-hero-inner { flex-direction: column; gap: 32px; }
           .s-hero-right { max-width: 100%; width: 100%; }
           .s-features-grid { grid-template-columns: 1fr 1fr; }
+          .s-gallery-grid { grid-template-columns: 1fr 1fr; }
           .s-stats-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 600px) {
           .s-nav-links { display: none; }
           .s-hero { padding: 56px 16px 0; }
           .s-features-grid { grid-template-columns: 1fr; }
+          .s-gallery-grid { grid-template-columns: 1fr; }
           .s-test-grid { grid-template-columns: 1fr; }
           .s-stats-grid { grid-template-columns: 1fr 1fr; }
           .s-cta { padding: 64px 16px; }
@@ -404,6 +416,34 @@ export default async function PublicContractorSitePage({ params }) {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {galleryPhotos.length > 0 && (
+          <section className="s-gallery">
+            <div className="s-gallery-inner">
+              <h2 className="s-section-eyebrow">Recent Work</h2>
+              <p className="s-section-sub">
+                See real projects completed by {companyName || "our team"}.
+              </p>
+              <div className="s-gallery-grid">
+                {galleryPhotos.map((photo, index) => (
+                  <div key={`${photo.alt || "work"}-${index}`} className="s-gallery-card">
+                    <div className="s-gallery-photo">
+                      <Image
+                        src={photo.src}
+                        alt={photo.alt || `Completed project ${index + 1}`}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        style={{ objectFit: "cover" }}
+                        unoptimized
+                      />
+                    </div>
+                    <div className="s-gallery-caption">{photo.alt || "Completed project"}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>

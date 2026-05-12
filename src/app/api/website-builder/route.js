@@ -43,6 +43,7 @@ function buildDefaultWebsiteContent(companyProfile) {
       `${companyName} helps service businesses run smarter with AI estimates, calendar scheduling, automated follow-ups, and faster payments in one workspace.`,
     ctaText: DEFAULT_CTA_TEXT,
     themeColor: DEFAULT_THEME_COLOR,
+    galleryPhotos: [],
     services: [
       {
         name: "AI-Powered Estimates",
@@ -180,6 +181,7 @@ export async function GET(request) {
       aboutText: row.about_text || defaults.aboutText,
       ctaText: normalizeWebsiteCta(row.cta_text, defaults.ctaText),
       themeColor: row.theme_color || defaults.themeColor,
+      galleryPhotos: Array.isArray(row.gallery_photos) ? row.gallery_photos : defaults.galleryPhotos,
       services: effectiveServices,
       published: row.published === true,
       industry: industryProfile.key,
@@ -222,6 +224,15 @@ export async function POST(request) {
       price: String(s.price || "").slice(0, 50),
     }));
   }
+  if (Array.isArray(body.galleryPhotos)) {
+    patch.gallery_photos = body.galleryPhotos
+      .slice(0, 8)
+      .map((photo) => ({
+        src: String(photo?.src || "").slice(0, 4_000_000),
+        alt: String(photo?.alt || "Completed project photo").slice(0, 160),
+      }))
+      .filter((photo) => photo.src.startsWith("data:image/"));
+  }
   if (typeof body.published === "boolean") patch.published = body.published;
   patch.updated_at = new Date().toISOString();
 
@@ -247,6 +258,7 @@ export async function POST(request) {
         aboutText: data.about_text || "",
         ctaText: normalizeWebsiteCta(data.cta_text, defaults.ctaText),
         themeColor: data.theme_color || "#16a34a",
+        galleryPhotos: Array.isArray(data.gallery_photos) ? data.gallery_photos : [],
         services: Array.isArray(data.services) ? data.services : [],
         published: data.published === true,
       },

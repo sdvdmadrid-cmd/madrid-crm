@@ -3,6 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 
+const MAX_GALLERY_IMAGES = 8;
+const MAX_GALLERY_IMAGE_SIZE = 3 * 1024 * 1024;
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 const THEME_PRESETS = [
   { label: "Green",   value: "#16a34a" },
   { label: "Blue",    value: "#2563eb" },
@@ -32,6 +44,11 @@ const UI = {
     sectionCta: "CTA Button Text",
     sectionTheme: "Brand Color",
     sectionServices: "Services",
+    sectionGallery: "Project Gallery",
+    addGalleryPhotos: "Add Work Photos",
+    galleryHint: "Upload completed-job photos so customers can see real public proof on your website.",
+    galleryAltLabel: "Photo caption",
+    galleryEmpty: "No project photos uploaded yet.",
     addService: "+ Add Service",
     removeService: "Remove",
     serviceNameLabel: "Service name",
@@ -66,6 +83,11 @@ const UI = {
     sectionCta: "Texto del Botón CTA",
     sectionTheme: "Color de Marca",
     sectionServices: "Servicios",
+    sectionGallery: "Galeria de Proyectos",
+    addGalleryPhotos: "Agregar Fotos de Trabajos",
+    galleryHint: "Sube fotos de trabajos terminados para que los clientes las vean publicamente en tu sitio web.",
+    galleryAltLabel: "Texto de la foto",
+    galleryEmpty: "Todavia no hay fotos de proyectos.",
     addService: "+ Agregar Servicio",
     removeService: "Eliminar",
     serviceNameLabel: "Nombre del servicio",
@@ -100,6 +122,11 @@ const UI = {
     sectionCta: "Tekst przycisku CTA",
     sectionTheme: "Kolor marki",
     sectionServices: "Usługi",
+    sectionGallery: "Galeria Realizacji",
+    addGalleryPhotos: "Dodaj Zdjecia Realizacji",
+    galleryHint: "Przeslij zdjecia ukonczonych prac, aby klienci widzieli je publicznie na Twojej stronie.",
+    galleryAltLabel: "Opis zdjecia",
+    galleryEmpty: "Nie dodano jeszcze zdjec realizacji.",
     addService: "+ Dodaj usługę",
     removeService: "Usuń",
     serviceNameLabel: "Nazwa usługi",
@@ -148,6 +175,7 @@ export default function WebsiteBuilderPage() {
     aboutText: "",
     ctaText: "",
     themeColor: "#16a34a",
+    galleryPhotos: [],
     services: [],
   });
 
@@ -177,6 +205,7 @@ export default function WebsiteBuilderPage() {
           aboutText: data.aboutText || "",
           ctaText: data.ctaText || "",
           themeColor: data.themeColor || "#16a34a",
+          galleryPhotos: Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [],
           services: Array.isArray(data.services) ? data.services : [],
         });
       })
@@ -303,6 +332,58 @@ export default function WebsiteBuilderPage() {
     }));
   }, []);
 
+  const handleGalleryUpload = useCallback(async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (event.target) {
+      event.target.value = "";
+    }
+
+    if (!files.length) return;
+
+    try {
+      const availableSlots = Math.max(0, MAX_GALLERY_IMAGES - form.galleryPhotos.length);
+      const selectedFiles = files.slice(0, availableSlots);
+      const uploaded = [];
+
+      for (const file of selectedFiles) {
+        if (!file.type.startsWith("image/")) {
+          throw new Error("Only image files are allowed in the gallery.");
+        }
+        if (file.size > MAX_GALLERY_IMAGE_SIZE) {
+          throw new Error("Each gallery photo must be 3MB or smaller.");
+        }
+
+        const src = await fileToDataUrl(file);
+        uploaded.push({
+          src,
+          alt: file.name.replace(/\.[^.]+$/, "").slice(0, 160),
+        });
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        galleryPhotos: [...prev.galleryPhotos, ...uploaded].slice(0, MAX_GALLERY_IMAGES),
+      }));
+    } catch (err) {
+      showNotice(err.message || t.errorSave, true);
+    }
+  }, [form.galleryPhotos.length, showNotice, t.errorSave]);
+
+  const setGalleryAlt = useCallback((index, value) => {
+    setForm((prev) => {
+      const nextPhotos = [...prev.galleryPhotos];
+      nextPhotos[index] = { ...nextPhotos[index], alt: value.slice(0, 160) };
+      return { ...prev, galleryPhotos: nextPhotos };
+    });
+  }, []);
+
+  const removeGalleryPhoto = useCallback((index) => {
+    setForm((prev) => ({
+      ...prev,
+      galleryPhotos: prev.galleryPhotos.filter((_, photoIndex) => photoIndex !== index),
+    }));
+  }, []);
+
   const siteUrl = publicUrl || (slug ? `/site/${slug}` : null);
   const requestUrl = slug ? `/site/${slug}/request` : "#preview-request-form";
   const theme = form.themeColor || "#16a34a";
@@ -359,6 +440,11 @@ export default function WebsiteBuilderPage() {
         .service-remove { font-size: 12px; color: #dc2626; cursor: pointer; background: none; border: none; font-weight: 700; }
         .wb-add-service { width: 100%; padding: 12px; border: 2px dashed #e2e8f0; border-radius: 12px; background: transparent; font-size: 14px; font-weight: 700; color: #64748b; cursor: pointer; transition: border-color 0.15s; }
         .wb-add-service:hover { border-color: var(--theme, #16a34a); color: var(--theme, #16a34a); }
+        .wb-upload-btn { width: 100%; padding: 12px; border: 2px dashed #cbd5e1; border-radius: 12px; background: #fff; font-size: 14px; font-weight: 700; color: #334155; cursor: pointer; text-align: center; display: block; }
+        .wb-gallery-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+        .wb-gallery-card { border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; background: #fff; }
+        .wb-gallery-photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #e2e8f0; }
+        .wb-gallery-meta { padding: 12px; }
         .wb-slug-row { display: flex; align-items: center; gap: 10px; background: #f1f5f9; border-radius: 10px; padding: 12px 16px; margin-bottom: 24px; }
         .wb-slug-url { font-size: 13px; color: #334155; font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .wb-save-row { display: flex; gap: 10px; margin-top: 32px; flex-wrap: wrap; }
@@ -410,6 +496,11 @@ export default function WebsiteBuilderPage() {
         .preview-about { background: #eff6ff; padding: 48px 24px; }
         .preview-about h2 { font-size: 1.4rem; font-weight: 900; color: #1e293b; margin-bottom: 14px; }
         .preview-about p { font-size: 14px; line-height: 1.75; color: #334155; }
+        .preview-gallery { background: #fff; padding: 0 24px 48px; }
+        .preview-gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+        .preview-gallery-card { border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(15,23,42,0.08); background: #fff; }
+        .preview-gallery-photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #e2e8f0; }
+        .preview-gallery-caption { padding: 12px 14px; color: #334155; font-size: 12px; font-weight: 700; }
         /* Testimonials */
         .preview-testimonials { background: #eff6ff; padding: 0 24px 48px; }
         .preview-test-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
@@ -450,11 +541,13 @@ export default function WebsiteBuilderPage() {
           .wb-preview.show { display: block; }
           .preview-request-grid { grid-template-columns: 1fr; }
           .preview-request-full { grid-column: auto; }
+          .preview-gallery-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 600px) {
           .wb-header { padding: 12px 16px; }
           .wb-tabs { padding: 0 16px; }
           .wb-editor { padding: 20px 16px; }
+          .preview-gallery-grid { grid-template-columns: 1fr; }
         }
       `}</style>
 
@@ -678,6 +771,35 @@ export default function WebsiteBuilderPage() {
               </button>
             )}
 
+            <div className="wb-section-title">{t.sectionGallery}</div>
+            <div className="wb-field">
+              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>{t.galleryHint}</div>
+              <label className="wb-upload-btn">
+                {t.addGalleryPhotos}
+                <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleGalleryUpload} />
+              </label>
+            </div>
+            {form.galleryPhotos.length === 0 ? (
+              <div className="wb-field" style={{ color: "#64748b", fontSize: 13 }}>{t.galleryEmpty}</div>
+            ) : (
+              <div className="wb-gallery-grid">
+                {form.galleryPhotos.map((photo, index) => (
+                  <div key={`${photo.alt || "gallery"}-${index}`} className="wb-gallery-card">
+                    <img src={photo.src} alt={photo.alt || `Gallery ${index + 1}`} className="wb-gallery-photo" />
+                    <div className="wb-gallery-meta">
+                      <div className="wb-field" style={{ marginBottom: 10 }}>
+                        <label className="wb-label">{t.galleryAltLabel}</label>
+                        <input className="wb-input" type="text" value={photo.alt || ""} onChange={(e) => setGalleryAlt(index, e.target.value)} maxLength={160} />
+                      </div>
+                      <button className="service-remove" onClick={() => removeGalleryPhoto(index)}>
+                        {t.removeService}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Save */}
             <div className="wb-save-row">
               <button
@@ -821,6 +943,21 @@ export default function WebsiteBuilderPage() {
                   <p>{form.aboutText}</p>
                 </div>
               )}
+
+              {form.galleryPhotos.length > 0 ? (
+                <div className="preview-gallery">
+                  <div className="preview-features-title">Recent Work</div>
+                  <div className="preview-features-sub">Show customers what your team has already completed.</div>
+                  <div className="preview-gallery-grid">
+                    {form.galleryPhotos.map((photo, index) => (
+                      <div key={`${photo.alt || "preview-gallery"}-${index}`} className="preview-gallery-card">
+                        <img src={photo.src} alt={photo.alt || `Completed project ${index + 1}`} className="preview-gallery-photo" />
+                        <div className="preview-gallery-caption">{photo.alt || "Completed project"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {/* Testimonials */}
               <div className="preview-testimonials">
