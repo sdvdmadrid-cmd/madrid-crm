@@ -13,6 +13,7 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState(null);
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
+  const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -94,6 +95,35 @@ export default function SubscriptionsPage() {
       setError(err.message);
     } finally {
       setCancellingSubscription(false);
+    }
+  }
+
+  async function handleManageBilling() {
+    try {
+      setOpeningBillingPortal(true);
+      setError(null);
+
+      const res = await fetch("/api/subscriptions/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to open billing setup");
+      }
+
+      const redirectUrl = String(data.url || "").trim();
+      if (!redirectUrl) {
+        throw new Error("Missing billing portal URL");
+      }
+
+      window.location.assign(redirectUrl);
+    } catch (err) {
+      console.error("Error opening billing portal:", err);
+      setError(err.message);
+    } finally {
+      setOpeningBillingPortal(false);
     }
   }
 
@@ -222,6 +252,15 @@ export default function SubscriptionsPage() {
                   </div>
                 )}
 
+                {subscription.status === "trialing" ? (
+                  <div className={styles.detailRow}>
+                    <span className={styles.label}>Para suscripción real:</span>
+                    <span className={styles.value}>
+                      Agrega tu tarjeta cuando decidas continuar.
+                    </span>
+                  </div>
+                ) : null}
+
                 {subscription.currentPeriodStart && (
                   <div className={styles.detailRow}>
                     <span className={styles.label}>Período actual:</span>
@@ -241,15 +280,29 @@ export default function SubscriptionsPage() {
               </div>
 
               {subscription.status !== "cancelled" && (
-                <button
-                  className={styles.buttonDanger}
-                  onClick={handleCancelSubscription}
-                  disabled={cancellingSubscription}
-                >
-                  {cancellingSubscription
-                    ? "Cancelando..."
-                    : "Cancelar suscripción"}
-                </button>
+                <>
+                  <button
+                    className={styles.buttonPrimary}
+                    onClick={handleManageBilling}
+                    disabled={openingBillingPortal}
+                  >
+                    {openingBillingPortal
+                      ? "Abriendo pago..."
+                      : subscription.status === "trialing"
+                        ? "Suscribirme de verdad (agregar pago)"
+                        : "Gestionar método de pago"}
+                  </button>
+
+                  <button
+                    className={styles.buttonDanger}
+                    onClick={handleCancelSubscription}
+                    disabled={cancellingSubscription}
+                  >
+                    {cancellingSubscription
+                      ? "Cancelando..."
+                      : "Cancelar suscripción"}
+                  </button>
+                </>
               )}
             </div>
 
