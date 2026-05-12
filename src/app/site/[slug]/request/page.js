@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
-import { getIndustryProfile } from "@/lib/industry-profiles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +17,6 @@ export async function generateMetadata({ params }) {
     .from("contractor_websites")
     .select("headline")
     .eq("slug", slug)
-    .eq("published", true)
     .maybeSingle();
 
   return {
@@ -35,7 +33,6 @@ export default async function PublicContractorRequestPage({ params, searchParams
     .from("contractor_websites")
     .select("slug, tenant_id, headline, cta_text")
     .eq("slug", slug)
-    .eq("published", true)
     .maybeSingle();
 
   if (!data) notFound();

@@ -5,6 +5,35 @@ import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 
 const MAX_GALLERY_IMAGES = 8;
 const MAX_GALLERY_IMAGE_SIZE = 3 * 1024 * 1024;
+const PREVIEW_REQUEST_SERVICES = [
+  "Interior Painting",
+  "Exterior Painting",
+  "Roof Inspection",
+  "Leak Repair",
+  "Shingle Repair",
+  "Full Roof Replacement",
+  "Lawn Maintenance",
+  "Mulch / Rock",
+  "Irrigation",
+  "Hardscape Install",
+  "Yard Cleanup",
+  "Deep Cleaning",
+  "Recurring Cleaning",
+  "Move-In / Move-Out",
+  "Post-Construction Cleaning",
+  "Panel Upgrade",
+  "Wiring Repair",
+  "Lighting Install",
+  "Outlet / Switch",
+  "Plumbing Repair",
+  "Water Heater",
+  "Fixture Install",
+  "AC Repair",
+  "Heating Repair",
+  "Ductwork",
+  "General Handyman",
+  "Other",
+];
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -1018,12 +1047,11 @@ export default function WebsiteBuilderPage() {
                     <input type="text" placeholder="Property address" className="preview-request-full" />
                     <select defaultValue="">
                       <option value="" disabled>Select the type of work</option>
-                      {form.services.slice(0, 8).map((service, index) => (
-                        <option key={`${service.name || "service"}-${index}`} value={service.name || ""}>
-                          {service.name || `Service ${index + 1}`}
+                      {PREVIEW_REQUEST_SERVICES.map((service) => (
+                        <option key={service} value={service}>
+                          {service}
                         </option>
                       ))}
-                      <option value="Other">Other</option>
                     </select>
                     <textarea
                       rows={4}
@@ -1032,7 +1060,7 @@ export default function WebsiteBuilderPage() {
                     />
                   </div>
                   <div className="preview-request-actions">
-                    <button type="submit" className="preview-request-primary">
+                    <button type="button" className="preview-request-primary">
                       Send Request
                     </button>
                   </div>

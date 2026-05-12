@@ -98,7 +98,6 @@ export async function generateMetadata({ params }) {
     .from("contractor_websites")
     .select("headline, subheadline")
     .eq("slug", slug)
-    .eq("published", true)
     .maybeSingle();
 
   if (!data) return { title: "Contractor" };
@@ -117,7 +116,6 @@ export default async function PublicContractorSitePage({ params }) {
     .from("contractor_websites")
     .select("*")
     .eq("slug", slug)
-    .eq("published", true)
     .maybeSingle();
 
   if (!data) notFound();
