@@ -126,6 +126,48 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
       ? "#fff"
       : "#0f172a";
 
+  const submitIcon =
+    submitState === "loading" ? (
+      <span
+        aria-hidden="true"
+        style={{
+          width: 14,
+          height: 14,
+          border: "2px solid currentColor",
+          borderTopColor: "transparent",
+          borderRadius: "50%",
+          animation: "request-spin 0.8s linear infinite",
+          display: "inline-block",
+        }}
+      />
+    ) : submitState === "success" ? (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        style={{ width: 15, height: 15, display: "inline-block", animation: "request-pop 220ms ease-out" }}
+      >
+        <path
+          d="M20 6L9 17l-5-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ) : submitState === "error" ? (
+      <svg aria-hidden="true" viewBox="0 0 24 24" style={{ width: 15, height: 15, display: "inline-block" }}>
+        <path
+          d="M12 8v5M12 16h.01M10.29 3.86l-8.18 14A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3.14l-8.18-14a2 2 0 0 0-3.42 0z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ) : null;
+
   const inputStyle = {
     width: "100%",
     padding: "10px 12px",
@@ -147,6 +189,18 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", width: "100%" }}>
+      <style>{`
+        @keyframes request-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes request-pop {
+          0% { transform: scale(0.8); opacity: 0.75; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+
       {success && (
         <div
           style={{
@@ -264,6 +318,10 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
           disabled={loading}
           aria-live="polite"
           style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
             width: "100%",
             padding: "12px 14px",
             borderRadius: 8,
@@ -277,6 +335,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
             transition: "background 0.2s ease, color 0.2s ease, opacity 0.2s ease",
           }}
         >
+          {submitIcon}
           {submitLabel}
         </button>
       </form>
