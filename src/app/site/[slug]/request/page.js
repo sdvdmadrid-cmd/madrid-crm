@@ -48,8 +48,36 @@ export default async function PublicContractorRequestPage({ params, searchParams
 
   const companyName =
     tenantProfile?.public_display_name || tenantProfile?.company_name || "Contractor";
-  const industryProfile = getIndustryProfile(tenantProfile?.business_type || "");
-  const serviceOptions = industryProfile.requestServiceOptions || [];
+  // Forzar una lista amplia de servicios para el select
+  const serviceOptions = [
+    "Interior Painting",
+    "Exterior Painting",
+    "Roof Inspection",
+    "Leak Repair",
+    "Shingle Repair",
+    "Full Roof Replacement",
+    "Lawn Maintenance",
+    "Mulch / Rock",
+    "Irrigation",
+    "Hardscape Install",
+    "Yard Cleanup",
+    "Deep Cleaning",
+    "Recurring Cleaning",
+    "Move-In / Move-Out",
+    "Post-Construction Cleaning",
+    "Panel Upgrade",
+    "Wiring Repair",
+    "Lighting Install",
+    "Outlet / Switch",
+    "Plumbing Repair",
+    "Water Heater",
+    "Fixture Install",
+    "AC Repair",
+    "Heating Repair",
+    "Ductwork",
+    "General Handyman",
+    "Other"
+  ];
   const initialService = normalizeRequestedService(
     resolvedSearchParams?.service,
     serviceOptions,
