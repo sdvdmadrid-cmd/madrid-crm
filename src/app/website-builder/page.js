@@ -1032,13 +1032,8 @@ export default function WebsiteBuilderPage() {
                     />
                   </div>
                   <div className="preview-request-actions">
-                    {siteUrl ? (
-                      <a href={requestUrl} target="_blank" rel="noreferrer" className="preview-request-primary">
-                        Send Request
-                      </a>
-                    ) : null}
-                    <button type="button" className="preview-request-secondary">
-                      Send Quote Request
+                    <button type="submit" className="preview-request-primary">
+                      Send Request
                     </button>
                   </div>
                 </div>
