@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
+  canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -28,7 +29,7 @@ export async function POST(request) {
     }
 
     // Only allow tenants to manage their own subscriptions
-    if (!context.canWrite) {
+    if (!canWrite(context.role)) {
       return forbiddenResponse();
     }
 
@@ -98,7 +99,7 @@ export async function POST(request) {
     const subscription = await createContractorSubscription({
       tenantId: context.tenantDbId,
       planId: plan.id,
-      email: tenantData.email || context.userEmail,
+      email: tenantData.email || context.email,
       name: tenantData.tenant_name || "Contractor",
       trialDays: 30,
     });
@@ -113,7 +114,7 @@ export async function POST(request) {
     if (planData.data) {
       await sendSubscriptionConfirmationEmail({
         tenantId: context.tenantDbId,
-        email: tenantData.email || context.userEmail,
+        email: tenantData.email || context.email,
         tenantName: tenantData.tenant_name || "Contractor",
         planName: planData.data.name,
         trialDays: 30,

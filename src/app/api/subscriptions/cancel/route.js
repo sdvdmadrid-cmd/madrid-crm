@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
+  canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -22,7 +23,7 @@ export async function POST(request) {
     }
 
     // Only allow tenants to manage their own subscriptions
-    if (!context.canWrite) {
+    if (!canWrite(context.role)) {
       return forbiddenResponse();
     }
 
