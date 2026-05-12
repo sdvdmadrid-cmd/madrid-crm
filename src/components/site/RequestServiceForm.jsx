@@ -13,12 +13,17 @@ function fileToDataUrl(file) {
   });
 }
 
-export default function RequestServiceForm({ slug, serviceOptions = [] }) {
+export default function RequestServiceForm({ slug, serviceOptions = [], initialService = "" }) {
+  const resolvedInitialService =
+    initialService && serviceOptions.includes(initialService)
+      ? initialService
+      : serviceOptions[0] || initialService || "";
+
   const [form, setForm] = useState({
     name: "",
     phone: "",
     address: "",
-    serviceNeeded: serviceOptions[0] || "",
+    serviceNeeded: resolvedInitialService,
     description: "",
     photoDataUrl: "",
     website: "",
@@ -79,7 +84,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [] }) {
         name: "",
         phone: "",
         address: "",
-        serviceNeeded: serviceOptions[0] || "",
+        serviceNeeded: resolvedInitialService,
         description: "",
         photoDataUrl: "",
         website: "",

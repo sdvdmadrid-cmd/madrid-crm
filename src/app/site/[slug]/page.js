@@ -111,6 +111,7 @@ export async function generateMetadata({ params }) {
 
 export default async function PublicContractorSitePage({ params }) {
   const { slug } = await params;
+  const requestHref = `/site/${slug}/request`;
 
   const { data } = await supabaseAdmin
     .from("contractor_websites")
@@ -286,7 +287,7 @@ export default async function PublicContractorSitePage({ params }) {
           </div>
           {phone
             ? <a href={`tel:${phone}`} className="s-nav-cta">{phone}</a>
-            : <a href="#request-service" className="s-nav-cta">Get a Quote</a>
+            : <a href={requestHref} className="s-nav-cta">Get a Quote</a>
           }
         </nav>
 
@@ -301,7 +302,7 @@ export default async function PublicContractorSitePage({ params }) {
               <p className="s-hero-sub">{subheadline || `Quality ${industryProfile.label.toLowerCase()} services you can count on. Licensed, insured, and trusted by local homeowners and businesses.`}</p>
               <p className="s-hero-pill">🎉 Free estimates — no obligation, same-day response</p>
               <div className="s-hero-btns">
-                <a href="#request-service" className="s-btn-primary">{ctaText || "Request Estimate"}</a>
+                <a href={requestHref} className="s-btn-primary">{ctaText || "Request Estimate"}</a>
                 <a href="#services" className="s-btn-secondary">Our Services</a>
               </div>
               <div className="s-hero-proof">
@@ -370,7 +371,7 @@ export default async function PublicContractorSitePage({ params }) {
                     {service.description && (
                       <div className="s-feature-desc">{service.description}</div>
                     )}
-                    <a href="#request-service" className="s-feature-cta">Get a quote →</a>
+                    <a href={`${requestHref}?service=${encodeURIComponent(service.name || "")}`} className="s-feature-cta">Get a quote →</a>
                   </div>
                 ))}
               </div>

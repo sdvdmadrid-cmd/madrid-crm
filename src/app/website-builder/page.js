@@ -304,6 +304,7 @@ export default function WebsiteBuilderPage() {
   }, []);
 
   const siteUrl = publicUrl || (slug ? `/site/${slug}` : null);
+  const requestUrl = slug ? `/site/${slug}/request` : "#preview-request-form";
   const theme = form.themeColor || "#16a34a";
 
   if (loading) {
@@ -367,7 +368,7 @@ export default function WebsiteBuilderPage() {
         .preview-logo-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--theme, #1d4ed8); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .preview-nav-links { display: flex; gap: 16px; font-size: 12px; }
         .preview-nav-links span { color: #94a3b8; font-weight: 600; }
-        .preview-nav-cta { background: var(--theme, #1d4ed8); color: #fff; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 700; }
+        .preview-nav-cta { background: var(--theme, #1d4ed8); color: #fff; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; }
         /* Hero */
         .preview-hero { background: #1e293b; color: #fff; padding: 48px 24px 0; }
         .preview-hero-inner { display: flex; gap: 24px; align-items: flex-start; max-width: 100%; }
@@ -377,8 +378,8 @@ export default function WebsiteBuilderPage() {
         .preview-hero-sub { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 12px; max-width: 400px; }
         .preview-hero-pill { display: inline-block; background: rgba(29,78,216,0.15); color: #93c5fd; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; margin-bottom: 20px; }
         .preview-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-        .preview-btn-primary { background: var(--theme, #1d4ed8); color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-weight: 800; font-size: 13px; cursor: default; }
-        .preview-btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 6px; padding: 10px 18px; font-weight: 700; font-size: 13px; cursor: default; }
+        .preview-btn-primary { background: var(--theme, #1d4ed8); color: #fff; border: none; border-radius: 6px; padding: 10px 20px; font-weight: 800; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+        .preview-btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 6px; padding: 10px 18px; font-weight: 700; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
         .preview-proof { display: flex; gap: 16px; flex-wrap: wrap; }
         .preview-proof-item { display: flex; align-items: center; gap: 6px; }
         .preview-proof-num { font-size: 12px; font-weight: 700; color: #fff; }
@@ -404,7 +405,7 @@ export default function WebsiteBuilderPage() {
         .preview-feat-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; }
         .preview-feat-title { font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
         .preview-feat-desc { font-size: 12px; color: #6b7280; line-height: 1.6; }
-        .preview-feat-link { font-size: 12px; font-weight: 700; color: var(--theme, #1d4ed8); margin-top: 12px; }
+        .preview-feat-link { font-size: 12px; font-weight: 700; color: var(--theme, #1d4ed8); margin-top: 12px; text-decoration: none; display: inline-flex; align-items: center; }
         /* About */
         .preview-about { background: #eff6ff; padding: 48px 24px; }
         .preview-about h2 { font-size: 1.4rem; font-weight: 900; color: #1e293b; margin-bottom: 14px; }
@@ -423,7 +424,23 @@ export default function WebsiteBuilderPage() {
         .preview-cta-section h2 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 900; letter-spacing: -1px; margin-bottom: 14px; }
         .preview-cta-section p { font-size: 14px; color: #94a3b8; margin-bottom: 14px; }
         .preview-cta-phone { font-size: 1.6rem; font-weight: 900; color: #fff; display: block; margin-bottom: 24px; }
-        .preview-cta-btn { background: var(--theme, #1d4ed8); color: #fff; border: none; border-radius: 6px; padding: 12px 28px; font-weight: 800; font-size: 15px; cursor: default; }
+        .preview-cta-btn { background: var(--theme, #1d4ed8); color: #fff; border: none; border-radius: 6px; padding: 12px 28px; font-weight: 800; font-size: 15px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+        .preview-request-shell { background: #1e293b; padding: 0 24px 56px; }
+        .preview-request-card { max-width: 760px; margin: 0 auto; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; padding: 24px; box-shadow: 0 24px 60px rgba(15,23,42,0.24); }
+        .preview-request-eyebrow { color: #93c5fd; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+        .preview-request-card h3 { color: #fff; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.8px; margin-bottom: 10px; }
+        .preview-request-card p { color: #cbd5e1; font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
+        .preview-request-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .preview-request-grid input,
+        .preview-request-grid select,
+        .preview-request-grid textarea { width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(15,23,42,0.45); color: #fff; padding: 12px 14px; font-size: 13px; }
+        .preview-request-grid input::placeholder,
+        .preview-request-grid textarea::placeholder { color: #94a3b8; }
+        .preview-request-grid option { color: #0f172a; }
+        .preview-request-full { grid-column: 1 / -1; }
+        .preview-request-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+        .preview-request-primary { background: var(--theme, #1d4ed8); color: #fff; text-decoration: none; border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 800; display: inline-flex; align-items: center; }
+        .preview-request-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 700; }
         .preview-footer { background: #0f172a; color: rgba(255,255,255,0.5); padding: 20px; text-align: center; font-size: 12px; }
         /* Mobile */
         @media (max-width: 900px) {
@@ -431,6 +448,8 @@ export default function WebsiteBuilderPage() {
           .wb-editor { border-right: none; }
           .wb-preview { display: none; }
           .wb-preview.show { display: block; }
+          .preview-request-grid { grid-template-columns: 1fr; }
+          .preview-request-full { grid-column: auto; }
         }
         @media (max-width: 600px) {
           .wb-header { padding: 12px 16px; }
@@ -691,9 +710,16 @@ export default function WebsiteBuilderPage() {
                   <span>About</span>
                   <span>Contact</span>
                 </div>
-                <span className="preview-nav-cta">
-                  {companyProfile?.phone || "Get a Quote"}
-                </span>
+                {companyProfile?.phone ? (
+                  <span className="preview-nav-cta">{companyProfile.phone}</span>
+                ) : (
+                  <a
+                    href="#preview-request-form"
+                    className="preview-nav-cta"
+                  >
+                    Get a Quote
+                  </a>
+                )}
               </div>
 
               {/* Hero */}
@@ -705,12 +731,15 @@ export default function WebsiteBuilderPage() {
                     <p className="preview-hero-sub">{form.subheadline || "Quality services you can count on. Licensed, insured, and trusted by homeowners."}</p>
                     <p className="preview-hero-pill">🎉 Free estimates — same-day response</p>
                     <div className="preview-hero-actions">
-                      <button type="button" className="preview-btn-primary" tabIndex={-1}>
+                      <a
+                        href="#preview-request-form"
+                        className="preview-btn-primary"
+                      >
                         {form.ctaText || "Request Estimate"}
-                      </button>
-                      <button type="button" className="preview-btn-secondary" tabIndex={-1}>
+                      </a>
+                      <a href="#preview-services" className="preview-btn-secondary">
                         Our Services
-                      </button>
+                      </a>
                     </div>
                     <div className="preview-proof">
                       <div className="preview-proof-item">
@@ -755,7 +784,7 @@ export default function WebsiteBuilderPage() {
 
               {/* Services / Features grid */}
               {form.services.length > 0 && (
-                <div className="preview-features">
+                <div className="preview-features" id="preview-services">
                   <div className="preview-features-title">Our Services</div>
                   <div className="preview-features-sub">Everything you need — from initial quote to completed project.</div>
                   <div className="preview-features-grid">
@@ -771,7 +800,7 @@ export default function WebsiteBuilderPage() {
                         </div>
                         <div className="preview-feat-title">{s.name || "Service"}</div>
                         {s.description && <div className="preview-feat-desc">{s.description}</div>}
-                        <div className="preview-feat-link">Get a quote →</div>
+                        <a href="#preview-request-form" className="preview-feat-link">Get a quote →</a>
                       </div>
                     ))}
                   </div>
@@ -833,9 +862,49 @@ export default function WebsiteBuilderPage() {
                 {companyProfile?.phone && (
                   <span className="preview-cta-phone">{companyProfile.phone}</span>
                 )}
-                <button type="button" className="preview-cta-btn" tabIndex={-1}>
+                <a href="#preview-request-form" className="preview-cta-btn">
                   {form.ctaText || "Request Estimate"}
-                </button>
+                </a>
+              </div>
+
+              <div id="preview-request-form" className="preview-request-shell">
+                <div className="preview-request-card">
+                  <div className="preview-request-eyebrow">Client Request Form</div>
+                  <h3>Get customer details before the job starts</h3>
+                  <p>
+                    This is where the client enters contact details, address, job type,
+                    and project information before you follow up.
+                  </p>
+                  <div className="preview-request-grid">
+                    <input type="text" placeholder="Full name" />
+                    <input type="tel" placeholder="Phone number" />
+                    <input type="text" placeholder="Property address" className="preview-request-full" />
+                    <select defaultValue="">
+                      <option value="" disabled>Select the type of work</option>
+                      {form.services.slice(0, 8).map((service, index) => (
+                        <option key={`${service.name || "service"}-${index}`} value={service.name || ""}>
+                          {service.name || `Service ${index + 1}`}
+                        </option>
+                      ))}
+                      <option value="Other">Other</option>
+                    </select>
+                    <textarea
+                      rows={4}
+                      placeholder="Describe the work the client wants done"
+                      className="preview-request-full"
+                    />
+                  </div>
+                  <div className="preview-request-actions">
+                    {siteUrl ? (
+                      <a href={requestUrl} target="_blank" rel="noreferrer" className="preview-request-primary">
+                        Open Real Request Page
+                      </a>
+                    ) : null}
+                    <button type="button" className="preview-request-secondary">
+                      Send Quote Request
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="preview-footer">
