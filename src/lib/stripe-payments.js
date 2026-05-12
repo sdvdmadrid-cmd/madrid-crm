@@ -746,19 +746,21 @@ export async function createContractorSubscription({
   // Create the subscription with free trial
   const priceInCents = Math.round(plan.price_monthly * 100);
 
+  const product = await stripe.products.create({
+    name: plan.name,
+    description: plan.description || undefined,
+    metadata: {
+      plan_id: planId,
+    },
+  });
+
   const subscription = await stripe.subscriptions.create({
     customer: stripeCustomerId,
     items: [
       {
         price_data: {
           currency: "usd",
-          product_data: {
-            name: plan.name,
-            description: plan.description,
-            metadata: {
-              plan_id: planId,
-            },
-          },
+          product: product.id,
           unit_amount: priceInCents,
           recurring: {
             interval: "month",
