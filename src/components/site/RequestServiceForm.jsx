@@ -32,6 +32,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [submitState, setSubmitState] = useState("idle");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -66,6 +67,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
     setLoading(true);
     setError("");
     setSuccess(false);
+    setSubmitState("loading");
 
     try {
       const res = await fetch(`/api/site/${slug}/contact`, {
@@ -80,6 +82,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
       }
 
       setSuccess(true);
+      setSubmitState("success");
       setForm({
         name: "",
         phone: "",
@@ -90,13 +93,38 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
         website: "",
         formStartedAt: String(Date.now()),
       });
-      setTimeout(() => setSuccess(false), 5000);
+      setTimeout(() => {
+        setSuccess(false);
+        setSubmitState("idle");
+      }, 5000);
     } catch (err) {
       setError(err.message || "Something went wrong");
+      setSubmitState("error");
     } finally {
       setLoading(false);
     }
   };
+
+  const submitLabel =
+    submitState === "loading"
+      ? "Sending..."
+      : submitState === "success"
+        ? "Request Sent"
+        : submitState === "error"
+          ? "Try Again"
+          : "Send Request";
+
+  const submitBackground =
+    submitState === "success"
+      ? "#10b981"
+      : submitState === "error"
+        ? "#ef4444"
+        : "#fff";
+
+  const submitTextColor =
+    submitState === "success" || submitState === "error"
+      ? "#fff"
+      : "#0f172a";
 
   const inputStyle = {
     width: "100%",
@@ -234,20 +262,22 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
         <button
           type="submit"
           disabled={loading}
+          aria-live="polite"
           style={{
             width: "100%",
             padding: "12px 14px",
             borderRadius: 8,
             border: "none",
-            background: "#fff",
-            color: "#0f172a",
+            background: submitBackground,
+            color: submitTextColor,
             fontWeight: 800,
             fontSize: 14,
             cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.65 : 1,
+            transition: "background 0.2s ease, color 0.2s ease, opacity 0.2s ease",
           }}
         >
-          {loading ? "Submitting..." : "Request Service"}
+          {submitLabel}
         </button>
       </form>
     </div>
