@@ -1060,9 +1060,15 @@ export default function WebsiteBuilderPage() {
                     />
                   </div>
                   <div className="preview-request-actions">
-                    <button type="button" className="preview-request-primary">
-                      Send Request
-                    </button>
+                    {siteUrl ? (
+                      <a href={requestUrl} target="_blank" rel="noreferrer" className="preview-request-primary">
+                        Send Request
+                      </a>
+                    ) : (
+                      <button type="button" className="preview-request-primary">
+                        Send Request
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -59,6 +59,36 @@ const HERO_PHOTOS = [
   { src: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=280&fit=crop", alt: "Home services professional" },
 ];
 
+const REQUEST_SERVICE_OPTIONS = [
+  "Interior Painting",
+  "Exterior Painting",
+  "Roof Inspection",
+  "Leak Repair",
+  "Shingle Repair",
+  "Full Roof Replacement",
+  "Lawn Maintenance",
+  "Mulch / Rock",
+  "Irrigation",
+  "Hardscape Install",
+  "Yard Cleanup",
+  "Deep Cleaning",
+  "Recurring Cleaning",
+  "Move-In / Move-Out",
+  "Post-Construction Cleaning",
+  "Panel Upgrade",
+  "Wiring Repair",
+  "Lighting Install",
+  "Outlet / Switch",
+  "Plumbing Repair",
+  "Water Heater",
+  "Fixture Install",
+  "AC Repair",
+  "Heating Repair",
+  "Ductwork",
+  "General Handyman",
+  "Other",
+];
+
 function normalizePublicCta(value) {
   const fallback = "Request Estimate";
   const trimmed = String(value || "").trim();
@@ -491,7 +521,7 @@ export default async function PublicContractorSitePage({ params }) {
             )}
             <RequestServiceForm
               slug={data.slug}
-              serviceOptions={industryProfile.requestServiceOptions || []}
+              serviceOptions={REQUEST_SERVICE_OPTIONS}
             />
           </div>
 
