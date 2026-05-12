@@ -1034,7 +1034,7 @@ export default function WebsiteBuilderPage() {
                   <div className="preview-request-actions">
                     {siteUrl ? (
                       <a href={requestUrl} target="_blank" rel="noreferrer" className="preview-request-primary">
-                        Open Real Request Page
+                        Send Request
                       </a>
                     ) : null}
                     <button type="button" className="preview-request-secondary">
