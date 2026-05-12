@@ -12,6 +12,32 @@ if (!supabaseUrl || !supabasePublishableKey) {
 
 let browserClientInstance = null;
 
+function clearLegacyPersistedSupabaseSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const storages = [window.localStorage, window.sessionStorage].filter(Boolean);
+    for (const storage of storages) {
+      const keysToRemove = [];
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (!key) continue;
+        if (key.startsWith("sb-") && key.includes("-auth-token")) {
+          keysToRemove.push(key);
+        }
+      }
+
+      for (const key of keysToRemove) {
+        storage.removeItem(key);
+      }
+    }
+  } catch {
+    // Ignore storage access failures in hardened browser contexts.
+  }
+}
+
 function maskToken(value) {
   const raw = String(value || "");
   if (!raw) return null;
@@ -25,12 +51,14 @@ function cookieNamesFromList(list) {
 
 export function createSupabaseBrowserAuthClient() {
   if (!browserClientInstance) {
+    clearLegacyPersistedSupabaseSession();
+
     browserClientInstance = createBrowserClient(
       supabaseUrl,
       supabasePublishableKey,
       {
         auth: {
-          persistSession: true,
+          persistSession: false,
           autoRefreshToken: true,
           detectSessionInUrl: true,
         },
@@ -39,7 +67,7 @@ export function createSupabaseBrowserAuthClient() {
 
     if (authDebugEnabled) {
       console.info("[supabase:browser] init", {
-        persistSession: true,
+        persistSession: false,
         autoRefreshToken: true,
         detectSessionInUrl: true,
         supabaseUrl,
