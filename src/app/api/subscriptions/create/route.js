@@ -84,23 +84,18 @@ export async function POST(request) {
       );
     }
 
-    // Get tenant email from auth
-    const { data: tenantData, error: tenantError } = await supabaseAdmin
-      .from("tenants")
-      .select("tenant_name, email")
-      .eq("id", context.tenantDbId)
-      .single();
-
-    if (tenantError) {
-      throw new Error(`Error fetching tenant: ${tenantError.message}`);
-    }
+    const tenantEmail = context.email || context.supabaseUser?.email || null;
+    const tenantName =
+      String(context.companyName || "").trim() ||
+      String(context.name || "").trim() ||
+      "Contractor";
 
     // Create subscription
     const subscription = await createContractorSubscription({
       tenantId: context.tenantDbId,
       planId: plan.id,
-      email: tenantData.email || context.email,
-      name: tenantData.tenant_name || "Contractor",
+      email: tenantEmail,
+      name: tenantName,
       trialDays: 30,
     });
 
@@ -114,8 +109,8 @@ export async function POST(request) {
     if (planData.data) {
       await sendSubscriptionConfirmationEmail({
         tenantId: context.tenantDbId,
-        email: tenantData.email || context.email,
-        tenantName: tenantData.tenant_name || "Contractor",
+        email: tenantEmail,
+        tenantName,
         planName: planData.data.name,
         trialDays: 30,
       });
