@@ -122,8 +122,9 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
       {success && (
         <div
           style={{
-            background: "rgba(16, 185, 129, 0.12)",
-            color: "#065f46",
+            background: "rgba(16, 185, 129, 0.2)",
+            color: "#d1fae5",
+            border: "1px solid rgba(16, 185, 129, 0.5)",
             padding: "14px 16px",
             borderRadius: 8,
             marginBottom: 16,
@@ -138,12 +139,14 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
       {error && (
         <div
           style={{
-            background: "rgba(239, 68, 68, 0.12)",
-            color: "#991b1b",
+            background: "rgba(239, 68, 68, 0.2)",
+            color: "#fee2e2",
+            border: "1px solid rgba(239, 68, 68, 0.5)",
             padding: "14px 16px",
             borderRadius: 8,
             marginBottom: 16,
             fontSize: 14,
+            fontWeight: 700,
           }}
         >
           {error}

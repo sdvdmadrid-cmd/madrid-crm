@@ -415,6 +415,7 @@ export default function WebsiteBuilderPage() {
 
   const siteUrl = publicUrl || (slug ? `/site/${slug}` : null);
   const requestUrl = slug ? `/site/${slug}/request` : "#preview-request-form";
+  const canOpenRequestPage = Boolean(slug);
   const theme = form.themeColor || "#16a34a";
 
   if (loading) {
@@ -1060,13 +1061,17 @@ export default function WebsiteBuilderPage() {
                     />
                   </div>
                   <div className="preview-request-actions">
-                    {siteUrl ? (
-                      <a href={requestUrl} target="_blank" rel="noreferrer" className="preview-request-primary">
+                    {canOpenRequestPage ? (
+                      <a href={requestUrl} className="preview-request-primary">
                         Send Request
                       </a>
                     ) : (
-                      <button type="button" className="preview-request-primary">
-                        Send Request
+                      <button
+                        type="button"
+                        className="preview-request-primary"
+                        onClick={() => showNotice("Save your website first to enable Send Request.", true)}
+                      >
+                        Send Request (Save First)
                       </button>
                     )}
                   </div>
