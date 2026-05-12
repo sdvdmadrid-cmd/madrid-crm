@@ -10,6 +10,7 @@ const SESSION_COOKIE_NAME =
 const SESSION_TTL_SECONDS = Number(
   process.env.SESSION_TTL_SECONDS || 60 * 60 * 24 * 7,
 );
+const SESSION_PERSISTENT_COOKIE = process.env.SESSION_PERSISTENT_COOKIE === "1";
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const JWT_ISSUER = process.env.SESSION_JWT_ISSUER || "madrid-app";
 const JWT_AUDIENCE = process.env.SESSION_JWT_AUDIENCE || "madrid-app-users";
@@ -117,9 +118,11 @@ export function getSessionFromRequest(request) {
 }
 
 export function buildSessionCookie(token) {
-  const maxAge = SESSION_TTL_SECONDS;
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  const maxAge = SESSION_PERSISTENT_COOKIE
+    ? `; Max-Age=${SESSION_TTL_SECONDS}`
+    : "";
+  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${maxAge}${secure}`;
 }
 
 export function clearSessionCookie() {
