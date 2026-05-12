@@ -11,11 +11,12 @@ const QUICK_QUESTIONS = [
   "What should I improve this week?",
 ];
 
-export default function AdminAiAssistantClient() {
+export default function AdminAiAssistantClient({ floating = false }) {
   const [question, setQuestion] = useState(QUICK_QUESTIONS[0]);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(!floating);
 
   const ask = async (prompt) => {
     const text = String(prompt || question || "").trim();
@@ -38,8 +39,8 @@ export default function AdminAiAssistantClient() {
     }
   };
 
-  return (
-    <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+  const assistantBody = (
+    <>
       <div className="border-b border-slate-200 bg-slate-50 px-4 py-4">
         <h2 className="text-lg font-semibold tracking-tight text-slate-900">
           Owner AI Assistant
@@ -96,6 +97,44 @@ export default function AdminAiAssistantClient() {
           </div>
         ) : null}
       </div>
+    </>
+  );
+
+  if (floating) {
+    return (
+      <div
+        id="owner-ai-assistant"
+        className="fixed bottom-6 right-6 z-[70] flex flex-col items-end gap-3"
+      >
+        {isOpen ? (
+          <section className="w-[min(92vw,440px)] max-h-[72vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-end border-b border-slate-200 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            {assistantBody}
+          </section>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => setIsOpen((open) => !open)}
+          className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-black/30 transition hover:bg-slate-800"
+        >
+          {isOpen ? "Hide Owner AI" : "Ask Owner AI"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      {assistantBody}
     </section>
   );
 }

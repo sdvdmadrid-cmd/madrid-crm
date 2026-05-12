@@ -4,7 +4,7 @@ import AdminDashboardTableClient from "@/components/admin/AdminDashboardTableCli
 import AdminAiAssistantClient from "@/components/admin/AdminAiAssistantClient";
 import AdminEmailDeliveryClient from "@/components/admin/AdminEmailDeliveryClient";
 import AdminSubscriptionsClient from "@/components/admin/AdminSubscriptionsClient";
-import AdminFinancialDashboardClient from "@/components/admin/AdminFinancialDashboardClient";
+import { AdminFinancialDashboardClient } from "@/components/admin/AdminFinancialDashboardClient";
 import AdminFeatureFlagsClient from "@/components/admin/AdminFeatureFlagsClient";
 import { verifySessionToken } from "@/lib/auth";
 import { getPlatformFeatureFlagMap } from "@/lib/platform-feature-flags";
@@ -817,10 +817,14 @@ export default async function AdminPage() {
 
         <section className="mb-6 grid gap-4 xl:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Website Generation</p>
-            <p className="mt-2 text-2xl font-semibold text-white">{websitesPublished}</p>
-            <p className="mt-1 text-sm text-slate-400">Published websites</p>
-            <p className="mt-3 text-xs text-slate-500">{websitesUpdated7d} updated in last 7 days</p>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Owner Command Center</p>
+            <p className="mt-2 text-sm text-slate-300">Access key platform modules from dedicated buttons.</p>
+            <div className="mt-4 grid gap-2">
+              <a href="#owner-ai-assistant" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10">Owner AI Assistant</a>
+              <a href="#verification-email-delivery" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10">Verification Email Delivery</a>
+              <a href="#contractor-subscriptions" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10">Contractor Subscriptions</a>
+              <a href="#stripe-overview" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10">Stripe Revenue & Transaction Stream</a>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
@@ -926,16 +930,11 @@ export default async function AdminPage() {
             <h2 className="text-lg font-semibold text-white">Internal Admin Controls</h2>
             <p className="mt-1 text-sm text-slate-400">Operational controls for AI messaging, outbound email, and tenant-level intervention.</p>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              {isModuleEnabled("platform_ai_ops", true) ? (
-              <div className="rounded-xl border border-white/10 bg-slate-950/50 p-4">
-                <p className="mb-2 text-sm font-medium text-slate-200">AI Operations</p>
-                <AdminAiAssistantClient />
-              </div>
-              ) : null}
+            {isModuleEnabled("platform_ai_ops", true) ? <AdminAiAssistantClient floating /> : null}
 
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
               {isModuleEnabled("platform_email_ops", true) ? (
-              <div className="rounded-xl border border-white/10 bg-slate-950/50 p-4">
+              <div id="verification-email-delivery" className="rounded-xl border border-white/10 bg-slate-950/50 p-4">
                 <p className="mb-2 text-sm font-medium text-slate-200">Email Reliability</p>
                 <AdminEmailDeliveryClient />
               </div>
@@ -953,7 +952,7 @@ export default async function AdminPage() {
         </section>
 
         {isModuleEnabled("platform_subscriptions_dashboard", true) ? (
-        <section className="mb-6">
+        <section id="contractor-subscriptions" className="mb-6">
           <AdminSubscriptionsClient />
         </section>
         ) : null}
