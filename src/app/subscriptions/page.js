@@ -254,10 +254,17 @@ export default function SubscriptionsPage() {
 
                 {subscription.status === "trialing" ? (
                   <div className={styles.detailRow}>
-                    <span className={styles.label}>Para suscripción real:</span>
+                    <span className={styles.label}>Estado de facturación:</span>
                     <span className={styles.value}>
-                      Agrega tu tarjeta cuando decidas continuar.
+                      Pendiente de método de pago.
                     </span>
+                  </div>
+                ) : null}
+
+                {subscription.status !== "trialing" ? (
+                  <div className={styles.detailRow}>
+                    <span className={styles.label}>Estado de facturación:</span>
+                    <span className={styles.value}>Método de pago configurado.</span>
                   </div>
                 ) : null}
 
@@ -289,7 +296,7 @@ export default function SubscriptionsPage() {
                     {openingBillingPortal
                       ? "Abriendo pago..."
                       : subscription.status === "trialing"
-                        ? "Suscribirme de verdad (agregar pago)"
+                        ? "Activar Suscripción"
                         : "Gestionar método de pago"}
                   </button>
 
