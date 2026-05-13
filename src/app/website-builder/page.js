@@ -81,6 +81,13 @@ const UI = {
     generateImage: "Generate AI Image",
     generatingImage: "Generating image...",
     aiImageHint: "Generate realistic project images for your gallery.",
+    aiImagePresetsLabel: "Quick Presets",
+    aiImagePresets: [
+      "modern kitchen remodel, bright daylight, premium finishes",
+      "roof replacement crew at work, suburban home, overcast sky",
+      "before and after bathroom renovation, clean composition",
+      "landscaping project with fresh sod and stone pathway",
+    ],
     addGalleryPhotos: "Add Work Photos",
     galleryHint: "Upload completed-job photos so customers can see real public proof on your website.",
     galleryAltLabel: "Photo caption",
@@ -128,6 +135,13 @@ const UI = {
     generateImage: "Generar Imagen IA",
     generatingImage: "Generando imagen...",
     aiImageHint: "Genera imagenes realistas de proyectos para tu galeria.",
+    aiImagePresetsLabel: "Presets Rapidos",
+    aiImagePresets: [
+      "remodelacion moderna de cocina, luz natural, acabados premium",
+      "equipo cambiando techo, casa suburbana, cielo nublado",
+      "antes y despues de renovacion de bano, composicion limpia",
+      "proyecto de jardineria con cesped nuevo y sendero de piedra",
+    ],
     addGalleryPhotos: "Agregar Fotos de Trabajos",
     galleryHint: "Sube fotos de trabajos terminados para que los clientes las vean publicamente en tu sitio web.",
     galleryAltLabel: "Texto de la foto",
@@ -175,6 +189,13 @@ const UI = {
     generateImage: "Generuj Obraz AI",
     generatingImage: "Generowanie obrazu...",
     aiImageHint: "Generuj realistyczne obrazy realizacji do galerii.",
+    aiImagePresetsLabel: "Szybkie Presety",
+    aiImagePresets: [
+      "nowoczesna przebudowa kuchni, dzienne swiatlo, premium wykonczenie",
+      "ekipa wymieniajaca dach, dom na przedmiesciach, pochmurne niebo",
+      "przed i po remoncie lazienki, czysta kompozycja",
+      "projekt ogrodu z nowa trawa i kamienna sciezka",
+    ],
     addGalleryPhotos: "Dodaj Zdjecia Realizacji",
     galleryHint: "Przeslij zdjecia ukonczonych prac, aby klienci widzieli je publicznie na Twojej stronie.",
     galleryAltLabel: "Opis zdjecia",
@@ -489,6 +510,10 @@ export default function WebsiteBuilderPage() {
     }
   }, [form.galleryPhotos, imagePrompt, showNotice, t]);
 
+  const applyImagePreset = useCallback((preset) => {
+    setImagePrompt(String(preset || "").slice(0, 320));
+  }, []);
+
   const setGalleryAlt = useCallback((index, value) => {
     setForm((prev) => {
       const nextPhotos = [...prev.galleryPhotos];
@@ -538,6 +563,9 @@ export default function WebsiteBuilderPage() {
         .wb-btn-pub { background: #16a34a; color: #fff; }
         .wb-btn-unpub { background: #dc2626; color: #fff; }
         .wb-btn-view { background: transparent; border: 1px solid #e2e8f0 !important; color: #0f172a; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .wb-preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .wb-preset-chip { border: 1px solid #c4b5fd; background: #ffffff; color: #5b21b6; border-radius: 999px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .wb-preset-chip:hover { background: #ede9fe; }
         .wb-tabs { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 28px; display: flex; gap: 0; }
         .wb-tab { padding: 14px 20px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; background: transparent; color: #64748b; border-bottom: 3px solid transparent; transition: color 0.15s; }
         .wb-tab.active { color: #0f172a; border-bottom-color: var(--theme, #16a34a); }
@@ -913,6 +941,21 @@ export default function WebsiteBuilderPage() {
               {featureAiDescription ? (
                 <div style={{ marginBottom: 14, padding: "12px", border: "1px solid #ddd6fe", borderRadius: 12, background: "#f5f3ff" }}>
                   <label className="wb-label" htmlFor="ai-image-prompt">{t.aiImagePromptLabel}</label>
+                  <div style={{ fontSize: 12, color: "#6d28d9", marginBottom: 8, fontWeight: 700 }}>
+                    {t.aiImagePresetsLabel}
+                  </div>
+                  <div className="wb-preset-row">
+                    {(Array.isArray(t.aiImagePresets) ? t.aiImagePresets : []).map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        className="wb-preset-chip"
+                        onClick={() => applyImagePreset(preset)}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     id="ai-image-prompt"
                     className="wb-input"
