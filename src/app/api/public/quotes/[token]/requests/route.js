@@ -311,7 +311,6 @@ export async function POST(request, { params }) {
         success: true,
         data: {
           _id: requestRow?.id || `${quoteToken}-${Date.now()}`,
-          tenantId,
           jobId: job.id,
           quoteToken,
           requestType: type,

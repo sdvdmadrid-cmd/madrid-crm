@@ -4,6 +4,10 @@ import {
   recordPublicQuoteAttempt,
 } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  createQuoteSignatureAuditRecord,
+  sanitizeSignatureDrawDataUrl,
+} from "@/lib/quote-signatures";
 
 const JOBS = "jobs";
 const QUOTES = "quotes";
@@ -81,10 +85,24 @@ export async function POST(request, { params }) {
     const contactName = sanitizeText(body.contactName, 100);
     const contactEmail = sanitizeText(body.contactEmail, 160).toLowerCase();
     const signatureText = sanitizeText(body.signatureText, 200);
+    const signatureDrawDataUrl = sanitizeSignatureDrawDataUrl(
+      body.signatureDrawDataUrl,
+    );
+    const acceptedElectronicConsent = body.acceptElectronicConsent === true;
 
-    if (action === "sign" && !signatureText) {
+    if (action === "sign" && !signatureText && !signatureDrawDataUrl) {
       return new Response(
         JSON.stringify({ success: false, error: "Signature is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (action === "sign" && !acceptedElectronicConsent) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Electronic signature consent is required" }),
         {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -129,6 +147,22 @@ export async function POST(request, { params }) {
       const update = {
         status: nextStatus,
         approved_at: action === "decline" ? quoteRow.approved_at || null : quoteRow.approved_at || nowIso,
+        quote_approved_by_name: action === "decline"
+          ? quoteRow.quote_approved_by_name || ""
+          : contactName || quoteRow.quote_approved_by_name || "",
+        quote_approved_by_email: action === "decline"
+          ? quoteRow.quote_approved_by_email || ""
+          : contactEmail || quoteRow.quote_approved_by_email || "",
+        quote_signed_at: action === "sign" ? nowIso : quoteRow.quote_signed_at || null,
+        quote_signed_by_name: action === "sign"
+          ? contactName || quoteRow.quote_signed_by_name || ""
+          : quoteRow.quote_signed_by_name || "",
+        quote_signed_by_email: action === "sign"
+          ? contactEmail || quoteRow.quote_signed_by_email || ""
+          : quoteRow.quote_signed_by_email || "",
+        quote_signature_text: action === "sign"
+          ? signatureText || contactName || quoteRow.quote_signature_text || ""
+          : quoteRow.quote_signature_text || "",
         updated_at: nowIso,
       };
 
@@ -145,18 +179,34 @@ export async function POST(request, { params }) {
         throw new Error(quoteUpdateError.message);
       }
 
+      const signatureEvidence = action === "sign"
+        ? await createQuoteSignatureAuditRecord({
+            request,
+            quote: {
+              ...quoteRow,
+              ...update,
+            },
+            contactName,
+            contactEmail,
+            signatureText: signatureText || contactName,
+            signatureDrawDataUrl,
+            acceptedElectronicConsent,
+          })
+        : null;
+
       return new Response(
         JSON.stringify({
           success: true,
           data: {
             quoteStatus: nextStatus,
             quoteApprovedAt: update.approved_at || "",
-            quoteSignedAt: action === "sign" ? nowIso : "",
-            quoteApprovedByName: contactName || "",
-            quoteApprovedByEmail: contactEmail || "",
-            quoteSignedByName: action === "sign" ? contactName || "" : "",
-            quoteSignedByEmail: action === "sign" ? contactEmail || "" : "",
-            quoteSignatureText: action === "sign" ? signatureText : "",
+            quoteSignedAt: update.quote_signed_at || "",
+            quoteApprovedByName: update.quote_approved_by_name || "",
+            quoteApprovedByEmail: update.quote_approved_by_email || "",
+            quoteSignedByName: update.quote_signed_by_name || "",
+            quoteSignedByEmail: update.quote_signed_by_email || "",
+            quoteSignatureText: update.quote_signature_text || "",
+            signatureEvidence,
           },
         }),
         {
@@ -222,7 +272,7 @@ export async function POST(request, { params }) {
         contactName || job.quote_signed_by_name || "";
       update.quote_signed_by_email =
         contactEmail || job.quote_signed_by_email || "";
-      update.quote_signature_text = signatureText;
+      update.quote_signature_text = signatureText || contactName || "";
     }
 
     const { error: updateError } = await supabaseAdmin
@@ -237,6 +287,26 @@ export async function POST(request, { params }) {
       );
       throw new Error(updateError.message);
     }
+
+    const signatureEvidence = action === "sign"
+      ? await createQuoteSignatureAuditRecord({
+          request,
+          quote: {
+            ...job,
+            id: job.id,
+            quote_token: quoteToken,
+            quote_number: job.quote_number || "",
+            line_items: Array.isArray(job.items) ? job.items : [],
+            price: job.price || 0,
+            scope_of_work: job.scope_details || "",
+          },
+          contactName,
+          contactEmail,
+          signatureText: signatureText || contactName,
+          signatureDrawDataUrl,
+          acceptedElectronicConsent,
+        })
+      : null;
 
     return new Response(
       JSON.stringify({
@@ -256,6 +326,7 @@ export async function POST(request, { params }) {
           quoteSignedByName: update.quote_signed_by_name || "",
           quoteSignedByEmail: update.quote_signed_by_email || "",
           quoteSignatureText: update.quote_signature_text || "",
+          signatureEvidence,
         },
       }),
       {

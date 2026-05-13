@@ -5,6 +5,7 @@ import {
   recordPublicQuoteAttempt,
 } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { readLatestQuoteSignatureAudit } from "@/lib/quote-signatures";
 
 const JOBS = "jobs";
 const QUOTES = "quotes";
@@ -108,12 +109,12 @@ export async function GET(_request, { params }) {
         down_payment_percent: "0",
         quote_status: quoteStatus,
         quote_approved_at: quoteRow.approved_at || "",
-        quote_signed_at: quoteStatus === "signed" ? quoteRow.approved_at || "" : "",
-        quote_approved_by_name: "",
-        quote_approved_by_email: "",
-        quote_signed_by_name: "",
-        quote_signed_by_email: "",
-        quote_signature_text: "",
+        quote_signed_at: quoteRow.quote_signed_at || "",
+        quote_approved_by_name: quoteRow.quote_approved_by_name || "",
+        quote_approved_by_email: quoteRow.quote_approved_by_email || "",
+        quote_signed_by_name: quoteRow.quote_signed_by_name || "",
+        quote_signed_by_email: quoteRow.quote_signed_by_email || "",
+        quote_signature_text: quoteRow.quote_signature_text || "",
       };
     } else {
       const { data: legacyJob, error: jobError } = await supabaseAdmin
@@ -156,7 +157,7 @@ export async function GET(_request, { params }) {
 
     const clientId = String(job.client_id || "").trim();
 
-    const [clientDoc, companyProfile] = await Promise.all([
+    const [clientDoc, companyProfile, signatureEvidence] = await Promise.all([
       clientId
         ? supabaseAdmin
             .from(CLIENTS)
@@ -176,14 +177,20 @@ export async function GET(_request, { params }) {
             })
         : Promise.resolve(null),
       getCompanyProfileByTenant({ tenantId }),
+      readLatestQuoteSignatureAudit({
+        quoteId: quoteRow?.id || job.id,
+        quoteToken,
+        tenantId,
+      }),
     ]);
+
+    const signedPdfUrl = `${new URL(_request.url).origin}/quote/${encodeURIComponent(quoteToken)}?print=signed`;
 
     return new Response(
       JSON.stringify({
         success: true,
         data: {
           quoteToken,
-          tenantId,
           job: {
             _id: job.id,
             title: job.title || "",
@@ -210,6 +217,8 @@ export async function GET(_request, { params }) {
             quoteSignedByEmail: job.quote_signed_by_email || "",
             quoteSignatureText: job.quote_signature_text || "",
           },
+          signatureEvidence,
+          signedPdfUrl,
           companyProfile: {
             companyName:
               companyProfile?.publicDisplayName ||
