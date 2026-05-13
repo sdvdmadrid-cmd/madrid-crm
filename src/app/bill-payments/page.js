@@ -327,6 +327,14 @@ export default function BillPaymentsPage() {
     typeof params?.id === "string" && params.id ? params.id : "";
 
   const canManageSensitiveData = capabilities.canManageSensitiveData;
+  const paymentBrandName = "FieldBase";
+  const paymentBillingName = useMemo(() => {
+    const companyCandidate = String(
+      authUser?.companyName || authUser?.businessName || "",
+    ).trim();
+    if (companyCandidate) return companyCandidate;
+    return paymentBrandName;
+  }, [authUser]);
   const bills = dashboard.bills || [];
   const recentTransactions = dashboard.recentTransactions || [];
   const executablePaymentMethods = useMemo(
@@ -1712,6 +1720,7 @@ export default function BillPaymentsPage() {
                       stripe={stripePromise}
                       options={{
                         clientSecret: setupIntentState.clientSecret,
+                        business: { name: paymentBrandName },
                         appearance: {
                           theme: "flat",
                           variables: {
@@ -1724,11 +1733,7 @@ export default function BillPaymentsPage() {
                       <PaymentMethodSetupForm
                         methodType={setupIntentState.methodType}
                         billingDetails={{
-                          name:
-                            authUser?.name ||
-                            authUser?.fullName ||
-                            authUser?.email ||
-                            "",
+                          name: paymentBillingName,
                           email: authUser?.email || "",
                         }}
                         saving={savingMethod}
@@ -4104,6 +4109,7 @@ export default function BillPaymentsPage() {
                       stripe={stripePromise}
                       options={{
                         clientSecret: setupIntentState.clientSecret,
+                        business: { name: paymentBrandName },
                         appearance: {
                           theme: "flat",
                           variables: {
@@ -4116,7 +4122,7 @@ export default function BillPaymentsPage() {
                       <PaymentMethodSetupForm
                         methodType={setupIntentState.methodType}
                         billingDetails={{
-                          name: authUser?.name || authUser?.fullName || authUser?.email || "",
+                          name: paymentBillingName,
                           email: authUser?.email || "",
                         }}
                         saving={savingMethod}
