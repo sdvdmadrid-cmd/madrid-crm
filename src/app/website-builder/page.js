@@ -82,6 +82,8 @@ const UI = {
     generatingImage: "Generating image...",
     aiImageHint: "Generate realistic project images for your gallery.",
     aiImagePresetsLabel: "Quick Presets",
+    aiImageUseOnly: "Use",
+    aiImageUseAndGenerate: "Use + Generate",
     aiImagePresets: [
       "modern kitchen remodel, bright daylight, premium finishes",
       "roof replacement crew at work, suburban home, overcast sky",
@@ -136,6 +138,8 @@ const UI = {
     generatingImage: "Generando imagen...",
     aiImageHint: "Genera imagenes realistas de proyectos para tu galeria.",
     aiImagePresetsLabel: "Presets Rapidos",
+    aiImageUseOnly: "Usar",
+    aiImageUseAndGenerate: "Usar + Generar",
     aiImagePresets: [
       "remodelacion moderna de cocina, luz natural, acabados premium",
       "equipo cambiando techo, casa suburbana, cielo nublado",
@@ -190,6 +194,8 @@ const UI = {
     generatingImage: "Generowanie obrazu...",
     aiImageHint: "Generuj realistyczne obrazy realizacji do galerii.",
     aiImagePresetsLabel: "Szybkie Presety",
+    aiImageUseOnly: "Uzyj",
+    aiImageUseAndGenerate: "Uzyj + Generuj",
     aiImagePresets: [
       "nowoczesna przebudowa kuchni, dzienne swiatlo, premium wykonczenie",
       "ekipa wymieniajaca dach, dom na przedmiesciach, pochmurne niebo",
@@ -465,8 +471,8 @@ export default function WebsiteBuilderPage() {
     }
   }, [form.galleryPhotos.length, showNotice, t.errorSave]);
 
-  const handleGenerateImage = useCallback(async () => {
-    const prompt = String(imagePrompt || "").trim();
+  const handleGenerateImage = useCallback(async (promptOverride = "") => {
+    const prompt = String(promptOverride || imagePrompt || "").trim();
     if (!prompt) {
       showNotice(t.errorGenerateImage, true);
       return;
@@ -513,6 +519,12 @@ export default function WebsiteBuilderPage() {
   const applyImagePreset = useCallback((preset) => {
     setImagePrompt(String(preset || "").slice(0, 320));
   }, []);
+
+  const applyPresetAndGenerate = useCallback(async (preset) => {
+    const normalized = String(preset || "").slice(0, 320);
+    setImagePrompt(normalized);
+    await handleGenerateImage(normalized);
+  }, [handleGenerateImage]);
 
   const setGalleryAlt = useCallback((index, value) => {
     setForm((prev) => {
@@ -563,9 +575,14 @@ export default function WebsiteBuilderPage() {
         .wb-btn-pub { background: #16a34a; color: #fff; }
         .wb-btn-unpub { background: #dc2626; color: #fff; }
         .wb-btn-view { background: transparent; border: 1px solid #e2e8f0 !important; color: #0f172a; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
-        .wb-preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-        .wb-preset-chip { border: 1px solid #c4b5fd; background: #ffffff; color: #5b21b6; border-radius: 999px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .wb-preset-row { display: grid; gap: 8px; margin-bottom: 10px; }
+        .wb-preset-item { border: 1px solid #ddd6fe; background: #ffffff; border-radius: 10px; padding: 8px; }
+        .wb-preset-title { font-size: 11px; color: #5b21b6; font-weight: 700; margin-bottom: 6px; }
+        .wb-preset-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .wb-preset-chip { border: 1px solid #c4b5fd; background: #ffffff; color: #5b21b6; border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 700; cursor: pointer; }
         .wb-preset-chip:hover { background: #ede9fe; }
+        .wb-preset-generate { border: none; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+        .wb-preset-generate:disabled { opacity: 0.6; cursor: not-allowed; }
         .wb-tabs { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 0 28px; display: flex; gap: 0; }
         .wb-tab { padding: 14px 20px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; background: transparent; color: #64748b; border-bottom: 3px solid transparent; transition: color 0.15s; }
         .wb-tab.active { color: #0f172a; border-bottom-color: var(--theme, #16a34a); }
@@ -946,14 +963,26 @@ export default function WebsiteBuilderPage() {
                   </div>
                   <div className="wb-preset-row">
                     {(Array.isArray(t.aiImagePresets) ? t.aiImagePresets : []).map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        className="wb-preset-chip"
-                        onClick={() => applyImagePreset(preset)}
-                      >
-                        {preset}
-                      </button>
+                      <div key={preset} className="wb-preset-item">
+                        <div className="wb-preset-title">{preset}</div>
+                        <div className="wb-preset-actions">
+                          <button
+                            type="button"
+                            className="wb-preset-chip"
+                            onClick={() => applyImagePreset(preset)}
+                          >
+                            {t.aiImageUseOnly}
+                          </button>
+                          <button
+                            type="button"
+                            className="wb-preset-generate"
+                            disabled={generatingImage}
+                            onClick={() => applyPresetAndGenerate(preset)}
+                          >
+                            {generatingImage ? t.generatingImage : t.aiImageUseAndGenerate}
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   <input
