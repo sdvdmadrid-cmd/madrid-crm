@@ -65,10 +65,11 @@ export default function DayCell({
           if (!dw) return null;
           return (
             <span
-              className="text-[10px] sm:text-[11px] font-semibold leading-none inline-flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-1 bg-slate-100 text-slate-700"
+              className="text-[10px] sm:text-[11px] font-semibold leading-none inline-flex items-center gap-1 rounded-full px-1.5 sm:px-2 py-1 bg-slate-100 text-slate-700 animate-weather-bounce"
               title={`${dw.condition} · Feels like ${dw.feelsLike}°`}
+              style={{ transition: 'background 0.5s, color 0.5s' }}
             >
-              <span>{dw.emoji}</span>
+              <span className="drop-shadow-md animate-fade-in" aria-hidden="true">{dw.emoji}</span>
               <span>{dw.temp}°</span>
             </span>
           );

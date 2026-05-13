@@ -65,6 +65,8 @@ const UI = {
     unpublish: "Unpublish",
     publishing: "Updating...",
     viewSite: "View Live Site",
+    viewPrivatePreview: "Open Private Preview",
+    draftPrivateHint: "Draft mode: only you can preview this site until you publish it.",
     previewLabel: "Preview",
     editLabel: "Editor",
     sectionHeadline: "Hero Headline",
@@ -74,6 +76,11 @@ const UI = {
     sectionTheme: "Brand Color",
     sectionServices: "Services",
     sectionGallery: "Project Gallery",
+    aiImagePromptLabel: "AI Image Prompt",
+    aiImagePromptPlaceholder: "Example: modern kitchen remodel, bright daylight, clean finishes",
+    generateImage: "Generate AI Image",
+    generatingImage: "Generating image...",
+    aiImageHint: "Generate realistic project images for your gallery.",
     addGalleryPhotos: "Add Work Photos",
     galleryHint: "Upload completed-job photos so customers can see real public proof on your website.",
     galleryAltLabel: "Photo caption",
@@ -88,6 +95,7 @@ const UI = {
     generateHint: "AI uses your company profile + services catalog to write the content.",
     savedNotice: "Changes saved.",
     errorGenerate: "AI generation failed. Check OpenAI key.",
+    errorGenerateImage: "AI image generation failed. Try a different prompt.",
     errorSave: "Save failed. Try again.",
     slugLabel: "Your site URL",
     noApiKey: "OpenAI key not configured — you can still edit manually.",
@@ -104,6 +112,8 @@ const UI = {
     unpublish: "Despublicar",
     publishing: "Actualizando...",
     viewSite: "Ver Sitio",
+    viewPrivatePreview: "Abrir Preview Privado",
+    draftPrivateHint: "Modo borrador: solo tu puedes ver este sitio hasta publicarlo.",
     previewLabel: "Vista Previa",
     editLabel: "Editor",
     sectionHeadline: "Titular Principal",
@@ -113,6 +123,11 @@ const UI = {
     sectionTheme: "Color de Marca",
     sectionServices: "Servicios",
     sectionGallery: "Galeria de Proyectos",
+    aiImagePromptLabel: "Prompt de Imagen IA",
+    aiImagePromptPlaceholder: "Ejemplo: remodelacion moderna de cocina, luz natural, acabados limpios",
+    generateImage: "Generar Imagen IA",
+    generatingImage: "Generando imagen...",
+    aiImageHint: "Genera imagenes realistas de proyectos para tu galeria.",
     addGalleryPhotos: "Agregar Fotos de Trabajos",
     galleryHint: "Sube fotos de trabajos terminados para que los clientes las vean publicamente en tu sitio web.",
     galleryAltLabel: "Texto de la foto",
@@ -127,6 +142,7 @@ const UI = {
     generateHint: "La IA usa tu perfil de empresa + catálogo de servicios.",
     savedNotice: "Cambios guardados.",
     errorGenerate: "Falló la generación. Verifica la clave de OpenAI.",
+    errorGenerateImage: "Falló la generación de imagen IA. Prueba otro prompt.",
     errorSave: "Error al guardar. Intenta de nuevo.",
     slugLabel: "URL de tu sitio",
     noApiKey: "Clave OpenAI no configurada — puedes editar manualmente.",
@@ -143,6 +159,8 @@ const UI = {
     unpublish: "Cofnij publikację",
     publishing: "Aktualizowanie...",
     viewSite: "Zobacz stronę",
+    viewPrivatePreview: "Otworz Prywatny Podglad",
+    draftPrivateHint: "Tryb roboczy: tylko Ty mozesz zobaczyc te strone do czasu publikacji.",
     previewLabel: "Podgląd",
     editLabel: "Edytor",
     sectionHeadline: "Główny nagłówek",
@@ -152,6 +170,11 @@ const UI = {
     sectionTheme: "Kolor marki",
     sectionServices: "Usługi",
     sectionGallery: "Galeria Realizacji",
+    aiImagePromptLabel: "Prompt Obrazu AI",
+    aiImagePromptPlaceholder: "Przyklad: nowoczesna przebudowa kuchni, dzienne swiatlo, czyste wykonczenie",
+    generateImage: "Generuj Obraz AI",
+    generatingImage: "Generowanie obrazu...",
+    aiImageHint: "Generuj realistyczne obrazy realizacji do galerii.",
     addGalleryPhotos: "Dodaj Zdjecia Realizacji",
     galleryHint: "Przeslij zdjecia ukonczonych prac, aby klienci widzieli je publicznie na Twojej stronie.",
     galleryAltLabel: "Opis zdjecia",
@@ -166,6 +189,7 @@ const UI = {
     generateHint: "AI używa profilu firmy i katalogu usług.",
     savedNotice: "Zmiany zapisane.",
     errorGenerate: "Generowanie nie powiodło się. Sprawdź klucz OpenAI.",
+    errorGenerateImage: "Generowanie obrazu AI nie powiodlo sie. Sprobuj inny prompt.",
     errorSave: "Nie udało się zapisać. Spróbuj ponownie.",
     slugLabel: "URL Twojej strony",
     noApiKey: "Klucz OpenAI nie skonfigurowany — możesz edytować ręcznie.",
@@ -189,6 +213,8 @@ export default function WebsiteBuilderPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [featureAiDescription, setFeatureAiDescription] = useState(true);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [imagePrompt, setImagePrompt] = useState("");
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
@@ -220,6 +246,26 @@ export default function WebsiteBuilderPage() {
   }, []);
 
   // Load website data
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const nextTab = params.get("tab");
+    if (nextTab === "preview" || nextTab === "edit") {
+      setTab(nextTab);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (tab === "preview") {
+      url.searchParams.set("tab", "preview");
+    } else {
+      url.searchParams.delete("tab");
+    }
+    window.history.replaceState({}, "", url);
+  }, [tab]);
+
   useEffect(() => {
     apiFetch("/api/website-builder")
       .then((res) => getJsonOrThrow(res, "Load failed"))
@@ -398,6 +444,51 @@ export default function WebsiteBuilderPage() {
     }
   }, [form.galleryPhotos.length, showNotice, t.errorSave]);
 
+  const handleGenerateImage = useCallback(async () => {
+    const prompt = String(imagePrompt || "").trim();
+    if (!prompt) {
+      showNotice(t.errorGenerateImage, true);
+      return;
+    }
+
+    if ((form.galleryPhotos || []).length >= MAX_GALLERY_IMAGES) {
+      showNotice(`Max ${MAX_GALLERY_IMAGES} gallery photos allowed.`, true);
+      return;
+    }
+
+    setGeneratingImage(true);
+    setError("");
+    try {
+      const res = await apiFetch("/api/website-builder/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      const payload = await getJsonOrThrow(res, t.errorGenerateImage);
+      const imageDataUrl = String(payload?.data?.imageDataUrl || "");
+      if (!imageDataUrl.startsWith("data:image/")) {
+        throw new Error(t.errorGenerateImage);
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        galleryPhotos: [
+          ...prev.galleryPhotos,
+          {
+            src: imageDataUrl,
+            alt: String(payload?.data?.alt || prompt).slice(0, 160),
+          },
+        ].slice(0, MAX_GALLERY_IMAGES),
+      }));
+      setImagePrompt("");
+      showNotice(t.savedNotice);
+    } catch (err) {
+      showNotice(err.message || t.errorGenerateImage, true);
+    } finally {
+      setGeneratingImage(false);
+    }
+  }, [form.galleryPhotos, imagePrompt, showNotice, t]);
+
   const setGalleryAlt = useCallback((index, value) => {
     setForm((prev) => {
       const nextPhotos = [...prev.galleryPhotos];
@@ -414,6 +505,7 @@ export default function WebsiteBuilderPage() {
   }, []);
 
   const siteUrl = publicUrl || (slug ? `/site/${slug}` : null);
+  const privatePreviewUrl = "/website-builder?tab=preview";
   const requestUrl = slug ? `/site/${slug}/request` : "#preview-request-form";
   const canOpenRequestPage = Boolean(slug);
   const theme = form.themeColor || "#16a34a";
@@ -596,6 +688,14 @@ export default function WebsiteBuilderPage() {
             <span className={`wb-badge ${published ? "wb-badge-pub" : "wb-badge-draft"}`}>
               {published ? t.publishedBadge : t.draftBadge}
             </span>
+            {slug && (
+              <a
+                href={privatePreviewUrl}
+                className="wb-btn wb-btn-view"
+              >
+                {t.viewPrivatePreview}
+              </a>
+            )}
             {siteUrl && published && (
               <a
                 href={siteUrl}
@@ -644,7 +744,9 @@ export default function WebsiteBuilderPage() {
               <div className="wb-slug-row">
                 <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>{t.slugLabel}:</span>
                 <span className="wb-slug-url">
-                  {publicUrl || `${typeof window !== "undefined" ? window.location.origin : ""}/site/${slug}`}
+                  {published
+                    ? (publicUrl || `${typeof window !== "undefined" ? window.location.origin : ""}/site/${slug}`)
+                    : `${typeof window !== "undefined" ? window.location.origin : ""}${privatePreviewUrl}`}
                 </span>
                 {published && (
                   <a
@@ -656,6 +758,11 @@ export default function WebsiteBuilderPage() {
                     ↗ Open
                   </a>
                 )}
+              </div>
+            )}
+            {!published && (
+              <div style={{ marginBottom: 20, fontSize: 13, color: "#475569", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "12px 14px" }}>
+                {t.draftPrivateHint}
               </div>
             )}
 
@@ -803,6 +910,30 @@ export default function WebsiteBuilderPage() {
 
             <div className="wb-section-title">{t.sectionGallery}</div>
             <div className="wb-field">
+              {featureAiDescription ? (
+                <div style={{ marginBottom: 14, padding: "12px", border: "1px solid #ddd6fe", borderRadius: 12, background: "#f5f3ff" }}>
+                  <label className="wb-label" htmlFor="ai-image-prompt">{t.aiImagePromptLabel}</label>
+                  <input
+                    id="ai-image-prompt"
+                    className="wb-input"
+                    type="text"
+                    maxLength={320}
+                    value={imagePrompt}
+                    placeholder={t.aiImagePromptPlaceholder}
+                    onChange={(e) => setImagePrompt(e.target.value)}
+                    style={{ marginBottom: 10 }}
+                  />
+                  <div style={{ fontSize: 12, color: "#6d28d9", marginBottom: 10 }}>{t.aiImageHint}</div>
+                  <button
+                    className="wb-btn wb-btn-ai"
+                    type="button"
+                    disabled={generatingImage}
+                    onClick={handleGenerateImage}
+                  >
+                    {generatingImage ? t.generatingImage : t.generateImage}
+                  </button>
+                </div>
+              ) : null}
               <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>{t.galleryHint}</div>
               <label className="wb-upload-btn">
                 {t.addGalleryPhotos}

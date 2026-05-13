@@ -9,6 +9,7 @@ import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
+import AiBubbleClient from "@/components/AiBubbleClient";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -1041,6 +1042,8 @@ export default function AuthShell({ children }) {
 
   const isSuperAdminRole =
     String(authUser?.role || "").toLowerCase() === "super_admin";
+  const normalizedRole = String(authUser?.role || "").toLowerCase();
+  const isContractorRole = normalizedRole === "contractor";
 
   // ─── Nav groups ──────────────────────────────────────────────────────────
   const mainNavItems = isSuperAdminRole
@@ -1051,6 +1054,21 @@ export default function AuthShell({ children }) {
           iconKey: "platform",
         },
       ]
+    : isContractorRole
+      ? [
+          {
+            href: "/dashboard",
+            label: t("sidebar.dashboard"),
+            iconKey: "dashboard",
+          },
+          { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
+          { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
+          {
+            href: "/invoices",
+            label: t("sidebar.invoices"),
+            iconKey: "invoices",
+          },
+        ]
     : [
         {
           href: "/dashboard",
@@ -1084,16 +1102,56 @@ export default function AuthShell({ children }) {
 
   const secondaryNavItems = isSuperAdminRole
     ? [
-        ...(platformFlags.featureWebsiteBuilder
-          ? [
-              {
-                href: "/website",
-                label: t("sidebar.websiteBuilder"),
-                iconKey: "websiteBuilder",
-              },
-            ]
-          : []),
+        {
+          href: "/admin",
+          label: t("sidebar.adminOverview"),
+          iconKey: "platform",
+          exact: true,
+        },
+        {
+          href: "/admin#tenant-command-center",
+          label: t("sidebar.adminAi"),
+          iconKey: "insights",
+        },
+        {
+          href: "/admin#stripe-overview",
+          label: t("sidebar.adminStripe"),
+          iconKey: "billPayments",
+        },
+        {
+          href: "/admin#security-watch",
+          label: t("sidebar.adminSecurity"),
+          iconKey: "services",
+        },
+        {
+          href: "/admin#support-queue",
+          label: t("sidebar.adminSupport"),
+          iconKey: "clients",
+        },
+        {
+          href: "/admin/settings",
+          label: t("sidebar.adminSettings"),
+          iconKey: "settings",
+        },
       ]
+    : isContractorRole
+      ? [
+          {
+            href: "/website-builder",
+            label: t("sidebar.websiteBuilder"),
+            iconKey: "websiteBuilder",
+          },
+          {
+            href: "/calendar",
+            label: t("sidebar.calendar"),
+            iconKey: "calendar",
+          },
+          {
+            href: "/lead-inbox",
+            label: t("sidebar.leadInbox"),
+            iconKey: "insights",
+          },
+        ]
     : [
         {
           href: "/website-builder",
@@ -1136,9 +1194,10 @@ export default function AuthShell({ children }) {
   );
 
   const isActive = (href, exact = false) => {
+    const routePath = String(href || "").split("#")[0].split("?")[0];
     if (exact) return pathname === href;
-    if (href === "/") return pathname === "/";
-    return pathname?.startsWith(href);
+    if (routePath === "/") return pathname === "/";
+    return pathname?.startsWith(routePath);
   };
 
   const linkClass = (href, exact = false) => `sb-link${isActive(href, exact) ? " sb-active" : ""}`;
@@ -1581,6 +1640,8 @@ export default function AuthShell({ children }) {
         {children}
         <AppFooter />
       </div>
+
+      {authUser ? <AiBubbleClient authUser={authUser} pathname={pathname} /> : null}
 
       <style jsx global>{`
         @media (max-width: 1200px) {

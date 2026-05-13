@@ -43,44 +43,79 @@ function WeatherPanel({ weather, t }) {
   if (!weather) return null;
   const alert = resolveWeatherAlert(weather);
 
+  // Animación SVG para el ícono del clima
+  const AnimatedWeatherIcon = () => (
+    <span
+      className="text-3xl leading-none animate-weather-bounce drop-shadow-md transition-transform duration-700"
+      aria-hidden="true"
+      style={{ display: 'inline-block' }}
+    >
+      {weather.emoji}
+    </span>
+  );
+
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-3">
-      <p className="text-[11px] uppercase tracking-widest text-blue-500 font-semibold">
+    <div className="rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 via-white to-blue-100 p-5 space-y-4 shadow-xl transition-all duration-500 animate-fade-in">
+      <p className="text-[12px] uppercase tracking-widest text-blue-600 font-extrabold mb-1 animate-fade-in">
         {t("calendar.weather.sectionTitle")}
       </p>
 
-      {/* Main condition row */}
-      <div className="flex items-center gap-3">
-        <span className="text-3xl leading-none" aria-hidden="true">
-          {weather.emoji}
-        </span>
-        <div>
-          <p className="text-xl font-bold text-gray-900">{weather.temp}°F</p>
-          <p className="text-sm text-gray-600 capitalize">
+      {/* Main condition row con animación */}
+      <div className="flex items-center gap-4">
+        <AnimatedWeatherIcon />
+        <div className="transition-all duration-500">
+          <p className="text-2xl font-extrabold text-blue-900 animate-fade-in-slow">{weather.temp}°F</p>
+          <p className="text-sm text-blue-700 capitalize animate-fade-in-slow">
             {weather.description || weather.condition}
           </p>
         </div>
       </div>
 
-      {/* Detail chips */}
-      <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-        <span>🌡️ {t("calendar.weather.feelsLike", { temp: weather.feelsLike })}</span>
-        <span>💧 {t("calendar.weather.humidity", { pct: weather.humidity })}</span>
+      {/* Detail chips con animación */}
+      <div className="flex flex-wrap gap-3 text-xs text-blue-700 animate-fade-in">
+        <span className="bg-blue-100 rounded px-2 py-1 shadow-sm">🌡️ {t("calendar.weather.feelsLike", { temp: weather.feelsLike })}</span>
+        <span className="bg-blue-100 rounded px-2 py-1 shadow-sm">💧 {t("calendar.weather.humidity", { pct: weather.humidity })}</span>
         {weather.windSpeed > 0 && (
-          <span>💨 {t("calendar.weather.wind", { speed: weather.windSpeed })}</span>
+          <span className="bg-blue-100 rounded px-2 py-1 shadow-sm">💨 {t("calendar.weather.wind", { speed: weather.windSpeed })}</span>
         )}
       </div>
 
-      {/* Alert / recommendation */}
+      {/* Alert / recommendation con animación */}
       {alert && (
         <div
-          className={`rounded-md border px-3 py-2 text-xs font-medium leading-snug ${alert.style}`}
+          className={`rounded-md border px-3 py-2 text-xs font-semibold leading-snug ${alert.style} animate-alert-pop`}
         >
           {t(`calendar.weather.${alert.key}`)}
         </div>
       )}
     </div>
   );
+// Animaciones CSS para weather panel
+// Puedes mover esto a un archivo CSS global si prefieres
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes weather-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px) scale(1.08); }
+}
+.animate-weather-bounce { animation: weather-bounce 1.6s infinite cubic-bezier(.68,-0.55,.27,1.55); }
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 1s ease-in; }
+.animate-fade-in-slow { animation: fade-in 1.8s ease-in; }
+@keyframes alert-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-alert-pop { animation: alert-pop 0.7s cubic-bezier(.68,-0.55,.27,1.55); }
+`;
+if (typeof window !== 'undefined' && !window.__weather_anim_injected) {
+  document.head.appendChild(style);
+  window.__weather_anim_injected = true;
+}
 }
 
 const buildEmptyForm = (initialDate) => ({
@@ -281,6 +316,7 @@ export default function AppointmentModal({
                 <button
                   type="button"
                   onClick={() => setIsEditMode(true)}
+                  data-testid="appointment-edit-button"
                   className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
                 >
                   {t("calendar.buttons.edit")}

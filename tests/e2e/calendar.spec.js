@@ -10,6 +10,11 @@ function addDaysYmd(base, delta) {
 }
 
 test.describe('calendar date safety and weather forecast', () => {
+  async function expectCalendarLoaded(page) {
+    await expect(page).toHaveURL(/\/calendar/);
+    await expect(page.getByTestId('calendar-forecast-strip')).toBeVisible({ timeout: 15000 });
+  }
+
   async function openNewAppointmentModal(page, dateYmd) {
     const dayCell = page.getByTestId(`calendar-day-${dateYmd}`);
     await dayCell.click({ position: { x: 8, y: 8 } });
@@ -21,7 +26,7 @@ test.describe('calendar date safety and weather forecast', () => {
       waitUntil: 'domcontentloaded',
     });
     await page.goto('/calendar', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('Schedule your appointments')).toBeVisible({ timeout: 15000 });
+    await expectCalendarLoaded(page);
   });
 
   test('shows 5-day weather strip on load without user interaction', async ({ page }) => {
@@ -46,7 +51,7 @@ test.describe('calendar date safety and weather forecast', () => {
     await dateInput.evaluate((el) => el.removeAttribute('min'));
 
     await page.getByPlaceholder('Title').fill(`PW Past Date ${Date.now()}`);
-    await page.getByPlaceholder('Client').fill('Playwright Client');
+    await page.getByPlaceholder('Client', { exact: true }).fill('Playwright Client');
     await dateInput.fill(yesterday);
     await page.locator('input[type="time"]').first().fill('10:30');
 
@@ -66,22 +71,22 @@ test.describe('calendar date safety and weather forecast', () => {
     await openNewAppointmentModal(page, today);
 
     await page.getByPlaceholder('Title').fill(uniqueTitle);
-    await page.getByPlaceholder('Client').fill('Playwright Client');
+    await page.getByPlaceholder('Client', { exact: true }).fill('Playwright Client');
     await page.getByTestId('appointment-date-input').fill(future);
     await page.locator('input[type="time"]').first().fill('11:45');
     await page.getByTestId('appointment-save-button').click();
 
     await page.getByText(uniqueTitle).first().click();
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByTestId('appointment-edit-button').click();
 
     const dateInput = page.getByTestId('appointment-date-input');
     await expect(dateInput).toHaveValue(future);
 
     await dateInput.fill(futureUpdated);
-    await page.getByRole('button', { name: 'Update' }).click();
+    await page.getByTestId('appointment-save-button').click();
 
     await page.getByText(uniqueTitle).first().click();
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByTestId('appointment-edit-button').click();
     await expect(page.getByTestId('appointment-date-input')).toHaveValue(futureUpdated);
   });
 

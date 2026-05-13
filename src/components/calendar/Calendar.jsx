@@ -129,6 +129,10 @@ export default function Calendar() {
   const [weatherLocationError, setWeatherLocationError] = useState("");
   const [weatherLocationNotice, setWeatherLocationNotice] = useState("");
   const [isApplyingWeatherLocation, setIsApplyingWeatherLocation] = useState(false);
+  const [scheduleNotes, setScheduleNotes] = useState("");
+  const [scheduleAdvice, setScheduleAdvice] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleLoading, setScheduleLoading] = useState(false);
   const [selectedForecastDate, setSelectedForecastDate] = useState("");
   const forecastScrollRef = useRef(null);
   const calendarGridRef = useRef(null);
@@ -475,6 +479,52 @@ export default function Calendar() {
     }
   };
 
+  const generateSchedulingAdvice = async () => {
+    setScheduleLoading(true);
+    setScheduleError("");
+    try {
+      const availability = appointments.slice(0, 20).map((row) => ({
+        date: row?.date || "",
+        time: row?.time || "",
+        status: row?.status || "",
+      }));
+      const weatherSummary = selectedForecastWeather
+        ? `${selectedForecastWeather.condition}; temp ${selectedForecastWeather.temp}F; wind ${selectedForecastWeather.windSpeed || 0} mph`
+        : "N/A";
+      const response = await fetch("/api/ai/scheduling", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          jobSummary: scheduleNotes || "Suggest scheduling priorities for this week.",
+          constraints: scheduleNotes,
+          weatherSummary,
+          availability,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || "Unable to generate scheduling advice.");
+      }
+      const summary = [
+        String(payload?.data?.schedulePlan || "").trim(),
+        (payload?.data?.riskNotes || []).length
+          ? `Risks: ${(payload?.data?.riskNotes || []).join("; ")}`
+          : "",
+        (payload?.data?.backupSlots || []).length
+          ? `Backup slots: ${(payload?.data?.backupSlots || []).join(", ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      setScheduleAdvice(summary);
+    } catch (err) {
+      setScheduleError(err?.message || "Unable to generate scheduling advice.");
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden flex flex-col bg-slate-100/70">
       {/* Header */}
@@ -580,12 +630,12 @@ export default function Calendar() {
                       : dateKey}
                   </div>
                   {weather ? (
-                    <div className="mt-1 inline-flex items-center gap-1 text-slate-800">
-                      <span>{weather.emoji}</span>
-                      <span>{weather.temp}°F</span>
+                    <div className="mt-1 inline-flex items-center gap-1 text-slate-800 animate-fade-in">
+                      <span className="text-2xl animate-weather-bounce drop-shadow-md" aria-hidden="true">{weather.emoji}</span>
+                      <span className="font-bold animate-fade-in-slow">{weather.temp}°F</span>
                       {weather.fallback ? (
                         <span
-                          className="ml-1 inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                          className="ml-1 inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 animate-alert-pop"
                           title={t("calendar.weather.fallbackHint")}
                         >
                           {t("calendar.weather.fallbackLabel")}
@@ -593,7 +643,7 @@ export default function Calendar() {
                       ) : null}
                     </div>
                   ) : (
-                    <div className="mt-1 text-slate-500">{t("calendar.weather.unavailable")}</div>
+                    <div className="mt-1 text-slate-500 animate-fade-in">{t("calendar.weather.unavailable")}</div>
                   )}
                 </button>
               );
@@ -657,6 +707,40 @@ export default function Calendar() {
               )}
             </div>
           ) : null}
+
+          <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/70 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-violet-700">
+                AI Scheduling Assistant
+              </p>
+              <button
+                type="button"
+                onClick={generateSchedulingAdvice}
+                disabled={scheduleLoading}
+                className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-800 disabled:cursor-wait disabled:opacity-70"
+              >
+                {scheduleLoading ? "Generating..." : "Generate Advice"}
+              </button>
+            </div>
+            <textarea
+              value={scheduleNotes}
+              onChange={(event) => setScheduleNotes(event.target.value)}
+              placeholder="Optional constraints: crew size, travel windows, client preferences, blackout hours..."
+              className="mt-2 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+              rows={3}
+            />
+            {scheduleError ? (
+              <p className="mt-2 text-xs font-medium text-rose-700">{scheduleError}</p>
+            ) : null}
+            {scheduleAdvice ? (
+              <textarea
+                readOnly
+                value={scheduleAdvice}
+                className="mt-2 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-slate-700"
+                rows={6}
+              />
+            ) : null}
+          </div>
         </div>
       </div>
 
