@@ -905,6 +905,7 @@ export default function BillPaymentsPage() {
   async function startPaymentMethodSetup(methodType) {
     setError("");
     setNotice("");
+    setShowPaymentMethods(true);
     try {
       const response = await apiFetch(
         "/api/bill-payments/payment-methods/setup-intent",
@@ -1588,7 +1589,7 @@ export default function BillPaymentsPage() {
                           )}
                           <button
                             type="button"
-                            onClick={() => selectBillForEdit(bill)}
+                            onClick={() => selectBillForEdit(bill, { navigate: false })}
                             style={{
                               borderRadius: 999,
                               border: "1px solid rgba(15,23,42,0.14)",
@@ -3257,7 +3258,7 @@ export default function BillPaymentsPage() {
                                 )}
                               <button
                                 type="button"
-                                onClick={() => selectBillForEdit(bill)}
+                                onClick={() => selectBillForEdit(bill, { navigate: false })}
                                 style={{
                                   borderRadius: 999,
                                   border: "1px solid rgba(15,23,42,0.14)",
