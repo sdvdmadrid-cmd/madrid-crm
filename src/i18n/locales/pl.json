@@ -441,6 +441,12 @@
     "leadInbox": "Skrzynka Leadow",
     "ownerAdmin": "Panel Wlasciciela",
     "platform": "Platforma",
+    "adminOverview": "Przeglad Admina",
+    "adminAi": "Centrum Polecen AI",
+    "adminStripe": "Przeglad Stripe",
+    "adminSecurity": "Nadzor Bezpieczenstwa",
+    "adminSupport": "Kolejka Wsparcia",
+    "adminSettings": "Ustawienia Admina",
     "settings": "Ustawienia",
     "logout": "Wyloguj",
     "signingOut": "Wylogowywanie..."

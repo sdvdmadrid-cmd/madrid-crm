@@ -450,7 +450,8 @@ export default function NewEstimatePage() {
                     body: JSON.stringify({ input: raw }),
                   });
                   const json = await getJsonOrThrow(res, "AI unavailable.");
-                  if (json?.data) setJobDescription(json.data);
+                  const nextDescription = String(json?.data?.description || "").trim();
+                  if (nextDescription) setJobDescription(nextDescription);
                 } catch (err) {
                   setStatusMessage(err.message || "AI unavailable.");
                 } finally {

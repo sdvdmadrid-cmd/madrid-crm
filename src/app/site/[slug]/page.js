@@ -1,8 +1,8 @@
-﻿import { supabaseAdmin } from "@/lib/supabase-admin";
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import Image from "next/image";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
 import { getIndustryProfile } from "@/lib/industry-profiles";
+import { getPublicWebsiteBySlug } from "@/lib/public-website";
 
 export const dynamic = "force-dynamic";
 
@@ -124,11 +124,7 @@ function WaveDivider({ fromColor, toColor }) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const { data } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("headline, subheadline")
-    .eq("slug", slug)
-    .maybeSingle();
+  const data = await getPublicWebsiteBySlug(slug);
 
   if (!data) return { title: "Contractor" };
 
@@ -142,32 +138,21 @@ export default async function PublicContractorSitePage({ params }) {
   const { slug } = await params;
   const requestHref = `/site/${slug}/request`;
 
-  const { data } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+  const data = await getPublicWebsiteBySlug(slug);
 
   if (!data) notFound();
 
-  const theme = data.theme_color || "#1d4ed8";
+  const theme = data.themeColor || "#1d4ed8";
   const headline = data.headline || "";
   const subheadline = data.subheadline || "";
-  const aboutText = data.about_text || "";
-  const ctaText = normalizePublicCta(data.cta_text);
+  const aboutText = data.aboutText || "";
+  const ctaText = normalizePublicCta(data.ctaText);
 
-  // Fetch company profile for contact details
-  const { data: tenantProfile } = await supabaseAdmin
-    .from("company_profiles")
-    .select("company_name, public_display_name, phone, business_address, logo_data_url, business_type")
-    .eq("tenant_id", data.tenant_id)
-    .maybeSingle();
-
-  const companyName = tenantProfile?.public_display_name || tenantProfile?.company_name || "";
-  const phone = tenantProfile?.phone || "";
-  const address = tenantProfile?.business_address || "";
-  const logoUrl = tenantProfile?.logo_data_url || "";
-  const industryProfile = getIndustryProfile(tenantProfile?.business_type || "");
+  const companyName =
+    data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "";
+  const phone = data.companyProfile?.phone || "";
+  const logoUrl = data.companyProfile?.logoDataUrl || "";
+  const industryProfile = getIndustryProfile(data.companyProfile?.businessType || "");
   const services =
     Array.isArray(data.services) && data.services.length > 0
       ? data.services
@@ -176,9 +161,7 @@ export default async function PublicContractorSitePage({ params }) {
           description: "",
           price: "",
         }));
-  const galleryPhotos = Array.isArray(data.gallery_photos)
-    ? data.gallery_photos.filter((photo) => String(photo?.src || "").startsWith("data:image/"))
-    : [];
+  const galleryPhotos = Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [];
 
   // Pad services to at least 3, max 6
   const displayServices = services.slice(0, 6);
@@ -430,20 +413,16 @@ export default async function PublicContractorSitePage({ params }) {
                   About {companyName}
                 </h2>
                 <p>{aboutText}</p>
-                {(phone || address) && (
-                  <div style={{ marginTop: 28, display: "flex", gap: 14, flexWrap: "wrap" }}>
-                    {phone && (
-                      <a href={`tel:${phone}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1e293b", color: "#fff", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
-                        📞 {phone}
-                      </a>
-                    )}
-                    {address && (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#475569", fontSize: 15 }}>
-                        📍 {address}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <div style={{ marginTop: 28, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  {phone ? (
+                    <a href={`tel:${phone}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1e293b", color: "#fff", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+                      📞 {phone}
+                    </a>
+                  ) : null}
+                  <a href={requestHref} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: phone ? "#ffffff" : "#1e293b", color: phone ? "#1e293b" : "#fff", border: phone ? "1px solid #cbd5e1" : "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+                    Request a quote
+                  </a>
+                </div>
               </div>
             </div>
           </section>
@@ -534,15 +513,13 @@ export default async function PublicContractorSitePage({ params }) {
                   <span><strong>{phone}</strong></span>
                 </div>
               )}
-              {address && (
-                <div className="s-contact-chip">
-                  <span>📍</span>
-                  <span>{address}</span>
-                </div>
-              )}
               <div className="s-contact-chip">
                 <span>🏷️</span>
                 <span>{industryProfile.label}</span>
+              </div>
+              <div className="s-contact-chip">
+                <span>📝</span>
+                <span>Contact via secure request form</span>
               </div>
             </div>
           </div>

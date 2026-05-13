@@ -11,7 +11,6 @@
  */
 
 import readline from "readline";
-import { execSync } from "child_process";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const PROJECT_ID = SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
@@ -78,7 +77,7 @@ async function enableViaAPI(token, projectId) {
 
   try {
     const response = await fetch(
-      `https://api.supabase.com/v1/projects/${projectId}/database`,
+      `https://api.supabase.com/v1/projects/${projectId}/config/database/pooler`,
       {
         method: "PATCH",
         headers: {
@@ -87,8 +86,7 @@ async function enableViaAPI(token, projectId) {
         },
         body: JSON.stringify({
           pool_mode: "transaction",
-          pool_size: 100,
-          connection_timeout: 30,
+          default_pool_size: 100,
         }),
       }
     );

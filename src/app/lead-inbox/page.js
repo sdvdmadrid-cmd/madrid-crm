@@ -21,6 +21,10 @@ const UI = {
     details: "Details",
     success: "Converted to estimate successfully.",
     failed: "Conversion failed.",
+    suggestReply: "Suggest reply",
+    suggestingReply: "Drafting…",
+    replySuggestion: "Suggested reply",
+    replyFailed: "Unable to generate reply suggestion.",
     total: (n) => `${n} lead${n === 1 ? "" : "s"}`,
   },
   es: {
@@ -39,6 +43,10 @@ const UI = {
     details: "Detalles",
     success: "Convertido a estimado correctamente.",
     failed: "La conversión falló.",
+    suggestReply: "Sugerir respuesta",
+    suggestingReply: "Redactando…",
+    replySuggestion: "Respuesta sugerida",
+    replyFailed: "No se pudo generar la respuesta sugerida.",
     total: (n) => `${n} lead${n === 1 ? "" : "s"}`,
   },
   pl: {
@@ -57,6 +65,10 @@ const UI = {
     details: "Szczegóły",
     success: "Pomyślnie przekonwertowano do wyceny.",
     failed: "Konwersja nieudana.",
+    suggestReply: "Zaproponuj odpowiedz",
+    suggestingReply: "Tworzenie…",
+    replySuggestion: "Sugerowana odpowiedz",
+    replyFailed: "Nie udalo sie wygenerowac odpowiedzi.",
     total: (n) => `${n} lead${n === 1 ? "" : "ów"}`,
   },
 };
@@ -91,7 +103,7 @@ function formatDate(value) {
   });
 }
 
-function LeadCard({ item, t, isConverting, onConvert }) {
+function LeadCard({ item, t, isConverting, onConvert, onSuggestReply, suggestingReply, replyDraft }) {
   const sc = sourceColors(item.source);
   const st = statusColors(item.status);
   const sourceName = item.source === "website_lead" ? t.sourceLead : t.sourceRequest;
@@ -159,7 +171,14 @@ function LeadCard({ item, t, isConverting, onConvert }) {
       </div>
 
       {/* Footer */}
-      <div className="px-5 pb-5 pt-2 flex justify-end">
+      <div className="px-5 pb-5 pt-2 flex flex-wrap justify-end gap-2">
+        <button
+          onClick={() => onSuggestReply(item)}
+          disabled={suggestingReply}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold bg-violet-600 text-white hover:bg-violet-700 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+        >
+          {suggestingReply ? t.suggestingReply : t.suggestReply}
+        </button>
         <button
           onClick={() => onConvert(item)}
           disabled={isConverting}
@@ -183,6 +202,16 @@ function LeadCard({ item, t, isConverting, onConvert }) {
           )}
         </button>
       </div>
+      {replyDraft ? (
+        <div className="px-5 pb-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-600 mb-2">{t.replySuggestion}</p>
+          <textarea
+            value={replyDraft}
+            readOnly
+            className="w-full min-h-[96px] rounded-xl border border-violet-200 bg-violet-50/60 p-3 text-[13px] text-slate-700"
+          />
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -194,6 +223,8 @@ export default function LeadInboxPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [convertingId, setConvertingId] = useState("");
+  const [replyLoadingId, setReplyLoadingId] = useState("");
+  const [replyById, setReplyById] = useState({});
 
   const lang =
     typeof window !== "undefined"
@@ -265,6 +296,31 @@ export default function LeadInboxPage() {
       setError(err.message || t.failed);
     } finally {
       setConvertingId("");
+    }
+  };
+
+  const suggestReply = async (item) => {
+    setReplyLoadingId(item.id);
+    setError("");
+    try {
+      const res = await apiFetch("/api/ai/client-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientMessage: item.description || `Lead from ${item.name || "client"}`,
+          context: `Name: ${item.name || ""}; Email: ${item.email || ""}; Phone: ${item.phone || ""}; Source: ${item.source || "website_lead"}`,
+          tone: "professional",
+        }),
+      });
+      const payload = await getJsonOrThrow(res, t.replyFailed);
+      const nextReply = String(payload?.data?.reply || "").trim();
+      if (nextReply) {
+        setReplyById((current) => ({ ...current, [item.id]: nextReply }));
+      }
+    } catch (err) {
+      setError(err.message || t.replyFailed);
+    } finally {
+      setReplyLoadingId("");
     }
   };
 
@@ -360,6 +416,9 @@ export default function LeadInboxPage() {
                 t={t}
                 isConverting={convertingId === item.id}
                 onConvert={convertToJob}
+                onSuggestReply={suggestReply}
+                suggestingReply={replyLoadingId === item.id}
+                replyDraft={replyById[item.id] || ""}
               />
             ))}
           </div>

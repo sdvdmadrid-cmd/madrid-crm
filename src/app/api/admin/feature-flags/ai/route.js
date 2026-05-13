@@ -19,6 +19,11 @@ const PRESETS = {
       "feature_ai_description",
       "feature_ai_invoice_assistant",
       "feature_admin_ai_assistant",
+      "feature_ai_proposal",
+      "feature_ai_crm_summary",
+      "feature_ai_client_reply",
+      "feature_ai_scheduling",
+      "platform_ai_monitoring",
     ],
   },
   security: {
@@ -34,6 +39,8 @@ const PRESETS = {
       "feature_estimate_builder",
       "feature_ai_description",
       "feature_ai_invoice_assistant",
+      "feature_ai_proposal",
+      "feature_ai_crm_summary",
     ],
   },
   lean: {
@@ -63,6 +70,11 @@ const KEYWORD_MAP = [
   { key: "feature_ai_description", terms: ["ai description", "description ai", "rewrite"] },
   { key: "feature_ai_invoice_assistant", terms: ["invoice ai", "invoice assistant"] },
   { key: "feature_admin_ai_assistant", terms: ["admin ai", "owner ai", "assistant"] },
+  { key: "feature_ai_proposal", terms: ["proposal", "propuesta", "oferta"] },
+  { key: "feature_ai_crm_summary", terms: ["crm", "summary", "resumen"] },
+  { key: "feature_ai_client_reply", terms: ["client reply", "respuesta cliente", "reply"] },
+  { key: "feature_ai_scheduling", terms: ["scheduling", "schedule", "agenda"] },
+  { key: "platform_ai_monitoring", terms: ["ai monitoring", "monitor ai", "cost panel"] },
 ];
 
 function forbidden() {
@@ -115,6 +127,11 @@ function inferRecommendations(prompt) {
       "feature_ai_description",
       "feature_ai_invoice_assistant",
       "feature_admin_ai_assistant",
+      "feature_ai_proposal",
+      "feature_ai_crm_summary",
+      "feature_ai_client_reply",
+      "feature_ai_scheduling",
+      "platform_ai_monitoring",
     ]);
 
     for (const row of flags) {

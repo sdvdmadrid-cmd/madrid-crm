@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import {
   canWrite,
@@ -6,6 +5,8 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
+import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
 
 export async function POST(request) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request) {
       );
     }
 
-    const { role, authenticated } = await getAuthenticatedTenantContext(request);
+    const { role, authenticated, tenantDbId, userId } = await getAuthenticatedTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();
     }
@@ -36,33 +37,28 @@ export async function POST(request) {
       );
     }
 
-    const apiKey = (process.env.OPENAI_API_KEY || "").trim();
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "OpenAI API key is not configured",
-        }),
-        { status: 503, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    const openai = new OpenAI({ apiKey });
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const response = await runAiCompletion({
+      request,
+      tenantId: tenantDbId,
+      userId,
+      feature: "estimate_description",
+      modelTier: "mini",
       messages: [
         {
+          role: "system",
+          content:
+            "You are a professional contractor assistant. Output only concise plain text (2-4 sentences).",
+        },
+        {
           role: "user",
-          content: `Rewrite this into a professional contractor estimate description: ${input}`,
+          content: `Rewrite this contractor estimate description clearly and professionally: ${input}`,
         },
       ],
-      max_tokens: 200,
-      temperature: 0.6,
+      maxTokens: 180,
+      temperature: 0.4,
     });
 
-    const description = response.choices[0]?.message?.content?.trim() || "";
+    const description = response.text;
 
     if (!description) {
       return new Response(
@@ -75,14 +71,32 @@ export async function POST(request) {
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: { description } }),
+      JSON.stringify({
+        success: true,
+        data: {
+          description,
+          ai: {
+            model: response.model,
+            usage: response.usage,
+            estimatedCostUsd: response.estimatedCostUsd,
+            responseTimeMs: response.responseTimeMs,
+          },
+        },
+      }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (error) {
     console.error("[api/generate-description][POST] error", error);
+    const code = normalizeAiErrorCode(error?.aiCode || error?.code, error?.status, error?.message);
+    const payload = buildAiErrorPayload({
+      code,
+      language: getRequestLanguage(request, "en"),
+      status: Number(error?.status || 502),
+      technicalMessage: error?.message || "AI request failed",
+    });
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      JSON.stringify(payload),
+      { status: Number(error?.status || 502), headers: { "Content-Type": "application/json" } },
     );
   }
 }

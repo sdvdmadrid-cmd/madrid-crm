@@ -7,6 +7,8 @@ import {
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { getIndustryProfile } from "@/lib/industry-profiles";
+import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
+import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
 
 export async function POST(request) {
   const websiteBuilderEnabled = await isPlatformFeatureEnabled("feature_website_builder", true);
@@ -28,14 +30,6 @@ export async function POST(request) {
   const access = await getAuthenticatedTenantContext(request);
   if (!access.authenticated) return unauthenticatedResponse();
   if (!canWrite(access.role)) return forbiddenResponse();
-
-  const apiKey = (process.env.OPENAI_API_KEY || "").trim();
-  if (!apiKey) {
-    return Response.json(
-      { success: false, error: "OpenAI API key not configured." },
-      { status: 503 },
-    );
-  }
 
   const body = await request.json().catch(() => ({}));
   const services = Array.isArray(body.services) ? body.services : [];
@@ -84,35 +78,38 @@ Write in first person plural (We/Our). Be professional and confident.
 Return ONLY the JSON object. No markdown, no code blocks, no extra text.
 `.trim();
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
+  let raw = "{}";
+  try {
+    const response = await runAiCompletion({
+      request,
+      tenantId: access.tenantDbId,
+      userId: access.userId,
+      feature: "website_builder_generate",
+      modelTier: "mini",
       messages: [
         {
           role: "system",
           content:
-            "You are a professional copywriter specializing in contractor websites. Output only valid JSON as instructed.",
+            "You write concise contractor website copy. Return only valid JSON exactly as requested.",
         },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 800,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    const message = errBody?.error?.message || `OpenAI error ${res.status}`;
-    return Response.json({ success: false, error: message }, { status: 502 });
+      maxTokens: 720,
+      temperature: 0.6,
+    });
+    raw = response.text || "{}";
+  } catch (error) {
+    const code = normalizeAiErrorCode(error?.aiCode || error?.code, error?.status, error?.message);
+    return Response.json(
+      buildAiErrorPayload({
+        code,
+        language: getRequestLanguage(request, "en"),
+        status: Number(error?.status || 502),
+        technicalMessage: error?.message || "AI request failed",
+      }),
+      { status: Number(error?.status || 502) },
+    );
   }
-
-  const json = await res.json();
-  const raw = json.choices?.[0]?.message?.content?.trim() || "{}";
 
   let parsed;
   try {

@@ -176,6 +176,9 @@ export default function JobsPage() {
   const [error, setError] = useState("");
   const [estimating, setEstimating] = useState(false);
   const [estimateResult, setEstimateResult] = useState(null);
+  const [proposalDraft, setProposalDraft] = useState("");
+  const [proposalLoading, setProposalLoading] = useState(false);
+  const [proposalContext, setProposalContext] = useState("");
   const [jobFiles, setJobFiles] = useState({});
   const [openFilesPanel, setOpenFilesPanel] = useState({});
   const [deleteFileModal, setDeleteFileModal] = useState({
@@ -465,6 +468,33 @@ export default function JobsPage() {
       ...form,
       price: String(estimateResult.recommendedPrice),
     });
+  };
+
+  const generateProposalDraft = async () => {
+    setProposalLoading(true);
+    setError("");
+    try {
+      const res = await apiFetch("/api/ai/proposal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectType: form.service,
+          scope: form.scopeDetails || form.title,
+          timeline: form.dueDate,
+          budget: form.price,
+          context: proposalContext,
+        }),
+      });
+      const payload = await getJsonOrThrow(res, "Unable to generate proposal.");
+      const nextProposal = String(payload?.data?.proposal || "").trim();
+      if (nextProposal) {
+        setProposalDraft(nextProposal);
+      }
+    } catch (err) {
+      setError(err.message || "Unable to generate proposal.");
+    } finally {
+      setProposalLoading(false);
+    }
   };
 
   const requestJobDelete = useCallback((job) => {
@@ -933,6 +963,68 @@ export default function JobsPage() {
                   </div>
                 </div>
               : null}
+          </div>
+          <div
+            style={{
+              padding: "16px",
+              borderRadius: "12px",
+              background: "#f5f3ff",
+              border: "1px solid #ddd6fe",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <strong>Proposal Generator</strong>
+                <p style={{ margin: "6px 0 0 0", color: "#5b4d8c" }}>
+                  Generate a client-ready proposal using the current job scope.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={generateProposalDraft}
+                disabled={proposalLoading}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "#5b21b6",
+                  color: "white",
+                  cursor: "pointer",
+                }}
+              >
+                {proposalLoading ? "Generating..." : "Generate Proposal (AI)"}
+              </button>
+            </div>
+            <textarea
+              value={proposalContext}
+              onChange={(e) => setProposalContext(e.target.value)}
+              placeholder="Optional context for AI (materials, warranty terms, exclusions, payment rules)..."
+              style={{
+                width: "100%",
+                marginTop: 12,
+                minHeight: 72,
+                padding: "10px",
+                borderRadius: 8,
+                border: "1px solid #c4b5fd",
+                background: "#fff",
+              }}
+            />
+            {proposalDraft ? (
+              <textarea
+                value={proposalDraft}
+                onChange={(e) => setProposalDraft(e.target.value)}
+                placeholder="Generated proposal will appear here"
+                style={{
+                  width: "100%",
+                  marginTop: 12,
+                  minHeight: 220,
+                  padding: "12px",
+                  borderRadius: 10,
+                  border: "1px solid #c4b5fd",
+                  background: "#fff",
+                }}
+              />
+            ) : null}
           </div>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <button

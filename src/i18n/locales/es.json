@@ -441,6 +441,12 @@
     "leadInbox": "Bandeja de Leads",
     "ownerAdmin": "Admin del Dueño",
     "platform": "Plataforma",
+    "adminOverview": "Resumen Admin",
+    "adminAi": "Centro de Comandos IA",
+    "adminStripe": "Resumen de Stripe",
+    "adminSecurity": "Vigilancia de Seguridad",
+    "adminSupport": "Cola de Soporte",
+    "adminSettings": "Ajustes de Admin",
     "settings": "Ajustes",
     "logout": "Cerrar sesion",
     "signingOut": "Cerrando sesion..."

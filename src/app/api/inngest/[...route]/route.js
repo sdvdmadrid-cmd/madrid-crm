@@ -1,5 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
+import { processStripeWebhookEvent } from "@/lib/stripe-webhook-processing";
 
 // ── Stripe Webhook Handler (async, no timeout risk) ─────────────────────────
 const handleStripeWebhookAsync = inngest.createFunction(
@@ -11,30 +12,15 @@ const handleStripeWebhookAsync = inngest.createFunction(
     triggers: [{ event: "stripe/webhook.received" }],
   },
   async ({ event, step }) => {
-    const { stripeEventId, eventType, eventData } = event.data;
-
-    // Step 1: Update payment/invoice status in DB
-    await step.run("update-payment-status", async () => {
-      const { updatePaymentFromStripeEvent } = await import(
-        "@/lib/stripe-payments"
-      );
-      await updatePaymentFromStripeEvent(stripeEventId, eventType, eventData);
+    const stripeEvent = event.data?.event;
+    await step.run("process-stripe-webhook", async () => {
+      await processStripeWebhookEvent(stripeEvent);
     });
-
-    // Step 2: Send notification to tenant owner (if applicable)
-    await step.run("notify-tenant", async () => {
-      if (
-        eventType === "checkout.session.completed" ||
-        eventType === "payment_intent.succeeded"
-      ) {
-        const { createNotificationForPayment } = await import(
-          "@/lib/stripe-payments"
-        );
-        await createNotificationForPayment(eventData);
-      }
-    });
-
-    return { processed: true, stripeEventId, eventType };
+    return {
+      processed: true,
+      stripeEventId: event.data?.stripeEventId || stripeEvent?.id || "",
+      eventType: stripeEvent?.type || "unknown",
+    };
   }
 );
 

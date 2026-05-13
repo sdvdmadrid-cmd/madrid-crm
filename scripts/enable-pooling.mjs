@@ -8,6 +8,24 @@
  * Get token at: https://supabase.com/dashboard/account/tokens
  */
 
+import fs from "fs";
+import { resolve } from "path";
+
+function loadEnv(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, "utf-8");
+  content.split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) return;
+    const [key, ...valueParts] = trimmed.split("=");
+    const value = valueParts.join("=").replace(/^["']|["']$/g, "");
+    process.env[key] = value;
+  });
+}
+
+loadEnv(resolve(".env.local"));
+loadEnv(resolve(".env.production"));
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const PROJECT_ID = SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
 const MANAGEMENT_API_TOKEN = process.argv[2] || process.env.SUPABASE_MANAGEMENT_API_TOKEN;
@@ -45,7 +63,7 @@ async function enablePooling() {
     
     // Step 1: Get current database config
     const getConfigRes = await fetch(
-      `https://api.supabase.com/v1/projects/${PROJECT_ID}/database`,
+      `https://api.supabase.com/v1/projects/${PROJECT_ID}/config/database/pooler`,
       {
         method: "GET",
         headers: {
@@ -67,7 +85,7 @@ async function enablePooling() {
     console.log("\n⏳ Enabling connection pooling (PgBouncer)...");
     
     const updateRes = await fetch(
-      `https://api.supabase.com/v1/projects/${PROJECT_ID}/database`,
+      `https://api.supabase.com/v1/projects/${PROJECT_ID}/config/database/pooler`,
       {
         method: "PATCH",
         headers: {
@@ -76,9 +94,7 @@ async function enablePooling() {
         },
         body: JSON.stringify({
           pool_mode: "transaction",
-          pool_size: 100,
-          connection_timeout: 30,
-          idle_in_transaction_session_timeout: 30000,
+          default_pool_size: 100,
         }),
       }
     );

@@ -441,6 +441,12 @@
     "leadInbox": "Lead Inbox",
     "ownerAdmin": "Owner Admin",
     "platform": "Platform",
+    "adminOverview": "Admin Overview",
+    "adminAi": "AI Command Center",
+    "adminStripe": "Stripe Overview",
+    "adminSecurity": "Security Watch",
+    "adminSupport": "Support Queue",
+    "adminSettings": "Admin Settings",
     "settings": "Settings",
     "logout": "Logout",
     "signingOut": "Signing out..."

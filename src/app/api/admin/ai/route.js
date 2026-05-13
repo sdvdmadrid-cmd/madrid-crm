@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
+import { runAiCompletion } from "@/lib/ai-service";
 
 function parseRole(user) {
   return String(
@@ -238,7 +239,7 @@ function buildInsights(users, question) {
 
 export async function POST(request) {
   try {
-    const { role, authenticated } = await getAuthenticatedTenantContext(request);
+    const { role, authenticated, userId, tenantDbId } = await getAuthenticatedTenantContext(request);
     if (!authenticated || role !== "super_admin") {
       return new Response(
         JSON.stringify({ success: false, error: "Forbidden" }),
@@ -289,7 +290,61 @@ export async function POST(request) {
         estimateCount: estimateMap[u.id] || 0,
       }));
 
-    const answer = buildInsights(users, question);
+    const fallbackAnswer = buildInsights(users, question);
+
+    let answer = fallbackAnswer;
+    const lower = question.toLowerCase();
+    const useStrongModel =
+      question.length > 100 ||
+      lower.includes("strategy") ||
+      lower.includes("forecast") ||
+      lower.includes("churn") ||
+      lower.includes("summary") ||
+      lower.includes("analyze");
+
+    const summary = {
+      totalUsers: users.length,
+      active: users.filter((u) => u.status === "active").length,
+      trial: users.filter((u) => u.status === "trial").length,
+      expired: users.filter((u) => u.status === "expired").length,
+      inactive7d: users.filter((u) => !u.lastLoginAt || new Date(u.lastLoginAt).getTime() < Date.now() - 7 * 24 * 60 * 60 * 1000).length,
+      topByEstimate: [...users]
+        .sort((a, b) => b.estimateCount - a.estimateCount)
+        .slice(0, 8)
+        .map((u) => ({ email: u.email, estimateCount: u.estimateCount, status: u.status })),
+    };
+
+    try {
+      const ai = await runAiCompletion({
+        request,
+        tenantId: tenantDbId || "super_admin",
+        userId,
+        feature: "admin_ai_assistant",
+        modelTier: useStrongModel ? "strong" : "mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an executive SaaS analyst. Give concise operational answers with clear actions.",
+          },
+          {
+            role: "user",
+            content: [
+              `Question: ${question}`,
+              `Platform summary: ${JSON.stringify(summary)}`,
+              "Return practical findings and top recommendations.",
+            ].join("\n"),
+          },
+        ],
+        temperature: 0.2,
+        maxTokens: useStrongModel ? 700 : 420,
+      });
+      if (ai.text) {
+        answer = ai.text;
+      }
+    } catch (aiError) {
+      console.error("[api/admin/ai] OpenAI fallback to local insights", aiError?.message || aiError);
+    }
 
     return new Response(JSON.stringify({ success: true, data: { answer } }), {
       status: 200,

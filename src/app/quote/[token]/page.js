@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import UniversalShareButton from "@/components/UniversalShareButton";
+import SignaturePad from "@/components/SignaturePad";
 import {
   computeEstimateFinancials,
   getUsStateLabel,
@@ -42,6 +43,23 @@ const UI_I18N = {
     description: "Describe the change in detail",
     contactEmail: "Your email",
     contactPhone: "Your phone (optional)",
+    signaturePadLabel: "Draw your signature",
+    clearSignature: "Clear",
+    electronicConsent:
+      "I agree to use electronic records and signatures for this quote.",
+    electronicConsentHint:
+      "Your signature event will store consent, timestamp, IP address, user agent, and a document hash for audit evidence.",
+    signedDocument: "Signed document",
+    signedDocumentDesc:
+      "This signed record includes signature evidence and can be printed or saved as PDF.",
+    printSignedPdf: "Print / Save signed PDF",
+    signatureEvidence: "Signature evidence",
+    signatureMethod: "Signature method",
+    documentHash: "Document hash",
+    signerIp: "Signer IP",
+    typedSignature: "Typed signature",
+    drawnSignature: "Drawn signature",
+    drawnAndTypedSignature: "Drawn + typed signature",
     sending: "Sending…",
     processing: "Processing…",
     confirmApprove: "Confirm acceptance",
@@ -79,6 +97,7 @@ const UI_I18N = {
       load: "Could not load quote. The link may have expired.",
       nameRequired: "Please enter your name.",
       signatureRequired: "Please type your signature.",
+      consentRequired: "Electronic signature consent is required.",
       describeChanges: "Please describe the changes you'd like.",
       submit: "Something went wrong. Please try again.",
     },
@@ -117,6 +136,23 @@ const UI_I18N = {
     description: "Describe el cambio en detalle",
     contactEmail: "Tu email",
     contactPhone: "Tu teléfono (opcional)",
+    signaturePadLabel: "Dibuja tu firma",
+    clearSignature: "Limpiar",
+    electronicConsent:
+      "Acepto usar registros y firmas electrónicas para esta cotización.",
+    electronicConsentHint:
+      "El evento de firma guardará consentimiento, fecha, IP, user-agent y hash del documento como evidencia.",
+    signedDocument: "Documento firmado",
+    signedDocumentDesc:
+      "Este registro firmado incluye evidencia de firma y puede imprimirse o guardarse como PDF.",
+    printSignedPdf: "Imprimir / Guardar PDF firmado",
+    signatureEvidence: "Dowód podpisu",
+    signatureMethod: "Metodo podpisu",
+    documentHash: "Hash dokumentu",
+    signerIp: "IP podpisującego",
+    typedSignature: "Podpis wpisany",
+    drawnSignature: "Podpis odręczny",
+    drawnAndTypedSignature: "Podpis odręczny + wpisany",
     sending: "Enviando…",
     processing: "Procesando…",
     confirmApprove: "Confirmar aceptación",
@@ -137,7 +173,7 @@ const UI_I18N = {
     alreadyDeclined: "Esta cotización fue rechazada",
     changesRequested: "Se solicitaron cambios",
     approvedBy: "Aceptado por",
-    signedBy: "Firmado por",
+    signedBy: "Podpisał",
     on: "el",
     dueDate: "Fecha límite",
     service: "Servicio",
@@ -153,6 +189,7 @@ const UI_I18N = {
       load: "No se pudo cargar la cotización. El enlace puede haber expirado.",
       nameRequired: "Por favor ingresa tu nombre.",
       signatureRequired: "Por favor escribe tu firma.",
+      consentRequired: "Wymagana jest zgoda na podpis elektroniczny.",
       describeChanges: "Por favor describe los cambios que deseas.",
       submit: "Algo salió mal. Intenta de nuevo.",
     },
@@ -192,6 +229,23 @@ const UI_I18N = {
     description: "Opisz zmianę szczegółowo",
     contactEmail: "Twój email",
     contactPhone: "Twój telefon (opcjonalnie)",
+    signaturePadLabel: "Narysuj podpis",
+    clearSignature: "Wyczyść",
+    electronicConsent:
+      "Zgadzam się na użycie elektronicznych zapisów i podpisów dla tej wyceny.",
+    electronicConsentHint:
+      "Zdarzenie podpisu zapisze zgodę, czas, adres IP, user-agent i hash dokumentu jako dowód audytowy.",
+    signedDocument: "Podpisany dokument",
+    signedDocumentDesc:
+      "Ten podpisany zapis zawiera dowód podpisu i można go wydrukować lub zapisać jako PDF.",
+    printSignedPdf: "Drukuj / Zapisz podpisany PDF",
+    signatureEvidence: "Dowód podpisu",
+    signatureMethod: "Metoda podpisu",
+    documentHash: "Hash dokumentu",
+    signerIp: "IP podpisującego",
+    typedSignature: "Podpis wpisany",
+    drawnSignature: "Podpis odręczny",
+    drawnAndTypedSignature: "Podpis odręczny + wpisany",
     sending: "Wysyłanie…",
     processing: "Przetwarzanie…",
     confirmApprove: "Potwierdź akceptację",
@@ -229,6 +283,7 @@ const UI_I18N = {
       load: "Nie udało się załadować wyceny. Link mógł wygasnąć.",
       nameRequired: "Proszę podać swoje imię.",
       signatureRequired: "Proszę wpisać podpis.",
+      consentRequired: "Wymagana jest zgoda na podpis elektroniczny.",
       describeChanges: "Proszę opisać żądane zmiany.",
       submit: "Coś poszło nie tak. Spróbuj ponownie.",
     },
@@ -296,15 +351,10 @@ export default function QuoteClientPage() {
     contactName: "",
     contactEmail: "",
     signatureText: "",
+    signatureDrawDataUrl: "",
+    acceptElectronicConsent: false,
   });
-  const [changesForm, setChangesForm] = useState({
-    requestType: "change",
-    item: "",
-    message: "",
-    contactName: "",
-    contactEmail: "",
-    contactPhone: "",
-  });
+  const [printSignedMode, setPrintSignedMode] = useState(false);
 
   const approveRef = useRef(null);
   const changesRef = useRef(null);
@@ -364,20 +414,27 @@ export default function QuoteClientPage() {
 
   const company = payload?.companyProfile || {};
   const job = payload?.job || {};
-  const financials = useMemo(
-    () =>
-      computeEstimateFinancials({
-        baseAmount: job.price,
-        taxState: job.taxState,
-        downPaymentPercent: job.downPaymentPercent,
-      }),
-    [job.price, job.taxState, job.downPaymentPercent],
-  );
+  const signatureEvidence = payload?.signatureEvidence || null;
+  const signedPdfUrl = payload?.signedPdfUrl || "";
 
   const quoteStatus = String(job.quoteStatus || "sent").toLowerCase();
   const isFinalized = quoteStatus === "approved" || quoteStatus === "signed" || quoteStatus === "declined";
   const isSigned = quoteStatus === "signed";
   const changesWereRequested = quoteStatus === "changes_requested";
+  const hasSignatureInput =
+    approvalForm.signatureText.trim() || approvalForm.signatureDrawDataUrl;
+  const signatureMethodLabel =
+    signatureEvidence?.signatureMethod === "drawn_and_typed"
+      ? t.drawnAndTypedSignature
+      : signatureEvidence?.signatureMethod === "drawn"
+        ? t.drawnSignature
+        : t.typedSignature;
+
+  useEffect(() => {
+    if (!printSignedMode || !isSigned || loading) return;
+    const timer = window.setTimeout(() => window.print(), 320);
+    return () => window.clearTimeout(timer);
+  }, [printSignedMode, isSigned, loading]);
 
   const submitApproval = async (action) => {
     setFormError("");
@@ -385,8 +442,12 @@ export default function QuoteClientPage() {
       setFormError(t.errors.nameRequired);
       return;
     }
-    if (action === "sign" && !approvalForm.signatureText.trim()) {
+    if (action === "sign" && !hasSignatureInput) {
       setFormError(t.errors.signatureRequired);
+      return;
+    }
+    if (action === "sign" && !approvalForm.acceptElectronicConsent) {
+      setFormError(t.errors.consentRequired);
       return;
     }
     setSubmitting(true);
@@ -1159,6 +1220,49 @@ export default function QuoteClientPage() {
                     onFocus={focusGreen}
                     onBlur={blurReset}
                   />
+                  <SignaturePad
+                    value={approvalForm.signatureDrawDataUrl}
+                    onChange={(signatureDrawDataUrl) =>
+                      setApprovalForm({
+                        ...approvalForm,
+                        signatureDrawDataUrl,
+                      })
+                    }
+                    label={t.signaturePadLabel}
+                    clearLabel={t.clearSignature}
+                  />
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 10,
+                      fontSize: 13,
+                      color: "#14532d",
+                      lineHeight: 1.5,
+                      background: "rgba(255,255,255,0.65)",
+                      border: "1px solid #bbf7d0",
+                      borderRadius: 10,
+                      padding: "12px 14px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={approvalForm.acceptElectronicConsent}
+                      onChange={(e) =>
+                        setApprovalForm({
+                          ...approvalForm,
+                          acceptElectronicConsent: e.target.checked,
+                        })
+                      }
+                      style={{ marginTop: 2 }}
+                    />
+                    <span>
+                      <strong>{t.electronicConsent}</strong>
+                      <span style={{ display: "block", color: "#4b7c55", marginTop: 3 }}>
+                        {t.electronicConsentHint}
+                      </span>
+                    </span>
+                  </label>
                   {formError && (
                     <div
                       style={{
@@ -1183,7 +1287,7 @@ export default function QuoteClientPage() {
                     >
                       {submitting ? t.processing : t.confirmApprove}
                     </button>
-                    {approvalForm.signatureText.trim() && (
+                    {hasSignatureInput && (
                       <button
                         type="button"
                         onClick={() => submitApproval("sign")}

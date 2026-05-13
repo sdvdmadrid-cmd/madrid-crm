@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getPublicWebsiteBySlug } from "@/lib/public-website";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +13,7 @@ function normalizeRequestedService(rawValue, options) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const { data } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("headline")
-    .eq("slug", slug)
-    .maybeSingle();
+  const data = await getPublicWebsiteBySlug(slug);
 
   return {
     title: data?.headline ? `Request Service | ${data.headline}` : "Request Service",
@@ -29,22 +25,12 @@ export default async function PublicContractorRequestPage({ params, searchParams
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
 
-  const { data } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("slug, tenant_id, headline, cta_text")
-    .eq("slug", slug)
-    .maybeSingle();
+  const data = await getPublicWebsiteBySlug(slug);
 
   if (!data) notFound();
 
-  const { data: tenantProfile } = await supabaseAdmin
-    .from("company_profiles")
-    .select("company_name, public_display_name, phone, business_type")
-    .eq("tenant_id", data.tenant_id)
-    .maybeSingle();
-
   const companyName =
-    tenantProfile?.public_display_name || tenantProfile?.company_name || "Contractor";
+    data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "Contractor";
   // Forzar una lista amplia de servicios para el select
   const serviceOptions = [
     "Interior Painting",

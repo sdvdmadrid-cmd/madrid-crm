@@ -6,6 +6,7 @@ import AdminEmailDeliveryClient from "@/components/admin/AdminEmailDeliveryClien
 import AdminSubscriptionsClient from "@/components/admin/AdminSubscriptionsClient";
 import { AdminFinancialDashboardClient } from "@/components/admin/AdminFinancialDashboardClient";
 import AdminFeatureFlagsClient from "@/components/admin/AdminFeatureFlagsClient";
+import AdminAiMonitoringClient from "@/components/admin/AdminAiMonitoringClient";
 import { verifySessionToken } from "@/lib/auth";
 import { getPlatformFeatureFlagMap } from "@/lib/platform-feature-flags";
 import { getSessionSecretHealth } from "@/lib/session-secret";
@@ -950,6 +951,12 @@ export default async function AdminPage() {
           </div>
           ) : null}
         </section>
+
+        {isModuleEnabled("platform_ai_monitoring", true) ? (
+        <section className="mb-6">
+          <AdminAiMonitoringClient />
+        </section>
+        ) : null}
 
         {isModuleEnabled("platform_subscriptions_dashboard", true) ? (
         <section id="contractor-subscriptions" className="mb-6">

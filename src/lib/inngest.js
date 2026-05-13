@@ -43,6 +43,7 @@ export async function sendInngestEvent(eventName, data) {
       data,
       ts: Date.now(),
     });
+    return true;
   } catch (error) {
     console.error(
       `[Inngest] Failed to send event ${eventName}:`,
@@ -50,5 +51,10 @@ export async function sendInngestEvent(eventName, data) {
     );
     // Don't throw - let the API respond success even if event queueing fails
     // Events can be retried via Inngest dashboard
+    return false;
   }
+}
+
+export function isInngestEnabled() {
+  return Boolean(String(process.env.INNGEST_EVENT_KEY || "").trim());
 }

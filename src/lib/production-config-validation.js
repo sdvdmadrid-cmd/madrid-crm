@@ -80,6 +80,18 @@ export function validateProductionConfig() {
 
   // === MEDIUM: Database ===
   if (
+    !validateEnvVar(
+      "SUPABASE_CONNECTION_POOLED_URL",
+      "PgBouncer / pooled Supabase connection string for high concurrency",
+      false
+    )
+  ) {
+    warnings.push(
+      "SUPABASE_CONNECTION_POOLED_URL not set - admin traffic will use direct connections and scale worse under concurrency"
+    );
+  }
+
+  if (
     !validateEnvVar("SUPABASE_DB_PASSWORD", "Database password", false)
   ) {
     warnings.push(
@@ -88,9 +100,17 @@ export function validateProductionConfig() {
   }
 
   // === MEDIUM: Optional Production Features ===
+  const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!redisRestUrl || !redisRestToken) {
+    warnings.push(
+      "Upstash Redis REST not fully configured - edge rate limiting and session cache will fall back to local memory"
+    );
+  }
+
   const redisUrl =
     process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL;
-  if (!redisUrl) {
+  if (!redisUrl && !redisRestUrl) {
     warnings.push(
       "Redis not configured - rate limiting will be in-memory only (not scalable)"
     );
@@ -99,7 +119,7 @@ export function validateProductionConfig() {
   const inngestEventKey = process.env.INNGEST_EVENT_KEY;
   if (!inngestEventKey) {
     warnings.push(
-      "Inngest not configured - async webhooks will process synchronously"
+      "Inngest not configured - Stripe webhooks will process synchronously"
     );
   }
 

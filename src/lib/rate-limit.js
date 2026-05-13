@@ -15,6 +15,9 @@ const PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS = 15;
 const PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS = 10;
 const WEBSITE_LEAD_IP_MAX_ATTEMPTS = 20;
 const WEBSITE_LEAD_SLUG_MAX_ATTEMPTS = 12;
+const AI_REQUEST_IP_MAX_ATTEMPTS = 45;
+const AI_REQUEST_TENANT_MAX_ATTEMPTS = 160;
+const AI_REQUEST_FEATURE_MAX_ATTEMPTS = 90;
 
 const memoryStore = new Map();
 
@@ -327,6 +330,31 @@ export async function recordWebsiteLeadAttempt({ slug, ip }) {
     {
       key: buildKey("website-lead:slug", slug),
       maxAttempts: WEBSITE_LEAD_SLUG_MAX_ATTEMPTS,
+    },
+  ]);
+}
+
+export async function checkAiRateLimit({ tenantId, ip, feature }) {
+  return checkScopedRateLimit([
+    { key: buildKey("ai:ip", ip) },
+    { key: buildKey("ai:tenant", tenantId) },
+    { key: buildKey("ai:feature", feature) },
+  ]);
+}
+
+export async function recordAiRateLimitAttempt({ tenantId, ip, feature }) {
+  return recordScopedAttempt([
+    {
+      key: buildKey("ai:ip", ip),
+      maxAttempts: AI_REQUEST_IP_MAX_ATTEMPTS,
+    },
+    {
+      key: buildKey("ai:tenant", tenantId),
+      maxAttempts: AI_REQUEST_TENANT_MAX_ATTEMPTS,
+    },
+    {
+      key: buildKey("ai:feature", feature),
+      maxAttempts: AI_REQUEST_FEATURE_MAX_ATTEMPTS,
     },
   ]);
 }

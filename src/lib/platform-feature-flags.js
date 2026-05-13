@@ -70,6 +70,31 @@ export const DEFAULT_PLATFORM_FEATURE_FLAGS = [
     enabled: true,
     description: "Enable owner Admin AI assistant module and endpoint.",
   },
+  {
+    key: "feature_ai_proposal",
+    enabled: true,
+    description: "Enable AI proposal generator endpoint.",
+  },
+  {
+    key: "feature_ai_crm_summary",
+    enabled: true,
+    description: "Enable AI CRM summary endpoint.",
+  },
+  {
+    key: "feature_ai_client_reply",
+    enabled: true,
+    description: "Enable AI client reply assistant endpoint.",
+  },
+  {
+    key: "feature_ai_scheduling",
+    enabled: true,
+    description: "Enable AI scheduling assistant endpoint.",
+  },
+  {
+    key: "platform_ai_monitoring",
+    enabled: true,
+    description: "Enable AI monitoring panel in admin dashboard.",
+  },
 ];
 
 function mergeFlags(rows = []) {
