@@ -856,11 +856,15 @@ export default function BillPaymentsPage() {
   }
 
   function openPaymentMethodSelector() {
-    if (!canManageSensitiveData) {
-      return;
-    }
     if (!executablePaymentMethods.length && stripePromise) {
       startPaymentMethodSetup("card");
+      return;
+    }
+    if (!executablePaymentMethods.length && !stripePromise) {
+      setShowPaymentMethods(true);
+      setError(
+        "Payment setup is unavailable. Configure Stripe publishable key or link a bank via Plaid.",
+      );
       return;
     }
     setBulkPaymentMethodMenuOpen((current) => !current);
@@ -965,7 +969,7 @@ export default function BillPaymentsPage() {
   }
 
   async function launchPlaidLink(existingMethod = null) {
-    if (!canManageSensitiveData || plaidLaunching) {
+    if (plaidLaunching) {
       return;
     }
 
@@ -1049,6 +1053,12 @@ export default function BillPaymentsPage() {
   async function paySelectedBills(billIds = selectedBillIds) {
     if (!billIds.length) {
       setError("Select at least one bill to pay.");
+      return;
+    }
+
+    if (!selectedPaymentMethodId) {
+      setShowPaymentMethods(true);
+      setError("Choose or add a payment method before paying.");
       return;
     }
 
@@ -1345,7 +1355,7 @@ export default function BillPaymentsPage() {
                 <button
                   type="button"
                   onClick={openPaymentMethodSelector}
-                  disabled={!canManageSensitiveData || (!executablePaymentMethods.length && !stripePromise)}
+                  disabled={false}
                   style={{
                     borderRadius: 12,
                     border: "1px solid rgba(15,23,42,0.12)",
@@ -1353,11 +1363,7 @@ export default function BillPaymentsPage() {
                     color: "#0f172a",
                     padding: "10px 11px",
                     fontWeight: 600,
-                    cursor:
-                      canManageSensitiveData &&
-                      (executablePaymentMethods.length || stripePromise)
-                        ? "pointer"
-                        : "not-allowed",
+                    cursor: "pointer",
                   }}
                 >
                   {formatSelectedPaymentMethodLabel(selectedPaymentMethod)}
@@ -1408,22 +1414,21 @@ export default function BillPaymentsPage() {
                 type="button"
                 onClick={paySelectedBills}
                 disabled={
-                  !canManageSensitiveData ||
                   !selectedBillIds.length ||
                   paying ||
-                  !executablePaymentMethods.length
+                  !selectedPaymentMethodId
                 }
                 style={{
                   border: 0,
                   borderRadius: 999,
-                  background: !canManageSensitiveData
+                  background: !selectedPaymentMethodId
                     ? "#94a3b8"
                     : "linear-gradient(135deg, #0f766e, #0b5f5a)",
                   color: "#fff",
                   padding: "11px 16px",
                   fontWeight: 700,
-                  cursor: canManageSensitiveData ? "pointer" : "not-allowed",
-                  boxShadow: canManageSensitiveData
+                  cursor: selectedPaymentMethodId ? "pointer" : "not-allowed",
+                  boxShadow: selectedPaymentMethodId
                     ? "0 10px 20px rgba(15,118,110,0.24)"
                     : "none",
                 }}
@@ -1565,7 +1570,6 @@ export default function BillPaymentsPage() {
                               type="button"
                               onClick={() => payBillNow(bill.id)}
                               disabled={
-                                !canManageSensitiveData ||
                                 paying ||
                                 !selectedPaymentMethodId
                               }
@@ -1577,7 +1581,6 @@ export default function BillPaymentsPage() {
                                 padding: compactMode ? "6px 10px" : "8px 12px",
                                 fontWeight: 700,
                                 cursor:
-                                  canManageSensitiveData &&
                                   !paying &&
                                   selectedPaymentMethodId
                                     ? "pointer"
@@ -1655,7 +1658,7 @@ export default function BillPaymentsPage() {
                   <button
                     type="button"
                     onClick={() => startPaymentMethodSetup("card")}
-                    disabled={!canManageSensitiveData || !stripePromise}
+                    disabled={!stripePromise}
                     style={{
                       border: 0,
                       borderRadius: 999,
@@ -1663,7 +1666,7 @@ export default function BillPaymentsPage() {
                       color: "#fff",
                       padding: "8px 12px",
                       fontWeight: 700,
-                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                      cursor: stripePromise ? "pointer" : "not-allowed",
                     }}
                   >
                     Add card/debit
@@ -1671,7 +1674,7 @@ export default function BillPaymentsPage() {
                   <button
                     type="button"
                     onClick={() => startPaymentMethodSetup("bank_account")}
-                    disabled={!canManageSensitiveData || !stripePromise}
+                    disabled={!stripePromise}
                     style={{
                       borderRadius: 999,
                       border: "1px solid rgba(15,23,42,0.14)",
@@ -1679,7 +1682,7 @@ export default function BillPaymentsPage() {
                       color: "#0f172a",
                       padding: "8px 12px",
                       fontWeight: 700,
-                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                      cursor: stripePromise ? "pointer" : "not-allowed",
                     }}
                   >
                     Add ACH
@@ -1687,7 +1690,7 @@ export default function BillPaymentsPage() {
                   <button
                     type="button"
                     onClick={launchPlaidLink}
-                    disabled={!canManageSensitiveData || plaidLaunching}
+                    disabled={plaidLaunching}
                     style={{
                       borderRadius: 999,
                       border: "1px solid rgba(14,165,233,0.22)",
@@ -1695,7 +1698,7 @@ export default function BillPaymentsPage() {
                       color: "#075985",
                       padding: "8px 12px",
                       fontWeight: 700,
-                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                      cursor: plaidLaunching ? "not-allowed" : "pointer",
                     }}
                   >
                     {plaidLaunching ? "Opening Plaid..." : "Link bank via Plaid"}
@@ -2762,7 +2765,7 @@ export default function BillPaymentsPage() {
                 <button
                   type="button"
                   onClick={openPaymentMethodSelector}
-                  disabled={!canManageSensitiveData || (!executablePaymentMethods.length && !stripePromise)}
+                  disabled={false}
                   style={{
                     minWidth: 260,
                     borderRadius: 18,
@@ -2774,10 +2777,7 @@ export default function BillPaymentsPage() {
                     display: "grid",
                     gap: 4,
                     textAlign: "left",
-                    cursor: canManageSensitiveData &&
-                      (executablePaymentMethods.length || stripePromise)
-                      ? "pointer"
-                      : "not-allowed",
+                    cursor: "pointer",
                   }}
                 >
                   <span style={{ fontSize: 12, color: "#64748b" }}>
@@ -2862,19 +2862,18 @@ export default function BillPaymentsPage() {
                 type="button"
                 onClick={paySelectedBills}
                 disabled={
-                  !canManageSensitiveData ||
                   !selectedBillIds.length ||
                   paying ||
-                  !executablePaymentMethods.length
+                  !selectedPaymentMethodId
                 }
                 style={{
                   border: 0,
                   borderRadius: 999,
-                  background: !canManageSensitiveData ? "#94a3b8" : "#0f766e",
+                  background: !selectedPaymentMethodId ? "#94a3b8" : "#0f766e",
                   color: "#fff",
                   padding: "12px 18px",
                   fontWeight: 700,
-                  cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                  cursor: selectedPaymentMethodId ? "pointer" : "not-allowed",
                 }}
               >
                 {paying
@@ -3234,7 +3233,6 @@ export default function BillPaymentsPage() {
                                     type="button"
                                     onClick={() => payBillNow(bill.id)}
                                     disabled={
-                                      !canManageSensitiveData ||
                                       paying ||
                                       !selectedPaymentMethodId
                                     }
@@ -3246,7 +3244,6 @@ export default function BillPaymentsPage() {
                                       padding: "10px 14px",
                                       fontWeight: 700,
                                       cursor:
-                                        canManageSensitiveData &&
                                         !paying &&
                                         selectedPaymentMethodId
                                           ? "pointer"
@@ -4047,7 +4044,7 @@ export default function BillPaymentsPage() {
                   <button
                     type="button"
                     onClick={() => startPaymentMethodSetup("card")}
-                    disabled={!canManageSensitiveData || !stripePromise}
+                    disabled={!stripePromise}
                     style={{
                       borderRadius: 999,
                       border: 0,
@@ -4055,7 +4052,7 @@ export default function BillPaymentsPage() {
                       color: "#fff",
                       padding: "10px 16px",
                       fontWeight: 700,
-                      cursor: canManageSensitiveData
+                      cursor: stripePromise
                         ? "pointer"
                         : "not-allowed",
                     }}
@@ -4065,7 +4062,7 @@ export default function BillPaymentsPage() {
                   <button
                     type="button"
                     onClick={() => startPaymentMethodSetup("bank_account")}
-                    disabled={!canManageSensitiveData || !stripePromise}
+                    disabled={!stripePromise}
                     style={{
                       borderRadius: 999,
                       border: "1px solid rgba(15,23,42,0.14)",
@@ -4073,7 +4070,7 @@ export default function BillPaymentsPage() {
                       color: "#0f172a",
                       padding: "10px 16px",
                       fontWeight: 700,
-                      cursor: canManageSensitiveData
+                      cursor: stripePromise
                         ? "pointer"
                         : "not-allowed",
                     }}
@@ -4083,7 +4080,7 @@ export default function BillPaymentsPage() {
                   <button
                     type="button"
                     onClick={launchPlaidLink}
-                    disabled={!canManageSensitiveData || plaidLaunching}
+                    disabled={plaidLaunching}
                     style={{
                       borderRadius: 999,
                       border: "1px solid rgba(14,165,233,0.22)",
@@ -4091,7 +4088,7 @@ export default function BillPaymentsPage() {
                       color: "#075985",
                       padding: "10px 16px",
                       fontWeight: 700,
-                      cursor: canManageSensitiveData ? "pointer" : "not-allowed",
+                      cursor: plaidLaunching ? "not-allowed" : "pointer",
                     }}
                   >
                     {plaidLaunching ? "Opening Plaid..." : "Link bank via Plaid"}
