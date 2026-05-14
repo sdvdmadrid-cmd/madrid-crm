@@ -105,6 +105,26 @@ export async function requireBillPaymentsAccess(request, mode = "read") {
   return { context };
 }
 
+export function billPaymentsSubscriptionRequiredResponse() {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error:
+        "Bill Payments subscription required to save bills or payment methods. If you pay 3-4+ bills per month, subscribing is usually worth it.",
+    }),
+    {
+      status: 402,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
+export function requireBillPaymentsSubscriptionForStorage(context) {
+  if (context?.isSuperAdmin) return null;
+  if (context?.isSubscribed === true) return null;
+  return billPaymentsSubscriptionRequiredResponse();
+}
+
 export function normalizeMoneyAmount(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return null;

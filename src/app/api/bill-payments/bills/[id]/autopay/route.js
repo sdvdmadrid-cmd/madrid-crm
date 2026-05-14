@@ -3,6 +3,7 @@ import {
   BILL_PAYMENT_METHOD_TABLE,
   BILL_TABLE,
   buildAutopayPayload,
+  requireBillPaymentsSubscriptionForStorage,
   requireBillPaymentsAccess,
   serializeAutopayRule,
 } from "@/lib/bill-payments";
@@ -12,6 +13,10 @@ import { normalizeUuid } from "@/lib/supabase-db";
 export async function PUT(request, { params }) {
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
+  const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(
+    access.context,
+  );
+  if (subscriptionResponse) return subscriptionResponse;
   const { context } = access;
   const { id } = await params;
   const billId = normalizeUuid(id);

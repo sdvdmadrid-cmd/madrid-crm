@@ -1,11 +1,16 @@
 import {
   createBillPaymentSetupIntent,
+  requireBillPaymentsSubscriptionForStorage,
   requireBillPaymentsAccess,
 } from "@/lib/bill-payments";
 
 export async function POST(request) {
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
+  const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(
+    access.context,
+  );
+  if (subscriptionResponse) return subscriptionResponse;
   const body = await request.json().catch(() => ({}));
 
   try {

@@ -5,6 +5,7 @@ import {
   computeBillStatus,
   findBillProvider,
   maybeCreateNextRecurringBill,
+  requireBillPaymentsSubscriptionForStorage,
   requireBillPaymentsAccess,
   serializeBill,
   validateProviderRequirementValues,
@@ -81,6 +82,10 @@ export async function PATCH(request, { params }) {
   if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "write");
   if (access.response) return access.response;
+  const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(
+    access.context,
+  );
+  if (subscriptionResponse) return subscriptionResponse;
   const { context } = access;
   const { id } = await params;
   const billId = normalizeUuid(id);

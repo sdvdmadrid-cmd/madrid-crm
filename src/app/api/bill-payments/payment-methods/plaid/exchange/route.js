@@ -1,4 +1,5 @@
 import {
+  requireBillPaymentsSubscriptionForStorage,
   requireBillPaymentsAccess,
   savePlaidPaymentMethod,
   serializeBillPaymentMethod,
@@ -12,6 +13,10 @@ import {
 export async function POST(request) {
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
+  const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(
+    access.context,
+  );
+  if (subscriptionResponse) return subscriptionResponse;
 
   if (!isPlaidConfigured()) {
     return new Response(

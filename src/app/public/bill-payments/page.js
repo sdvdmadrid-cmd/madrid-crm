@@ -13,9 +13,9 @@ function formatCurrency(value) {
 }
 
 const defaultPricing = {
-  monthlyFeeUsd: 5,
-  cardFeePercent: 3.9,
-  bankAccountFeePercent: 1.5,
+  monthlyFeeUsd: 9.99,
+  cardFeePercent: 5.9,
+  bankAccountFeePercent: 3.0,
 };
 
 export default function PublicBillPaymentsPage() {
@@ -43,10 +43,10 @@ export default function PublicBillPaymentsPage() {
         const payload = await response.json().catch(() => ({}));
         if (!cancelled && response.ok && payload?.success) {
           setPricing({
-            monthlyFeeUsd: Number(payload.data.monthlyFeeUsd || 5),
-            cardFeePercent: Number(payload.data.cardFeePercent || 3.9),
+            monthlyFeeUsd: Number(payload.data.monthlyFeeUsd || 9.99),
+            cardFeePercent: Number(payload.data.cardFeePercent || 5.9),
             bankAccountFeePercent: Number(
-              payload.data.bankAccountFeePercent || 1.5,
+              payload.data.bankAccountFeePercent || 3.0,
             ),
           });
         }
@@ -127,7 +127,7 @@ export default function PublicBillPaymentsPage() {
             Public bill-payments checkout, built for margin
           </h1>
           <p style={{ margin: 0, color: "#475569", maxWidth: 760, lineHeight: 1.5 }}>
-            Doqo-style onboarding inside your app: public registration, transparent monthly plan, and transaction fee by payment method.
+            Public onboarding inside your app: account registration is required, transparent monthly pricing, and fee-by-method checkout.
           </p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Link href="/login" style={{ textDecoration: "none", background: "#0f766e", color: "#fff", borderRadius: 999, padding: "10px 16px", fontWeight: 700 }}>
@@ -152,6 +152,9 @@ export default function PublicBillPaymentsPage() {
             <h2 style={{ margin: 0, color: "#0f172a" }}>Live pricing preview</h2>
             <p style={{ color: "#64748b", marginTop: 8 }}>
               Monthly platform fee: <strong>{formatCurrency(pricing.monthlyFeeUsd)}</strong>
+            </p>
+            <p style={{ color: "#0f172a", marginTop: 8, fontSize: 14 }}>
+              If you pay 3-4+ bills per month, subscribing usually saves time and makes saved methods worth it.
             </p>
             <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
               <label style={{ display: "grid", gap: 6 }}>
@@ -206,7 +209,7 @@ export default function PublicBillPaymentsPage() {
           >
             <h2 style={{ margin: 0, color: "#0f172a" }}>Create public account</h2>
             <p style={{ marginTop: 8, color: "#64748b" }}>
-              Launch this as your public intake page. New users register here, then manage bills inside your app.
+              Registration is required. Users can pay publicly, and saved bill/payment data is enabled for subscribed accounts.
             </p>
             <form onSubmit={submitSignup} style={{ display: "grid", gap: 10, marginTop: 12 }}>
               <input

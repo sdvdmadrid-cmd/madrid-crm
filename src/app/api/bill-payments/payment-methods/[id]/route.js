@@ -1,6 +1,7 @@
 import {
   BILL_PAYMENT_METHOD_TABLE,
   listBillPaymentMethodsForContext,
+  requireBillPaymentsSubscriptionForStorage,
   requireBillPaymentsAccess,
   serializeBillPaymentMethod,
 } from "@/lib/bill-payments";
@@ -13,6 +14,10 @@ export async function PATCH(request, { params }) {
   if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
+  const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(
+    access.context,
+  );
+  if (subscriptionResponse) return subscriptionResponse;
   const { context } = access;
   const { id } = await params;
   const methodId = normalizeUuid(id);
