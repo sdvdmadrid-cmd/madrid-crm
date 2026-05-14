@@ -29,6 +29,7 @@ export const BILL_PAYMENT_METHOD_TABLE = "bill_payment_methods";
 export const BILL_PAYMENT_CUSTOMER_TABLE = "bill_payment_customers";
 export const BILL_PAYMENT_TRANSACTION_TABLE = "bill_payment_transactions";
 export const BILL_AUTOPAY_RULE_TABLE = "bill_autopay_rules";
+export const BILL_PLATFORM_FEE_TABLE = "bill_payment_platform_fees";
 export const NOTIFICATIONS_TABLE = "notifications";
 
 const DEFAULT_PROVIDER_REQUIRED_FIELDS = [
@@ -159,6 +160,308 @@ export function calculateBillPaymentPricing({
     monthlyFeeUsd: pricing.monthlyFeeUsd,
     transactionFeePercent: pricing.transactionFeePercent,
   };
+}
+
+function resolveChargeMonth(value = "") {
+  const input = String(value || "").trim();
+  if (/^\d{4}-\d{2}$/.test(input)) {
+    return input;
+  }
+
+  const now = new Date();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${now.getUTCFullYear()}-${month}`;
+}
+
+async function markPlatformFeeFailed({
+  rowId,
+  tenantId,
+  failureReason,
+  metadata = {},
+}) {
+  const nowIso = new Date().toISOString();
+  await supabaseAdmin
+    .from(BILL_PLATFORM_FEE_TABLE)
+    .update({
+      status: "failed",
+      failure_reason: String(failureReason || "Charge failed").slice(0, 500),
+      failed_at: nowIso,
+      updated_at: nowIso,
+      metadata,
+    })
+    .eq("id", rowId)
+    .eq("tenant_id", tenantId);
+}
+
+export async function processBillPaymentsMonthlyPlatformFees({
+  chargeMonth = "",
+  dryRun = false,
+} = {}) {
+  const normalizedChargeMonth = resolveChargeMonth(chargeMonth);
+  const pricing = getBillPaymentsPricingConfig();
+  const monthlyFeeUsd = normalizeMoneyAmount(pricing.monthlyFeeUsd) ?? 0;
+
+  const summary = {
+    chargeMonth: normalizedChargeMonth,
+    monthlyFeeUsd,
+    candidates: 0,
+    charged: 0,
+    skipped: 0,
+    failed: 0,
+    failures: [],
+  };
+
+  if (monthlyFeeUsd <= 0) {
+    return summary;
+  }
+
+  const { data: customers, error: customerError } = await supabaseAdmin
+    .from(BILL_PAYMENT_CUSTOMER_TABLE)
+    .select("tenant_id, user_id, stripe_customer_id")
+    .order("created_at", { ascending: true });
+
+  if (customerError) {
+    throw new Error(customerError.message);
+  }
+
+  const stripe = getStripeServerClient();
+  if (!stripe && !dryRun) {
+    throw new Error("Stripe is not configured for monthly platform fee processing");
+  }
+
+  summary.candidates = (customers || []).length;
+
+  for (const customer of customers || []) {
+    const tenantId = String(customer.tenant_id || "").trim();
+    const userId = String(customer.user_id || "").trim();
+    const stripeCustomerId = String(customer.stripe_customer_id || "").trim();
+
+    if (!tenantId || !userId || !stripeCustomerId) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    const { data: existingFeeRow, error: existingError } = await supabaseAdmin
+      .from(BILL_PLATFORM_FEE_TABLE)
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .eq("charge_month", normalizedChargeMonth)
+      .maybeSingle();
+
+    if (existingError) {
+      summary.failed += 1;
+      summary.failures.push({
+        tenantId,
+        userId,
+        error: existingError.message,
+      });
+      continue;
+    }
+
+    const existingStatus = String(existingFeeRow?.status || "").toLowerCase();
+    if (["paid", "processing"].includes(existingStatus)) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    const { data: method, error: methodError } = await supabaseAdmin
+      .from(BILL_PAYMENT_METHOD_TABLE)
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .eq("allow_autopay", true)
+      .in("status", ["active", "processing"])
+      .order("is_default", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (methodError) {
+      summary.failed += 1;
+      summary.failures.push({ tenantId, userId, error: methodError.message });
+      continue;
+    }
+
+    if (!method?.stripe_payment_method_id) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    if (dryRun) {
+      summary.charged += 1;
+      continue;
+    }
+
+    const nowIso = new Date().toISOString();
+    const nextMetadata = {
+      source: "bill_payments_monthly_fee",
+      payment_method_type: method.method_type || "card",
+      monthly_fee_usd: monthlyFeeUsd,
+      transaction_fee_percent: pricing.transactionFeePercent,
+    };
+
+    let activeRow = existingFeeRow;
+    if (!activeRow) {
+      const { data: insertedRow, error: insertError } = await supabaseAdmin
+        .from(BILL_PLATFORM_FEE_TABLE)
+        .insert({
+          tenant_id: tenantId,
+          user_id: userId,
+          stripe_customer_id: stripeCustomerId,
+          payment_method_id: method.id,
+          stripe_payment_method_id: method.stripe_payment_method_id,
+          charge_month: normalizedChargeMonth,
+          amount: monthlyFeeUsd,
+          currency: "usd",
+          status: "processing",
+          metadata: nextMetadata,
+          created_at: nowIso,
+          updated_at: nowIso,
+        })
+        .select("*")
+        .maybeSingle();
+
+      if (insertError) {
+        const isDuplicate = String(insertError.code || "") === "23505";
+        if (isDuplicate) {
+          summary.skipped += 1;
+          continue;
+        }
+
+        summary.failed += 1;
+        summary.failures.push({ tenantId, userId, error: insertError.message });
+        continue;
+      }
+
+      activeRow = insertedRow;
+    } else {
+      const { data: updatedRow, error: updateRowError } = await supabaseAdmin
+        .from(BILL_PLATFORM_FEE_TABLE)
+        .update({
+          stripe_customer_id: stripeCustomerId,
+          payment_method_id: method.id,
+          stripe_payment_method_id: method.stripe_payment_method_id,
+          amount: monthlyFeeUsd,
+          status: "processing",
+          failure_reason: "",
+          failed_at: null,
+          updated_at: nowIso,
+          metadata: {
+            ...(activeRow.metadata && typeof activeRow.metadata === "object"
+              ? activeRow.metadata
+              : {}),
+            ...nextMetadata,
+          },
+        })
+        .eq("id", activeRow.id)
+        .eq("tenant_id", tenantId)
+        .select("*")
+        .maybeSingle();
+
+      if (updateRowError) {
+        summary.failed += 1;
+        summary.failures.push({
+          tenantId,
+          userId,
+          error: updateRowError.message,
+        });
+        continue;
+      }
+
+      activeRow = updatedRow;
+    }
+
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(monthlyFeeUsd * 100),
+        currency: "usd",
+        customer: stripeCustomerId,
+        payment_method: method.stripe_payment_method_id,
+        payment_method_types:
+          method.method_type === "bank_account" ? ["us_bank_account"] : undefined,
+        confirm: true,
+        off_session: true,
+        metadata: {
+          source: "bill_payments_monthly_fee",
+          tenantDbId: tenantId,
+          userId,
+          chargeMonth: normalizedChargeMonth,
+          monthlyFeeUsd: String(monthlyFeeUsd),
+        },
+      });
+
+      const intentStatus = String(paymentIntent.status || "").toLowerCase();
+      const nextStatus = intentStatus === "succeeded"
+        ? "paid"
+        : intentStatus === "processing"
+          ? "processing"
+          : "failed";
+
+      if (nextStatus === "failed") {
+        const reason =
+          paymentIntent.last_payment_error?.message ||
+          `Payment intent status: ${paymentIntent.status || "unknown"}`;
+        await markPlatformFeeFailed({
+          rowId: activeRow.id,
+          tenantId,
+          failureReason: reason,
+          metadata: {
+            ...(activeRow.metadata && typeof activeRow.metadata === "object"
+              ? activeRow.metadata
+              : {}),
+            ...nextMetadata,
+            stripe_payment_intent_status: paymentIntent.status || "",
+          },
+        });
+        summary.failed += 1;
+        summary.failures.push({ tenantId, userId, error: reason });
+        continue;
+      }
+
+      await supabaseAdmin
+        .from(BILL_PLATFORM_FEE_TABLE)
+        .update({
+          stripe_payment_intent_id: paymentIntent.id,
+          status: nextStatus,
+          charged_at: nextStatus === "paid" ? nowIso : null,
+          failed_at: null,
+          failure_reason: "",
+          updated_at: nowIso,
+          metadata: {
+            ...(activeRow.metadata && typeof activeRow.metadata === "object"
+              ? activeRow.metadata
+              : {}),
+            ...nextMetadata,
+            stripe_payment_intent_status: paymentIntent.status || "",
+          },
+        })
+        .eq("id", activeRow.id)
+        .eq("tenant_id", tenantId);
+
+      summary.charged += 1;
+    } catch (chargeError) {
+      await markPlatformFeeFailed({
+        rowId: activeRow.id,
+        tenantId,
+        failureReason: chargeError?.message || "Monthly fee charge failed",
+        metadata: {
+          ...(activeRow.metadata && typeof activeRow.metadata === "object"
+            ? activeRow.metadata
+            : {}),
+          ...nextMetadata,
+        },
+      });
+      summary.failed += 1;
+      summary.failures.push({
+        tenantId,
+        userId,
+        error: chargeError?.message || "Monthly fee charge failed",
+      });
+    }
+  }
+
+  return summary;
 }
 
 export function normalizeTagList(values = []) {
