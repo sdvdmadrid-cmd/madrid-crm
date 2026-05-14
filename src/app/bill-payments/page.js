@@ -331,6 +331,8 @@ export default function BillPaymentsPage() {
   });
   const [savingMethod, setSavingMethod] = useState(false);
   const [plaidLaunching, setPlaidLaunching] = useState(false);
+  const [remittanceRefs, setRemittanceRefs] = useState({});
+  const [submittingRemittance, setSubmittingRemittance] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [billDrawerOpen, setBillDrawerOpen] = useState(false);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
@@ -1132,6 +1134,38 @@ export default function BillPaymentsPage() {
 
   async function payBillNow(billId) {
     await paySelectedBills([billId]);
+  }
+
+  async function submitRemittance(transactionId) {
+    const ref = String(remittanceRefs[transactionId] || "").trim();
+    setSubmittingRemittance(transactionId);
+    try {
+      const response = await apiFetch(
+        `/api/bill-payments/remittance/${transactionId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ remittanceReference: ref, remittanceStatus: "submitted" }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Failed to submit remittance");
+      }
+      setDashboard((prev) => ({
+        ...prev,
+        recentTransactions: (prev.recentTransactions || []).map((tx) =>
+          tx.id === transactionId
+            ? { ...tx, remittanceStatus: "submitted", remittanceReference: ref }
+            : tx,
+        ),
+      }));
+      setRemittanceRefs((prev) => { const next = { ...prev }; delete next[transactionId]; return next; });
+    } catch (e) {
+      setError(e.message || "Failed to submit remittance");
+    } finally {
+      setSubmittingRemittance(null);
+    }
   }
 
   async function exportBillsCsv() {
@@ -4286,6 +4320,89 @@ export default function BillPaymentsPage() {
                     ))}
               </div>
             </section>
+            {canManageSensitiveData && (() => {
+              const pendingRemittance = recentTransactions.filter(
+                (tx) => tx.status === "paid" && tx.remittanceStatus === "pending_submission",
+              );
+              if (!pendingRemittance.length) return null;
+              return (
+                <section
+                  style={{
+                    background: "rgba(255,251,235,0.96)",
+                    borderRadius: 24,
+                    border: "1px solid rgba(245,158,11,0.25)",
+                    boxShadow: "0 4px 20px rgba(245,158,11,0.08)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontSize: 20 }}>⏳</span>
+                    <h2 style={{ margin: 0, color: "#92400e" }}>Pending remittance to provider</h2>
+                  </div>
+                  <p style={{ margin: "0 0 14px", color: "#78350f", fontSize: 14 }}>
+                    These payments were funded via Stripe but still need to be submitted to the provider portal. Log in to the provider's payment portal, submit the payment, then enter the confirmation reference below.
+                  </p>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {pendingRemittance.map((tx) => (
+                      <div
+                        key={tx.id}
+                        style={{
+                          background: "#fff",
+                          borderRadius: 18,
+                          border: "1px solid rgba(245,158,11,0.2)",
+                          padding: 16,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, color: "#0f172a" }}>{tx.providerName}</div>
+                            <div style={{ color: "#64748b", fontSize: 13, marginTop: 2 }}>
+                              {tx.accountReferenceMasked ? `Acct: ${tx.accountReferenceMasked} · ` : ""}{formatDate(tx.createdAt)}
+                            </div>
+                          </div>
+                          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 18 }}>
+                            {formatCurrency(tx.amount, tx.currency)}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <input
+                            type="text"
+                            placeholder="Confirmation / reference #"
+                            value={remittanceRefs[tx.id] || ""}
+                            onChange={(e) =>
+                              setRemittanceRefs((prev) => ({ ...prev, [tx.id]: e.target.value }))
+                            }
+                            style={{
+                              flex: 1,
+                              borderRadius: 10,
+                              border: "1px solid rgba(15,23,42,0.2)",
+                              padding: "8px 12px",
+                              fontSize: 14,
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={submittingRemittance === tx.id}
+                            onClick={() => submitRemittance(tx.id)}
+                            style={{
+                              borderRadius: 10,
+                              border: "none",
+                              background: submittingRemittance === tx.id ? "#d1d5db" : "#d97706",
+                              color: "#fff",
+                              padding: "8px 18px",
+                              fontWeight: 700,
+                              cursor: submittingRemittance === tx.id ? "not-allowed" : "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {submittingRemittance === tx.id ? "Saving…" : "Mark submitted"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
             <section
               style={{
                 background: "rgba(255,255,255,0.92)",
@@ -4366,6 +4483,25 @@ export default function BillPaymentsPage() {
                             >
                               {transaction.status}
                             </div>
+                            {transaction.status === "paid" && (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.06em",
+                                  color:
+                                    transaction.remittanceStatus === "submitted"
+                                      ? "#047857"
+                                      : "#92400e",
+                                }}
+                              >
+                                {transaction.remittanceStatus === "submitted"
+                                  ? `✓ Remitted${transaction.remittanceReference ? ` · ${transaction.remittanceReference}` : ""}`
+                                  : "⏳ Pending remittance"}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
