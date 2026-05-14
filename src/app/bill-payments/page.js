@@ -308,6 +308,11 @@ export default function BillPaymentsPage() {
     bills: [],
     autopayRules: [],
     recentTransactions: [],
+    pricing: {
+      monthlyFeeUsd: 5,
+      cardFeePercent: 3.9,
+      bankAccountFeePercent: 1.5,
+    },
   });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [billForm, setBillForm] = useState(initialBillForm);
@@ -354,6 +359,14 @@ export default function BillPaymentsPage() {
   }, [authUser]);
   const bills = dashboard.bills || [];
   const recentTransactions = dashboard.recentTransactions || [];
+  const pricingConfig =
+    dashboard.pricing && typeof dashboard.pricing === "object"
+      ? dashboard.pricing
+      : {
+          monthlyFeeUsd: 5,
+          cardFeePercent: 3.9,
+          bankAccountFeePercent: 1.5,
+        };
   const executablePaymentMethods = useMemo(
     () =>
       paymentMethods.filter(
@@ -530,6 +543,18 @@ export default function BillPaymentsPage() {
       .filter((bill) => selectedBillIds.includes(bill.id))
       .reduce((sum, bill) => sum + Number(bill.amountDue || 0), 0);
   }, [bills, selectedBillIds]);
+
+  const selectedPaymentBreakdown = useMemo(() => {
+    const subtotal = selectedTotalAmount;
+    const methodType = String(selectedPaymentMethod?.methodType || "").trim();
+    const feePercent =
+      methodType === "bank_account"
+        ? Number(pricingConfig.bankAccountFeePercent || 0)
+        : Number(pricingConfig.cardFeePercent || 0);
+    const fee = Number((subtotal * (feePercent / 100)).toFixed(2));
+    const total = Number((subtotal + fee).toFixed(2));
+    return { subtotal, feePercent, fee, total };
+  }, [pricingConfig, selectedPaymentMethod?.methodType, selectedTotalAmount]);
 
   const categoryFieldHints = useMemo(() => {
     const selectedCategory =
@@ -1090,8 +1115,15 @@ export default function BillPaymentsPage() {
     const payAmount = bills
       .filter((bill) => billIds.includes(bill.id))
       .reduce((sum, bill) => sum + Number(bill.amountDue || 0), 0);
+    const methodType = String(selectedPaymentMethod?.methodType || "").trim();
+    const feePercent =
+      methodType === "bank_account"
+        ? Number(pricingConfig.bankAccountFeePercent || 0)
+        : Number(pricingConfig.cardFeePercent || 0);
+    const feeAmount = Number((payAmount * (feePercent / 100)).toFixed(2));
+    const totalAmount = Number((payAmount + feeAmount).toFixed(2));
     const confirmed = window.confirm(
-      `Pay ${billIds.length} bill${billIds.length === 1 ? "" : "s"} for ${formatCurrency(payAmount)}?`,
+      `Pay ${billIds.length} bill${billIds.length === 1 ? "" : "s"}?\nSubtotal: ${formatCurrency(payAmount)}\nTransaction fee (${feePercent.toFixed(2)}%): ${formatCurrency(feeAmount)}\nTotal charge: ${formatCurrency(totalAmount)}`,
     );
     if (!confirmed) return;
 
@@ -1115,7 +1147,7 @@ export default function BillPaymentsPage() {
       setNotice(
         failureCount > 0
           ? `Submitted ${payload.data.transactions.length} payments with ${failureCount} failures.`
-          : `Submitted ${payload.data.transactions.length} bill payment${payload.data.transactions.length === 1 ? "" : "s"}.`,
+          : `Submitted ${payload.data.transactions.length} bill payment${payload.data.transactions.length === 1 ? "" : "s"}. Charged ${formatCurrency(payload?.data?.summary?.totalCharged || 0)} (fees ${formatCurrency(payload?.data?.summary?.totalFees || 0)}).`,
       );
       if (billIds === selectedBillIds) {
         setSelectedBillIds([]);
@@ -1492,7 +1524,7 @@ export default function BillPaymentsPage() {
               >
                 {paying
                   ? "Submitting..."
-                  : `Pay Selected (${selectedBillIds.length}) • ${formatCurrency(selectedTotalAmount)}`}
+                  : `Pay Selected (${selectedBillIds.length}) • ${formatCurrency(selectedPaymentBreakdown.total)} total (${formatCurrency(selectedPaymentBreakdown.fee)} fee)`}
               </button>
             </div>
 
@@ -2932,7 +2964,7 @@ export default function BillPaymentsPage() {
               >
                 {paying
                   ? "Submitting payments..."
-                  : `Pay selected (${selectedBillIds.length}) • ${formatCurrency(selectedTotalAmount)}`}
+                  : `Pay selected (${selectedBillIds.length}) • ${formatCurrency(selectedPaymentBreakdown.total)} total (${formatCurrency(selectedPaymentBreakdown.fee)} fee)`}
               </button>
               {!canManageSensitiveData && (
                 <span style={{ color: "#64748b", fontSize: 14 }}>
@@ -4360,9 +4392,17 @@ export default function BillPaymentsPage() {
                             </div>
                           </div>
                           <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 18 }}>
-                            {formatCurrency(tx.amount, tx.currency)}
+                            {formatCurrency(
+                              tx.remittanceAmount || tx.amount,
+                              tx.currency,
+                            )}
                           </div>
                         </div>
+                        {Number(tx.platformFeeAmount || 0) > 0 && (
+                          <div style={{ marginBottom: 10, color: "#92400e", fontSize: 13 }}>
+                            Fee captured in app: {formatCurrency(tx.platformFeeAmount, tx.currency)}
+                          </div>
+                        )}
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <input
                             type="text"
@@ -4462,10 +4502,15 @@ export default function BillPaymentsPage() {
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontWeight: 800, color: "#0f172a" }}>
                               {formatCurrency(
-                                transaction.amount,
+                                transaction.totalChargedAmount || transaction.amount,
                                 transaction.currency,
                               )}
                             </div>
+                            {Number(transaction.platformFeeAmount || 0) > 0 && (
+                              <div style={{ marginTop: 3, color: "#64748b", fontSize: 12 }}>
+                                bill {formatCurrency(transaction.remittanceAmount, transaction.currency)} + fee {formatCurrency(transaction.platformFeeAmount, transaction.currency)}
+                              </div>
+                            )}
                             <div
                               style={{
                                 marginTop: 4,

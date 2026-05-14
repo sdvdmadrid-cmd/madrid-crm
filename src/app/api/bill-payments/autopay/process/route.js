@@ -2,6 +2,7 @@ import {
   BILL_AUTOPAY_RULE_TABLE,
   BILL_PAYMENT_METHOD_TABLE,
   BILL_TABLE,
+  calculateBillPaymentPricing,
   createNotification,
   isAutopayDue,
   processBillPayment,
@@ -94,11 +95,16 @@ export async function POST(request) {
 
     try {
       const amount = resolveAutopayAmount(bill, rule);
+      const pricing = calculateBillPaymentPricing({
+        baseAmount: amount,
+        paymentMethodType: paymentMethod.method_type,
+      });
       await processBillPayment({
         context: { tenantDbId: rule.tenant_id, userId: rule.user_id },
         bill,
         paymentMethod,
-        amount,
+        amount: pricing.totalAmount,
+        pricing,
         source: "autopay",
       });
       paymentsProcessed += 1;

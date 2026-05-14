@@ -3,6 +3,7 @@ import {
   BILL_PAYMENT_TRANSACTION_TABLE,
   BILL_TABLE,
   buildBillWritePayload,
+  getBillPaymentsPricingConfig,
   computeBillStatus,
   findBillProvider,
   requireBillPaymentsAccess,
@@ -69,6 +70,12 @@ export async function GET(request) {
         recentTransactions: (transactions || []).map(
           serializeBillPaymentTransaction,
         ),
+        pricing: {
+          monthlyFeeUsd: getBillPaymentsPricingConfig().monthlyFeeUsd,
+          cardFeePercent: getBillPaymentsPricingConfig("card").transactionFeePercent,
+          bankAccountFeePercent:
+            getBillPaymentsPricingConfig("bank_account").transactionFeePercent,
+        },
       },
     }),
     { status: 200, headers: { "Content-Type": "application/json" } },

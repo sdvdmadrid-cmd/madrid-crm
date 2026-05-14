@@ -110,6 +110,57 @@ export function normalizeMoneyAmount(value) {
   return Math.round(amount * 100) / 100;
 }
 
+function clampPercent(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  if (numeric < 0) return 0;
+  if (numeric > 100) return 100;
+  return numeric;
+}
+
+function resolveFeePercentByMethod(methodType = "") {
+  const normalizedMethod = String(methodType || "").trim().toLowerCase();
+  if (normalizedMethod === "bank_account") {
+    return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_ACH, 1.5);
+  }
+  if (normalizedMethod === "card") {
+    return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_CARD, 3.9);
+  }
+  return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_DEFAULT, 3.5);
+}
+
+export function getBillPaymentsPricingConfig(methodType = "") {
+  const monthlyFeeUsd = normalizeMoneyAmount(
+    process.env.BILL_PAYMENTS_MONTHLY_FEE_USD,
+  ) ?? 5;
+  const transactionFeePercent = resolveFeePercentByMethod(methodType);
+
+  return {
+    monthlyFeeUsd,
+    transactionFeePercent,
+  };
+}
+
+export function calculateBillPaymentPricing({
+  baseAmount,
+  paymentMethodType = "",
+}) {
+  const safeBaseAmount = normalizeMoneyAmount(baseAmount) ?? 0;
+  const pricing = getBillPaymentsPricingConfig(paymentMethodType);
+  const feeAmount = normalizeMoneyAmount(
+    safeBaseAmount * (pricing.transactionFeePercent / 100),
+  ) ?? 0;
+  const totalAmount = normalizeMoneyAmount(safeBaseAmount + feeAmount) ?? 0;
+
+  return {
+    baseAmount: safeBaseAmount,
+    feeAmount,
+    totalAmount,
+    monthlyFeeUsd: pricing.monthlyFeeUsd,
+    transactionFeePercent: pricing.transactionFeePercent,
+  };
+}
+
 export function normalizeTagList(values = []) {
   if (!Array.isArray(values)) return [];
   const unique = new Set();
@@ -371,6 +422,13 @@ export function serializeBillPaymentTransaction(row) {
   const metadata = row.metadata && typeof row.metadata === "object"
     ? row.metadata
     : {};
+  const remittanceAmount = Number(
+    metadata.remittance_amount ?? metadata.bill_amount ?? row.amount ?? 0,
+  );
+  const platformFeeAmount = Number(metadata.platform_fee_amount ?? 0);
+  const totalChargedAmount = Number(
+    metadata.total_charged_amount ?? row.amount ?? 0,
+  );
   return {
     _id: row.id,
     id: row.id,
@@ -390,6 +448,11 @@ export function serializeBillPaymentTransaction(row) {
     processedAt: row.processed_at || null,
     failedAt: row.failed_at || null,
     failureReason: row.failure_reason || "",
+    remittanceAmount,
+    platformFeeAmount,
+    totalChargedAmount,
+    monthlyFeeUsd: Number(metadata.monthly_fee_usd ?? 0),
+    transactionFeePercent: Number(metadata.transaction_fee_percent ?? 0),
     fundingStatus:
       String(metadata.funding_status || "").trim() ||
       (row.status === "paid"
@@ -1227,6 +1290,7 @@ export async function processBillPayment({
   bill,
   paymentMethod,
   amount,
+  pricing = null,
   source = "manual",
   bulkBatchId = null,
   paymentContext = null,
@@ -1343,6 +1407,21 @@ export async function processBillPayment({
   });
 
   try {
+    const pricingDetails = pricing && typeof pricing === "object"
+      ? pricing
+      : {
+          baseAmount: normalizeMoneyAmount(bill.amount_due) ?? normalizeMoneyAmount(amount) ?? 0,
+          feeAmount: 0,
+          totalAmount: normalizeMoneyAmount(amount) ?? 0,
+          monthlyFeeUsd: getBillPaymentsPricingConfig(paymentMethod?.method_type).monthlyFeeUsd,
+          transactionFeePercent: 0,
+        };
+    const baseAmount = normalizeMoneyAmount(pricingDetails.baseAmount) ?? 0;
+    const feeAmount = normalizeMoneyAmount(pricingDetails.feeAmount) ?? 0;
+    const totalAmount = normalizeMoneyAmount(pricingDetails.totalAmount) ?? normalizeMoneyAmount(amount) ?? 0;
+    const monthlyFeeUsd = normalizeMoneyAmount(pricingDetails.monthlyFeeUsd) ?? 0;
+    const transactionFeePercent = Number(pricingDetails.transactionFeePercent || 0);
+
     const stripeInstrumentId = String(
       paymentMethod.stripe_payment_method_id || "",
     );
@@ -1352,7 +1431,7 @@ export async function processBillPayment({
       paymentContext?.ipAddress &&
       paymentContext?.userAgent;
     const intent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(totalAmount * 100),
       currency: (bill.currency || "usd").toLowerCase(),
       customer: paymentMethod.stripe_customer_id,
       payment_method: stripeInstrumentId,
@@ -1379,6 +1458,9 @@ export async function processBillPayment({
         billId: bill.id,
         tenantDbId: context.tenantDbId,
         userId: context.userId,
+        baseAmount: String(baseAmount),
+        feeAmount: String(feeAmount),
+        totalAmount: String(totalAmount),
       },
     });
 
@@ -1405,6 +1487,10 @@ export async function processBillPayment({
           : "pending_funding";
 
     const nowIso = new Date().toISOString();
+    const existingMeta =
+      transaction.metadata && typeof transaction.metadata === "object"
+        ? transaction.metadata
+        : {};
     const { error: updateError } = await supabaseAdmin
       .from(BILL_PAYMENT_TRANSACTION_TABLE)
       .update({
@@ -1412,6 +1498,13 @@ export async function processBillPayment({
         status: nextStatus,
         processed_at: nextStatus === "paid" ? nowIso : null,
         metadata: {
+          ...existingMeta,
+          bill_amount: baseAmount,
+          remittance_amount: baseAmount,
+          platform_fee_amount: feeAmount,
+          total_charged_amount: totalAmount,
+          monthly_fee_usd: monthlyFeeUsd,
+          transaction_fee_percent: transactionFeePercent,
           funding_status: fundingStatus,
           remittance_status: remittanceStatus,
           remittance_channel: "manual_portal",
@@ -1470,12 +1563,15 @@ export async function processBillPayment({
           : "Bill payment processing",
       message:
         nextStatus === "paid"
-          ? `${bill.provider_name} funding captured for $${amount.toFixed(2)}. Remittance status: pending submission.`
-          : `${bill.provider_name} payment funding is processing for $${amount.toFixed(2)}.`,
+          ? `${bill.provider_name} funding captured for $${totalAmount.toFixed(2)} (bill $${baseAmount.toFixed(2)} + fee $${feeAmount.toFixed(2)}). Remittance status: pending submission.`
+          : `${bill.provider_name} payment funding is processing for $${totalAmount.toFixed(2)}.`,
       metadata: {
         billId: bill.id,
         transactionId: transaction.id,
         stripePaymentIntentId: intent.id,
+        billAmount: baseAmount,
+        platformFeeAmount: feeAmount,
+        totalChargedAmount: totalAmount,
         fundingStatus,
         remittanceStatus,
       },
@@ -1495,10 +1591,20 @@ export async function processBillPayment({
 
     return {
       ...transaction,
+      amount: totalAmount,
       stripe_payment_intent_id: intent.id,
       status: nextStatus,
       processed_at: nextStatus === "paid" ? nowIso : null,
       metadata: {
+        ...((transaction.metadata && typeof transaction.metadata === "object")
+          ? transaction.metadata
+          : {}),
+        bill_amount: baseAmount,
+        remittance_amount: baseAmount,
+        platform_fee_amount: feeAmount,
+        total_charged_amount: totalAmount,
+        monthly_fee_usd: monthlyFeeUsd,
+        transaction_fee_percent: transactionFeePercent,
         funding_status: fundingStatus,
         remittance_status: remittanceStatus,
         remittance_channel: "manual_portal",
@@ -1507,6 +1613,10 @@ export async function processBillPayment({
   } catch (error) {
     const nowIso = new Date().toISOString();
     const message = error?.message || "Payment failed";
+    const existingMeta =
+      transaction.metadata && typeof transaction.metadata === "object"
+        ? transaction.metadata
+        : {};
 
     await supabaseAdmin
       .from(BILL_PAYMENT_TRANSACTION_TABLE)
@@ -1515,6 +1625,7 @@ export async function processBillPayment({
         failed_at: nowIso,
         failure_reason: message,
         metadata: {
+          ...existingMeta,
           funding_status: "failed",
           remittance_status: "blocked",
           remittance_channel: "manual_portal",

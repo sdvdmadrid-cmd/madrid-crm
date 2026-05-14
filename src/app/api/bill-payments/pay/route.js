@@ -3,6 +3,7 @@
 import {
   BILL_PAYMENT_METHOD_TABLE,
   BILL_TABLE,
+  calculateBillPaymentPricing,
   processBillPayment,
   requireBillPaymentsAccess,
   serializeBillPaymentTransaction,
@@ -98,6 +99,9 @@ export async function POST(request) {
   const bulkBatchId = billIds.length > 1 ? crypto.randomUUID() : null;
   const results = [];
   const failures = [];
+  let subtotal = 0;
+  let totalFees = 0;
+  let totalCharged = 0;
   const forwardedFor = String(request.headers.get("x-forwarded-for") || "")
     .split(",")
     .map((value) => value.trim())
@@ -111,15 +115,23 @@ export async function POST(request) {
 
   for (const bill of bills || []) {
     try {
+      const pricing = calculateBillPaymentPricing({
+        baseAmount: Number(bill.amount_due || 0),
+        paymentMethodType: paymentMethod.method_type,
+      });
       const transaction = await processBillPayment({
         context,
         bill,
         paymentMethod,
-        amount: Number(bill.amount_due || 0),
+        amount: pricing.totalAmount,
+        pricing,
         source: billIds.length > 1 ? "bulk" : "manual",
         bulkBatchId,
         paymentContext,
       });
+      subtotal += pricing.baseAmount;
+      totalFees += pricing.feeAmount;
+      totalCharged += pricing.totalAmount;
       results.push(serializeBillPaymentTransaction(transaction));
     } catch (error) {
       failures.push({ billId: bill.id, error: error.message });
@@ -129,7 +141,16 @@ export async function POST(request) {
   return new Response(
     JSON.stringify({
       success: failures.length === 0,
-      data: { transactions: results, failures, bulkBatchId },
+      data: {
+        transactions: results,
+        failures,
+        bulkBatchId,
+        summary: {
+          subtotal,
+          totalFees,
+          totalCharged,
+        },
+      },
     }),
     {
       status: failures.length > 0 ? 207 : 200,

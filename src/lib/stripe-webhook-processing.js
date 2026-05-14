@@ -262,6 +262,10 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
         ? "blocked"
         : "pending_funding";
   const nowIso = new Date().toISOString();
+  const existingMeta =
+    transaction.metadata && typeof transaction.metadata === "object"
+      ? transaction.metadata
+      : {};
   const failureReason =
     intent.last_payment_error?.message ||
     intent.cancellation_reason ||
@@ -281,6 +285,7 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
       failed_at: nextStatus === "failed" ? nowIso : null,
       failure_reason: nextStatus === "failed" ? failureReason : "",
       metadata: {
+        ...existingMeta,
         funding_status: fundingStatus,
         remittance_status: remittanceStatus,
         remittance_channel: "manual_portal",
