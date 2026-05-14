@@ -1,6 +1,23 @@
 export async function apiFetch(input, init = {}) {
-  const { suppressUnauthorizedEvent = false, ...fetchInit } = init;
-  const response = await fetch(input, fetchInit);
+  const {
+    suppressUnauthorizedEvent = false,
+    timeoutMs = 0,
+    signal,
+    ...fetchInit
+  } = init;
+
+  const controller = timeoutMs > 0 ? new AbortController() : null;
+  const timeoutId =
+    controller && typeof setTimeout === "function"
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  const response = await fetch(input, {
+    ...fetchInit,
+    signal: signal || controller?.signal,
+  }).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 
   if (
     response.status === 401 &&

@@ -137,20 +137,34 @@ function PaymentMethodSetupForm({
     setSaving(true);
     onError("");
 
-    const result = await stripe.confirmSetup({
-      elements,
-      redirect: "if_required",
-      confirmParams: {
-        return_url:
-          typeof window !== "undefined" ? window.location.href : undefined,
-        payment_method_data: {
-          billing_details: {
-            name: billingDetails?.name || "Cardholder",
-            email: billingDetails?.email || undefined,
+    let result;
+    try {
+      result = await Promise.race([
+        stripe.confirmSetup({
+          elements,
+          redirect: "if_required",
+          confirmParams: {
+            return_url:
+              typeof window !== "undefined" ? window.location.href : undefined,
+            payment_method_data: {
+              billing_details: {
+                name: billingDetails?.name || "Cardholder",
+                email: billingDetails?.email || undefined,
+              },
+            },
           },
-        },
-      },
-    });
+        }),
+        new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("Stripe is taking too long. Please try again."));
+          }, 30000);
+        }),
+      ]);
+    } catch (error) {
+      onError(error.message || "Unable to save payment method.");
+      setSaving(false);
+      return;
+    }
 
     if (result.error) {
       onError(result.error.message || "Unable to save payment method.");
@@ -172,6 +186,7 @@ function PaymentMethodSetupForm({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ paymentMethodId, setDefault: false }),
+          timeoutMs: 30000,
         },
       );
       const payload = await getJsonOrThrow(
