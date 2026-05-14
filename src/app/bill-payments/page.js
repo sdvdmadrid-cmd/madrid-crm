@@ -1345,9 +1345,33 @@ export default function BillPaymentsPage() {
                 >
                   Bills & Payments
                 </h1>
-                <p style={{ margin: "7px 0 0", color: "#64748b", fontSize: 15 }}>
-                  View, select, and pay bills fast.
-                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                  <p style={{ margin: 0, color: "#64748b", fontSize: 15 }}>
+                    View, select, and pay bills fast.
+                  </p>
+                  {!authUser?.isSubscribed && bills.length > 0 && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        borderRadius: 999,
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        background: bills.length >= 2
+                          ? "rgba(239, 68, 68, 0.12)"
+                          : "rgba(34, 197, 94, 0.12)",
+                        color: bills.length >= 2 ? "#dc2626" : "#16a34a",
+                      }}
+                    >
+                      {bills.length >= 2
+                        ? "⚠️ 2/2 free bills used — subscribe to add more"
+                        : `✓ ${bills.length}/2 free bills used`}
+                    </span>
+                  )}
+                </div>
               </div>
               <button
                 type="button"
@@ -1624,6 +1648,48 @@ export default function BillPaymentsPage() {
             )}
 
             <div style={{ display: "grid", gap: 10 }}>
+              {!authUser?.isSubscribed && bills.length >= 2 && (
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(239,68,68,0.24)",
+                    background: "rgba(239,68,68,0.08)",
+                    color: "#991b1b",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      ⚠️ All free bills used (2/2)
+                    </div>
+                    <div style={{ fontSize: 13, marginTop: 4, opacity: 0.9 }}>
+                      Subscribe to add more bills and keep your business organized.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push(subscriptionSubscribeUrl)}
+                    style={{
+                      border: 0,
+                      borderRadius: 8,
+                      background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+                      color: "#fff",
+                      padding: "8px 14px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Subscribe now
+                  </button>
+                </div>
+              )}
               {loading ? (
                 <div style={{ padding: 18, color: "#64748b" }}>Loading bills...</div>
               ) : filteredBills.length === 0 ? (
