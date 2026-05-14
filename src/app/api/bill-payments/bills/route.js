@@ -1,12 +1,13 @@
 import {
   BILL_AUTOPAY_RULE_TABLE,
+  BILL_PAYMENTS_FREE_BILLS_LIMIT,
   BILL_PAYMENT_TRANSACTION_TABLE,
   BILL_TABLE,
+  billPaymentsSubscriptionRequiredResponse,
   buildBillWritePayload,
   getBillPaymentsPricingConfig,
   computeBillStatus,
   findBillProvider,
-  requireBillPaymentsSubscriptionForStorage,
   requireBillPaymentsAccess,
   serializeAutopayRule,
   serializeBill,
@@ -86,12 +87,34 @@ export async function GET(request) {
 export async function POST(request) {
   const access = await requireBillPaymentsAccess(request, "write");
   if (access.response) return access.response;
-  const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(
-    access.context,
-  );
-  if (subscriptionResponse) return subscriptionResponse;
-
   const { context } = access;
+
+  if (!context.isSubscribed && !context.isSuperAdmin) {
+    const { count, error: countError } = await supabaseAdmin
+      .from(BILL_TABLE)
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", context.tenantDbId);
+
+    if (countError) {
+      return new Response(
+        JSON.stringify({ success: false, error: countError.message }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const currentBills = Number(count || 0);
+    if (currentBills >= BILL_PAYMENTS_FREE_BILLS_LIMIT) {
+      return billPaymentsSubscriptionRequiredResponse({
+        errorMessage:
+          "You have reached your free bill limit. Subscribe to keep adding bills and save payment methods.",
+        details: {
+          currentBills,
+          freeBillsLimit: BILL_PAYMENTS_FREE_BILLS_LIMIT,
+        },
+      });
+    }
+  }
+
   const body = await request.json().catch(() => ({}));
 
   try {

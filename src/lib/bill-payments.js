@@ -88,6 +88,8 @@ export const AUTOPAY_SCHEDULE_TYPES = new Set([
   "monthly_date",
 ]);
 
+export const BILL_PAYMENTS_FREE_BILLS_LIMIT = 2;
+
 export async function requireBillPaymentsAccess(request, mode = "read") {
   const context = await getAuthenticatedTenantContext(request);
   if (!context.authenticated) {
@@ -105,14 +107,18 @@ export async function requireBillPaymentsAccess(request, mode = "read") {
   return { context };
 }
 
-export function billPaymentsSubscriptionRequiredResponse() {
+export function billPaymentsSubscriptionRequiredResponse({
+  errorMessage =
+    "Bill Payments subscription required to save bills or payment methods. If you pay 3-4+ bills per month, subscribing is usually worth it.",
+  details = null,
+} = {}) {
   return new Response(
     JSON.stringify({
       success: false,
       code: "bill_payments_subscription_required",
       subscribeUrl: "/subscriptions?source=bill-payments",
-      error:
-        "Bill Payments subscription required to save bills or payment methods. If you pay 3-4+ bills per month, subscribing is usually worth it.",
+      error: errorMessage,
+      details,
     }),
     {
       status: 402,

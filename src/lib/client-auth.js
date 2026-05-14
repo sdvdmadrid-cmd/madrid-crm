@@ -38,6 +38,10 @@ export async function getJsonOrThrow(response, fallbackMessage) {
     error.status = response.status;
     error.code = String(payload?.code || "").trim();
     error.subscribeUrl = String(payload?.subscribeUrl || "").trim();
+    error.details =
+      payload?.details && typeof payload.details === "object"
+        ? payload.details
+        : null;
     throw error;
   }
 

@@ -343,6 +343,9 @@ export default function BillPaymentsPage() {
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
   const [compactMode, setCompactMode] = useState(true);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [subscriptionGateDetails, setSubscriptionGateDetails] = useState(null);
+  const [monthlyBillsEstimate, setMonthlyBillsEstimate] = useState("4");
   const deferredProviderQuery = useDeferredValue(providerQuery);
   const deferredFilterQuery = useDeferredValue(filterQuery);
   const routeBillId =
@@ -370,6 +373,26 @@ export default function BillPaymentsPage() {
   const isSubscriptionRequiredError =
     typeof error === "string" &&
     error.toLowerCase().includes("subscription required");
+  const subscriptionSubscribeUrl =
+    String(subscriptionGateDetails?.subscribeUrl || "").trim() ||
+    "/subscriptions?source=bill-payments";
+  const upgradeEstimate = useMemo(() => {
+    const billsPerMonth = Math.max(1, Math.min(100, Number(monthlyBillsEstimate || 0) || 4));
+    const monthlyFee = Number(pricingConfig.monthlyFeeUsd || 0);
+    const costPerBill = monthlyFee / billsPerMonth;
+    const minutesSaved = billsPerMonth * 8;
+    const hourlyValue = 30;
+    const timeValue = (minutesSaved / 60) * hourlyValue;
+    const netValue = timeValue - monthlyFee;
+    return {
+      billsPerMonth,
+      monthlyFee,
+      costPerBill,
+      minutesSaved,
+      timeValue,
+      netValue,
+    };
+  }, [monthlyBillsEstimate, pricingConfig.monthlyFeeUsd]);
   const executablePaymentMethods = useMemo(
     () =>
       paymentMethods.filter(
@@ -410,6 +433,27 @@ export default function BillPaymentsPage() {
         : [],
     [selectedProvider],
   );
+
+  function handleActionError(actionError, fallbackMessage) {
+    const message = actionError?.message || fallbackMessage;
+    setError(message);
+
+    const subscriptionError =
+      String(actionError?.code || "") === "bill_payments_subscription_required" ||
+      /subscription required|free bill limit/i.test(String(message || ""));
+
+    if (!subscriptionError) {
+      setSubscriptionGateDetails(null);
+      return;
+    }
+
+    setSubscriptionGateDetails({
+      subscribeUrl: String(actionError?.subscribeUrl || "").trim(),
+      freeBillsLimit: Number(actionError?.details?.freeBillsLimit || 0) || null,
+      currentBills: Number(actionError?.details?.currentBills || 0) || null,
+    });
+    setShowSubscriptionModal(true);
+  }
 
   function formatSelectedPaymentMethodLabel(method) {
     if (!method) return "Choose payment method";
@@ -902,7 +946,7 @@ export default function BillPaymentsPage() {
       resetBillForm();
       await loadDashboard();
     } catch (saveError) {
-      setError(saveError.message || "Unable to save bill.");
+      handleActionError(saveError, "Unable to save bill.");
     } finally {
       setSavingBill(false);
     }
@@ -982,7 +1026,7 @@ export default function BillPaymentsPage() {
         methodType,
       });
     } catch (setupError) {
-      setError(setupError.message || "Unable to prepare payment method setup.");
+      handleActionError(setupError, "Unable to prepare payment method setup.");
     }
   }
 
@@ -1000,7 +1044,7 @@ export default function BillPaymentsPage() {
       await getJsonOrThrow(response, "Unable to update payment method.");
       await loadDashboard();
     } catch (methodError) {
-      setError(methodError.message || "Unable to update payment method.");
+      handleActionError(methodError, "Unable to update payment method.");
     }
   }
 
@@ -1017,7 +1061,7 @@ export default function BillPaymentsPage() {
       setNotice("Payment method removed.");
       await loadDashboard();
     } catch (methodError) {
-      setError(methodError.message || "Unable to remove payment method.");
+      handleActionError(methodError, "Unable to remove payment method.");
     }
   }
 
@@ -1097,7 +1141,7 @@ export default function BillPaymentsPage() {
         handler.open();
       });
     } catch (plaidError) {
-      setError(plaidError.message || "Unable to link bank account with Plaid.");
+      handleActionError(plaidError, "Unable to link bank account with Plaid.");
     } finally {
       setPlaidLaunching(false);
     }
@@ -1543,12 +1587,10 @@ export default function BillPaymentsPage() {
               >
                 <div>{error || notice}</div>
                 {isSubscriptionRequiredError ? (
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={() =>
-                        router.push("/subscriptions?source=bill-payments")
-                      }
+                      onClick={() => router.push(subscriptionSubscribeUrl)}
                       style={{
                         border: 0,
                         borderRadius: 999,
@@ -1560,6 +1602,21 @@ export default function BillPaymentsPage() {
                       }}
                     >
                       Subscribe now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSubscriptionModal(true)}
+                      style={{
+                        borderRadius: 999,
+                        border: "1px solid rgba(15,23,42,0.16)",
+                        background: "#fff",
+                        color: "#0f172a",
+                        padding: "9px 14px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Why subscribe?
                     </button>
                   </div>
                 ) : null}
@@ -4577,6 +4634,164 @@ export default function BillPaymentsPage() {
                     ))}
               </div>
             </section>
+
+            {showSubscriptionModal ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Close subscription modal"
+                  onClick={() => setShowSubscriptionModal(false)}
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "rgba(15,23,42,0.50)",
+                    border: 0,
+                    padding: 0,
+                    margin: 0,
+                    cursor: "pointer",
+                    zIndex: 80,
+                  }}
+                />
+                <aside
+                  style={{
+                    position: "fixed",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    width: "min(560px, calc(100vw - 28px))",
+                    borderRadius: 20,
+                    border: "1px solid rgba(15,23,42,0.12)",
+                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                    boxShadow: "0 32px 80px rgba(15,23,42,0.35)",
+                    padding: 18,
+                    zIndex: 90,
+                    display: "grid",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+                    <div>
+                      <p style={{ margin: 0, color: "#0f766e", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        Bill Payments Pro
+                      </p>
+                      <h3 style={{ margin: "6px 0 0", color: "#0f172a" }}>
+                        Subscribe if you pay 3-4+ bills monthly
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowSubscriptionModal(false)}
+                      style={{
+                        borderRadius: 10,
+                        border: "1px solid rgba(15,23,42,0.16)",
+                        background: "#fff",
+                        color: "#0f172a",
+                        padding: "6px 10px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <p style={{ margin: 0, color: "#334155", lineHeight: 1.5 }}>
+                    Save payment methods, keep all bills organized, and automate repeat payments from one dashboard.
+                  </p>
+
+                  {subscriptionGateDetails?.freeBillsLimit && subscriptionGateDetails?.currentBills ? (
+                    <div
+                      style={{
+                        borderRadius: 12,
+                        border: "1px solid rgba(245,158,11,0.28)",
+                        background: "rgba(245,158,11,0.10)",
+                        color: "#92400e",
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Free bills used: {subscriptionGateDetails.currentBills}/{subscriptionGateDetails.freeBillsLimit}
+                    </div>
+                  ) : null}
+
+                  <div
+                    style={{
+                      borderRadius: 14,
+                      border: "1px solid rgba(15,23,42,0.10)",
+                      background: "#fff",
+                      padding: 12,
+                      display: "grid",
+                      gap: 8,
+                    }}
+                  >
+                    <label style={{ fontSize: 13, color: "#334155", fontWeight: 700 }}>
+                      How many bills do you pay per month?
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={monthlyBillsEstimate}
+                      onChange={(event) => setMonthlyBillsEstimate(event.target.value)}
+                      style={{
+                        borderRadius: 10,
+                        border: "1px solid rgba(15,23,42,0.16)",
+                        background: "#fff",
+                        padding: "9px 12px",
+                      }}
+                    />
+                    <div style={{ display: "grid", gap: 4, color: "#0f172a", fontSize: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>Monthly plan</span>
+                        <strong>{formatCurrency(upgradeEstimate.monthlyFee)}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>Effective cost per bill</span>
+                        <strong>{formatCurrency(upgradeEstimate.costPerBill)}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>Estimated time saved</span>
+                        <strong>{upgradeEstimate.minutesSaved} min / month</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => router.push(subscriptionSubscribeUrl)}
+                      style={{
+                        border: 0,
+                        borderRadius: 999,
+                        background: "linear-gradient(135deg, #0f766e, #0b5f5a)",
+                        color: "#fff",
+                        padding: "10px 16px",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Upgrade now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSubscriptionModal(false)}
+                      style={{
+                        borderRadius: 999,
+                        border: "1px solid rgba(15,23,42,0.16)",
+                        background: "#fff",
+                        color: "#0f172a",
+                        padding: "10px 16px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Maybe later
+                    </button>
+                  </div>
+                </aside>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
