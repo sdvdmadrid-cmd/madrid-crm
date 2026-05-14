@@ -309,9 +309,9 @@ export default function BillPaymentsPage() {
     autopayRules: [],
     recentTransactions: [],
     pricing: {
-      monthlyFeeUsd: 5,
-      cardFeePercent: 3.9,
-      bankAccountFeePercent: 1.5,
+      monthlyFeeUsd: 9.99,
+      cardFeePercent: 5.9,
+      bankAccountFeePercent: 3.0,
     },
   });
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -363,10 +363,13 @@ export default function BillPaymentsPage() {
     dashboard.pricing && typeof dashboard.pricing === "object"
       ? dashboard.pricing
       : {
-          monthlyFeeUsd: 5,
-          cardFeePercent: 3.9,
-          bankAccountFeePercent: 1.5,
+          monthlyFeeUsd: 9.99,
+          cardFeePercent: 5.9,
+          bankAccountFeePercent: 3.0,
         };
+  const isSubscriptionRequiredError =
+    typeof error === "string" &&
+    error.toLowerCase().includes("subscription required");
   const executablePaymentMethods = useMemo(
     () =>
       paymentMethods.filter(
@@ -1538,7 +1541,28 @@ export default function BillPaymentsPage() {
                   color: error ? "#991b1b" : "#065f46",
                 }}
               >
-                {error || notice}
+                <div>{error || notice}</div>
+                {isSubscriptionRequiredError ? (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push("/subscriptions?source=bill-payments")
+                      }
+                      style={{
+                        border: 0,
+                        borderRadius: 999,
+                        background: "linear-gradient(135deg, #0f766e, #0b5f5a)",
+                        color: "#fff",
+                        padding: "9px 14px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Subscribe now
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
 

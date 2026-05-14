@@ -34,7 +34,11 @@ export async function getJsonOrThrow(response, fallbackMessage) {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(payload?.error || fallbackMessage);
+    const error = new Error(payload?.error || fallbackMessage);
+    error.status = response.status;
+    error.code = String(payload?.code || "").trim();
+    error.subscribeUrl = String(payload?.subscribeUrl || "").trim();
+    throw error;
   }
 
   return payload;
