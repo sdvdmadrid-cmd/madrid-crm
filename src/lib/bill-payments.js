@@ -122,18 +122,18 @@ function clampPercent(value, fallback = 0) {
 function resolveFeePercentByMethod(methodType = "") {
   const normalizedMethod = String(methodType || "").trim().toLowerCase();
   if (normalizedMethod === "bank_account") {
-    return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_ACH, 1.5);
+    return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_ACH, 3.0);
   }
   if (normalizedMethod === "card") {
-    return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_CARD, 3.9);
+    return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_CARD, 5.9);
   }
-  return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_DEFAULT, 3.5);
+  return clampPercent(process.env.BILL_PAYMENTS_FEE_PERCENT_DEFAULT, 4.5);
 }
 
 export function getBillPaymentsPricingConfig(methodType = "") {
   const monthlyFeeUsd = normalizeMoneyAmount(
     process.env.BILL_PAYMENTS_MONTHLY_FEE_USD,
-  ) ?? 5;
+  ) ?? 9.99;
   const transactionFeePercent = resolveFeePercentByMethod(methodType);
 
   return {
