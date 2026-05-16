@@ -97,7 +97,7 @@ function WaveDivider({ fromColor, toColor }) {
 
 // ─── Data ─────────────────────────────────────────────────────────────
 const STATS = [
-  { number: "30 days", label: "Free trial — no credit card needed" },
+  { number: "15 days", label: "Free trial — no credit card needed" },
   { number: "$35/mo", label: "Flat rate after your free trial" },
   { number: "10 hrs+", label: "Saved on average per week" },
   { number: "38%", label: "Revenue growth in first year" },
@@ -221,6 +221,9 @@ function Navbar() {
         <Link href="#industries" className="hover:text-white transition-colors">Industries</Link>
         <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
         <Link href="#resources" className="hover:text-white transition-colors">Resources</Link>
+        <Link href="/public/bill-payments" className="hover:text-white transition-colors font-bold" style={{ color: "#38bdf8" }}>
+          Bill payments for just $5/mo
+        </Link>
       </div>
 
       <div className="hidden md:flex items-center gap-4">
@@ -248,6 +251,9 @@ function Navbar() {
           <Link href="#industries" className="hover:text-white">Industries</Link>
           <Link href="#pricing" className="hover:text-white">Pricing</Link>
           <Link href="#resources" className="hover:text-white">Resources</Link>
+          <Link href="/public/bill-payments" className="hover:text-white font-bold" style={{ color: "#38bdf8" }}>
+            Bill payments for just $5/mo
+          </Link>
           <Link href="/login?mode=login" className="hover:text-white">Log In</Link>
           <Link href="/login?mode=register" className="font-bold px-4 py-2 rounded-md text-center"
             style={{ background: "#1d4ed8", color: "#ffffff" }}>
@@ -325,13 +331,13 @@ export default function MarketingPage() {
               FieldBase is the all-in-one platform built for contractors — from your first estimate to your final payment, powered by AI and synced with Google Calendar.
             </p>
             <p className="text-sm font-semibold mb-8 px-4 py-2 rounded-lg inline-block" style={{ background: "rgba(29,78,216,0.15)", color: "#93c5fd" }}>
-              🎉 Try free for 30 days — then just $35/month. No credit card required.
+              🎉 Try free for 15 days — then just $35/month. No credit card required.
             </p>
             <div className="flex flex-wrap gap-4 mb-8">
               <Link href="/login?mode=register"
                 className="font-bold text-base px-6 py-3 rounded-md transition-colors"
                 style={{ background: "#1d4ed8", color: "#ffffff" }}>
-                Start Free — 30 Days
+                  Start Free — 15 Days
               </Link>
               <Link href="#resources"
                 className="font-bold text-base px-6 py-3 rounded-md transition-colors bg-white/10 hover:bg-white/20"
@@ -406,7 +412,7 @@ export default function MarketingPage() {
               Start Free — 30 Days
             </Link>
           </div>
-          <p className="text-center text-xs mt-2" style={{ color: "#94a3b8" }}>Free for 30 days · Then $35/month · Cancel anytime · No credit card required</p>
+          <p className="text-center text-xs mt-2" style={{ color: "#94a3b8" }}>Free for 15 days · Then $35/month · Cancel anytime · No credit card required</p>
         </div>
       </section>
 
@@ -598,7 +604,7 @@ export default function MarketingPage() {
       <section id="pricing" style={{ background: "#1e293b" }} className="py-16 px-6 text-center">
         <div className="max-w-2xl mx-auto">
           <h2 className="text-5xl font-extrabold text-white mb-6">
-            30 days free.<br />Then $35/month.
+            15 days free.<br />Then $35/month.
           </h2>
           <p className="text-lg mb-10" style={{ color: "#94a3b8" }}>
             No credit card required. Cancel anytime.
@@ -606,7 +612,7 @@ export default function MarketingPage() {
           <Link href="/login?mode=register"
             className="inline-block font-bold px-12 py-4 rounded-md text-lg transition-all hover:shadow-lg"
             style={{ background: "#1d4ed8", color: "#ffffff" }}>
-            Start Free Trial
+            Start Free Trial — 15 Days
           </Link>
         </div>
       </section>
@@ -665,11 +671,11 @@ export default function MarketingPage() {
           {/* Getting Started */}
           <div className="mt-16 bg-white rounded-2xl p-12 border border-gray-200 text-center">
             <h3 className="text-2xl font-bold mb-4" style={{ color: "#1e293b" }}>Ready to streamline your workflow?</h3>
-            <p className="mb-8" style={{ color: "#6b7280" }}>Start your free 30-day trial today. All features included, no credit card required.</p>
+            <p className="mb-8" style={{ color: "#6b7280" }}>Start your free 15-day trial today. All features included, no credit card required.</p>
             <Link href="/login?mode=register"
               className="inline-block font-bold px-10 py-3 rounded-md transition-all hover:shadow-lg"
               style={{ background: "#1d4ed8", color: "#ffffff" }}>
-              Try Now Free
+              Try Now Free — 15 Days
             </Link>
           </div>
         </div>

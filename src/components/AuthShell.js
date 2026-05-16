@@ -113,12 +113,14 @@ export default function AuthShell({ children }) {
   const isPublicQuotePage = pathname?.startsWith("/quote/");
   const isPublicEstimatePage = pathname?.startsWith("/estimate/");
   const isPublicSitePage = pathname?.startsWith("/site/");
+  const isPublicBillPaymentsPage = pathname?.startsWith("/public/bill-payments");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";
   const isPublicPage =
     isPublicQuotePage ||
     isPublicEstimatePage ||
     isPublicSitePage ||
+    isPublicBillPaymentsPage ||
     isPublicLegalPage ||
     isMarketingHomePage ||
     isVerifyEmailPage;
@@ -143,6 +145,13 @@ export default function AuthShell({ children }) {
     featureAiInvoiceAssistant: true,
     featureAdminAiAssistant: true,
   });
+
+  const resolveAuthRedirect = useCallback(() => {
+    if (typeof window === "undefined") return "/dashboard";
+    const params = new URLSearchParams(window.location.search);
+    const redirectParam = (params.get("redirect") || "").trim();
+    return redirectParam.startsWith("/") ? redirectParam : "/dashboard";
+  }, []);
 
   useEffect(() => {
     if (isPublicPage) return;
@@ -281,14 +290,14 @@ export default function AuthShell({ children }) {
     if (!isDedicatedLoginPage && !isResetPasswordPage) return;
     if (typeof window === "undefined") return;
 
-    const params = new URLSearchParams(window.location.search);
-    const redirectParam = (params.get("redirect") || "").trim();
-    const safeRedirect = redirectParam.startsWith("/")
-      ? redirectParam
-      : "/dashboard";
-
-    router.replace(safeRedirect);
-  }, [authUser, isDedicatedLoginPage, isResetPasswordPage, router]);
+    router.replace(resolveAuthRedirect());
+  }, [
+    authUser,
+    isDedicatedLoginPage,
+    isResetPasswordPage,
+    resolveAuthRedirect,
+    router,
+  ]);
 
   const detectMobileViewport = useCallback(() => {
     if (typeof window === "undefined") return false;
@@ -641,7 +650,7 @@ export default function AuthShell({ children }) {
       }
       setLoginFailedAttempts(0);
       setAuthUser(payload.data);
-      router.replace("/dashboard");
+      router.replace(resolveAuthRedirect());
       router.refresh();
     } catch (err) {
       setError(err.message || t("auth.authError"));

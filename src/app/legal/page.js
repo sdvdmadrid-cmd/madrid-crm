@@ -193,7 +193,7 @@ export default function LegalPage() {
               Paid subscriptions renew automatically on the interval shown at
               signup (monthly or annual) unless cancelled before the renewal
               date. FieldBase offers two subscription plans: (a) a
-              monthly plan at $35.00/month, following a 30-day free trial; or
+              monthly plan at $35.00/month, following a 15-day free trial; or
               (b) an annual plan at $350/year billed as a single payment. The
               selected rate is locked in for the lifetime of an active
               workspace. Applicable taxes, payment
