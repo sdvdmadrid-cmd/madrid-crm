@@ -15,6 +15,7 @@ export async function sendSubscriptionConfirmationEmail({
   email,
   tenantName,
   planName,
+  planPriceMonthly = 35,
   trialDays = 30,
 }) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -24,13 +25,20 @@ export async function sendSubscriptionConfirmationEmail({
     };
   }
 
+  const hasTrial = Number(trialDays) > 0;
   const trialEndDate = new Date();
-  trialEndDate.setDate(trialEndDate.getDate() + trialDays);
+  trialEndDate.setDate(trialEndDate.getDate() + Number(trialDays || 0));
   const trialEndFormatted = trialEndDate.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
+  const normalizedPrice = Number(planPriceMonthly);
+  const safePlanPriceMonthly = Number.isFinite(normalizedPrice)
+    ? normalizedPrice
+    : 35;
+  const formattedMonthlyPrice = `$${safePlanPriceMonthly.toFixed(2)}/month`;
+  const safePlanName = String(planName || PUBLIC_BILLING_NAME).trim() || PUBLIC_BILLING_NAME;
 
   const subject = `Your ${PUBLIC_BILLING_NAME} subscription is active`;
 
@@ -38,7 +46,9 @@ export async function sendSubscriptionConfirmationEmail({
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 40px 20px; text-align: center; margin-bottom: 30px;">
         <h1 style="color: white; margin: 0; font-size: 28px; font-weight: bold;">Welcome to FieldBase!</h1>
-        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your ${trialDays}-day free trial has started</p>
+        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">
+          ${hasTrial ? `Your ${trialDays}-day free trial has started` : "Your subscription is now active"}
+        </p>
       </div>
 
       <div style="background: #f8f9fa; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
@@ -50,10 +60,10 @@ export async function sendSubscriptionConfirmationEmail({
 
         <div style="background: white; border-left: 4px solid #667eea; padding: 16px; margin: 24px 0; border-radius: 4px;">
           <p style="margin: 0; font-size: 14px; color: #333;">
-            <strong>Trial Period:</strong> ${trialDays} days free<br />
-            <strong>Trial Ends:</strong> ${trialEndFormatted}<br />
-            <strong>Plan:</strong> ${PUBLIC_BILLING_NAME}<br />
-            <strong>Price:</strong> $35/month after trial
+            ${hasTrial ? `<strong>Trial Period:</strong> ${trialDays} days free<br />` : ""}
+            ${hasTrial ? `<strong>Trial Ends:</strong> ${trialEndFormatted}<br />` : ""}
+            <strong>Plan:</strong> ${safePlanName}<br />
+            <strong>Price:</strong> ${formattedMonthlyPrice}${hasTrial ? " after trial" : ""}
           </p>
         </div>
 
@@ -68,7 +78,9 @@ export async function sendSubscriptionConfirmationEmail({
         </ul>
 
         <p style="margin: 0 0 16px 0; font-size: 14px; color: #666;">
-          At the end of your trial, your ${PUBLIC_BILLING_NAME} subscription will automatically renew at the regular rate of $35/month. You can cancel anytime from your subscription settings.
+          ${hasTrial
+            ? `At the end of your trial, your ${safePlanName} subscription will automatically renew at the regular rate of ${formattedMonthlyPrice}. You can cancel anytime from your subscription settings.`
+            : `Your ${safePlanName} subscription renews monthly at ${formattedMonthlyPrice}. You can cancel anytime from your subscription settings.`}
         </p>
 
         <p style="margin: 0; font-size: 14px; color: #666;">
@@ -95,10 +107,8 @@ Hi ${tenantName || "there"},
 Your ${PUBLIC_BILLING_NAME} subscription is now active! You have full access to all features.
 
 SUBSCRIPTION DETAILS:
-- Trial Period: ${trialDays} days free
-- Trial Ends: ${trialEndFormatted}
-- Plan: ${PUBLIC_BILLING_NAME}
-- Price: $35/month after trial
+${hasTrial ? `- Trial Period: ${trialDays} days free\n` : ""}${hasTrial ? `- Trial Ends: ${trialEndFormatted}\n` : ""}- Plan: ${safePlanName}
+- Price: ${formattedMonthlyPrice}${hasTrial ? " after trial" : ""}
 
 WHAT'S INCLUDED:
 • Bill payments management
@@ -108,7 +118,9 @@ WHAT'S INCLUDED:
 • Mobile app access
 • Priority support
 
-At the end of your trial, your ${PUBLIC_BILLING_NAME} subscription will automatically renew at the regular rate of $35/month. You can cancel anytime from your subscription settings.
+${hasTrial
+  ? `At the end of your trial, your ${safePlanName} subscription will automatically renew at the regular rate of ${formattedMonthlyPrice}. You can cancel anytime from your subscription settings.`
+  : `Your ${safePlanName} subscription renews monthly at ${formattedMonthlyPrice}. You can cancel anytime from your subscription settings.`}
 
 If you have any questions or need help getting started, please reach out to our support team.
 

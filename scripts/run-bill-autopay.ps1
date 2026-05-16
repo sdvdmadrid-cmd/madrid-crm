@@ -6,6 +6,37 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Import-DotEnvFiles {
+  $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+  $envFiles = @(
+    (Join-Path $projectRoot ".env.local"),
+    (Join-Path $projectRoot ".env")
+  )
+
+  foreach ($envFile in $envFiles) {
+    if (-not (Test-Path $envFile)) { continue }
+
+    foreach ($rawLine in (Get-Content -Path $envFile)) {
+      $line = [string]$rawLine
+      if ([string]::IsNullOrWhiteSpace($line)) { continue }
+      $trimmed = $line.Trim()
+      if ($trimmed.StartsWith("#")) { continue }
+
+      $idx = $line.IndexOf("=")
+      if ($idx -le 0) { continue }
+
+      $key = $line.Substring(0, $idx).Trim()
+      if ([string]::IsNullOrWhiteSpace($key)) { continue }
+
+      $current = [Environment]::GetEnvironmentVariable($key, "Process")
+      if (-not [string]::IsNullOrWhiteSpace([string]$current)) { continue }
+
+      $value = $line.Substring($idx + 1)
+      [Environment]::SetEnvironmentVariable($key, $value, "Process")
+    }
+  }
+}
+
 function Get-HealthyBaseUrl {
   param([string[]]$Candidates)
 
@@ -34,14 +65,8 @@ function Resolve-BaseUrl {
     return $ExplicitBaseUrl.TrimEnd('/')
   }
 
-  $envCandidates = @(
-    $env:BILL_AUTOPAY_BASE_URL,
-    $env:APP_BASE_URL,
-    $env:APP_URL
-  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-
-  if ($envCandidates.Count -gt 0) {
-    return ($envCandidates[0]).TrimEnd('/')
+  if (-not [string]::IsNullOrWhiteSpace([string]$env:BILL_AUTOPAY_BASE_URL)) {
+    return ([string]$env:BILL_AUTOPAY_BASE_URL).TrimEnd('/')
   }
 
   $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -65,8 +90,24 @@ function Resolve-BaseUrl {
     $candidates += "http://127.0.0.1:$port"
   }
 
-  return Get-HealthyBaseUrl -Candidates $candidates
+  $localBaseUrl = Get-HealthyBaseUrl -Candidates $candidates
+  if (-not [string]::IsNullOrWhiteSpace($localBaseUrl)) {
+    return $localBaseUrl
+  }
+
+  $fallbackCandidates = @(
+    $env:APP_BASE_URL,
+    $env:APP_URL
+  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+  if ($fallbackCandidates.Count -gt 0) {
+    return ($fallbackCandidates[0]).TrimEnd('/')
+  }
+
+  return ""
 }
+
+Import-DotEnvFiles
 
 $resolvedBaseUrl = Resolve-BaseUrl -ExplicitBaseUrl $BaseUrl
 if ([string]::IsNullOrWhiteSpace($resolvedBaseUrl)) {

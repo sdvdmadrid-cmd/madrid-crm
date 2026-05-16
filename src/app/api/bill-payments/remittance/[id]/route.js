@@ -1,5 +1,7 @@
 import {
+  BILL_PAYMENT_REMITTANCE_QUEUE_TABLE,
   BILL_PAYMENT_TRANSACTION_TABLE,
+  BILL_TABLE,
   requireBillPaymentsAccess,
   serializeBillPaymentTransaction,
 } from "@/lib/bill-payments";
@@ -79,6 +81,44 @@ export async function PATCH(request, { params }) {
       JSON.stringify({ success: false, error: updateError.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
+  }
+
+  const existingQueueMeta =
+    updated?.metadata && typeof updated.metadata === "object"
+      ? updated.metadata
+      : {};
+
+  await supabaseAdmin
+    .from(BILL_PAYMENT_REMITTANCE_QUEUE_TABLE)
+    .update({
+      status: remittanceStatus,
+      remittance_reference: remittanceReference,
+      submitted_at:
+        remittanceStatus === "submitted"
+          ? nowIso
+          : null,
+      submitted_by: remittanceStatus === "submitted" ? context.userId : null,
+      updated_at: nowIso,
+      metadata: {
+        ...existingQueueMeta,
+        remittance_status: remittanceStatus,
+        remittance_reference: remittanceReference,
+      },
+    })
+    .eq("tenant_id", context.tenantDbId)
+    .eq("transaction_id", transactionId);
+
+  if (remittanceStatus === "submitted") {
+    await supabaseAdmin
+      .from(BILL_TABLE)
+      .update({
+        status: "paid",
+        last_paid_at: nowIso,
+        last_payment_id: transactionId,
+        updated_at: nowIso,
+      })
+      .eq("tenant_id", context.tenantDbId)
+      .eq("id", transaction.bill_id);
   }
 
   return new Response(

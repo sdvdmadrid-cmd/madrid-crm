@@ -1,7 +1,8 @@
 param(
   [string]$BaseUrl,
   [string]$CronSecret,
-  [string]$ChargeMonth,
+  [string]$ProviderName,
+  [int]$Limit = 25,
   [switch]$DryRun,
   [int]$TimeoutSec = 60
 )
@@ -41,9 +42,7 @@ function Import-DotEnvFiles {
 }
 
 function Resolve-HealthyBaseUrl {
-  param(
-    [string[]]$Candidates
-  )
+  param([string[]]$Candidates)
 
   foreach ($candidate in $Candidates) {
     if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
@@ -63,16 +62,14 @@ function Resolve-HealthyBaseUrl {
 }
 
 function Resolve-BaseUrl {
-  param(
-    [string]$ExplicitBaseUrl
-  )
+  param([string]$ExplicitBaseUrl)
 
   if (-not [string]::IsNullOrWhiteSpace($ExplicitBaseUrl)) {
     return $ExplicitBaseUrl.Trim().TrimEnd("/")
   }
 
-  if (-not [string]::IsNullOrWhiteSpace([string]$env:BILL_PLATFORM_FEE_BASE_URL)) {
-    return ([string]$env:BILL_PLATFORM_FEE_BASE_URL).Trim().TrimEnd("/")
+  if (-not [string]::IsNullOrWhiteSpace([string]$env:BILL_REMITTANCE_BASE_URL)) {
+    return ([string]$env:BILL_REMITTANCE_BASE_URL).Trim().TrimEnd("/")
   }
 
   if (-not [string]::IsNullOrWhiteSpace([string]$env:BILL_AUTOPAY_BASE_URL)) {
@@ -113,13 +110,13 @@ Import-DotEnvFiles
 
 $resolvedBaseUrl = Resolve-BaseUrl -ExplicitBaseUrl $BaseUrl
 if ([string]::IsNullOrWhiteSpace($resolvedBaseUrl)) {
-  throw "Unable to resolve Bill Platform Fee base URL. Set BILL_PLATFORM_FEE_BASE_URL, BILL_AUTOPAY_BASE_URL, APP_BASE_URL, APP_URL, or pass -BaseUrl explicitly."
+  throw "Unable to resolve Bill Remittance base URL. Set BILL_REMITTANCE_BASE_URL, BILL_AUTOPAY_BASE_URL, APP_BASE_URL, APP_URL, or pass -BaseUrl explicitly."
 }
 
 $resolvedSecret = if (-not [string]::IsNullOrWhiteSpace($CronSecret)) {
   $CronSecret.Trim()
 } else {
-  [string]$env:BILL_PLATFORM_FEE_CRON_SECRET
+  [string]$env:BILL_REMITTANCE_CRON_SECRET
 }
 
 if ([string]::IsNullOrWhiteSpace($resolvedSecret)) {
@@ -127,18 +124,22 @@ if ([string]::IsNullOrWhiteSpace($resolvedSecret)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($resolvedSecret)) {
-  throw "Missing BILL_PLATFORM_FEE_CRON_SECRET (or BILL_AUTOPAY_CRON_SECRET fallback). Pass -CronSecret or set the environment variable."
+  throw "Missing BILL_REMITTANCE_CRON_SECRET (or BILL_AUTOPAY_CRON_SECRET fallback). Pass -CronSecret or set the environment variable."
 }
 
-$endpoint = "$resolvedBaseUrl/api/bill-payments/platform-fee/process"
-Write-Output "Triggering Bill Platform Fee processor: $endpoint"
+$endpoint = "$resolvedBaseUrl/api/bill-payments/remittance/process"
+Write-Output "Triggering Bill Remittance processor: $endpoint"
 
-$body = @{}
-if (-not [string]::IsNullOrWhiteSpace($ChargeMonth)) {
-  $body.chargeMonth = $ChargeMonth.Trim()
+$body = @{
+  limit = [Math]::Max(1, $Limit)
 }
+
 if ($DryRun.IsPresent) {
   $body.dryRun = $true
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ProviderName)) {
+  $body.providerName = $ProviderName.Trim()
 }
 
 $response = Invoke-RestMethod `
@@ -151,7 +152,7 @@ $response = Invoke-RestMethod `
 
 if (-not $response.success) {
   $failureJson = $response | ConvertTo-Json -Depth 8
-  throw "Bill Platform Fee processor returned an unsuccessful response: $failureJson"
+  throw "Bill Remittance processor returned an unsuccessful response: $failureJson"
 }
 
 $response | ConvertTo-Json -Depth 8

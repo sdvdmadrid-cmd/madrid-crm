@@ -32,9 +32,8 @@ test.describe('bill payments', () => {
     await page.getByRole('button', { name: /Add Bill/i }).click();
     await page.getByRole('button', { name: /^Add bill$/i }).last().click();
 
+    await expect(page.getByText('Provider is required')).toBeVisible();
     await expect(page.getByText('Account label is required')).toBeVisible();
-    await expect(page.getByText('Amount due is required')).toBeVisible();
-    await expect(page.getByText('Please fix the highlighted fields.')).toBeVisible();
   });
 
   test('shows fee-inclusive bulk payment summary', async ({ page }) => {

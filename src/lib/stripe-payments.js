@@ -754,6 +754,8 @@ export async function createContractorSubscription({
     },
   });
 
+  const hasTrial = Number(trialDays) > 0;
+
   const subscription = await stripe.subscriptions.create({
     customer: stripeCustomerId,
     items: [
@@ -770,7 +772,7 @@ export async function createContractorSubscription({
         quantity: 1,
       },
     ],
-    trial_period_days: trialDays,
+    ...(hasTrial ? { trial_period_days: Number(trialDays) } : {}),
     metadata: {
       tenant_id: tenantId,
       plan_id: planId,

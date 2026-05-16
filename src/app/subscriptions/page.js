@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import styles from "./subscriptions.module.css";
 
 export default function SubscriptionsPage() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +14,23 @@ export default function SubscriptionsPage() {
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
+  const sourceParam = String(searchParams?.get("source") || "").trim().toLowerCase();
+  const isBillPaymentsFlow = sourceParam === "bill-payments";
+  const planDisplay = isBillPaymentsFlow
+    ? {
+        title: "Bill Payments",
+        price: "$5 al mes",
+        trial: "2 facturas gratis para probar",
+        cta: "Activar Bill Payments",
+        creating: "Activando Bill Payments...",
+      }
+    : {
+        title: "Suscripción",
+        price: "$35 al mes",
+        trial: "mes gratis como período de prueba",
+        cta: "Comenzar período de prueba",
+        creating: "Creando suscripción...",
+      };
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -54,6 +71,9 @@ export default function SubscriptionsPage() {
       const res = await fetch("/api/subscriptions/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: isBillPaymentsFlow ? "bill-payments" : "app",
+        }),
       });
 
       if (!res.ok) {
@@ -179,8 +199,12 @@ export default function SubscriptionsPage() {
     <AuthShell>
       <div className={styles.container}>
         <div className={styles.header}>
-          <h1>Suscripción</h1>
-          <p>Gestiona tu suscripción a la plataforma</p>
+          <h1>{planDisplay.title}</h1>
+          <p>
+            {isBillPaymentsFlow
+              ? "Activa la suscripción de Bill Payments"
+              : "Gestiona tu suscripción a la plataforma"}
+          </p>
         </div>
 
         {error && <div className={styles.errorBanner}>{error}</div>}
@@ -190,8 +214,8 @@ export default function SubscriptionsPage() {
             <div className={styles.noSubscriptionContent}>
               <h2>No tienes una suscripción activa</h2>
               <p>
-                Suscríbete hoy por <strong>$35 al mes</strong> y disfruta de un{" "}
-                <strong>mes gratis</strong> como período de prueba.
+                Suscríbete hoy por <strong>{planDisplay.price}</strong> y disfruta de{" "}
+                <strong>{planDisplay.trial}</strong>.
               </p>
 
               <div className={styles.features}>
@@ -212,8 +236,8 @@ export default function SubscriptionsPage() {
                 disabled={creatingSubscription}
               >
                 {creatingSubscription
-                  ? "Creando suscripción..."
-                  : "Comenzar período de prueba"}
+                  ? planDisplay.creating
+                  : planDisplay.cta}
               </button>
             </div>
           </div>

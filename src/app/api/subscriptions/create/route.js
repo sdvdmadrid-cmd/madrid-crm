@@ -22,6 +22,12 @@ import { sendSubscriptionConfirmationEmail } from "@/lib/subscription-emails";
  */
 export async function POST(request) {
   try {
+    const requestBody = await request
+      .json()
+      .catch(() => ({}));
+    const source = String(requestBody?.source || "app").trim().toLowerCase();
+    const isBillPaymentsSource = source === "bill-payments";
+
     const context = await getAuthenticatedTenantContext(request);
 
     if (!context.authenticated) {
@@ -66,19 +72,54 @@ export async function POST(request) {
       );
     }
 
-    // Get the default plan (Contractor Pro at $35/month)
-    const { data: plan, error: planError } = await supabaseAdmin
+    const desiredPlanName = isBillPaymentsSource
+      ? "Bill Payments Pro"
+      : "Contractor Pro";
+    let { data: plan, error: planError } = await supabaseAdmin
       .from("subscription_plans")
       .select("id")
-      .eq("name", "Contractor Pro")
+      .eq("name", desiredPlanName)
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
+
+    if (!plan && !planError && isBillPaymentsSource) {
+      const configuredPrice = Number.parseFloat(
+        process.env.BILL_PAYMENTS_MONTHLY_FEE_USD || "5",
+      );
+      const fallbackPrice = Number.isFinite(configuredPrice)
+        ? Math.max(1, Math.round(configuredPrice * 100) / 100)
+        : 5;
+
+      const upsertResult = await supabaseAdmin
+        .from("subscription_plans")
+        .upsert(
+          {
+            name: desiredPlanName,
+            description: "Bill Payments subscription",
+            price_monthly: fallbackPrice,
+            trial_days: 0,
+            features: [
+              "Bill payments dashboard",
+              "Saved payment methods",
+              "AutoPay scheduling",
+              "Payment tracking",
+            ],
+            is_active: true,
+          },
+          { onConflict: "name" },
+        )
+        .select("id")
+        .single();
+
+      plan = upsertResult.data;
+      planError = upsertResult.error;
+    }
 
     if (planError || !plan) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Subscription plan not found",
+          error: `Subscription plan not found: ${desiredPlanName}`,
         }),
         { status: 404, headers: { "Content-Type": "application/json" } },
       );
@@ -96,7 +137,7 @@ export async function POST(request) {
       planId: plan.id,
       email: tenantEmail,
       name: tenantName,
-      trialDays: 30,
+      trialDays: isBillPaymentsSource ? 0 : 30,
     });
 
     // Send confirmation email
@@ -112,7 +153,8 @@ export async function POST(request) {
         email: tenantEmail,
         tenantName,
         planName: planData.data.name,
-        trialDays: 30,
+        planPriceMonthly: planData.data.price_monthly,
+        trialDays: isBillPaymentsSource ? 0 : 30,
       });
     }
 

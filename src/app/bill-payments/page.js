@@ -131,9 +131,10 @@ function PaymentMethodSetupForm({
   const stripe = useStripe();
   const elements = useElements();
 
-  const submit = async (event) => {
+  const submit = useCallback(async (event) => {
     event.preventDefault();
     if (!stripe || !elements) return;
+
     setSaving(true);
     onError("");
 
@@ -199,7 +200,7 @@ function PaymentMethodSetupForm({
     } finally {
       setSaving(false);
     }
-  };
+  }, [billingDetails?.email, billingDetails?.name, elements, onError, onSaved, setSaving, stripe]);
 
   return (
     <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
@@ -214,7 +215,7 @@ function PaymentMethodSetupForm({
         <PaymentElement
           options={{
             layout: { type: "tabs", defaultCollapsed: false },
-            fields: { billingDetails: "never" },
+            fields: { billingDetails: "auto" },
             wallets: { applePay: "never", googlePay: "never" },
           }}
         />
@@ -366,7 +367,7 @@ export default function BillPaymentsPage() {
     dashboard.pricing && typeof dashboard.pricing === "object"
       ? dashboard.pricing
       : {
-          monthlyFeeUsd: 9.99,
+          monthlyFeeUsd: 5,
           cardFeePercent: 5.9,
           bankAccountFeePercent: 3.0,
         };
@@ -376,6 +377,7 @@ export default function BillPaymentsPage() {
   const subscriptionSubscribeUrl =
     String(subscriptionGateDetails?.subscribeUrl || "").trim() ||
     "/subscriptions?source=bill-payments";
+  const billPaymentsSubscribeUrl = "/subscriptions?source=bill-payments";
   const upgradeEstimate = useMemo(() => {
     const billsPerMonth = Math.max(1, Math.min(100, Number(monthlyBillsEstimate || 0) || 4));
     const monthlyFee = Number(pricingConfig.monthlyFeeUsd || 0);
@@ -1575,19 +1577,18 @@ export default function BillPaymentsPage() {
                 onClick={paySelectedBills}
                 disabled={
                   !selectedBillIds.length ||
-                  paying ||
-                  !selectedPaymentMethodId
+                  paying
                 }
                 style={{
                   border: 0,
                   borderRadius: 999,
                   background: !selectedPaymentMethodId
-                    ? "#94a3b8"
+                    ? "#64748b"
                     : "linear-gradient(135deg, #0f766e, #0b5f5a)",
                   color: "#fff",
                   padding: "11px 16px",
                   fontWeight: 700,
-                  cursor: selectedPaymentMethodId ? "pointer" : "not-allowed",
+                  cursor: !selectedBillIds.length || paying ? "not-allowed" : "pointer",
                   boxShadow: selectedPaymentMethodId
                     ? "0 10px 20px rgba(15,118,110,0.24)"
                     : "none",
@@ -1614,7 +1615,7 @@ export default function BillPaymentsPage() {
                   <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={() => router.push(subscriptionSubscribeUrl)}
+                      onClick={() => router.push(billPaymentsSubscribeUrl)}
                       style={{
                         border: 0,
                         borderRadius: 999,
@@ -1629,7 +1630,9 @@ export default function BillPaymentsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowSubscriptionModal(true)}
+                      onClick={() => {
+                        setShowSubscriptionModal(true);
+                      }}
                       style={{
                         borderRadius: 999,
                         border: "1px solid rgba(15,23,42,0.16)",
@@ -1773,14 +1776,14 @@ export default function BillPaymentsPage() {
                               </strong>
                               <span
                                 style={{
-                                  padding: compactMode ? "2px 7px" : "3px 8px",
                                   borderRadius: 999,
                                   background: statusTone.bg,
                                   color: statusTone.color,
+                                  padding: compactMode ? "2px 8px" : "3px 9px",
                                   fontSize: compactMode ? 10 : 11,
                                   fontWeight: 700,
-                                  textTransform: "uppercase",
                                   letterSpacing: "0.05em",
+                                  textTransform: "uppercase",
                                 }}
                               >
                                 {statusLabel}
@@ -1805,22 +1808,19 @@ export default function BillPaymentsPage() {
                             <button
                               type="button"
                               onClick={() => payBillNow(bill.id)}
-                              disabled={
-                                paying ||
-                                !selectedPaymentMethodId
-                              }
+                              disabled={paying}
                               style={{
                                 borderRadius: 999,
                                 border: "1px solid rgba(15,118,110,0.28)",
-                                background: "rgba(15,118,110,0.08)",
-                                color: "#0f766e",
+                                background: !selectedPaymentMethodId
+                                  ? "#f8fafc"
+                                  : "rgba(15,118,110,0.08)",
+                                color: !selectedPaymentMethodId
+                                  ? "#0f172a"
+                                  : "#0f766e",
                                 padding: compactMode ? "6px 10px" : "8px 12px",
                                 fontWeight: 700,
-                                cursor:
-                                  !paying &&
-                                  selectedPaymentMethodId
-                                    ? "pointer"
-                                    : "not-allowed",
+                                cursor: paying ? "not-allowed" : "pointer",
                               }}
                             >
                               Pay now
@@ -1991,10 +1991,8 @@ export default function BillPaymentsPage() {
                         }}
                       />
                     </Elements>
-                  )}
-
-                <div style={{ display: "grid", gap: 8 }}>
-                  {paymentMethods.length === 0 ? (
+                    )}
+                {paymentMethods.length === 0 ? (
                     <div style={{ color: "#64748b" }}>No saved payment methods yet.</div>
                   ) : (
                     paymentMethods.map((method) => (
@@ -2057,7 +2055,6 @@ export default function BillPaymentsPage() {
                     ))
                   )}
                 </div>
-              </div>
             )}
           </section>
         </div>
@@ -3465,22 +3462,19 @@ export default function BillPaymentsPage() {
                                   <button
                                     type="button"
                                     onClick={() => payBillNow(bill.id)}
-                                    disabled={
-                                      paying ||
-                                      !selectedPaymentMethodId
-                                    }
+                                    disabled={paying}
                                     style={{
                                       borderRadius: 999,
                                       border: "1px solid rgba(15,118,110,0.32)",
-                                      background: "rgba(15,118,110,0.08)",
-                                      color: "#0f766e",
+                                      background: !selectedPaymentMethodId
+                                        ? "#f8fafc"
+                                        : "rgba(15,118,110,0.08)",
+                                      color: !selectedPaymentMethodId
+                                        ? "#0f172a"
+                                        : "#0f766e",
                                       padding: "10px 14px",
                                       fontWeight: 700,
-                                      cursor:
-                                        !paying &&
-                                        selectedPaymentMethodId
-                                          ? "pointer"
-                                          : "not-allowed",
+                                      cursor: paying ? "not-allowed" : "pointer",
                                     }}
                                   >
                                     Pay now

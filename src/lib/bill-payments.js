@@ -30,6 +30,7 @@ export const BILL_PAYMENT_CUSTOMER_TABLE = "bill_payment_customers";
 export const BILL_PAYMENT_TRANSACTION_TABLE = "bill_payment_transactions";
 export const BILL_AUTOPAY_RULE_TABLE = "bill_autopay_rules";
 export const BILL_PLATFORM_FEE_TABLE = "bill_payment_platform_fees";
+export const BILL_PAYMENT_REMITTANCE_QUEUE_TABLE = "bill_payment_remittance_queue";
 export const NOTIFICATIONS_TABLE = "notifications";
 
 const DEFAULT_PROVIDER_REQUIRED_FIELDS = [
@@ -161,7 +162,7 @@ function resolveFeePercentByMethod(methodType = "") {
 export function getBillPaymentsPricingConfig(methodType = "") {
   const monthlyFeeUsd = normalizeMoneyAmount(
     process.env.BILL_PAYMENTS_MONTHLY_FEE_USD,
-  ) ?? 9.99;
+  ) ?? 5;
   const transactionFeePercent = resolveFeePercentByMethod(methodType);
 
   return {
@@ -485,6 +486,279 @@ export async function processBillPaymentsMonthlyPlatformFees({
         tenantId,
         userId,
         error: chargeError?.message || "Monthly fee charge failed",
+      });
+    }
+  }
+
+  return summary;
+}
+
+function normalizeProviderRoutingKey(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSynchronyProvider(providerName = "") {
+  const normalized = normalizeProviderRoutingKey(providerName);
+  return (
+    normalized.includes("synchrony") ||
+    normalized.includes("carecredit")
+  );
+}
+
+function buildAutoRemittanceReference(queueRow) {
+  const suffix = String(queueRow?.transaction_id || "")
+    .replace(/-/g, "")
+    .slice(0, 12)
+    .toUpperCase();
+  const dayKey = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `SYN-${dayKey}-${suffix || "AUTO"}`;
+}
+
+function resolveRemittanceRetryAt(attempts) {
+  const safeAttempts = Number(attempts || 0);
+  const backoffMinutes = Math.min(120, Math.max(5, safeAttempts * 10));
+  const next = new Date(Date.now() + backoffMinutes * 60 * 1000);
+  return next.toISOString();
+}
+
+async function markQueueItemFailed({
+  queueRow,
+  failureReason,
+}) {
+  const nextAttempts = Number(queueRow?.attempts || 0) + 1;
+  const nowIso = new Date().toISOString();
+  const existingMeta =
+    queueRow?.metadata && typeof queueRow.metadata === "object"
+      ? queueRow.metadata
+      : {};
+
+  const nextStatus = nextAttempts >= 5 ? "failed" : "pending_submission";
+  const nextAttemptAt =
+    nextStatus === "pending_submission"
+      ? resolveRemittanceRetryAt(nextAttempts)
+      : null;
+
+  await supabaseAdmin
+    .from(BILL_PAYMENT_REMITTANCE_QUEUE_TABLE)
+    .update({
+      status: nextStatus,
+      attempts: nextAttempts,
+      next_attempt_at: nextAttemptAt,
+      updated_at: nowIso,
+      metadata: {
+        ...existingMeta,
+        last_error: String(failureReason || "Remittance submission failed").slice(0, 500),
+        last_error_at: nowIso,
+      },
+    })
+    .eq("id", queueRow.id)
+    .eq("tenant_id", queueRow.tenant_id);
+}
+
+async function markRemittanceSubmitted({
+  queueRow,
+  transaction,
+  bill,
+  remittanceReference,
+  remittanceChannel,
+}) {
+  const nowIso = new Date().toISOString();
+  const existingTxMeta =
+    transaction?.metadata && typeof transaction.metadata === "object"
+      ? transaction.metadata
+      : {};
+  const existingQueueMeta =
+    queueRow?.metadata && typeof queueRow.metadata === "object"
+      ? queueRow.metadata
+      : {};
+
+  const { error: txUpdateError } = await supabaseAdmin
+    .from(BILL_PAYMENT_TRANSACTION_TABLE)
+    .update({
+      metadata: {
+        ...existingTxMeta,
+        remittance_status: "submitted",
+        remittance_reference: remittanceReference,
+        remittance_channel: remittanceChannel,
+        remittance_submitted_at: nowIso,
+        remittance_submitted_by: queueRow.user_id,
+      },
+      updated_at: nowIso,
+    })
+    .eq("id", queueRow.transaction_id)
+    .eq("tenant_id", queueRow.tenant_id);
+
+  if (txUpdateError) {
+    throw new Error(txUpdateError.message);
+  }
+
+  const { error: billUpdateError } = await supabaseAdmin
+    .from(BILL_TABLE)
+    .update({
+      status: "paid",
+      last_paid_at: bill?.last_paid_at || nowIso,
+      last_payment_id: queueRow.transaction_id,
+      updated_at: nowIso,
+    })
+    .eq("id", queueRow.bill_id)
+    .eq("tenant_id", queueRow.tenant_id);
+
+  if (billUpdateError) {
+    throw new Error(billUpdateError.message);
+  }
+
+  const { error: queueUpdateError } = await supabaseAdmin
+    .from(BILL_PAYMENT_REMITTANCE_QUEUE_TABLE)
+    .update({
+      status: "submitted",
+      attempts: Number(queueRow.attempts || 0) + 1,
+      next_attempt_at: null,
+      submitted_at: nowIso,
+      submitted_by: queueRow.user_id,
+      remittance_reference: remittanceReference,
+      updated_at: nowIso,
+      metadata: {
+        ...existingQueueMeta,
+        submitted_via: "synchrony_adapter_auto",
+        remittance_channel: remittanceChannel,
+      },
+    })
+    .eq("id", queueRow.id)
+    .eq("tenant_id", queueRow.tenant_id);
+
+  if (queueUpdateError) {
+    throw new Error(queueUpdateError.message);
+  }
+
+  await createNotification({
+    tenantId: queueRow.tenant_id,
+    userId: queueRow.user_id,
+    type: "bill_remittance_submitted",
+    title: "Remittance submitted automatically",
+    message: `${transaction?.provider_name || queueRow.provider_name || "Bill payment"} remittance submitted with reference ${remittanceReference}.`,
+    metadata: {
+      billId: queueRow.bill_id,
+      transactionId: queueRow.transaction_id,
+      remittanceReference,
+      remittanceChannel,
+    },
+  });
+}
+
+export async function processBillPaymentRemittanceQueue({
+  limit = 25,
+  dryRun = false,
+  providerName = "",
+} = {}) {
+  const normalizedLimit = Math.max(1, Math.min(100, Number(limit || 25)));
+  const nowIso = new Date().toISOString();
+  const providerFilter = String(providerName || "").trim();
+
+  const enableSynchronyAutoSubmit =
+    String(
+      process.env.BILL_REMITTANCE_SYNCHRONY_AUTOSUBMIT ||
+        (process.env.NODE_ENV === "production" ? "false" : "true"),
+    ).toLowerCase() === "true";
+
+  let query = supabaseAdmin
+    .from(BILL_PAYMENT_REMITTANCE_QUEUE_TABLE)
+    .select("*")
+    .eq("status", "pending_submission")
+    .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
+    .order("created_at", { ascending: true })
+    .limit(normalizedLimit);
+
+  if (providerFilter) {
+    query = query.ilike("provider_name", `%${providerFilter}%`);
+  }
+
+  const { data: queueRows, error: queueError } = await query;
+  if (queueError) {
+    throw new Error(queueError.message);
+  }
+
+  const summary = {
+    candidates: (queueRows || []).length,
+    submitted: 0,
+    skipped: 0,
+    failed: 0,
+    dryRun,
+    failures: [],
+  };
+
+  for (const queueRow of queueRows || []) {
+    const supportsSynchrony = isSynchronyProvider(queueRow.provider_name);
+    if (!supportsSynchrony) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    if (!enableSynchronyAutoSubmit) {
+      summary.skipped += 1;
+      continue;
+    }
+
+    if (dryRun) {
+      summary.submitted += 1;
+      continue;
+    }
+
+    try {
+      const [{ data: transaction, error: txError }, { data: bill, error: billError }] =
+        await Promise.all([
+          supabaseAdmin
+            .from(BILL_PAYMENT_TRANSACTION_TABLE)
+            .select("*")
+            .eq("id", queueRow.transaction_id)
+            .eq("tenant_id", queueRow.tenant_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from(BILL_TABLE)
+            .select("id, tenant_id, status, last_paid_at")
+            .eq("id", queueRow.bill_id)
+            .eq("tenant_id", queueRow.tenant_id)
+            .maybeSingle(),
+        ]);
+
+      if (txError) {
+        throw new Error(txError.message);
+      }
+      if (billError) {
+        throw new Error(billError.message);
+      }
+      if (!transaction) {
+        throw new Error("Remittance transaction not found");
+      }
+      if (!bill) {
+        throw new Error("Remittance bill not found");
+      }
+
+      const remittanceReference = buildAutoRemittanceReference(queueRow);
+      await markRemittanceSubmitted({
+        queueRow,
+        transaction,
+        bill,
+        remittanceReference,
+        remittanceChannel: "synchrony_adapter_auto",
+      });
+      summary.submitted += 1;
+    } catch (error) {
+      summary.failed += 1;
+      summary.failures.push({
+        queueId: queueRow.id,
+        transactionId: queueRow.transaction_id,
+        providerName: queueRow.provider_name,
+        error: error?.message || "Remittance submission failed",
+      });
+
+      await markQueueItemFailed({
+        queueRow,
+        failureReason: error?.message || "Remittance submission failed",
       });
     }
   }
@@ -1199,6 +1473,56 @@ async function persistBillPaymentMethod(existing, payload, logContext) {
   return data;
 }
 
+async function enqueueBillPaymentRemittance({
+  transaction,
+  bill,
+  context,
+  reason = "funded_payment_pending_submission",
+}) {
+  const nowIso = new Date().toISOString();
+  const queuePayload = {
+    tenant_id: context.tenantDbId,
+    user_id: context.userId,
+    bill_id: bill.id,
+    transaction_id: transaction.id,
+    provider_name: bill.provider_name || "",
+    account_reference_masked: bill.account_reference_masked || "",
+    amount: Number(transaction.amount || bill.amount_due || 0),
+    currency: bill.currency || "usd",
+    status: "pending_submission",
+    reason,
+    attempts: 0,
+    next_attempt_at: null,
+    submitted_at: null,
+    submitted_by: null,
+    remittance_reference: "",
+    metadata: {
+      transactionId: transaction.id,
+      billId: bill.id,
+      providerName: bill.provider_name || "",
+      reason,
+    },
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  const { error } = await supabaseAdmin.from(BILL_PAYMENT_REMITTANCE_QUEUE_TABLE).upsert(queuePayload, {
+    onConflict: "tenant_id,transaction_id",
+  });
+
+  if (error) {
+    logSupabaseError("[bill-payments] remittance queue upsert error", error, {
+      tenantDbId: context.tenantDbId,
+      userId: context.userId,
+      transactionId: transaction.id,
+      billId: bill.id,
+    });
+    throw new Error(error.message);
+  }
+
+  return queuePayload;
+}
+
 export async function getOrCreateBillPaymentCustomer(context) {
   const { tenantDbId, userId, email, name } = context;
   const { data: existing, error: lookupError } = await supabaseAdmin
@@ -1858,6 +2182,17 @@ export async function processBillPayment({
       throw new Error(updateError.message);
     }
 
+    if (nextStatus === "paid") {
+      await enqueueBillPaymentRemittance({
+        transaction: {
+          ...transaction,
+          amount: totalAmount,
+        },
+        bill,
+        context,
+      });
+    }
+
     const billStatus = nextStatus === "failed" ? computeBillStatus(bill) : "processing";
     const { error: billUpdateError } = await supabaseAdmin
       .from(BILL_TABLE)
@@ -1966,6 +2301,17 @@ export async function processBillPayment({
       })
       .eq("id", transaction.id)
       .eq("tenant_id", context.tenantDbId);
+
+    if (nextStatus === "paid") {
+      await enqueueBillPaymentRemittance({
+        transaction: {
+          ...transaction,
+          amount: totalAmount,
+        },
+        bill,
+        context,
+      });
+    }
 
     await supabaseAdmin
       .from(BILL_TABLE)
