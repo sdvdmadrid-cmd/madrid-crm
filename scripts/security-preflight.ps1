@@ -3,7 +3,8 @@ param(
   [switch]$RunLint,
   [switch]$RunBuild,
   [string]$JsonOutputPath = "",
-  [switch]$EmitJson
+  [switch]$EmitJson,
+  [switch]$AllowDegradedHealth
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,11 +69,17 @@ try {
   $health = Invoke-WebRequest -Uri "$BaseUrl/api/health" -UseBasicParsing -TimeoutSec 10
   if ([int]$health.StatusCode -eq 200) {
     Add-Pass "/api/health returned 200"
+  } elseif ([int]$health.StatusCode -eq 503 -and $AllowDegradedHealth) {
+    Add-Warn "/api/health returned 503 (allowed in this preflight run)"
   } else {
     Add-Fail "/api/health returned status $($health.StatusCode)"
   }
 } catch {
-  Add-Fail "Could not reach $BaseUrl/api/health. Ensure app is running."
+  if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 503 -and $AllowDegradedHealth) {
+    Add-Warn "/api/health returned 503 (allowed in this preflight run)"
+  } else {
+    Add-Fail "Could not reach $BaseUrl/api/health. Ensure app is running."
+  }
 }
 
 # 2) Protected page should redirect unauthenticated users to /login
