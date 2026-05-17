@@ -25,12 +25,12 @@ function isSafeImageDataUrl(value) {
   if (!match) return false;
 
   const encoded = match[1];
-  if (encoded.length < 16) return false;
+  if (encoded.length < 16 || encoded.length % 4 !== 0) return false;
 
   try {
     const decoded = Buffer.from(encoded, "base64");
     if (!decoded.length) return false;
-    return decoded.toString("base64").replace(/=+$/u, "") === encoded.replace(/=+$/u, "");
+    return Math.ceil(decoded.length / 3) * 4 === encoded.length;
   } catch {
     return false;
   }
