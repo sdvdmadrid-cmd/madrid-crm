@@ -1,6 +1,8 @@
 {
   "scripts": {
     "dev": "next dev",
+    "dev:restart": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1",
+    "dev:stop": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1 -NoStart",
     "build": "next build",
     "start": "next start",
     "bill:autopay": "powershell -ExecutionPolicy Bypass -File scripts/run-bill-autopay.ps1",
