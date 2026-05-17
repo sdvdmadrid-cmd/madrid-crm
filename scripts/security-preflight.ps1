@@ -1,7 +1,9 @@
 param(
   [string]$BaseUrl = "https://localhost:3000",
   [switch]$RunLint,
-  [switch]$RunBuild
+  [switch]$RunBuild,
+  [string]$JsonOutputPath = "",
+  [switch]$EmitJson
 )
 
 $ErrorActionPreference = "Stop"
@@ -230,6 +232,39 @@ if ($RunBuild) {
     }
   } catch {
     Add-Fail "Build command failed to execute"
+  }
+}
+
+$report = [ordered]@{
+  baseUrl = $BaseUrl
+  generatedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+  success = ($failed.Count -eq 0)
+  counts = [ordered]@{
+    passed = $passed.Count
+    warnings = $warnings.Count
+    failed = $failed.Count
+  }
+  passed = @($passed)
+  warnings = @($warnings)
+  failed = @($failed)
+}
+
+$reportJson = $report | ConvertTo-Json -Depth 8
+
+if ($EmitJson) {
+  Write-Output $reportJson
+}
+
+if (-not [string]::IsNullOrWhiteSpace($JsonOutputPath)) {
+  try {
+    $outputDir = Split-Path -Parent $JsonOutputPath
+    if (-not [string]::IsNullOrWhiteSpace($outputDir) -and -not (Test-Path $outputDir)) {
+      New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+    }
+    Set-Content -Path $JsonOutputPath -Value $reportJson -Encoding UTF8
+    Write-Host "JSON report written to $JsonOutputPath" -ForegroundColor Cyan
+  } catch {
+    Add-Fail "Could not write JSON report to ${JsonOutputPath}: $($_.Exception.Message)"
   }
 }
 

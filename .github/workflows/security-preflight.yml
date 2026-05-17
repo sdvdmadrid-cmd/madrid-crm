@@ -1,0 +1,74 @@
+name: Security Preflight
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Optional deployed base URL. Leave empty to run against local app.
+        required: false
+        default: ""
+
+jobs:
+  preflight:
+    name: Run Security Preflight
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve target base URL
+        shell: bash
+        run: |
+          BASE_URL="${{ github.event.inputs.base_url }}"
+          if [ -z "$BASE_URL" ]; then
+            BASE_URL="http://127.0.0.1:3000"
+          fi
+          echo "BASE_URL=$BASE_URL" >> "$GITHUB_ENV"
+          echo "Using BASE_URL=$BASE_URL"
+
+      - name: Build app (local target)
+        if: ${{ github.event.inputs.base_url == '' }}
+        run: npm run build
+
+      - name: Start app and wait for health (local target)
+        if: ${{ github.event.inputs.base_url == '' }}
+        shell: bash
+        run: |
+          nohup npm run start -- -p 3000 > /tmp/next-start.log 2>&1 &
+          for i in {1..90}; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health || true)
+            if [ "$CODE" = "200" ]; then
+              echo "App is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App did not become healthy in time"
+          tail -n 200 /tmp/next-start.log || true
+          exit 1
+
+      - name: Run security preflight
+        shell: pwsh
+        run: |
+          ./scripts/security-preflight.ps1 -BaseUrl "$env:BASE_URL" -JsonOutputPath "./security-preflight-report.json"
+
+      - name: Upload security preflight report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-preflight-report
+          path: security-preflight-report.json
