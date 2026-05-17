@@ -13,7 +13,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_FORM_FILL_MS = 1200;
 const MAX_PHOTO_DATA_URL_CHARS = 1_000_000; // 1MB limit (reduced from 4.5MB for security)
 const SAFE_IMAGE_DATA_URL_REGEX =
-  /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=]+$/i;
+  /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,([a-z0-9+/=]+)$/i;
 
 function toText(value, max = 2000) {
   return String(value || "").trim().slice(0, max);
@@ -21,7 +21,19 @@ function toText(value, max = 2000) {
 
 function isSafeImageDataUrl(value) {
   if (!value) return true;
-  return SAFE_IMAGE_DATA_URL_REGEX.test(String(value).trim());
+  const match = SAFE_IMAGE_DATA_URL_REGEX.exec(String(value).trim());
+  if (!match) return false;
+
+  const encoded = match[1];
+  if (encoded.length < 16) return false;
+
+  try {
+    const decoded = Buffer.from(encoded, "base64");
+    if (!decoded.length) return false;
+    return decoded.toString("base64").replace(/=+$/u, "") === encoded.replace(/=+$/u, "");
+  } catch {
+    return false;
+  }
 }
 
 async function resolveContractorNotificationTargets(tenantId) {
