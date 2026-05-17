@@ -79,12 +79,43 @@ try {
 } catch {
   Write-Host "Get-NetTCPConnection unavailable, trying netstat fallback..." -ForegroundColor Yellow
   try {
-    $netstat = netstat -ano -p tcp | Select-String ":$Port\s"
+    $netstat = netstat -ano -p tcp
     foreach ($entry in $netstat) {
-      $parts = ($entry.ToString().Trim() -replace "\s+", " ").Split(" ")
-      if ($parts.Length -ge 5) {
-        $pidCandidates.Add([int]$parts[4]) | Out-Null
+      $line = $entry.ToString().Trim()
+      if (-not $line) {
+        continue
       }
+
+      $parts = ($line -replace "\s+", " ").Split(" ")
+      if ($parts.Length -lt 5) {
+        continue
+      }
+
+      if ($parts[0] -ne "TCP") {
+        continue
+      }
+
+      $localAddress = $parts[1]
+      $state = $parts[3]
+      $owningPid = $parts[4]
+
+      if ($state -ne "LISTENING") {
+        continue
+      }
+
+      if ($localAddress -notmatch ":(\d+)$") {
+        continue
+      }
+
+      if ([int]$Matches[1] -ne $Port) {
+        continue
+      }
+
+      if ($owningPid -notmatch "^\d+$") {
+        continue
+      }
+
+      $pidCandidates.Add([int]$owningPid) | Out-Null
     }
   } catch {
     Write-Host "Could not inspect listeners on port ${Port}: $($_.Exception.Message)" -ForegroundColor Yellow
