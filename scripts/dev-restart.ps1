@@ -73,8 +73,8 @@ if (Test-Path $devLogPath) {
 try {
   $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop |
     Select-Object -ExpandProperty OwningProcess -Unique
-  foreach ($pid in $listeners) {
-    $pidCandidates.Add([int]$pid) | Out-Null
+  foreach ($listenerPid in $listeners) {
+    $pidCandidates.Add([int]$listenerPid) | Out-Null
   }
 } catch {
   Write-Host "Get-NetTCPConnection unavailable, trying netstat fallback..." -ForegroundColor Yellow
