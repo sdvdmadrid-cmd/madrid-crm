@@ -1217,6 +1217,45 @@ export default function AuthShell({ children }) {
     }
   };
 
+  const getBackFallbackPath = () => {
+    const currentPath = String(pathname || "").split("?")[0];
+    const segments = currentPath.split("/").filter(Boolean);
+
+    if (segments.length <= 1) {
+      return "/dashboard";
+    }
+
+    const section = segments[0];
+    if (section === "admin") {
+      return "/admin";
+    }
+
+    return `/${section}`;
+  };
+
+  const globalBackDisabledPaths = new Set([
+    "/",
+    "/dashboard",
+    "/admin",
+    "/login",
+    "/reset-password",
+    "/verify-email",
+  ]);
+
+  const shouldShowGlobalBackButton =
+    Boolean(authUser) &&
+    !isPublicPage &&
+    !globalBackDisabledPaths.has(String(pathname || ""));
+
+  const handleGlobalBack = () => {
+    const target = getBackFallbackPath();
+    if (typeof window !== "undefined") {
+      window.location.assign(target);
+      return;
+    }
+    router.push(target);
+  };
+
   return (
     <div
       className="auth-shell"
@@ -1646,6 +1685,29 @@ export default function AuthShell({ children }) {
           trialExpired={trialExpiredParam}
           t={t}
         />
+        {shouldShowGlobalBackButton ? (
+          <div
+            style={{
+              padding: isMobileViewport ? "12px 14px 0" : "14px 22px 0",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleGlobalBack}
+              style={{
+                border: 0,
+                background: "transparent",
+                color: "#1d4ed8",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              ← Volver
+            </button>
+          </div>
+        ) : null}
         {children}
         <AppFooter />
       </div>
