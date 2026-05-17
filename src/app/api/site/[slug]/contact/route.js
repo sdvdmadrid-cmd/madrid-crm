@@ -12,6 +12,7 @@ import {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_FORM_FILL_MS = 1200;
 const MAX_PHOTO_DATA_URL_CHARS = 1_000_000; // 1MB limit (reduced from 4.5MB for security)
+const MIN_IMAGE_BASE64_LENGTH = 16;
 const SAFE_IMAGE_DATA_URL_REGEX =
   /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,([a-z0-9+/=]+)$/i;
 
@@ -25,11 +26,14 @@ function isSafeImageDataUrl(value) {
   if (!match) return false;
 
   const encoded = match[1];
-  if (encoded.length < 16 || encoded.length % 4 !== 0) return false;
+  if (encoded.length < MIN_IMAGE_BASE64_LENGTH || encoded.length % 4 !== 0) {
+    return false;
+  }
 
   try {
     const decoded = Buffer.from(encoded, "base64");
     if (!decoded.length) return false;
+    // Base64 should encode 3 bytes into 4 chars, with padding reflected in the final length.
     return Math.ceil(decoded.length / 3) * 4 === encoded.length;
   } catch {
     return false;
