@@ -1,6 +1,15 @@
 import "server-only";
 
-import { supabaseAdmin } from "@/lib/supabase-admin";
+let supabaseAdminClientPromise = null;
+
+async function getSupabaseAdminClient() {
+  if (!supabaseAdminClientPromise) {
+    supabaseAdminClientPromise = import("@/lib/supabase-admin").then(
+      (module) => module.supabaseAdmin,
+    );
+  }
+  return supabaseAdminClientPromise;
+}
 
 const TABLE = "platform_feature_flags";
 
@@ -117,6 +126,7 @@ function mergeFlags(rows = []) {
 }
 
 export async function listPlatformFeatureFlags() {
+  const supabaseAdmin = await getSupabaseAdminClient();
   const { data, error } = await supabaseAdmin
     .from(TABLE)
     .select("key,enabled,description,updated_by,updated_at");
@@ -151,6 +161,8 @@ export async function upsertPlatformFeatureFlag({ key, enabled, description = ""
   if (!normalizedKey) {
     throw new Error("Feature flag key is required");
   }
+
+  const supabaseAdmin = await getSupabaseAdminClient();
 
   const { error } = await supabaseAdmin.from(TABLE).upsert(
     {

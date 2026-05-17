@@ -1,8 +1,8 @@
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
-import { runAiCompletion } from "@/lib/ai-service";
 
 let supabaseAdminClientPromise = null;
+let aiServicePromise = null;
 
 async function getSupabaseAdminClient() {
   if (!supabaseAdminClientPromise) {
@@ -11,6 +11,15 @@ async function getSupabaseAdminClient() {
     );
   }
   return supabaseAdminClientPromise;
+}
+
+async function getRunAiCompletion() {
+  if (!aiServicePromise) {
+    aiServicePromise = import("@/lib/ai-service").then(
+      (module) => module.runAiCompletion,
+    );
+  }
+  return aiServicePromise;
 }
 
 function parseRole(user) {
@@ -339,6 +348,7 @@ export async function POST(request) {
     };
 
     try {
+      const runAiCompletion = await getRunAiCompletion();
       const ai = await runAiCompletion({
         request,
         tenantId: tenantDbId || "super_admin",
