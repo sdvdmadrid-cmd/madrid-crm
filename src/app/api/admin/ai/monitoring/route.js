@@ -1,6 +1,16 @@
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
+
+let supabaseAdminClientPromise = null;
+
+async function getSupabaseAdminClient() {
+  if (!supabaseAdminClientPromise) {
+    supabaseAdminClientPromise = import("@/lib/supabase-admin").then(
+      (module) => module.supabaseAdmin,
+    );
+  }
+  return supabaseAdminClientPromise;
+}
 
 const MONTHLY_SPEND_CAP_USD = Number(process.env.AI_MONTHLY_SPEND_CAP_USD || 250);
 
@@ -28,6 +38,17 @@ export async function GET(request) {
       return Response.json(
         { success: false, error: "AI monitoring is disabled by feature flag" },
         { status: 403 },
+      );
+    }
+
+    let supabaseAdmin;
+    try {
+      supabaseAdmin = await getSupabaseAdminClient();
+    } catch (error) {
+      console.error("[api/admin/ai/monitoring] Supabase admin client unavailable", error);
+      return Response.json(
+        { success: false, error: "AI monitoring is not configured" },
+        { status: 503 },
       );
     }
 

@@ -1,7 +1,17 @@
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
 import { runAiCompletion } from "@/lib/ai-service";
+
+let supabaseAdminClientPromise = null;
+
+async function getSupabaseAdminClient() {
+  if (!supabaseAdminClientPromise) {
+    supabaseAdminClientPromise = import("@/lib/supabase-admin").then(
+      (module) => module.supabaseAdmin,
+    );
+  }
+  return supabaseAdminClientPromise;
+}
 
 function parseRole(user) {
   return String(
@@ -26,7 +36,7 @@ function computeStatus(user) {
   return "expired";
 }
 
-async function listAllAuthUsers() {
+async function listAllAuthUsers(supabaseAdmin) {
   const perPage = 200;
   let page = 1;
   const users = [];
@@ -50,7 +60,7 @@ async function listAllAuthUsers() {
   return users;
 }
 
-async function readEstimateCountsByUser() {
+async function readEstimateCountsByUser(supabaseAdmin) {
   const { data, error } = await supabaseAdmin
     .from("estimate_builder")
     .select("tenant_id");
@@ -274,9 +284,23 @@ export async function POST(request) {
       );
     }
 
+    let supabaseAdmin;
+    try {
+      supabaseAdmin = await getSupabaseAdminClient();
+    } catch (error) {
+      console.error("[api/admin/ai] Supabase admin client unavailable", error);
+      return new Response(
+        JSON.stringify({ success: false, error: "Admin AI is not configured" }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const [allUsers, estimateMap] = await Promise.all([
-      listAllAuthUsers(),
-      readEstimateCountsByUser(),
+      listAllAuthUsers(supabaseAdmin),
+      readEstimateCountsByUser(supabaseAdmin),
     ]);
 
     const users = allUsers
