@@ -8,7 +8,8 @@ import {
 } from "@/lib/supabase-auth";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
 
-const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+const AUTH_DEBUG =
+  process.env.NODE_ENV !== "production" && process.env.AUTH_DEBUG === "1";
 
 export async function GET(request) {
   try {
@@ -29,12 +30,14 @@ export async function GET(request) {
         error,
       } = await supabase.auth.getUser();
 
-      console.info("[dashboard-protection][api/auth/me] fallback auth", {
-        hasUser: Boolean(user),
-        userId: user?.id || null,
-        emailConfirmedAt: user?.email_confirmed_at || null,
-        error: error?.message || null,
-      });
+      if (AUTH_DEBUG) {
+        console.info("[dashboard-protection][api/auth/me] fallback auth", {
+          hasUser: Boolean(user),
+          userId: user?.id || null,
+          emailConfirmedAt: user?.email_confirmed_at || null,
+          error: error?.message || null,
+        });
+      }
 
       if (error || !user || !user.email_confirmed_at) {
         return new Response(
@@ -117,7 +120,7 @@ export async function GET(request) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error?.message || "Unable to load session",
+        error: "Unable to load session",
       }),
       {
         status: 500,

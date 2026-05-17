@@ -197,6 +197,7 @@ export async function GET(request) {
       },
     });
   } catch (error) {
-    return new Response(error.message, { status: 500 });
+    console.error("[api/auth/dev-login][GET] error", error);
+    return new Response("Unable to create dev user", { status: 500 });
   }
 }

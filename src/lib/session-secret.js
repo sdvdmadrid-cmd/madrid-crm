@@ -2,7 +2,6 @@ const FALLBACK_SECRET_KEYS = [
   "SESSION_SECRET",
   "SESSION_JWT_SECRET",
   "JWT_SECRET",
-  "SUPABASE_SERVICE_ROLE_KEY",
 ];
 
 export function resolveSessionSecret() {

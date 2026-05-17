@@ -496,8 +496,12 @@ export async function POST(request) {
       },
     );
   } catch (error) {
+    console.error("[api/auth/register][POST] error", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({
+        success: false,
+        error: "Unable to complete registration right now",
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },

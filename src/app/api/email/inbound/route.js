@@ -146,7 +146,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("[api/email/inbound][POST] error", error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: "Unable to process inbound email" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

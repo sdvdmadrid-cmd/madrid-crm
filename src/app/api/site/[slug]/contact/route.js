@@ -12,9 +12,16 @@ import {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_FORM_FILL_MS = 1200;
 const MAX_PHOTO_DATA_URL_CHARS = 1_000_000; // 1MB limit (reduced from 4.5MB for security)
+const SAFE_IMAGE_DATA_URL_REGEX =
+  /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=\s]+$/i;
 
 function toText(value, max = 2000) {
   return String(value || "").trim().slice(0, max);
+}
+
+function isSafeImageDataUrl(value) {
+  if (!value) return true;
+  return SAFE_IMAGE_DATA_URL_REGEX.test(String(value).trim());
 }
 
 async function resolveContractorNotificationTargets(tenantId) {
@@ -230,6 +237,13 @@ export async function POST(request, { params }) {
     if (cleanEmail && !EMAIL_REGEX.test(cleanEmail)) {
       return Response.json(
         { error: "Invalid email format" },
+        { status: 400 },
+      );
+    }
+
+    if (cleanPhotoDataUrl && !isSafeImageDataUrl(cleanPhotoDataUrl)) {
+      return Response.json(
+        { error: "Invalid image format" },
         { status: 400 },
       );
     }
