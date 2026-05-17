@@ -158,18 +158,30 @@ $csrfEndpoints = @(
 
 foreach ($ep in $csrfEndpoints) {
   try {
+    $targetUri = [Uri]("$BaseUrl$($ep.Path)")
+    $cookieDomain = $targetUri.Host
+    $cookiePath = "/"
+    $cookieValue = "csrf-preflight-test-fake-token"
+
+    $xoSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    $cookiePrimary = New-Object System.Net.Cookie("madrid_session", $cookieValue, $cookiePath, $cookieDomain)
+    $cookieHostPrefixed = New-Object System.Net.Cookie("__Host-madrid_session", $cookieValue, $cookiePath, $cookieDomain)
+    $xoSession.Cookies.Add($cookiePrimary)
+    $xoSession.Cookies.Add($cookieHostPrefixed)
+
     $xoHeaders = @{
       "Content-Type" = "application/json"
-      "Cookie"       = "madrid_session=csrf-preflight-test-fake-token"
       "Origin"       = "https://evil.attacker.example.com"
+      "Referer"      = "https://evil.attacker.example.com/security-preflight"
     }
     $xoBody = '{"__csrftest":true}'
     $xoStatus = 0
     try {
       $xoResp = Invoke-WebRequest `
-        -Uri "$BaseUrl$($ep.Path)" `
+        -Uri $targetUri `
         -Method $ep.Method `
         -Headers $xoHeaders `
+        -WebSession $xoSession `
         -Body $xoBody `
         -UseBasicParsing `
         -TimeoutSec 10 `
