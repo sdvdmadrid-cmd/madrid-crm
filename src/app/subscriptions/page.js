@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import styles from "./subscriptions.module.css";
 
 export default function SubscriptionsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState(null);
   const [invoices, setInvoices] = useState([]);
@@ -16,6 +17,7 @@ export default function SubscriptionsPage() {
   const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
   const sourceParam = String(searchParams?.get("source") || "").trim().toLowerCase();
   const isBillPaymentsFlow = sourceParam === "bill-payments";
+  const goBackPath = isBillPaymentsFlow ? "/bill-payments" : "/dashboard";
   const planDisplay = isBillPaymentsFlow
     ? {
         title: "Bill Payments",
@@ -126,6 +128,9 @@ export default function SubscriptionsPage() {
       const res = await fetch("/api/subscriptions/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: isBillPaymentsFlow ? "bill-payments" : "app",
+        }),
       });
 
       const data = await res.json();
@@ -198,6 +203,14 @@ export default function SubscriptionsPage() {
   return (
     <AuthShell>
       <div className={styles.container}>
+        <button
+          type="button"
+          className={styles.backButton}
+          onClick={() => router.push(goBackPath)}
+        >
+          ← {isBillPaymentsFlow ? "Volver a Bill Payments" : "Volver"}
+        </button>
+
         <div className={styles.header}>
           <h1>{planDisplay.title}</h1>
           <p>
@@ -312,6 +325,15 @@ export default function SubscriptionsPage() {
 
               {subscription.status !== "cancelled" && (
                 <>
+                  {isBillPaymentsFlow && (
+                    <button
+                      className={styles.buttonSecondary}
+                      onClick={() => router.push("/bill-payments")}
+                    >
+                      Continuar en Bill Payments
+                    </button>
+                  )}
+
                   <button
                     className={styles.buttonPrimary}
                     onClick={handleManageBilling}

@@ -11,6 +11,16 @@ import { getStripeServerClient } from "@/lib/stripe-payments";
 
 export async function POST(request) {
   try {
+    let requestBody = {};
+    try {
+      requestBody = await request.json();
+    } catch {
+      requestBody = {};
+    }
+
+    const source = String(requestBody?.source || "").trim().toLowerCase();
+    const isBillPaymentsFlow = source === "bill-payments";
+
     const context = await getAuthenticatedTenantContext(request);
 
     if (!context.authenticated) {
@@ -53,9 +63,13 @@ export async function POST(request) {
     }
 
     const origin = new URL(request.url).origin;
+    const returnUrl = isBillPaymentsFlow
+      ? `${origin}/bill-payments?subscription=updated`
+      : `${origin}/subscriptions?billing=updated`;
+
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: subscription.stripe_customer_id,
-      return_url: `${origin}/subscriptions?billing=updated`,
+      return_url: returnUrl,
     });
 
     return new Response(

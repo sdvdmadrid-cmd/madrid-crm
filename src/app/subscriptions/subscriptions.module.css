@@ -4,6 +4,21 @@
   padding: 2rem 1rem;
 }
 
+.backButton {
+  background: transparent;
+  border: 0;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding: 0;
+}
+
+.backButton:hover {
+  color: #0056b3;
+}
+
 .header {
   margin-bottom: 2rem;
 }
@@ -219,6 +234,7 @@
 }
 
 .buttonPrimary,
+.buttonSecondary,
 .buttonDanger {
   padding: 0.75rem 1.5rem;
   border: none;
@@ -242,6 +258,22 @@
 
 .buttonPrimary:disabled {
   background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.buttonSecondary {
+  background-color: #f5f5f5;
+  border: 1px solid var(--color-border, #e0e0e0);
+  color: var(--color-text-primary, #1a1a1a);
+  margin-top: 1rem;
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background-color: #ececec;
+}
+
+.buttonSecondary:disabled {
+  color: #888;
   cursor: not-allowed;
 }
 
