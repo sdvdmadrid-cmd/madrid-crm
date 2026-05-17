@@ -721,7 +721,9 @@ export async function createContractorSubscription({
   planId,
   email,
   name,
-  trialDays = 30,
+  userId,
+  trialDays = 15,
+  source = "app",
 }) {
   const stripe = requireStripeClient();
 
@@ -776,6 +778,8 @@ export async function createContractorSubscription({
     metadata: {
       tenant_id: tenantId,
       plan_id: planId,
+      user_id: userId || "",
+      source: source || "app",
     },
   });
 

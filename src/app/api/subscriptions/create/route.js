@@ -17,7 +17,7 @@ import { sendSubscriptionConfirmationEmail } from "@/lib/subscription-emails";
  * POST /api/subscriptions/create
  *
  * Create a new subscription for the authenticated tenant.
- * Free trial period: 30 days
+ * Free trial period: 15 days
  * Recurring billing: $35/month
  */
 export async function POST(request) {
@@ -137,8 +137,23 @@ export async function POST(request) {
       planId: plan.id,
       email: tenantEmail,
       name: tenantName,
-      trialDays: isBillPaymentsSource ? 0 : 30,
+      userId: context.userId,
+      trialDays: isBillPaymentsSource ? 0 : 15,
+      source: isBillPaymentsSource ? "bill-payments" : "app",
     });
+
+    // If this is a Bill Payments subscription, mark the user's metadata
+    if (isBillPaymentsSource && context.userId) {
+      const { createClient } = await import("@supabase/supabase-js");
+      const admin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { autoRefreshToken: false, persistSession: false } },
+      );
+      await admin.auth.admin.updateUserById(context.userId, {
+        user_metadata: { billPaymentsSubscribed: true },
+      });
+    }
 
     // Send confirmation email
     const planData = await supabaseAdmin
@@ -154,7 +169,7 @@ export async function POST(request) {
         tenantName,
         planName: planData.data.name,
         planPriceMonthly: planData.data.price_monthly,
-        trialDays: isBillPaymentsSource ? 0 : 30,
+        trialDays: isBillPaymentsSource ? 0 : 15,
       });
     }
 

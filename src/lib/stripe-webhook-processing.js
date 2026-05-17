@@ -67,6 +67,8 @@ async function handleSubscriptionEvent(event) {
       const subscription = event.data.object;
       const metadata = subscription.metadata || {};
       const tenantId = String(metadata.tenant_id || "");
+      const userId = String(metadata.user_id || "");
+      const source = String(metadata.source || "");
 
       if (!tenantId) {
         return null;
@@ -88,6 +90,38 @@ async function handleSubscriptionEvent(event) {
           { subscriptionId: subscription.id, tenantId },
         );
       }
+
+      // If this was a Bill Payments subscription, clear billPaymentsSubscribed from user metadata
+      if (source === "bill-payments") {
+        try {
+          const { createClient } = await import("@supabase/supabase-js");
+          const admin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY,
+            { auth: { autoRefreshToken: false, persistSession: false } },
+          );
+          let targetUserId = userId;
+
+          if (!targetUserId && tenantId) {
+            const { data: profileRow } = await admin
+              .from("profiles")
+              .select("id")
+              .eq("tenant_id", tenantId)
+              .limit(1)
+              .maybeSingle();
+            targetUserId = String(profileRow?.id || "");
+          }
+
+          if (targetUserId) {
+            await admin.auth.admin.updateUserById(targetUserId, {
+              user_metadata: { billPaymentsSubscribed: false },
+            });
+          }
+        } catch (metaError) {
+          console.error("[stripe-webhook-processing] failed to clear billPaymentsSubscribed", metaError);
+        }
+      }
+
       return null;
     }
 

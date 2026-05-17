@@ -409,7 +409,7 @@ export default function MarketingPage() {
               className="font-bold px-6 py-3 rounded-md text-sm transition-colors whitespace-nowrap"
               style={{ background: "#1d4ed8", color: "#ffffff" }}
             >
-              Start Free — 30 Days
+              Start Free — 15 Days
             </Link>
           </div>
           <p className="text-center text-xs mt-2" style={{ color: "#94a3b8" }}>Free for 15 days · Then $35/month · Cancel anytime · No credit card required</p>

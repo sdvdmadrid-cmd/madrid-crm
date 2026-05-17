@@ -130,7 +130,9 @@ export function billPaymentsSubscriptionRequiredResponse({
 
 export function requireBillPaymentsSubscriptionForStorage(context) {
   if (context?.isSuperAdmin) return null;
+  // $35/mo full plan OR $5/mo bill payments only plan both grant access
   if (context?.isSubscribed === true) return null;
+  if (context?.billPaymentsSubscribed === true) return null;
   return billPaymentsSubscriptionRequiredResponse();
 }
 
