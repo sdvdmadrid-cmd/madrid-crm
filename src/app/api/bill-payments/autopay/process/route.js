@@ -9,10 +9,15 @@ import {
   resolveAutopayAmount,
   shouldSendAutopayReminder,
 } from "@/lib/bill-payments";
-import { timingSafeEqualString } from "@/lib/request-security";
+import {
+  enforceSameOriginForMutation,
+  timingSafeEqualString,
+} from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   const cronSecret = String(process.env.BILL_AUTOPAY_CRON_SECRET || "").trim();
   const requestSecret = String(
     request.headers.get("x-cron-secret") || "",

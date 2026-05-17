@@ -15,6 +15,7 @@ import {
   updateBillStatusesForTenant,
   validateProviderRequirementValues,
 } from "@/lib/bill-payments";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function GET(request) {
@@ -85,6 +86,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "write");
   if (access.response) return access.response;
   const { context } = access;

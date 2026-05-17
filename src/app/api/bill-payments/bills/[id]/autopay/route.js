@@ -7,10 +7,13 @@ import {
   requireBillPaymentsAccess,
   serializeAutopayRule,
 } from "@/lib/bill-payments";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUuid } from "@/lib/supabase-db";
 
 export async function PUT(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
   const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(

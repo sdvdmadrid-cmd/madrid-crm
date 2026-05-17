@@ -504,6 +504,17 @@ function normalizeProviderRoutingKey(value = "") {
     .trim();
 }
 
+function parseCsvListEnv(value = "") {
+  return String(value || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function normalizeRoutingKeySet(values = []) {
+  return new Set(values.map((value) => normalizeProviderRoutingKey(value)).filter(Boolean));
+}
+
 function isSynchronyProvider(providerName = "") {
   const normalized = normalizeProviderRoutingKey(providerName);
   return (
@@ -512,13 +523,73 @@ function isSynchronyProvider(providerName = "") {
   );
 }
 
-function buildAutoRemittanceReference(queueRow) {
+function buildAutoRemittanceReference(queueRow, prefix = "AUTO") {
   const suffix = String(queueRow?.transaction_id || "")
     .replace(/-/g, "")
     .slice(0, 12)
     .toUpperCase();
   const dayKey = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return `SYN-${dayKey}-${suffix || "AUTO"}`;
+  const safePrefix = String(prefix || "AUTO")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(0, 8)
+    .toUpperCase() || "AUTO";
+  return `${safePrefix}-${dayKey}-${suffix || "AUTO"}`;
+}
+
+function resolveAutoRemittanceRoute({
+  queueRow,
+  bill,
+  provider,
+  enableSynchronyAutoSubmit,
+  allowManualPortalAutosubmit,
+  autoSubmitChannels,
+  autoSubmitProviders,
+}) {
+  const providerName =
+    String(queueRow?.provider_name || bill?.provider_name || provider?.provider_name || "").trim();
+  const providerRoutingKey = normalizeProviderRoutingKey(providerName);
+  const providerChannel = String(provider?.remittance_channel || "").trim().toLowerCase();
+
+  // Safety default: never auto-submit for manual portal routes unless explicitly enabled.
+  if (providerChannel === "manual_portal" && !allowManualPortalAutosubmit) {
+    return {
+      enabled: false,
+      channel: "",
+      referencePrefix: "",
+    };
+  }
+
+  if (providerChannel && providerChannel !== "manual_portal") {
+    if (autoSubmitChannels.has(providerChannel)) {
+      return {
+        enabled: true,
+        channel: providerChannel,
+        referencePrefix: providerChannel.slice(0, 8).toUpperCase(),
+      };
+    }
+  }
+
+  if (providerRoutingKey && autoSubmitProviders.has(providerRoutingKey)) {
+    return {
+      enabled: true,
+      channel: "provider_allowlist_auto",
+      referencePrefix: "ALWL",
+    };
+  }
+
+  if (enableSynchronyAutoSubmit && isSynchronyProvider(providerName)) {
+    return {
+      enabled: true,
+      channel: "synchrony_adapter_auto",
+      referencePrefix: "SYN",
+    };
+  }
+
+  return {
+    enabled: false,
+    channel: "",
+    referencePrefix: "",
+  };
 }
 
 function resolveRemittanceRetryAt(attempts) {
@@ -626,7 +697,7 @@ async function markRemittanceSubmitted({
       updated_at: nowIso,
       metadata: {
         ...existingQueueMeta,
-        submitted_via: "synchrony_adapter_auto",
+        submitted_via: remittanceChannel,
         remittance_channel: remittanceChannel,
       },
     })
@@ -662,10 +733,16 @@ export async function processBillPaymentRemittanceQueue({
   const providerFilter = String(providerName || "").trim();
 
   const enableSynchronyAutoSubmit =
-    String(
-      process.env.BILL_REMITTANCE_SYNCHRONY_AUTOSUBMIT ||
-        (process.env.NODE_ENV === "production" ? "false" : "true"),
-    ).toLowerCase() === "true";
+    String(process.env.BILL_REMITTANCE_SYNCHRONY_AUTOSUBMIT || "false").toLowerCase() === "true";
+  const allowManualPortalAutosubmit =
+    String(process.env.BILL_REMITTANCE_ALLOW_MANUAL_PORTAL_AUTOSUBMIT || "false").toLowerCase() === "true";
+  const autoSubmitChannels = new Set(
+    parseCsvListEnv(process.env.BILL_REMITTANCE_AUTOSUBMIT_CHANNELS)
+      .map((value) => value.toLowerCase()),
+  );
+  const autoSubmitProviders = normalizeRoutingKeySet(
+    parseCsvListEnv(process.env.BILL_REMITTANCE_AUTOSUBMIT_PROVIDERS),
+  );
 
   let query = supabaseAdmin
     .from(BILL_PAYMENT_REMITTANCE_QUEUE_TABLE)
@@ -694,22 +771,6 @@ export async function processBillPaymentRemittanceQueue({
   };
 
   for (const queueRow of queueRows || []) {
-    const supportsSynchrony = isSynchronyProvider(queueRow.provider_name);
-    if (!supportsSynchrony) {
-      summary.skipped += 1;
-      continue;
-    }
-
-    if (!enableSynchronyAutoSubmit) {
-      summary.skipped += 1;
-      continue;
-    }
-
-    if (dryRun) {
-      summary.submitted += 1;
-      continue;
-    }
-
     try {
       const [{ data: transaction, error: txError }, { data: bill, error: billError }] =
         await Promise.all([
@@ -721,7 +782,7 @@ export async function processBillPaymentRemittanceQueue({
             .maybeSingle(),
           supabaseAdmin
             .from(BILL_TABLE)
-            .select("id, tenant_id, status, last_paid_at")
+            .select("id, tenant_id, status, last_paid_at, provider_id, provider_name")
             .eq("id", queueRow.bill_id)
             .eq("tenant_id", queueRow.tenant_id)
             .maybeSingle(),
@@ -740,13 +801,49 @@ export async function processBillPaymentRemittanceQueue({
         throw new Error("Remittance bill not found");
       }
 
-      const remittanceReference = buildAutoRemittanceReference(queueRow);
+      let provider = null;
+      if (bill.provider_id) {
+        const { data: providerData, error: providerError } = await supabaseAdmin
+          .from(BILL_PROVIDER_TABLE)
+          .select("provider_name, remittance_channel")
+          .eq("id", bill.provider_id)
+          .maybeSingle();
+        if (providerError) {
+          throw new Error(providerError.message);
+        }
+        provider = providerData || null;
+      }
+
+      const route = resolveAutoRemittanceRoute({
+        queueRow,
+        bill,
+        provider,
+        enableSynchronyAutoSubmit,
+        allowManualPortalAutosubmit,
+        autoSubmitChannels,
+        autoSubmitProviders,
+      });
+
+      if (!route.enabled) {
+        summary.skipped += 1;
+        continue;
+      }
+
+      if (dryRun) {
+        summary.submitted += 1;
+        continue;
+      }
+
+      const remittanceReference = buildAutoRemittanceReference(
+        queueRow,
+        route.referencePrefix,
+      );
       await markRemittanceSubmitted({
         queueRow,
         transaction,
         bill,
         remittanceReference,
-        remittanceChannel: "synchrony_adapter_auto",
+        remittanceChannel: route.channel,
       });
       summary.submitted += 1;
     } catch (error) {
@@ -2303,17 +2400,6 @@ export async function processBillPayment({
       })
       .eq("id", transaction.id)
       .eq("tenant_id", context.tenantDbId);
-
-    if (nextStatus === "paid") {
-      await enqueueBillPaymentRemittance({
-        transaction: {
-          ...transaction,
-          amount: totalAmount,
-        },
-        bill,
-        context,
-      });
-    }
 
     await supabaseAdmin
       .from(BILL_TABLE)

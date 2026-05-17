@@ -9,8 +9,11 @@ import {
   getPlaidAccounts,
   isPlaidConfigured,
 } from "@/lib/plaid-integration";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 
 export async function POST(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
   const subscriptionResponse = requireBillPaymentsSubscriptionForStorage(

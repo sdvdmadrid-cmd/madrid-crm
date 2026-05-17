@@ -1,5 +1,8 @@
 import { processBillPaymentRemittanceQueue } from "@/lib/bill-payments";
-import { timingSafeEqualString } from "@/lib/request-security";
+import {
+  enforceSameOriginForMutation,
+  timingSafeEqualString,
+} from "@/lib/request-security";
 
 function isAuthorized(request) {
   const secret = String(
@@ -13,6 +16,8 @@ function isAuthorized(request) {
 }
 
 export async function POST(request) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
   if (!isAuthorized(request)) {
     return new Response(
       JSON.stringify({ success: false, error: "Unauthorized" }),

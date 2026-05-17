@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifySessionToken } from "@/lib/auth";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { cookies } from "next/headers";
 import Stripe from "stripe";
@@ -19,6 +20,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 export async function POST(request) {
   try {
+    const csrfResponse = enforceSameOriginForMutation(request);
+    if (csrfResponse) return csrfResponse;
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value || "";
     const session = verifySessionToken(token);

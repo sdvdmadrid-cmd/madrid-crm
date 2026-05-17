@@ -6,6 +6,7 @@ import AdminEmailDeliveryClient from "@/components/admin/AdminEmailDeliveryClien
 import AdminSubscriptionsClient from "@/components/admin/AdminSubscriptionsClient";
 import { AdminFinancialDashboardClient } from "@/components/admin/AdminFinancialDashboardClient";
 import { AdminPlatformFeeDashboardClient } from "@/components/admin/AdminPlatformFeeDashboardClient";
+import AdminBillPaymentsOpsClient from "@/components/admin/AdminBillPaymentsOpsClient";
 import AdminFeatureFlagsClient from "@/components/admin/AdminFeatureFlagsClient";
 import AdminAiMonitoringClient from "@/components/admin/AdminAiMonitoringClient";
 import { verifySessionToken } from "@/lib/auth";
@@ -975,6 +976,13 @@ export default async function AdminPage() {
         <section id="platform-fees-dashboard" className="mb-6 rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-black/20 p-6">
           <h2 className="mb-6 text-2xl font-semibold tracking-tight text-white">Bill Payments Platform Fees</h2>
           <AdminPlatformFeeDashboardClient />
+        </section>
+        ) : null}
+
+        {isModuleEnabled("platform_financial_dashboard", true) ? (
+        <section id="bill-payments-ops" className="mb-6 rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-black/20 p-6">
+          <h2 className="mb-6 text-2xl font-semibold tracking-tight text-white">Bill Payments Operations (Platform Owner)</h2>
+          <AdminBillPaymentsOpsClient mode="platform-owner" />
         </section>
         ) : null}
 

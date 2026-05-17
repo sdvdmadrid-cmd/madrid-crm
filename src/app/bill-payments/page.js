@@ -22,6 +22,7 @@ import {
   isValidBillAccountNumber,
 } from "@/lib/bill-payments-validation";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
+import AdminBillPaymentsOpsClient from "@/components/admin/AdminBillPaymentsOpsClient";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -1315,6 +1316,26 @@ export default function BillPaymentsPage() {
             gap: 18,
           }}
         >
+          {canManageSensitiveData ? (
+            <section
+              style={{
+                background: "#fff",
+                border: "1px solid #e0e7ef",
+                borderRadius: 18,
+                padding: "18px 18px 10px",
+                boxShadow: "0 2px 12px #e0e7ef33",
+              }}
+            >
+              <h2 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>
+                Bill Payments Operativo (Tenant-safe)
+              </h2>
+              <div style={{ fontSize: 15, color: "#334155", marginBottom: 10 }}>
+                Solo muestra informacion y acciones seguras para tu tenant. No incluye acciones globales ni datos de otros tenants.
+              </div>
+              <AdminBillPaymentsOpsClient mode="tenant-safe" />
+            </section>
+          ) : null}
+
           <section
             style={{
               background: "rgba(255,255,255,0.95)",
