@@ -4,7 +4,17 @@ import { createClient } from "@supabase/supabase-js";
 import { normalizeAppRole } from "@/lib/access-control";
 import { getSessionFromRequest } from "@/lib/auth";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+let supabaseAdminClientPromise = null;
+
+async function getSupabaseAdminClient() {
+  if (!supabaseAdminClientPromise) {
+    supabaseAdminClientPromise = import("@/lib/supabase-admin").then(
+      (module) => module.supabaseAdmin,
+    );
+  }
+  return supabaseAdminClientPromise;
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -271,6 +281,7 @@ export async function generateSignupVerificationLink({ email, origin, userId }) 
 }
 
 export async function generatePasswordRecoveryLink({ email, origin }) {
+  const supabaseAdmin = await getSupabaseAdminClient();
   const errors = [];
   const candidates = buildOriginCandidates(origin);
 
@@ -348,6 +359,7 @@ export async function sendPasswordRecoveryEmailViaSupabase({ email, origin }) {
 }
 
 export async function listAllAuthUsers() {
+  const supabaseAdmin = await getSupabaseAdminClient();
   const users = [];
   const perPage = 200;
   let page = 1;
