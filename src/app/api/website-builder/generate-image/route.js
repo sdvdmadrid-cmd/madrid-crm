@@ -18,14 +18,56 @@ function badRequest(error) {
   return Response.json({ success: false, error }, { status: 400 });
 }
 
+function assertTrustedOpenAiImageUrl(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("AI image URL is invalid");
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error("AI image URL must use HTTPS");
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const allowedHosts = [
+    "oaidalleapiprodscus.blob.core.windows.net",
+    "cdn.openai.com",
+    "files.openaiusercontent.com",
+  ];
+
+  const isAllowed = allowedHosts.includes(host);
+  if (!isAllowed) {
+    throw new Error("AI image URL host is not allowed");
+  }
+
+  return parsed.toString();
+}
+
 async function urlToDataUrl(imageUrl) {
-  const response = await fetch(imageUrl, { signal: AbortSignal.timeout(10000) });
+  const trustedUrl = assertTrustedOpenAiImageUrl(imageUrl);
+  const response = await fetch(trustedUrl, { signal: AbortSignal.timeout(10000) });
   if (!response.ok) {
     throw new Error("Unable to download AI image");
   }
 
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (Number.isFinite(contentLength) && contentLength > 8 * 1024 * 1024) {
+    throw new Error("AI image payload too large");
+  }
+
   const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > 8 * 1024 * 1024) {
+    throw new Error("AI image payload too large");
+  }
+
   const mimeType = String(response.headers.get("content-type") || "image/png");
+  if (!mimeType.toLowerCase().startsWith("image/")) {
+    throw new Error("AI image payload is not an image");
+  }
+
   const base64 = Buffer.from(arrayBuffer).toString("base64");
   return `data:${mimeType};base64,${base64}`;
 }

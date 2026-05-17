@@ -3,6 +3,8 @@ import { verifyEdgeSessionToken } from "./src/lib/auth-edge";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+const AUTH_LOG_VERBOSE =
+  AUTH_DEBUG && process.env.NODE_ENV !== "production";
 
 function cookieNames(request) {
   return request.cookies.getAll().map((cookie) => cookie.name);
@@ -300,10 +302,12 @@ export async function middleware(request) {
   }
 
   if (isAuthFlowBypassPath(pathname)) {
-    console.info("[middleware] bypassing auth for auth-flow route", {
-      pathname,
-      note: "callback is never blocked by middleware before exchange",
-    });
+    if (AUTH_LOG_VERBOSE) {
+      console.info("[middleware] bypassing auth for auth-flow route", {
+        pathname,
+        note: "callback is never blocked by middleware before exchange",
+      });
+    }
     return NextResponse.next();
   }
 
@@ -335,13 +339,15 @@ export async function middleware(request) {
       } = await supabase.auth.getUser();
       supabaseUser = user || null;
 
-      console.info("[middleware] supabase hydration", {
-        pathname,
-        hasEdgeSession: Boolean(edgeSession),
-        hasCookie: Boolean(sessionCookie),
-        hasSupabaseUser: Boolean(supabaseUser),
-        supabaseError: error?.message || null,
-      });
+      if (AUTH_LOG_VERBOSE) {
+        console.info("[middleware] supabase hydration", {
+          pathname,
+          hasEdgeSession: Boolean(edgeSession),
+          hasCookie: Boolean(sessionCookie),
+          hasSupabaseUser: Boolean(supabaseUser),
+          supabaseError: error?.message || null,
+        });
+      }
     } catch (supabaseError) {
       console.warn("[middleware] supabase hydration threw", {
         pathname,
@@ -354,21 +360,25 @@ export async function middleware(request) {
     Boolean(supabaseUser?.id) && Boolean(supabaseUser?.email_confirmed_at);
 
   if (["/verify-email", "/sign-in", "/login"].includes(pathname)) {
-    console.info("[middleware] login-page check", {
-      pathname,
-      hasCookie: Boolean(sessionCookie),
-      hasEdgeSession: Boolean(edgeSession),
-      hasConfirmedSupabaseUser,
-    });
-    if (edgeSession || hasConfirmedSupabaseUser) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      console.info("[middleware] redirect public auth page -> dashboard", {
+    if (AUTH_LOG_VERBOSE) {
+      console.info("[middleware] login-page check", {
         pathname,
-        redirectDestination: url.pathname,
+        hasCookie: Boolean(sessionCookie),
         hasEdgeSession: Boolean(edgeSession),
         hasConfirmedSupabaseUser,
       });
+    }
+    if (edgeSession || hasConfirmedSupabaseUser) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      if (AUTH_LOG_VERBOSE) {
+        console.info("[middleware] redirect public auth page -> dashboard", {
+          pathname,
+          redirectDestination: url.pathname,
+          hasEdgeSession: Boolean(edgeSession),
+          hasConfirmedSupabaseUser,
+        });
+      }
       return NextResponse.redirect(url);
     }
   }
@@ -412,26 +422,32 @@ export async function middleware(request) {
   if (!edgeSession && hasConfirmedSupabaseUser) {
     // Allow page navigation and auth hydration endpoints while app cookie sync completes.
     if (!isApiPath(pathname) || isAuthHydrationApiPath(pathname)) {
-      console.info("[middleware] allowing request while auth loading", {
-        pathname,
-        userId: supabaseUser.id,
-      });
+      if (AUTH_LOG_VERBOSE) {
+        console.info("[middleware] allowing request while auth loading", {
+          pathname,
+          userId: supabaseUser.id,
+        });
+      }
       return response;
     }
   }
 
   if (!sessionCookie) {
     if (isApiPath(pathname)) {
-      console.info("[middleware] missing app session cookie on API route", {
-        pathname,
-        action: "defer_to_route_handler_auth",
-      });
+      if (AUTH_LOG_VERBOSE) {
+        console.info("[middleware] missing app session cookie on API route", {
+          pathname,
+          action: "defer_to_route_handler_auth",
+        });
+      }
       return response;
     }
-    console.info("[middleware] missing app session cookie on page route", {
-      pathname,
-      action: "allow_client_hydration",
-    });
+    if (AUTH_LOG_VERBOSE) {
+      console.info("[middleware] missing app session cookie on page route", {
+        pathname,
+        action: "allow_client_hydration",
+      });
+    }
     return response;
   }
 
@@ -439,16 +455,20 @@ export async function middleware(request) {
   const session = edgeSession;
   if (!session) {
     if (isApiPath(pathname)) {
-      console.info("[middleware] invalid app session token on API route", {
-        pathname,
-        action: "defer_to_route_handler_auth",
-      });
+      if (AUTH_LOG_VERBOSE) {
+        console.info("[middleware] invalid app session token on API route", {
+          pathname,
+          action: "defer_to_route_handler_auth",
+        });
+      }
       return response;
     }
-    console.info("[middleware] invalid app session token on page route", {
-      pathname,
-      action: "allow_client_hydration",
-    });
+    if (AUTH_LOG_VERBOSE) {
+      console.info("[middleware] invalid app session token on page route", {
+        pathname,
+        action: "allow_client_hydration",
+      });
+    }
     return response;
   }
 
