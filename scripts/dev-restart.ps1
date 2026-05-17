@@ -28,10 +28,18 @@ function Stop-DevProcessIfSafe([int]$ProcessId, [string]$Reason) {
   }
 
   $cmd = Get-ProcessCommandLine -ProcessId $ProcessId
-  $isRepoScoped =
-    ($cmd -like "*$repoRoot*") -or
+  $repoRootWindows = $repoRoot -replace '/', '\'
+  $repoRootUnix = $repoRoot -replace '\\', '/'
+  $referencesRepo =
+    ($cmd -like "*$repoRootWindows*") -or
+    ($cmd -like "*$repoRootUnix*")
+  $isNextDevCommand =
     ($cmd -like "*next dev*") -or
-    ($cmd -like "*next\\dist\\bin\\next*")
+    ($cmd -like "*next\\dist\\bin\\next*") -or
+    ($cmd -like "*next/dist/bin/next*")
+  $isRepoScoped =
+    $referencesRepo -or
+    ($referencesRepo -and $isNextDevCommand)
 
   if (-not $ForceKillAnyOnPort -and -not $isRepoScoped) {
     Write-Host "Skipping PID $ProcessId on port $Port (not recognized as this repo): $($proc.ProcessName)" -ForegroundColor Yellow
