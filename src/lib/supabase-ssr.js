@@ -1,13 +1,16 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const authDebugEnabled = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
-if (!supabaseUrl || !supabasePublishableKey) {
-  throw new Error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-  );
+function getSupabasePublicConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !supabasePublishableKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    );
+  }
+  return { supabaseUrl, supabasePublishableKey };
 }
 
 let browserClientInstance = null;
@@ -52,6 +55,7 @@ function cookieNamesFromList(list) {
 export function createSupabaseBrowserAuthClient() {
   if (!browserClientInstance) {
     clearLegacyPersistedSupabaseSession();
+    const { supabaseUrl, supabasePublishableKey } = getSupabasePublicConfig();
 
     browserClientInstance = createBrowserClient(
       supabaseUrl,
@@ -80,6 +84,7 @@ export function createSupabaseBrowserAuthClient() {
 }
 
 export function createSupabaseRouteHandlerClient(cookieStore, onSetCookies) {
+  const { supabaseUrl, supabasePublishableKey } = getSupabasePublicConfig();
   return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
@@ -111,6 +116,7 @@ export function createSupabaseRouteHandlerClient(cookieStore, onSetCookies) {
 }
 
 export function createSupabaseMiddlewareClient(request, response) {
+  const { supabaseUrl, supabasePublishableKey } = getSupabasePublicConfig();
   return createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
