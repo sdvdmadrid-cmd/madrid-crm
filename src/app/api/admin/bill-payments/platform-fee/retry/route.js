@@ -16,7 +16,13 @@ function normalizeRole(session) {
   return String(session?.role || "").toLowerCase();
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+function getStripeClient() {
+  const secretKey = String(process.env.STRIPE_SECRET_KEY || "").trim();
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY is not configured");
+  }
+  return new Stripe(secretKey);
+}
 
 export async function POST(request) {
   try {
@@ -66,6 +72,8 @@ export async function POST(request) {
     }
 
     try {
+      const stripe = getStripeClient();
+
       // Create new PaymentIntent for retry
       const monthlyFeeUsd = Number(
         process.env.BILL_PAYMENTS_MONTHLY_FEE_USD || "5"
