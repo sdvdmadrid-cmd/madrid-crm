@@ -164,14 +164,7 @@ export async function getTransactionHistory(limit = 50) {
         created_at,
         amount,
         status,
-        contractor_subscriptions (
-          contractor_subscriptions (
-            tenants (
-              email,
-              tenant_name
-            )
-          )
-        )
+        tenant_id
       `,
       )
       .order("created_at", { ascending: false })
@@ -184,6 +177,7 @@ export async function getTransactionHistory(limit = 50) {
       date: inv.created_at,
       amount: inv.amount,
       status: inv.status,
+      tenantId: inv.tenant_id,
       type: "invoice",
     }));
   } catch (error) {
