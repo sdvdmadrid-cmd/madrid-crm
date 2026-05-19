@@ -29,6 +29,58 @@ function requireEnvValue(key, fallbackMap) {
   return value;
 }
 
+async function ensureLegalAccepted(api) {
+  const originHeaders = { Origin: "http://localhost:3000" };
+
+  const statusRes = await api.get("/api/legal/status", { headers: originHeaders });
+  const statusJson = await statusRes.json().catch(() => null);
+  if (statusRes.ok() && statusJson?.data?.accepted) {
+    return;
+  }
+
+  const versionRes = await api.get("/api/legal/version", { headers: originHeaders });
+  const versionJson = await versionRes.json().catch(() => null);
+  const version = String(versionJson?.data?.version || "").trim();
+
+  const acceptRes = await api.post("/api/legal/accept", {
+    headers: {
+      ...originHeaders,
+      "Content-Type": "application/json",
+    },
+    data: version ? { version } : {},
+  });
+  expect(acceptRes.ok()).toBeTruthy();
+}
+
+async function postWithTransientRetry(api, page, url, data, options = {}) {
+  const {
+    retries = 3,
+    retryDelayMs = 500,
+    shouldRetry = (status, body) =>
+      status === 500 && String(body?.error || body?.raw || "").toLowerCase().includes("fetch failed"),
+  } = options;
+
+  let lastRes = null;
+  let lastBody = null;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    const res = await api.post(url, { data });
+    const parsed = await res.json().catch(async () => ({
+      raw: await res.text(),
+    }));
+
+    if (res.ok() || attempt === retries || !shouldRetry(res.status(), parsed)) {
+      return { res, body: parsed };
+    }
+
+    lastRes = res;
+    lastBody = parsed;
+    await page.waitForTimeout(retryDelayMs * attempt);
+  }
+
+  return { res: lastRes, body: lastBody };
+}
+
 test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
   test("approval auto-converts, base number preserved, signed quote lock works", async ({ page }) => {
     // Ensure authenticated session cookie via dev-login helper.
@@ -37,6 +89,8 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     });
 
     const api = page.request;
+    await ensureLegalAccepted(api);
+
     const now = Date.now();
     const estimateNumber = `E2E-${now}`;
     const clientName = `E2E Client ${now}`;
@@ -73,12 +127,12 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     expect(estimateId).toBeTruthy();
 
     // 1) Approve estimate (should auto-convert to quote).
-    const approveRes = await api.post(`/api/estimates/${estimateId}/respond`, {
-      data: { action: "approved" },
-    });
-    const approveJson = await approveRes.json().catch(async () => ({
-      raw: await approveRes.text(),
-    }));
+    const { res: approveRes, body: approveJson } = await postWithTransientRetry(
+      api,
+      page,
+      `/api/estimates/${estimateId}/respond`,
+      { action: "approved" },
+    );
     if (!approveRes.ok()) {
       // eslint-disable-next-line no-console
       console.log("approve response", approveRes.status(), approveJson);
@@ -117,29 +171,52 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
       : null;
 
     expect(quoteLookupError).toBeNull();
+    // Ensure 'quoteFromEstimate' is defined before accessing its properties
+    expect(quoteFromEstimate).toBeTruthy();
     expect(quoteFromEstimate?.id).toBeTruthy();
 
     // 2) Base number must be preserved.
-    expect(String(quoteFromEstimate.quote_number || "")).toBe(estimateNumber);
+    expect(String(quoteFromEstimate?.quote_number || "")).toBe(estimateNumber);
 
     // 3) Signed quote lock test via estimate-builder pipeline.
     const { data: someClient, error: clientError } = await supabase
       .from("clients")
       .select("id")
-      .eq("tenant_id", quoteFromEstimate.tenant_id)
+      .eq("tenant_id", String(quoteFromEstimate?.tenant_id || estimateTenantId))
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     expect(clientError).toBeNull();
-    expect(someClient?.id).toBeTruthy();
+
+    let clientId = String(someClient?.id || "").trim();
+    if (!clientId) {
+      const createClientRes = await api.post("/api/clients", {
+        headers: {
+          Origin: "http://localhost:3000",
+          "Content-Type": "application/json",
+        },
+        data: {
+          name: `E2E Quote Client ${now}`,
+          email: `e2e.client+${now}@example.com`,
+          phone: "+15550002222",
+          address: "456 E2E Ave, Austin, TX 73301",
+        },
+      });
+      expect(createClientRes.ok()).toBeTruthy();
+      const createClientJson = await createClientRes.json();
+      expect(createClientJson?.success).toBeTruthy();
+      clientId = String(createClientJson?.data?.id || "").trim();
+    }
+
+    expect(clientId).toBeTruthy();
 
     const ebCreateRes = await api.post("/api/estimate-builder", {
       data: {
         name: `EB Lock Test ${now}`,
         description: "Lock flow test",
         notes: "Lock flow test",
-        client_id: someClient.id,
+        client_id: clientId,
         lines: [
           {
             serviceId: "svc-lock-1",
@@ -181,10 +258,17 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
         contactName: "E2E QA",
         contactEmail: `qa+${now}@example.com`,
         signatureText: "E2E QA Signature",
+        acceptElectronicConsent: true,
       },
     });
+    const signJson = await signRes.json().catch(async () => ({
+      raw: await signRes.text(),
+    }));
+    if (!signRes.ok()) {
+      // eslint-disable-next-line no-console
+      console.log("sign response", signRes.status(), signJson);
+    }
     expect(signRes.ok()).toBeTruthy();
-    const signJson = await signRes.json();
     expect(signJson?.success).toBeTruthy();
     expect(signJson?.data?.quoteStatus).toBe("signed");
 

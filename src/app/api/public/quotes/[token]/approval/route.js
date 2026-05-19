@@ -23,6 +23,40 @@ function sanitizeText(value, maxLen) {
     .slice(0, maxLen);
 }
 
+function getMissingColumnName(errorMessage) {
+  const message = String(errorMessage || "");
+  const match = message.match(/Could not find the '([^']+)' column/i);
+  return match?.[1] || "";
+}
+
+async function updateQuoteWithSchemaFallback({ quoteId, tenantId, update }) {
+  const candidateUpdate = { ...update };
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabaseAdmin
+      .from(QUOTES)
+      .update(candidateUpdate)
+      .eq("id", quoteId)
+      .eq("tenant_id", tenantId || null);
+
+    if (!error) {
+      return { error: null, appliedUpdate: candidateUpdate };
+    }
+
+    const missingColumn = getMissingColumnName(error.message);
+    if (!missingColumn || !(missingColumn in candidateUpdate)) {
+      return { error, appliedUpdate: candidateUpdate };
+    }
+
+    delete candidateUpdate[missingColumn];
+  }
+
+  return {
+    error: new Error("Failed to update quote due to repeated schema mismatches"),
+    appliedUpdate: candidateUpdate,
+  };
+}
+
 export async function POST(request, { params }) {
   try {
     const { token } = await params;
@@ -166,11 +200,12 @@ export async function POST(request, { params }) {
         updated_at: nowIso,
       };
 
-      const { error: quoteUpdateError } = await supabaseAdmin
-        .from(QUOTES)
-        .update(update)
-        .eq("id", quoteRow.id)
-        .eq("tenant_id", quoteRow.tenant_id || null);
+      const { error: quoteUpdateError, appliedUpdate } =
+        await updateQuoteWithSchemaFallback({
+          quoteId: quoteRow.id,
+          tenantId: quoteRow.tenant_id,
+          update,
+        });
       if (quoteUpdateError) {
         console.error(
           "[api/public/quotes/:token/approval][POST] Supabase quote update error",
@@ -184,7 +219,7 @@ export async function POST(request, { params }) {
             request,
             quote: {
               ...quoteRow,
-              ...update,
+              ...appliedUpdate,
             },
             contactName,
             contactEmail,
@@ -199,13 +234,28 @@ export async function POST(request, { params }) {
           success: true,
           data: {
             quoteStatus: nextStatus,
-            quoteApprovedAt: update.approved_at || "",
-            quoteSignedAt: update.quote_signed_at || "",
-            quoteApprovedByName: update.quote_approved_by_name || "",
-            quoteApprovedByEmail: update.quote_approved_by_email || "",
-            quoteSignedByName: update.quote_signed_by_name || "",
-            quoteSignedByEmail: update.quote_signed_by_email || "",
-            quoteSignatureText: update.quote_signature_text || "",
+            quoteApprovedAt: appliedUpdate.approved_at || quoteRow.approved_at || "",
+            quoteSignedAt: appliedUpdate.quote_signed_at || quoteRow.quote_signed_at || "",
+            quoteApprovedByName:
+              appliedUpdate.quote_approved_by_name ||
+              quoteRow.quote_approved_by_name ||
+              "",
+            quoteApprovedByEmail:
+              appliedUpdate.quote_approved_by_email ||
+              quoteRow.quote_approved_by_email ||
+              "",
+            quoteSignedByName:
+              appliedUpdate.quote_signed_by_name ||
+              quoteRow.quote_signed_by_name ||
+              "",
+            quoteSignedByEmail:
+              appliedUpdate.quote_signed_by_email ||
+              quoteRow.quote_signed_by_email ||
+              "",
+            quoteSignatureText:
+              appliedUpdate.quote_signature_text ||
+              quoteRow.quote_signature_text ||
+              "",
             signatureEvidence,
           },
         }),

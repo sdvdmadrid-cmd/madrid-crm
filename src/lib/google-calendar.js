@@ -25,7 +25,7 @@ function isExpired(expiresAt) {
 }
 
 export async function getGoogleIntegration({ userId, tenantId = null }) {
-  let query = supabaseAdmin
+  const baseQuery = supabaseAdmin
     .from("integrations")
     .select(
       "id, tenant_id, user_id, provider, access_token, refresh_token, expires_at",
@@ -34,10 +34,20 @@ export async function getGoogleIntegration({ userId, tenantId = null }) {
     .eq("provider", "google");
 
   if (tenantId) {
-    query = query.eq("tenant_id", tenantId);
+    const { data: tenantScopedData, error: tenantScopedError } = await baseQuery
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    if (tenantScopedError) {
+      throw new Error(tenantScopedError.message);
+    }
+
+    if (tenantScopedData) {
+      return tenantScopedData;
+    }
   }
 
-  const { data, error } = await query.maybeSingle();
+  const { data, error } = await baseQuery.maybeSingle();
   if (error) {
     throw new Error(error.message);
   }
