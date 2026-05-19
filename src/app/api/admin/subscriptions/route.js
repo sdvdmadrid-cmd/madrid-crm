@@ -1,23 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
 
-function formatCurrency(value) {
-  const amount = Number(value || 0);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
-
-function formatDate(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export async function GET(request) {
   try {
     const { role, authenticated } = await getAuthenticatedTenantContext(request);
@@ -52,10 +35,6 @@ export async function GET(request) {
           id,
           name,
           price_monthly
-        ),
-        tenants (
-          tenant_name,
-          email
         )
       `,
       )
@@ -72,11 +51,45 @@ export async function GET(request) {
       throw new Error(error.message);
     }
 
+    const tenantIds = [...new Set((data || []).map((row) => row.tenant_id).filter(Boolean))];
+    const tenantDirectory = new Map();
+
+    if (tenantIds.length > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("id,email,name")
+        .in("id", tenantIds);
+
+      (profiles || []).forEach((profile) => {
+        tenantDirectory.set(profile.id, {
+          tenantName: profile.name || profile.email || "-",
+          tenantEmail: profile.email || "-",
+        });
+      });
+
+      const missingTenantIds = tenantIds.filter((tenantId) => !tenantDirectory.has(tenantId));
+      if (missingTenantIds.length > 0) {
+        const { data: tenants, error: tenantsError } = await supabaseAdmin
+          .from("tenants")
+          .select("id,tenant_name,email")
+          .in("id", missingTenantIds);
+
+        if (!tenantsError) {
+          (tenants || []).forEach((tenant) => {
+            tenantDirectory.set(tenant.id, {
+              tenantName: tenant.tenant_name || tenant.email || "-",
+              tenantEmail: tenant.email || "-",
+            });
+          });
+        }
+      }
+    }
+
     const rows = (data || []).map((row) => ({
       id: row.id,
       tenantId: row.tenant_id,
-      tenantName: row.tenants?.tenant_name || "-",
-      tenantEmail: row.tenants?.email || "-",
+      tenantName: tenantDirectory.get(row.tenant_id)?.tenantName || "-",
+      tenantEmail: tenantDirectory.get(row.tenant_id)?.tenantEmail || "-",
       planName: row.subscription_plans?.name || "-",
       priceMonthly: row.subscription_plans?.price_monthly || 0,
       status: row.status,

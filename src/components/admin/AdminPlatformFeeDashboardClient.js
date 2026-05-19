@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api-helpers";
+import { apiFetch, getJsonOrThrow } from "@/lib/api-helpers";
 
 export function AdminPlatformFeeDashboardClient() {
   const [data, setData] = useState(null);
@@ -13,14 +13,10 @@ export function AdminPlatformFeeDashboardClient() {
     async function load() {
       try {
         setLoading(true);
-        const result = await apiFetch("/api/admin/bill-payments/platform-fees");
-
-        if (result.success) {
-          setData(result.data);
-          setError(null);
-        } else {
-          setError(result.error || "Failed to load platform fee data");
-        }
+        const response = await apiFetch("/api/admin/bill-payments/platform-fees");
+        const payload = await getJsonOrThrow(response, "Failed to load platform fee data");
+        setData(payload?.data || null);
+        setError(null);
       } catch (err) {
         setError(err.message || "Error loading platform fees");
       } finally {
@@ -55,23 +51,27 @@ export function AdminPlatformFeeDashboardClient() {
     try {
       setRetrying((prev) => new Set(prev).add(feeId));
 
-      const result = await apiFetch("/api/admin/bill-payments/platform-fee/retry", {
+      const response = await apiFetch("/api/admin/bill-payments/platform-fee/retry", {
         method: "POST",
-        body: {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           feeId,
           tenantId,
           chargeMonth,
-        },
+        }),
       });
+      const payload = await getJsonOrThrow(response, "Failed to retry charge");
 
-      if (result.success) {
+      if (payload?.success) {
         // Reload data
-        const reloadResult = await apiFetch("/api/admin/bill-payments/platform-fees");
-        if (reloadResult.success) {
-          setData(reloadResult.data);
-        }
+        const reloadResponse = await apiFetch("/api/admin/bill-payments/platform-fees");
+        const reloadPayload = await getJsonOrThrow(
+          reloadResponse,
+          "Failed to load platform fee data",
+        );
+        setData(reloadPayload?.data || null);
       } else {
-        setError(result.error || "Failed to retry charge");
+        setError(payload?.error || "Failed to retry charge");
       }
     } catch (err) {
       setError(err.message || "Error retrying charge");
