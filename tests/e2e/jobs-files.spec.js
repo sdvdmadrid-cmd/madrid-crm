@@ -12,12 +12,50 @@ async function loginAsAdmin(page) {
   await expect(page.getByRole('heading', { name: 'Jobs' })).toBeVisible();
 }
 
+async function ensureLegalAccepted(api) {
+  const originHeaders = { Origin: 'http://localhost:3000' };
+
+  const statusRes = await api.get('/api/legal/status', { headers: originHeaders });
+  const statusJson = await statusRes.json().catch(() => null);
+  if (statusRes.ok() && statusJson?.data?.accepted) {
+    return;
+  }
+
+  const versionRes = await api.get('/api/legal/version', { headers: originHeaders });
+  const versionJson = await versionRes.json().catch(() => null);
+  const version = String(versionJson?.data?.version || '').trim();
+
+  const acceptRes = await api.post('/api/legal/accept', {
+    headers: {
+      ...originHeaders,
+      'Content-Type': 'application/json',
+    },
+    data: version ? { version } : {},
+  });
+  expect(acceptRes.ok()).toBeTruthy();
+}
+
 async function createJob(page, title) {
+  const createJobResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/jobs') &&
+      response.request().method() === 'POST',
+  );
+
   await page.getByPlaceholder('Title').fill(title);
   await page.getByPlaceholder('Client').fill('Playwright Client');
   await page.getByPlaceholder('Service').fill('File Management Test');
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('heading', { name: title })).toBeVisible();
+
+  const createJobResponse = await createJobResponsePromise;
+  const createJobJson = await createJobResponse.json().catch(() => null);
+  expect(createJobResponse.ok(), JSON.stringify(createJobJson)).toBeTruthy();
+
+  const jobTitle = String(createJobJson?.data?.title || title);
+  const jobCard = getJobCard(page, jobTitle);
+  await expect(jobCard).toBeVisible();
+
+  return jobTitle;
 }
 
 function getJobCard(page, title) {
@@ -31,13 +69,14 @@ test.describe('jobs file management', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
+    await ensureLegalAccepted(page.request);
   });
 
   test('validates photo upload type in Manage files panel', async ({ page }) => {
     const title = `PW Job Files ${Date.now()}`;
-    await createJob(page, title);
+    const createdTitle = await createJob(page, title);
 
-    const jobCard = getJobCard(page, title);
+    const jobCard = getJobCard(page, createdTitle);
     await jobCard.getByRole('button', { name: 'Manage files' }).click();
     const filesPanel = jobCard.getByTestId('job-files-panel');
 
@@ -59,9 +98,9 @@ test.describe('jobs file management', () => {
 
   test('requires typing DELETE in job delete modal', async ({ page }) => {
     const title = `PW Job Delete ${Date.now()}`;
-    await createJob(page, title);
+    const createdTitle = await createJob(page, title);
 
-    const jobCard = getJobCard(page, title);
+    const jobCard = getJobCard(page, createdTitle);
     await jobCard.getByRole('button', { name: 'Delete' }).click();
 
     await expect(page.getByRole('heading', { name: 'Delete this item?' })).toBeVisible();

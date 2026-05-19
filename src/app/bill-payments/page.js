@@ -1421,6 +1421,21 @@ export default function BillPaymentsPage() {
               >
                 + Add Bill
               </button>
+              <button
+                type="button"
+                onClick={() => router.push("/bill-payments/processing-center")}
+                style={{
+                  border: "1px solid rgba(14,165,233,0.34)",
+                  borderRadius: 999,
+                  background: "rgba(14,165,233,0.12)",
+                  color: "#0c4a6e",
+                  padding: "11px 17px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Open Processing Center
+              </button>
             </div>
 
             <div
