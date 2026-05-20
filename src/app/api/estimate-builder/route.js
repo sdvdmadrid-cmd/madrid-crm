@@ -86,6 +86,13 @@ export async function POST(request) {
     const body = await request.json();
     const nowIso = new Date().toISOString();
 
+    if (!body.client_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: "client_id is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const estimateNumber = String(body.estimate_number || body.estimateNumber || "").trim() ||
       await nextEstimateBuilderNumber(tenantDbId);
 

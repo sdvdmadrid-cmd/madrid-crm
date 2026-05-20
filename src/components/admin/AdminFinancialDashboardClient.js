@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-helpers";
+import { getJsonOrThrow } from "@/lib/api-helpers";
 
 export function AdminFinancialDashboardClient() {
   const [data, setData] = useState(null);
@@ -13,16 +14,12 @@ export function AdminFinancialDashboardClient() {
     async function load() {
       try {
         setLoading(true);
-        const result = await apiFetch("/api/admin/financial", {
-          query: { scope: activeTab },
-        });
-
-        if (result.success) {
-          setData(result.data);
-          setError(null);
-        } else {
-          setError(result.error || "Failed to load financial data");
-        }
+        const response = await apiFetch(
+          `/api/admin/financial?scope=${encodeURIComponent(activeTab)}`,
+        );
+        const payload = await getJsonOrThrow(response, "Failed to load financial data");
+        setData(payload?.data || null);
+        setError(null);
       } catch (err) {
         setError(err.message || "Error loading financial data");
       } finally {
