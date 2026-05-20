@@ -1058,7 +1058,7 @@ export default function AuthShell({ children }) {
   const mainNavItems = isSuperAdminRole
     ? [
         {
-          href: "/admin",
+          href: "/owner/overview",
           label: t("sidebar.platform"),
           iconKey: "platform",
         },
@@ -1112,33 +1112,33 @@ export default function AuthShell({ children }) {
   const secondaryNavItems = isSuperAdminRole
     ? [
         {
-          href: "/admin",
+          href: "/owner/overview",
           label: t("sidebar.adminOverview"),
           iconKey: "platform",
           exact: true,
         },
         {
-          href: "/admin#tenant-command-center",
+          href: "/owner/ai-ops",
           label: t("sidebar.adminAi"),
           iconKey: "insights",
         },
         {
-          href: "/admin#stripe-overview",
+          href: "/owner/revenue",
           label: t("sidebar.adminStripe"),
           iconKey: "billPayments",
         },
         {
-          href: "/admin#security-watch",
+          href: "/owner/security",
           label: t("sidebar.adminSecurity"),
           iconKey: "services",
         },
         {
-          href: "/admin#support-queue",
+          href: "/owner/support",
           label: t("sidebar.adminSupport"),
           iconKey: "clients",
         },
         {
-          href: "/admin/settings",
+          href: "/owner/settings",
           label: t("sidebar.adminSettings"),
           iconKey: "settings",
         },
@@ -1186,7 +1186,7 @@ export default function AuthShell({ children }) {
 
   const bottomNavItems = [
     {
-      href: isSuperAdminRole ? "/admin/settings" : "/workspace-owner",
+      href: isSuperAdminRole ? "/owner/settings" : "/workspace-owner",
       label: t("sidebar.settings"),
       iconKey: "settings",
     },
@@ -1228,6 +1228,10 @@ export default function AuthShell({ children }) {
     const section = segments[0];
     if (section === "admin") {
       return "/admin";
+    }
+
+    if (section === "owner") {
+      return "/owner/overview";
     }
 
     return `/${section}`;

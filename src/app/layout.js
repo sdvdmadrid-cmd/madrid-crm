@@ -5,6 +5,10 @@ import InstantNavigation from "@/components/InstantNavigation";
 import I18nProvider from "@/components/I18nProvider";
 import MarketingScripts from "@/components/MarketingScripts";
 
+const APP_BASE_URL = String(
+  process.env.APP_BASE_URL || process.env.APP_URL || "https://fieldbaseapp.net",
+).replace(/\/$/, "");
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -19,6 +23,10 @@ export const metadata = {
   title: "FieldBase",
   description:
     "Complete contractor management system for clients jobs invoices and contracts.",
+  metadataBase: new URL(APP_BASE_URL),
+  alternates: {
+    canonical: "/",
+  },
   manifest: "/site.webmanifest?v=4",
   icons: {
     icon: [
