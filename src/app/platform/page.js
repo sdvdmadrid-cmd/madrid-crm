@@ -15,7 +15,7 @@ export default async function PlatformPage() {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/admin");
+    redirect("/login?next=/owner/overview");
   }
 
   const role = String(session.role || "").toLowerCase();
@@ -23,5 +23,5 @@ export default async function PlatformPage() {
     redirect("/dashboard");
   }
 
-  redirect("/admin");
+  redirect("/owner/overview");
 }

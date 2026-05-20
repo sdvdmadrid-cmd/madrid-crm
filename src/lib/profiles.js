@@ -1,7 +1,18 @@
 import "server-only";
 
 import { normalizeAppRole } from "@/lib/access-control";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+
+let supabaseAdminPromise = null;
+
+async function getSupabaseAdmin() {
+  if (!supabaseAdminPromise) {
+    supabaseAdminPromise = import("@/lib/supabase-admin").then(
+      (module) => module.supabaseAdmin,
+    );
+  }
+
+  return supabaseAdminPromise;
+}
 
 const PROFILES = "profiles";
 
@@ -24,6 +35,8 @@ function mapProfile(row) {
 export async function getProfileByUserId(userId) {
   if (!userId) return null;
 
+  const supabaseAdmin = await getSupabaseAdmin();
+
   const { data, error } = await supabaseAdmin
     .from(PROFILES)
     .select("id, tenant_id, role")
@@ -39,6 +52,8 @@ export async function getProfileByUserId(userId) {
 
 export async function countProfilesInTenant(tenantId) {
   if (!tenantId) return 0;
+
+  const supabaseAdmin = await getSupabaseAdmin();
 
   const { count, error } = await supabaseAdmin
     .from(PROFILES)
@@ -59,6 +74,8 @@ export async function upsertProfile({ id, tenantId, role }) {
   if (!tenantId) {
     throw new Error("Profile tenant id is required");
   }
+
+  const supabaseAdmin = await getSupabaseAdmin();
 
   const { data, error } = await supabaseAdmin
     .from(PROFILES)

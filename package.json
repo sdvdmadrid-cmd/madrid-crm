@@ -13,7 +13,13 @@
     "test:e2e:ui": "playwright test --ui",
     "pooling:enable": "node scripts/auto-pooling.mjs",
     "pooling:verify": "node scripts/verify-pooling.mjs",
-    "pooling:info": "node scripts/pooling-quick-start.mjs"
+    "pooling:info": "node scripts/pooling-quick-start.mjs",
+    "indexnow:submit": "node scripts/submit-indexnow.mjs",
+    "indexing:verify": "node scripts/verify-indexing-postdeploy.mjs",
+    "release:prod:indexing": "powershell -ExecutionPolicy Bypass -File scripts/release-prod-indexing.ps1",
+    "env:backup": "powershell -ExecutionPolicy Bypass -File scripts/env-backup.ps1",
+    "env:restore": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1",
+    "env:backups": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1 -List"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -28,6 +34,7 @@
     "@upstash/redis": "^1.37.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "crypto-js": "^4.2.0",
+    "dotenv-cli": "^11.0.0",
     "i18next": "^24.2.3",
     "inngest": "^4.4.0",
     "ioredis": "^5.10.1",
@@ -40,6 +47,7 @@
     "react-dom": "^19.2.5",
     "react-i18next": "^15.4.1",
     "redis": "^5.12.1",
+    "server-only": "^0.0.1",
     "stripe": "^17.7.0",
     "tailwindcss": "^4.1.4"
   },
