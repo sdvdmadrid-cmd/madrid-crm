@@ -111,7 +111,7 @@ export default function RevenueDashboardPage() {
         const sessionPayload = await sessionResult.value.json().catch(() => null);
         const sessionRole = String(sessionPayload?.data?.role || "").toLowerCase();
         if (sessionRole === "super_admin") {
-          router.replace("/admin");
+          router.replace("/owner/overview");
           return;
         }
         setUserName(String(sessionPayload?.data?.name || "").trim());
