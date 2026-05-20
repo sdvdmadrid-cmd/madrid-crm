@@ -1,3 +1,5 @@
+import AdminEmailDeliveryClient from '@/components/admin/AdminEmailDeliveryClient';
+
 export default function OwnerEmailsPage() {
-  return <div>Email delivery monitoring coming soon...</div>;
+  return <AdminEmailDeliveryClient />;
 }

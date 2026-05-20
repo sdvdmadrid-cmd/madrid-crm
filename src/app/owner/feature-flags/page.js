@@ -1,3 +1,5 @@
+import AdminFeatureFlagsClient from '@/components/admin/AdminFeatureFlagsClient';
+
 export default function OwnerFeatureFlagsPage() {
-  return <div>Feature flags management coming soon...</div>;
+  return <AdminFeatureFlagsClient />;
 }

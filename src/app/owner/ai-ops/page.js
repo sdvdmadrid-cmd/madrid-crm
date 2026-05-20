@@ -1,3 +1,11 @@
+import AdminAiAssistantClient from '@/components/admin/AdminAiAssistantClient';
+import AdminAiMonitoringClient from '@/components/admin/AdminAiMonitoringClient';
+
 export default function OwnerAIOpsPage() {
-  return <div>AI Operations dashboard coming soon...</div>;
+  return (
+    <section className="space-y-6">
+      <AdminAiAssistantClient />
+      <AdminAiMonitoringClient />
+    </section>
+  );
 }

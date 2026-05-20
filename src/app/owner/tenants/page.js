@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+
 export default function OwnerTenantsPage() {
-  return <div>Tenants management coming soon...</div>;
+  redirect('/admin#tenant-command-center');
+  return null;
 }

@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+
 export default function OwnerSecurityPage() {
-  return <div>Security watch coming soon...</div>;
+  redirect('/admin#security-watch');
+  return null;
 }

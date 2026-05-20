@@ -1,4 +1,5 @@
 "use client";
+import Link from 'next/link';
 const NAV = [
   { label: 'Overview', href: '/owner/overview' },
   { label: 'Tenants', href: '/owner/tenants' },
@@ -26,12 +27,12 @@ export default function OwnerSidebar() {
             const isActive = pathname && pathname.startsWith(item.href);
             return (
               <li key={item.href}>
-                <a
+                <Link
                   href={item.href}
                   className={isActive ? 'active' : ''}
                 >
                   {item.label}
-                </a>
+                </Link>
               </li>
             );
           })}

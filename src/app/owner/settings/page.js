@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+
 export default function OwnerSettingsPage() {
-  return <div>Settings coming soon...</div>;
+  redirect('/admin/settings');
+  return null;
 }

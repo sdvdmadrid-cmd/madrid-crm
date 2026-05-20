@@ -15,7 +15,7 @@ export default async function PlatformFeedbackRedirectPage() {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/admin");
+    redirect("/login?next=/owner/support");
   }
 
   const role = String(session.role || "").toLowerCase();
@@ -23,5 +23,5 @@ export default async function PlatformFeedbackRedirectPage() {
     redirect("/dashboard");
   }
 
-  redirect("/admin#support-queue");
+  redirect("/owner/support");
 }

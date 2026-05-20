@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+
 export default function OwnerActivityPage() {
-  return <div>Activity feed coming soon...</div>;
+  redirect('/admin');
+  return null;
 }

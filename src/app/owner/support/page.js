@@ -1,3 +1,6 @@
+import { redirect } from 'next/navigation';
+
 export default function OwnerSupportPage() {
-  return <div>Support queue coming soon...</div>;
+  redirect('/admin#support-queue');
+  return null;
 }

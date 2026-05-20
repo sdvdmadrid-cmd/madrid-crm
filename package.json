@@ -16,7 +16,10 @@
     "pooling:info": "node scripts/pooling-quick-start.mjs",
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "indexing:verify": "node scripts/verify-indexing-postdeploy.mjs",
-    "release:prod:indexing": "powershell -ExecutionPolicy Bypass -File scripts/release-prod-indexing.ps1"
+    "release:prod:indexing": "powershell -ExecutionPolicy Bypass -File scripts/release-prod-indexing.ps1",
+    "env:backup": "powershell -ExecutionPolicy Bypass -File scripts/env-backup.ps1",
+    "env:restore": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1",
+    "env:backups": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1 -List"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
