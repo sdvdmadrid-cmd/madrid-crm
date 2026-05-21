@@ -115,11 +115,15 @@ export default function PublicBillPaymentsRegisterPage() {
         <input
           required
           type="password"
+          minLength={8}
           placeholder="Password"
           value={form.password}
           onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
           style={{ borderRadius: 10, border: "1px solid #cbd5e1", padding: "10px 12px" }}
         />
+        <p style={{ margin: "-4px 0 0", color: "#64748b", fontSize: 13 }}>
+          Use at least 8 characters with 1 uppercase letter, 1 number, and 1 special character.
+        </p>
 
         <button
           type="submit"

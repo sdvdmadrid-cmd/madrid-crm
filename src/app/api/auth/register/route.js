@@ -49,6 +49,21 @@ function tenantSeedFromEmail(email) {
   return sanitizeTenantSlug(localPart) || "workspace";
 }
 
+function verificationOriginUnavailableResponse() {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error:
+        "We could not generate a verification link for this request. Open the app using its public URL or configure APP_URL / APP_BASE_URL, then try again.",
+      code: "VERIFICATION_LINK_ORIGIN_UNAVAILABLE",
+    }),
+    {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -147,7 +162,7 @@ export async function POST(request) {
           try {
             const origin = getRequestOrigin(request);
             if (!origin) {
-              throw new Error("APP_URL must be configured for verification links");
+              return verificationOriginUnavailableResponse();
             }
 
             const { verifyUrl } = await generateSignupVerificationLink({
@@ -295,6 +310,12 @@ export async function POST(request) {
     const assignedRole = isSuperAdmin
       ? "super_admin"
       : normalizeAppRole(finalRole);
+    const verificationOrigin = isSuperAdmin ? "" : getRequestOrigin(request);
+
+    if (!isSuperAdmin && !verificationOrigin) {
+      return verificationOriginUnavailableResponse();
+    }
+
     const now = new Date();
     const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const authPayload = {
@@ -390,15 +411,9 @@ export async function POST(request) {
       });
     }
 
-    const origin = getRequestOrigin(request);
-    if (!origin) {
-      throw new Error(
-        "APP_URL must be configured for signup verification links",
-      );
-    }
     const { verifyUrl } = await generateSignupVerificationLink({
       email,
-      origin,
+      origin: verificationOrigin,
       userId: createdUser.id,
     });
 

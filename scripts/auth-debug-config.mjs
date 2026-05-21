@@ -1,8 +1,17 @@
 import fs from "node:fs";
 
 function readEnv() {
-  const lines = fs.readFileSync(".env.local", "utf8").split(/\r?\n/);
   const map = new Map();
+  if (!fs.existsSync(".env.local")) {
+    for (const [key, value] of Object.entries(process.env)) {
+      if (typeof value === "string") {
+        map.set(key, value);
+      }
+    }
+    return map;
+  }
+
+  const lines = fs.readFileSync(".env.local", "utf8").split(/\r?\n/);
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
