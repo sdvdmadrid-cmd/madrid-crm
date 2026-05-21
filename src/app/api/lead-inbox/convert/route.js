@@ -1,5 +1,6 @@
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -41,6 +42,9 @@ async function findClient(tenantId, email, phone) {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();

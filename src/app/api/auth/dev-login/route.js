@@ -1,4 +1,4 @@
-﻿import { normalizeAppRole } from "@/lib/access-control";
+import { normalizeAppRole } from "@/lib/access-control";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
 import { upsertProfile } from "@/lib/profiles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -18,13 +18,13 @@ const DEV_PROFILES = {
     role: "super_admin",
   },
   admin: {
-    tenantId: process.env.DEV_ADMIN_TENANT_ID || "tenant-admin",
+    tenantId: process.env.DEV_ADMIN_TENANT_ID || "platform",
     email: (process.env.DEV_ADMIN_EMAIL || "admin@FieldBase.local")
       .trim()
       .toLowerCase(),
     password: String(process.env.DEV_ADMIN_PASSWORD || "").trim(),
-    name: process.env.DEV_ADMIN_NAME || "Admin Dev",
-    role: "admin",
+    name: process.env.DEV_ADMIN_NAME || "Platform Admin",
+    role: "super_admin",
   },
   viewer: {
     tenantId: process.env.DEV_VIEWER_TENANT_ID || "tenant-admin",
@@ -92,10 +92,16 @@ function isAllowed(request) {
   );
 }
 
-function getRedirectTarget(request) {
+function getRedirectTarget(request, role) {
   const url = new URL(request.url);
-  const redirect = url.searchParams.get("redirect") || "/";
-  return redirect.startsWith("/") ? redirect : "/";
+  const redirect = url.searchParams.get("redirect");
+  if (redirect?.startsWith("/")) {
+    return redirect;
+  }
+  if (String(role || "").toLowerCase() === "super_admin") {
+    return "/owner/overview";
+  }
+  return "/dashboard";
 }
 
 function getProfile(request) {
@@ -191,7 +197,7 @@ export async function GET(request) {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: getRedirectTarget(request),
+        Location: getRedirectTarget(request, sessionUser.role),
         "Cache-Control": "no-store",
         "Set-Cookie": buildSessionCookie(createSessionToken(sessionUser)),
       },

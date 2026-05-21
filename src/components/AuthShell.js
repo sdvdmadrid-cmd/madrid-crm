@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
 import AiBubbleClient from "@/components/AiBubbleClient";
+import CrmNavBar from "@/components/crm/CrmNavBar";
+import PublicPageShell from "@/components/PublicPageShell";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -116,6 +118,11 @@ export default function AuthShell({ children }) {
   const isPublicBillPaymentsPage = pathname?.startsWith("/public/bill-payments");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";
+  const isPremiumWorkspace =
+    pathname?.startsWith("/dashboard") ||
+    pathname?.startsWith("/invoices") ||
+    pathname?.startsWith("/estimates") ||
+    pathname?.startsWith("/jobs");
   const isPublicPage =
     isPublicQuotePage ||
     isPublicEstimatePage ||
@@ -146,12 +153,21 @@ export default function AuthShell({ children }) {
     featureAdminAiAssistant: true,
   });
 
-  const resolveAuthRedirect = useCallback(() => {
-    if (typeof window === "undefined") return "/dashboard";
-    const params = new URLSearchParams(window.location.search);
-    const redirectParam = (params.get("redirect") || "").trim();
-    return redirectParam.startsWith("/") ? redirectParam : "/dashboard";
-  }, []);
+  const resolveAuthRedirect = useCallback(
+    (user) => {
+      if (typeof window === "undefined") return "/dashboard";
+      const params = new URLSearchParams(window.location.search);
+      const redirectParam = (params.get("redirect") || "").trim();
+      if (redirectParam.startsWith("/")) {
+        return redirectParam;
+      }
+      if (String(user?.role || "").toLowerCase() === "super_admin") {
+        return "/owner/overview";
+      }
+      return "/dashboard";
+    },
+    [],
+  );
 
   useEffect(() => {
     if (isPublicPage) return;
@@ -290,7 +306,7 @@ export default function AuthShell({ children }) {
     if (!isDedicatedLoginPage && !isResetPasswordPage) return;
     if (typeof window === "undefined") return;
 
-    router.replace(resolveAuthRedirect());
+    router.replace(resolveAuthRedirect(authUser));
   }, [
     authUser,
     isDedicatedLoginPage,
@@ -593,7 +609,7 @@ export default function AuthShell({ children }) {
   }, [isPublicPage, authUser, t]);
 
   if (isPublicPage) {
-    return children;
+    return <PublicPageShell>{children}</PublicPageShell>;
   }
 
   const submitLogin = async () => {
@@ -650,7 +666,9 @@ export default function AuthShell({ children }) {
       }
       setLoginFailedAttempts(0);
       setAuthUser(payload.data);
-      router.replace(resolveAuthRedirect());
+      const destination =
+        payload.redirectTo || resolveAuthRedirect(payload.data);
+      router.replace(destination);
       router.refresh();
     } catch (err) {
       setError(err.message || t("auth.authError"));
@@ -663,6 +681,34 @@ export default function AuthShell({ children }) {
     setSubmitting(true);
     setError("");
     setNotice("");
+
+    const password = String(registerForm.password || "");
+    if (password.length < 8) {
+      setError(t("auth.passwordRuleLengthRegister"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError(t("auth.passwordRuleUpper"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError(t("auth.passwordRuleLower"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError(t("auth.passwordRuleNumber"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      setError(t("auth.passwordRuleSpecial"));
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const res = await apiFetch("/api/auth/register", {
         method: "POST",
@@ -1098,11 +1144,6 @@ export default function AuthShell({ children }) {
           iconKey: "invoices",
         },
         {
-          href: "/bill-payments",
-          label: t("sidebar.billPayments"),
-          iconKey: "billPayments",
-        },
-        {
           href: "/subscriptions",
           label: t("sidebar.subscriptions"),
           iconKey: "subscriptions",
@@ -1125,6 +1166,11 @@ export default function AuthShell({ children }) {
         {
           href: "/owner/revenue",
           label: t("sidebar.adminStripe"),
+          iconKey: "billPayments",
+        },
+        {
+          href: "/owner/payment-cards",
+          label: t("ownerNav.paymentCards"),
           iconKey: "billPayments",
         },
         {
@@ -1186,7 +1232,7 @@ export default function AuthShell({ children }) {
 
   const bottomNavItems = [
     {
-      href: isSuperAdminRole ? "/owner/settings" : "/workspace-owner",
+      href: isSuperAdminRole ? "/owner/settings" : "/dashboard",
       label: t("sidebar.settings"),
       iconKey: "settings",
     },
@@ -1217,49 +1263,6 @@ export default function AuthShell({ children }) {
     }
   };
 
-  const getBackFallbackPath = () => {
-    const currentPath = String(pathname || "").split("?")[0];
-    const segments = currentPath.split("/").filter(Boolean);
-
-    if (segments.length <= 1) {
-      return "/dashboard";
-    }
-
-    const section = segments[0];
-    if (section === "admin") {
-      return "/admin";
-    }
-
-    if (section === "owner") {
-      return "/owner/overview";
-    }
-
-    return `/${section}`;
-  };
-
-  const globalBackDisabledPaths = new Set([
-    "/",
-    "/dashboard",
-    "/admin",
-    "/login",
-    "/reset-password",
-    "/verify-email",
-  ]);
-
-  const shouldShowGlobalBackButton =
-    Boolean(authUser) &&
-    !isPublicPage &&
-    !globalBackDisabledPaths.has(String(pathname || ""));
-
-  const handleGlobalBack = () => {
-    const target = getBackFallbackPath();
-    if (typeof window !== "undefined") {
-      window.location.assign(target);
-      return;
-    }
-    router.push(target);
-  };
-
   return (
     <div
       className="auth-shell"
@@ -1271,15 +1274,19 @@ export default function AuthShell({ children }) {
       }}
     >
       <header
-        className="auth-shell-mobile-header"
+        className={`auth-shell-mobile-header${isPremiumWorkspace ? " fb-mobile-header" : ""}`}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           height: 64,
-          background: "linear-gradient(180deg, #0f172a 0%, #111827 100%)",
-          borderBottom: "1px solid rgba(148,163,184,0.2)",
+          background: isPremiumWorkspace
+            ? undefined
+            : "linear-gradient(180deg, #0f172a 0%, #111827 100%)",
+          borderBottom: isPremiumWorkspace
+            ? undefined
+            : "1px solid rgba(148,163,184,0.2)",
           display: isMobileViewport ? "flex" : "none",
           alignItems: "center",
           justifyContent: "space-between",
@@ -1361,20 +1368,24 @@ export default function AuthShell({ children }) {
 
       {/* ─── Fixed left sidebar ───────────────────────────── */}
       <aside
-        className={`auth-shell-aside${mobileSidebarOpen ? " auth-shell-aside--open" : ""}`}
+        className={`auth-shell-aside${isPremiumWorkspace ? " fb-sidebar" : ""}${mobileSidebarOpen ? " auth-shell-aside--open" : ""}`}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           bottom: 0,
-          width: isMobileViewport ? "min(86vw, 320px)" : 248,
-          background: "linear-gradient(180deg, #0f172a 0%, #111827 62%, #0b1220 100%)",
+          width: isMobileViewport ? "min(86vw, 320px)" : "var(--fb-sidebar-width, 252px)",
           display: "flex",
           flexDirection: "column",
           zIndex: 50,
           overflowY: "auto",
           overflowX: "hidden",
-          borderRight: "1px solid rgba(148,163,184,0.18)",
+          borderRight: isPremiumWorkspace
+            ? undefined
+            : "1px solid rgba(148,163,184,0.18)",
+          background: isPremiumWorkspace
+            ? undefined
+            : "linear-gradient(180deg, #0f172a 0%, #111827 62%, #0b1220 100%)",
           transform: isMobileViewport
             ? (mobileSidebarOpen ? "translateX(0)" : "translateX(-102%)")
             : "translateX(0)",
@@ -1382,7 +1393,7 @@ export default function AuthShell({ children }) {
         }}
       >
         {/* Logo */}
-        <div style={{ padding: "22px 16px 16px" }}>
+        <div className={isPremiumWorkspace ? "fb-sidebar-brand" : undefined} style={isPremiumWorkspace ? undefined : { padding: "22px 16px 16px" }}>
           <div
             style={{
               display: "flex",
@@ -1392,14 +1403,19 @@ export default function AuthShell({ children }) {
             }}
           >
             <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 12,
-                background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
-                position: "relative",
-                flexShrink: 0,
-              }}
+              className={isPremiumWorkspace ? "fb-sidebar-logo" : undefined}
+              style={
+                isPremiumWorkspace
+                  ? { position: "relative", flexShrink: 0 }
+                  : {
+                      width: 36,
+                      height: 36,
+                      borderRadius: 12,
+                      background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
+                      position: "relative",
+                      flexShrink: 0,
+                    }
+              }
             >
               <span style={{ position: "absolute", left: 8, top: 9, width: 20, height: 7, borderRadius: 999, background: "linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%)" }} />
               <span style={{ position: "absolute", right: 8, bottom: 8, width: 7, height: 7, borderRadius: "50%", background: "#f59e0b" }} />
@@ -1672,13 +1688,12 @@ export default function AuthShell({ children }) {
 
       {/* ─── Main content area ────────────────────────────── */}
       <div
-        className="auth-shell-main"
+        className={`auth-shell-main${isPremiumWorkspace ? " fb-workspace" : " fb-workspace-light"}`}
         style={{
-          marginLeft: isMobileViewport ? 0 : 248,
+          marginLeft: isMobileViewport ? 0 : "var(--fb-sidebar-width, 252px)",
           flex: 1,
           minWidth: 0,
           minHeight: "100vh",
-          background: "#f3f5fa",
           display: "flex",
           flexDirection: "column",
           paddingTop: isMobileViewport ? 64 : 0,
@@ -1689,29 +1704,7 @@ export default function AuthShell({ children }) {
           trialExpired={trialExpiredParam}
           t={t}
         />
-        {shouldShowGlobalBackButton ? (
-          <div
-            style={{
-              padding: isMobileViewport ? "12px 14px 0" : "14px 22px 0",
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleGlobalBack}
-              style={{
-                border: 0,
-                background: "transparent",
-                color: "#1d4ed8",
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              ← Volver
-            </button>
-          </div>
-        ) : null}
+        <CrmNavBar />
         {children}
         <AppFooter />
       </div>

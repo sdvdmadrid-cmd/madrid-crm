@@ -92,7 +92,11 @@ export async function POST(request) {
   if (access.response) return access.response;
   const { context } = access;
 
-  if (!context.isSubscribed && !context.isSuperAdmin) {
+  if (
+    !context.isSubscribed &&
+    !context.billPaymentsSubscribed &&
+    !context.isSuperAdmin
+  ) {
     const { count, error: countError } = await supabaseAdmin
       .from(BILL_TABLE)
       .select("id", { count: "exact", head: true })

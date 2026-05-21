@@ -1,5 +1,6 @@
 import { generateInvoiceAssistant } from "@/lib/document-ai";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -9,6 +10,8 @@ import {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
     const invoiceAiEnabled = await isPlatformFeatureEnabled("feature_ai_invoice_assistant", true);
     if (!invoiceAiEnabled) {
       return new Response(

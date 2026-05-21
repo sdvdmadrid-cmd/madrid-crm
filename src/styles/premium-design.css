@@ -1,0 +1,274 @@
+/**
+ * FieldBase Premium SaaS design system
+ * Layered slate dark mode — Linear / Stripe / Vercel inspired
+ */
+
+:root {
+  /* Canvas — NOT pure black */
+  --fb-bg-base: #13161c;
+  --fb-bg-subtle: #171b24;
+  --fb-bg-elevated: #1c212b;
+  --fb-bg-surface: #222833;
+  --fb-bg-glass: rgba(28, 33, 43, 0.72);
+
+  /* Borders & glow */
+  --fb-border: rgba(148, 163, 184, 0.12);
+  --fb-border-strong: rgba(148, 163, 184, 0.22);
+  --fb-glow-blue: rgba(59, 130, 246, 0.35);
+  --fb-glow-emerald: rgba(16, 185, 129, 0.28);
+  --fb-glow-violet: rgba(139, 92, 246, 0.25);
+
+  /* Text */
+  --fb-text: #e8ecf4;
+  --fb-text-muted: #94a3b8;
+  --fb-text-subtle: #64748b;
+  --fb-text-heading: #f8fafc;
+
+  /* Accents */
+  --fb-accent-blue: #3b82f6;
+  --fb-accent-blue-soft: rgba(59, 130, 246, 0.15);
+  --fb-accent-emerald: #10b981;
+  --fb-accent-emerald-soft: rgba(16, 185, 129, 0.14);
+  --fb-accent-violet: #8b5cf6;
+  --fb-accent-amber: #f59e0b;
+
+  /* Radius & shadow */
+  --fb-radius-xl: 1rem;
+  --fb-radius-2xl: 1.25rem;
+  --fb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --fb-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --fb-shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --fb-shadow-glow-blue: 0 0 40px -8px var(--fb-glow-blue);
+
+  /* Motion */
+  --fb-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fb-duration: 0.2s;
+
+  /* Sidebar */
+  --fb-sidebar-width: 252px;
+  --fb-sidebar-bg: linear-gradient(
+    180deg,
+    #161a22 0%,
+    #141820 48%,
+    #12151c 100%
+  );
+}
+
+/* ─── App shell ───────────────────────────────────────────── */
+.auth-shell-aside.fb-sidebar {
+  position: relative;
+  width: var(--fb-sidebar-width);
+  background: var(--fb-sidebar-bg);
+  border-right: 1px solid var(--fb-border);
+  backdrop-filter: blur(12px);
+}
+
+.auth-shell-aside.fb-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 80% 40% at 50% 0%,
+    rgba(59, 130, 246, 0.08),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.fb-sidebar-brand {
+  padding: 22px 18px 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.fb-sidebar-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2563eb 0%, #1e3a5f 100%);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.fb-sidebar-nav-label {
+  margin: 0 0 8px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fb-text-subtle);
+}
+
+.auth-shell-mobile-header.fb-mobile-header {
+  background: rgba(19, 22, 28, 0.92);
+  border-bottom: 1px solid var(--fb-border);
+  backdrop-filter: blur(16px);
+}
+
+.auth-shell-main.fb-workspace {
+  background:
+    radial-gradient(ellipse 90% 60% at 0% -10%, rgba(59, 130, 246, 0.09), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 0%, rgba(16, 185, 129, 0.06), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 80% 100%, rgba(139, 92, 246, 0.05), transparent 45%),
+    var(--fb-bg-base);
+  color: var(--fb-text);
+}
+
+.auth-shell-main.fb-workspace-light {
+  background: #f4f6fa;
+  color: #111827;
+}
+
+/* Premium sidebar links */
+.fb-sidebar .sb-link {
+  margin: 2px 10px;
+  width: calc(100% - 20px);
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--fb-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.fb-sidebar .sb-link:hover {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--fb-text);
+  border-color: rgba(148, 163, 184, 0.1);
+  transform: translateX(2px);
+  box-shadow: none;
+}
+
+.fb-sidebar .sb-link.sb-active {
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0.22) 0%,
+    rgba(59, 130, 246, 0.06) 100%
+  );
+  color: var(--fb-text-heading);
+  border-color: rgba(59, 130, 246, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), var(--fb-shadow-glow-blue);
+}
+
+.fb-sidebar .sb-link.sb-active::before {
+  background: linear-gradient(180deg, #60a5fa, #3b82f6);
+  box-shadow: 0 0 12px var(--fb-glow-blue);
+}
+
+/* CRM breadcrumb bar */
+.crm-nav-premium {
+  padding: 14px 28px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.crm-nav-premium--dark .crm-nav-back {
+  color: #7dd3fc;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  transition: color var(--fb-duration) var(--fb-ease);
+}
+
+.crm-nav-premium--dark .crm-nav-back:hover {
+  color: #bae6fd;
+}
+
+.crm-nav-premium--dark .crm-nav-trail {
+  font-size: 13px;
+  color: var(--fb-text-muted);
+}
+
+.crm-nav-premium--dark .crm-nav-trail strong {
+  color: var(--fb-text-heading);
+  font-weight: 600;
+}
+
+.crm-nav-premium--dark .crm-nav-trail a {
+  color: var(--fb-text-muted);
+  text-decoration: none;
+}
+
+.crm-nav-premium--dark .crm-nav-trail a:hover {
+  color: var(--fb-text);
+}
+
+.crm-nav-premium .crm-nav-trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crm-nav-premium .crm-nav-trail li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.crm-nav-premium--dark .crm-nav-sep {
+  color: var(--fb-text-subtle);
+}
+
+.crm-nav-premium:not(.crm-nav-premium--dark) .crm-nav-back {
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.crm-nav-premium:not(.crm-nav-premium--dark) .crm-nav-trail {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.crm-nav-premium:not(.crm-nav-premium--dark) .crm-nav-trail strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.crm-nav-premium:not(.crm-nav-premium--dark) .crm-nav-trail a {
+  color: #64748b;
+  text-decoration: none;
+}
+
+.crm-nav-premium:not(.crm-nav-premium--dark) .crm-nav-sep {
+  color: #94a3b8;
+}
+
+/* Shimmer loading */
+@keyframes fb-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.fb-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.06) 0%,
+    rgba(148, 163, 184, 0.14) 50%,
+    rgba(148, 163, 184, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: fb-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Scrollbar dark workspace */
+.fb-workspace ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+}
+
+.fb-workspace ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
+}

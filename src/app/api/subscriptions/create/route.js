@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -22,6 +23,9 @@ import { sendSubscriptionConfirmationEmail } from "@/lib/subscription-emails";
  */
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const requestBody = await request
       .json()
       .catch(() => ({}));

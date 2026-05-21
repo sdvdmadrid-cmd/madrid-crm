@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -175,6 +176,9 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {

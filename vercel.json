@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/bill-payments/autopay/process",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/bill-payments/remittance/process",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/bill-payments/platform-fee/process",
+      "schedule": "0 7 1 * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/bill-payments/autopay/process/route.js": {
+      "maxDuration": 60
+    },
+    "src/app/api/bill-payments/remittance/process/route.js": {
+      "maxDuration": 60
+    },
+    "src/app/api/bill-payments/platform-fee/process/route.js": {
+      "maxDuration": 60
+    }
+  }
+}

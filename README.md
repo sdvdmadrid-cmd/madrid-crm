@@ -1,8 +1,17 @@
-﻿# FieldBase
+# FieldBase
 
 Aplicacion Next.js para gestion de clientes, trabajos e ingresos de contratistas con Supabase.
 
 ## Desarrollo (sin pasos manuales)
+
+Configura variables locales antes del primer arranque:
+
+```bash
+copy .env.example .env.local
+npm run env:ensure
+```
+
+`SESSION_SECRET` es obligatorio (mín. 32 caracteres). `npm run dev` lo valida y puede generarlo si falta.
 
 Primera vez en Windows, genera el certificado local confiable:
 

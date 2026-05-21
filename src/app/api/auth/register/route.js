@@ -1,4 +1,5 @@
-﻿import { normalizeAppRole } from "@/lib/access-control";
+import { normalizeAppRole } from "@/lib/access-control";
+import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
 import { getSessionFromRequest } from "@/lib/auth";
 import { upsertCompanyProfileForTenant } from "@/lib/company-profile-store";
@@ -12,6 +13,7 @@ import {
   generateUniqueTenantId,
   getRequestOrigin,
 } from "@/lib/supabase-auth";
+import { trialEndFromNow } from "@/lib/trial-config";
 
 const ALLOWED_ROLES = new Set(["admin", "owner", "worker", "contractor", "viewer"]);
 
@@ -286,17 +288,12 @@ export async function POST(request) {
       : 0;
     const finalRole =
       isSelfSignup || usersInTenant === 0 ? "owner" : normalizeAppRole(role);
-    const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || "")
-      .trim()
-      .toLowerCase();
-    const isSuperAdmin = Boolean(
-      SUPER_ADMIN_EMAIL && email === SUPER_ADMIN_EMAIL,
-    );
+    const isSuperAdmin = isPlatformOperatorEmail(email);
     const assignedRole = isSuperAdmin
       ? "super_admin"
       : normalizeAppRole(finalRole);
     const now = new Date();
-    const trialEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const trialEnd = trialEndFromNow(now);
     const authPayload = {
       email,
       password,
@@ -383,11 +380,18 @@ export async function POST(request) {
     }
 
     if (companyName || businessType) {
-      await upsertCompanyProfileForTenant({
-        tenantId: profileTenantId,
-        profile: { companyName, businessType },
-        userId: createdUser.id,
-      });
+      try {
+        await upsertCompanyProfileForTenant({
+          tenantId: profileTenantId,
+          profile: { companyName, businessType },
+          userId: createdUser.id,
+        });
+      } catch (profileError) {
+        console.error(
+          "[api/auth/register] company profile upsert failed (signup continues)",
+          profileError?.message || profileError,
+        );
+      }
     }
 
     const origin = getRequestOrigin(request);

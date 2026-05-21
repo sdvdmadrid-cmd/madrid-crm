@@ -1,12 +1,14 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPastYmd, isValidYmd } from "@/lib/local-date";
 import { assertSafeText } from "@/lib/input-sanitizer";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
 
 // Tabla relacional: appointments
 
@@ -74,21 +76,45 @@ export async function GET(request) {
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
 
-    let query = supabaseAdmin
-      .from("appointments")
-      .select("*")
-      .order("date", { ascending: true });
-    if ((role || "").toLowerCase() !== "super_admin") {
-      query = query.eq("tenant_id", tenantDbId);
+    const { searchParams } = new URL(request.url);
+    const { paginate, page, limit, from, to } =
+      getListPaginationParams(searchParams);
+
+    let query = scopeByTenant(
+      supabaseAdmin
+        .from("appointments")
+        .select("*", { count: paginate ? "exact" : undefined })
+        .order("date", { ascending: true }),
+      { tenantDbId, role },
+    );
+
+    if (paginate) {
+      query = query.range(from, to);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) {
       console.error("[api/appointments][GET] Supabase query error", error);
       throw new Error("Unable to load appointments");
     }
 
-    return new Response(JSON.stringify((data || []).map(serialize)), {
+    const docs = (data || []).map(serialize);
+
+    if (paginate) {
+      const total = Number(count || 0);
+      return new Response(
+        JSON.stringify({
+          data: docs,
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(JSON.stringify(docs), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -106,6 +132,9 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();

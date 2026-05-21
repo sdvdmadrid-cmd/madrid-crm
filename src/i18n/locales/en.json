@@ -26,14 +26,18 @@
     "invoiceWithoutNumber": "Invoice without number"
   },
   "dashboardControl": {
-    "operationsLabel": "Operations command center",
+    "operationsLabel": "Run · Get paid · Grow",
     "title": "Dashboard",
-    "subtitle": "Here is your business at a glance.",
+    "subtitle": "Your business in three moves — operations, collections, and growth.",
     "subtitleWithName": "Welcome back, {{name}}. Here is your business at a glance.",
     "actions": {
+      "collectPayment": "Collect payment",
       "newEstimate": "New Estimate",
       "newJob": "New Job",
       "addClient": "Add Client"
+    },
+    "pillars": {
+      "ariaLabel": "Run, get paid, and grow"
     },
     "metrics": {
       "revenue": "Revenue",
@@ -78,13 +82,38 @@
       "jobsDesc": "Manage active work, assignments, and job progress.",
       "jobsAction": "Open jobs",
       "invoicesTitle": "Invoices",
-      "invoicesDesc": "Send invoices, collect payments, and monitor balances.",
-      "invoicesAction": "View invoices"
+      "invoicesDesc": "Email a Stripe payment link so clients pay you online, or record cash and Zelle.",
+      "invoicesAction": "Invoices and online pay"
     },
     "statuses": {
       "paid": "Paid",
       "pending": "Pending",
       "overdue": "Overdue"
+    }
+  },
+  "pillars": {
+    "run": {
+      "title": "Run the day",
+      "tagline": "Field ops",
+      "desc": "Clients, jobs, and calendar in one flow — schedule crews, track work, and never lose context on site.",
+      "linkClients": "Clients",
+      "linkJobs": "Jobs",
+      "linkCalendar": "Calendar"
+    },
+    "paid": {
+      "title": "Get paid",
+      "tagline": "Money in",
+      "desc": "Invoice when the job is done. Clients pay by card through Stripe; you can still record cash or Zelle.",
+      "linkInvoices": "Invoices",
+      "linkCollect": "Set up online pay"
+    },
+    "grow": {
+      "title": "Win the next job",
+      "tagline": "Growth",
+      "desc": "AI estimates, lead inbox, and your website — turn interest into signed work without juggling five apps.",
+      "linkEstimates": "Estimates",
+      "linkLeads": "Lead inbox",
+      "linkWebsite": "Website"
     }
   },
   "sections": {
@@ -421,6 +450,17 @@
       "invoiceTextMessage": "Hi, your invoice {invoice} for {amount} is ready. Pay online here: {link}"
     }
   },
+  "nav": {
+    "ariaLabel": "Page navigation",
+    "back": "Back",
+    "currentPage": "Current page",
+    "ownerTenants": "Tenants",
+    "ownerActivity": "Activity",
+    "ownerEmails": "Email logs",
+    "ownerFeatureFlags": "Feature flags",
+    "ownerMonitoring": "Monitoring",
+    "ownerPaymentCards": "Payment cards"
+  },
   "sidebar": {
     "main": "Main",
     "secondary": "Secondary",
@@ -432,6 +472,8 @@
     "jobs": "Jobs",
     "invoices": "Invoices",
     "billPayments": "Bill Payments",
+    "payBills": "Pay bills",
+    "paymentMethods": "Payment Methods",
     "subscriptions": "Subscriptions",
     "calendar": "Calendar",
     "insights": "Insights",
@@ -499,6 +541,7 @@
     "passwordStrengthTitle": "Password requirements",
     "passwordStrengthError": "Password must be at least 12 characters and include uppercase, lowercase, number, and special character.",
     "passwordRuleLength": "At least 12 characters",
+    "passwordRuleLengthRegister": "Password must be at least 8 characters",
     "passwordRuleUpper": "At least one uppercase letter",
     "passwordRuleLower": "At least one lowercase letter",
     "passwordRuleNumber": "At least one number",
@@ -592,7 +635,7 @@
   },
   "verifyEmail": {
     "checkEmail": "Check your email",
-    "checkEmailDesc": "We sent a verification link to your inbox. Click it to activate your account and start your 30-day free trial.",
+    "checkEmailDesc": "We sent a verification link to your inbox. Click it to activate your account and start your 15-day free trial.",
     "backToSignIn": "Back to sign in",
     "verifying": "Verifying your email...",
     "verifyingDesc": "Please wait while we activate your account.",
@@ -772,6 +815,38 @@
   "invoices": {
     "title": "Invoices",
     "description": "Create, edit, and manage invoices.",
+    "clientPaymentsBanner": "Collect from your clients online: email the invoice or open a payment link. Card and bank payments run through Stripe to your business. This is not for paying your own utility or credit card bills.",
+    "guide": {
+      "title": "Get paid online by your clients",
+      "subtitle": "Your client pays you for the job (invoice), not a utility company. Use the buttons on each saved invoice: email, text, share link, or charge online.",
+      "step1Title": "Create and save the invoice",
+      "step1Body": "Add client name, amount, and due date. Save the invoice so it appears in your list.",
+      "step2Title": "Send a payment link",
+      "step2Body": "Use Send by email, Send by text, or Share payment link. The client opens Stripe Checkout and pays with card or bank.",
+      "step3Title": "Client pays on Stripe",
+      "step3Body": "Money goes to your Stripe account connected to FieldBase. You will see the invoice marked paid when the webhook confirms payment.",
+      "step4Title": "Cash or Zelle? Register manually",
+      "step4Body": "If they paid offline, click Register payment and record cash, check, Zelle, or other methods.",
+      "stripeTitle": "Stripe setup (required for online links)",
+      "stripeLoading": "Checking configuration...",
+      "stripeReady": "Ready: clients can pay online.",
+      "stripeNotReady": "Incomplete: payment links will fail until all items below are configured in Vercel (or .env.local).",
+      "checkPublishable": "Publishable key (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)",
+      "checkSecret": "Secret key (STRIPE_SECRET_KEY)",
+      "checkWebhook": "Webhook signing secret (STRIPE_WEBHOOK_SECRET)",
+      "checkAppUrl": "Public app URL (APP_URL or APP_BASE_URL)",
+      "webhookHint": "In Stripe Dashboard → Developers → Webhooks, add this endpoint and subscribe to checkout and payment_intent events:",
+      "webhookEvents": "Events: checkout.session.completed, checkout.session.async_payment_succeeded, payment_intent.succeeded (and related failure events).",
+      "copyWebhook": "Copy URL",
+      "copied": "Webhook URL copied.",
+      "copyFailed": "Could not copy. Select the URL manually.",
+      "dismiss": "Hide guide",
+      "show": "How to get paid online",
+      "collapsedHint": "Send invoices with a Stripe payment link so clients can pay you.",
+      "setupLoadError": "Could not load payment setup status.",
+      "paymentSuccess": "Payment received. Your invoice list will show the updated balance.",
+      "paymentCancelled": "Checkout cancelled. No charge was made."
+    },
     "loading": "Loading invoices...",
     "formTitleNew": "New invoice",
     "formTitleEdit": "Edit invoice",
@@ -1113,6 +1188,121 @@
       "signInToAccept": "Please sign in to accept these terms.",
       "signInLink": "Sign in",
       "complianceNote": "Your acceptance is recorded with timestamp and IP address for compliance."
+    }
+  },
+  "ownerNav": {
+    "commandCenter": "Owner Command Center",
+    "platform": "Platform",
+    "groupCommand": "Command",
+    "groupOps": "Operations",
+    "groupTrust": "Trust & safety",
+    "overview": "Overview",
+    "paymentCards": "Payment cards",
+    "revenue": "Revenue",
+    "tenants": "Tenants",
+    "aiOps": "AI Ops",
+    "monitoring": "Monitoring",
+    "emails": "Emails",
+    "featureFlags": "Feature flags",
+    "activity": "Activity",
+    "support": "Support",
+    "security": "Security",
+    "settings": "Settings",
+    "backToApp": "Tenant app"
+  },
+  "ownerPaymentCards": {
+    "title": "Payment cards & usage",
+    "subtitle": "All Stripe-connected cards and bank accounts across tenants, with bill payment volume and success rates.",
+    "from": "From",
+    "to": "To",
+    "type": "Type",
+    "allTypes": "All",
+    "cardsOnly": "Cards only",
+    "banksOnly": "Banks only",
+    "search": "Search",
+    "searchPlaceholder": "Email, brand, last4…",
+    "refresh": "Refresh",
+    "retry": "Try again",
+    "volumeTrend": "Volume trend",
+    "brandMix": "Card brands",
+    "topTenants": "Top tenants by volume",
+    "allMethods": "All saved methods",
+    "noData": "No data in this range",
+    "truncated": "Transaction sample capped — totals may be approximate.",
+    "metrics": {
+      "methods": "Saved methods",
+      "cards": "cards",
+      "banks": "banks",
+      "tenants": "Tenants with wallet",
+      "volume": "Bill pay volume",
+      "cardVolume": "Card:",
+      "payments": "Payments",
+      "paid": "paid",
+      "failed": "failed",
+      "autopay": "Autopay enabled"
+    },
+    "table": {
+      "tenant": "Tenant",
+      "methods": "Methods",
+      "payments": "Payments",
+      "volume": "Volume",
+      "failed": "Failed",
+      "user": "User",
+      "method": "Method",
+      "type": "Type",
+      "usage": "Uses",
+      "lastUsed": "Last used"
+    }
+  },
+  "billPayHub": {
+    "eyebrow": "Bill pay",
+    "title": "Pay bills in one place",
+    "subtitle": "Add payees, schedule payments, and manage cards and banks securely.",
+    "tabsLabel": "Bill pay sections",
+    "tabBills": "Pay bills",
+    "tabWallet": "Cards & banks",
+    "tabActivity": "Activity",
+    "badgeStripe": "Stripe secured",
+    "badgeTenant": "Your workspace only",
+    "badgeMasked": "Masked account numbers",
+    "badgeLimits": "Rate limits and caps",
+    "findPayee": "Find a payee",
+    "allCategories": "All"
+  },
+  "paymentMethods": {
+    "title": "Payment Methods",
+    "subtitle": "Securely save cards and bank accounts with Stripe. See real usage from your bill payments.",
+    "addCard": "Add card",
+    "linkBank": "Link bank (Plaid)",
+    "linkingBank": "Opening Plaid…",
+    "openBillPayments": "Bill Payments",
+    "backToBills": "Back to bills",
+    "walletTitle": "Your wallet",
+    "emptyTitle": "No payment methods yet",
+    "emptyBody": "Add a card or link a bank account to pay bills and enable autopay.",
+    "default": "Default",
+    "makeDefault": "Make default",
+    "remove": "Remove",
+    "reconnect": "Reconnect",
+    "payments": "payments",
+    "lastUsed": "Last used",
+    "recentActivity": "Recent card activity",
+    "payment": "Payment",
+    "bankAccount": "Bank account",
+    "plaidNote": "Plaid-linked accounts are used for verification; bill charges use Stripe-backed methods.",
+    "defaultHint": "Default for payments: {{label}}",
+    "saved": "Saved {{label}}",
+    "defaultUpdated": "Default payment method updated.",
+    "removed": "Payment method removed.",
+    "bankLinked": "Bank account linked.",
+    "stripeMissing": "Stripe is not configured. Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.",
+    "metrics": {
+      "saved": "Saved",
+      "cards": "cards",
+      "banks": "banks",
+      "payments90d": "Payments (90d)",
+      "volume90d": "Volume (90d)",
+      "successRate": "Success rate"
     }
   }
 }

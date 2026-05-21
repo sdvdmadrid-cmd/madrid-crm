@@ -12,6 +12,8 @@ import {
   US_STATE_OPTIONS,
 } from "@/lib/estimate-pricing";
 import "@/i18n";
+import ws from "@/styles/workspace-dark.module.css";
+import jobStyles from "./jobs.module.css";
 
 const initialJob = {
   title: "",
@@ -29,21 +31,6 @@ const initialJob = {
   travelMinutes: "",
   urgency: "flexible",
   estimateSnapshot: null,
-};
-
-const actionIconButtonStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  height: 30,
-  padding: "0 10px",
-  borderRadius: 999,
-  border: "1px solid #d1d5db",
-  background: "#fff",
-  color: "#334155",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
 };
 
 const INITIAL_FILE_STATE = {
@@ -550,101 +537,42 @@ export default function JobsPage() {
   };
 
   return (
-    <main
-      style={{
-        padding: "24px",
-        fontFamily: "Arial, sans-serif",
-        maxWidth: 1000,
-        margin: "0 auto",
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
-      >
+    <main className={`${ws.page} ${jobStyles.jobsPage}`}>
+      <header className={ws.topBar} style={{ borderRadius: 18, marginBottom: 20, border: "1px solid rgba(148,163,184,0.16)" }}>
         <div>
-          <h1 style={{ fontSize: "32px", margin: 0 }}>{t("jobs.title")}</h1>
-          <p style={{ margin: "10px 0 0 0", color: "#555" }}>
-            {t("jobs.description")}
-          </p>
+          <h1 className={ws.title}>{t("jobs.title")}</h1>
+          <p className={ws.subtitle}>{t("jobs.description")}</p>
         </div>
       </header>
 
-      {error && (
-        <div style={{ marginTop: "20px", color: "#b00020" }}>{error}</div>
-      )}
-      {loading && (
-        <div style={{ marginTop: "20px", color: "#333" }}>
-          {t("jobs.loading")}
-        </div>
-      )}
+      {error ? <div className={ws.noticeError}>{error}</div> : null}
+      {loading ? <p className={ws.subtitle}>{t("jobs.loading")}</p> : null}
 
-      <section
-        style={{
-          marginTop: "24px",
-          padding: "20px",
-          border: "1px solid #ddd",
-          borderRadius: "16px",
-          background: "#fff",
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>
-          {selectedId ? t("jobs.formTitleEdit") : t("jobs.formTitleNew")}
-        </h2>
-        <div style={{ display: "grid", gap: "12px" }}>
+      <section>
+        <h2>{selectedId ? t("jobs.formTitleEdit") : t("jobs.formTitleNew")}</h2>
+        <div className={jobStyles.formGrid}>
           <input
             placeholder={t("jobs.placeholders.title")}
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           />
           <input
             placeholder={t("jobs.placeholders.client")}
             value={form.clientName}
             onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           />
           <input
             placeholder={t("jobs.placeholders.service")}
             value={form.service}
             onChange={(e) => setForm({ ...form, service: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           />
           <textarea
             placeholder={t("jobs.placeholders.scopeDetails")}
             value={form.scopeDetails}
             onChange={(e) => setForm({ ...form, scopeDetails: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-              minHeight: "90px",
-            }}
+            style={{ minHeight: "90px" }}
           />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "12px",
-            }}
-          >
+          <div className={jobStyles.formGridSplit}>
             <input
               placeholder={t("jobs.placeholders.squareMeters")}
               value={form.squareMeters}
@@ -964,14 +892,7 @@ export default function JobsPage() {
                 </div>
               : null}
           </div>
-          <div
-            style={{
-              padding: "16px",
-              borderRadius: "12px",
-              background: "#f5f3ff",
-              border: "1px solid #ddd6fe",
-            }}
-          >
+          <div className={jobStyles.proposalBox}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <strong>Proposal Generator</strong>
@@ -983,14 +904,7 @@ export default function JobsPage() {
                 type="button"
                 onClick={generateProposalDraft}
                 disabled={proposalLoading}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "#5b21b6",
-                  color: "white",
-                  cursor: "pointer",
-                }}
+                className={jobStyles.aiBtn}
               >
                 {proposalLoading ? "Generating..." : "Generate Proposal (AI)"}
               </button>
@@ -1026,51 +940,22 @@ export default function JobsPage() {
               />
             ) : null}
           </div>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={saveJob}
-              style={{
-                padding: "12px 20px",
-                borderRadius: "10px",
-                border: "none",
-                background: "black",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
+          <div className={jobStyles.actionRow}>
+            <button type="button" onClick={saveJob} className={jobStyles.saveBtn}>
               {selectedId ? t("jobs.buttons.update") : t("jobs.buttons.save")}
             </button>
-            <button
-              type="button"
-              onClick={resetForm}
-              style={{
-                padding: "12px 20px",
-                borderRadius: "10px",
-                border: "1px solid #ccc",
-                background: "white",
-                cursor: "pointer",
-              }}
-            >
+            <button type="button" onClick={resetForm} className={jobStyles.clearBtn}>
               {t("jobs.buttons.clear")}
             </button>
           </div>
         </div>
       </section>
 
-      <section style={{ marginTop: "24px" }}>
+      <section>
         <h2>{t("jobs.listTitle")}</h2>
-        <div style={{ display: "grid", gap: "14px" }}>
+        <div className={jobStyles.jobList}>
           {jobs.map((job) => (
-            <div
-              key={job._id}
-              style={{
-                padding: "18px",
-                border: "1px solid #ddd",
-                borderRadius: "14px",
-                background: "#fff",
-              }}
-            >
+            <div key={job._id} className={jobStyles.jobCard}>
               {(() => {
                 const financials = computeEstimateFinancials({
                   baseAmount: job.price,
@@ -1138,14 +1023,14 @@ export default function JobsPage() {
                         <button
                           type="button"
                           onClick={() => toggleFilesPanel(job._id)}
-                          style={actionIconButtonStyle}
+                          className={jobStyles.iconBtn}
                         >
                           {filesOpen ? "Hide files" : "Manage files"}
                         </button>
                         <button
                           type="button"
                           onClick={() => editJob(job)}
-                          style={actionIconButtonStyle}
+                          className={jobStyles.iconBtn}
                         >
                           <IconPencil />
                           {t("jobs.buttons.edit")}
@@ -1154,11 +1039,7 @@ export default function JobsPage() {
                           ? <button
                               type="button"
                               onClick={() => requestJobDelete(job)}
-                              style={{
-                                ...actionIconButtonStyle,
-                                border: "1px solid #fecaca",
-                                color: "#b91c1c",
-                              }}
+                              className={ws.btnDanger}
                             >
                               <IconTrash />
                               {t("jobs.buttons.delete")}
@@ -1213,11 +1094,8 @@ export default function JobsPage() {
                                   input.click();
                                 }
                               }}
-                              style={{
-                                ...actionIconButtonStyle,
-                                height: 34,
-                                background: "#fff",
-                              }}
+                              className={jobStyles.iconBtn}
+                              style={{ height: 34 }}
                             >
                               Upload Photos
                             </button>
@@ -1230,11 +1108,8 @@ export default function JobsPage() {
                                   input.click();
                                 }
                               }}
-                              style={{
-                                ...actionIconButtonStyle,
-                                height: 34,
-                                background: "#fff",
-                              }}
+                              className={jobStyles.iconBtn}
+                              style={{ height: 34 }}
                             >
                               Upload Documents
                             </button>

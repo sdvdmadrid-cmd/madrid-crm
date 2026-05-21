@@ -27,8 +27,13 @@ jobs:
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_dummy
       STRIPE_SECRET_KEY: sk_test_ci_dummy
       ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      BILL_AUTOPAY_CRON_SECRET: ci-bill-autopay-cron-secret-for-build-only
+      EMAIL_PROVIDER: mock
+      EMAIL_FROM: FieldBase <noreply@example.com>
+      EMAIL_WEBHOOK_SECRET: ci-email-webhook-secret-0123456789abcdef
       DEV_LOGIN_ENABLED: false
       NEXT_PUBLIC_DEV_LOGIN_ENABLED: false
+      ALLOW_INSECURE_DEV_WEBHOOKS: false
 
     steps:
       - name: Checkout
@@ -69,8 +74,8 @@ jobs:
           nohup npm run start -- -p 3000 > /tmp/next-start.log 2>&1 &
           for i in {1..90}; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health || true)
-            if [ "$CODE" = "200" ] || [ "$CODE" = "503" ]; then
-              echo "App is reachable (health status $CODE)"
+            if [ "$CODE" = "200" ]; then
+              echo "App is healthy (HTTP 200)"
               exit 0
             fi
             sleep 2
@@ -82,7 +87,7 @@ jobs:
       - name: Run security preflight
         shell: pwsh
         run: |
-          ./scripts/security-preflight.ps1 -BaseUrl "${{ steps.target.outputs.base_url }}" -JsonOutputPath "./security-preflight-report.json" -AllowDegradedHealth
+          ./scripts/security-preflight.ps1 -BaseUrl "${{ steps.target.outputs.base_url }}" -JsonOutputPath "./security-preflight-report.json"
 
       - name: Upload security preflight report
         if: always()

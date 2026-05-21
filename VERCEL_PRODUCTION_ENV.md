@@ -9,7 +9,8 @@ Set these in the Vercel Production environment before deploy:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `SESSION_SECRET`
+- `SESSION_SECRET` (dedicated random string, 32+ chars — never reuse the service role key)
+- `ENCRYPTION_KEY` (64 hex chars for Plaid token encryption)
 - `APP_URL`
 - `APP_BASE_URL`
 
@@ -54,8 +55,25 @@ Plaid is only required if the bank-linking flow is enabled for Bill Payments.
 
 `GOOGLE_PLACES_API_KEY` is used by Places autocomplete and details endpoints.
 
+## Cron Jobs (Vercel — see `vercel.json`)
+
+Set at least:
+
+- `BILL_AUTOPAY_CRON_SECRET`
+- `CRON_SECRET` (optional; Vercel sends `Authorization: Bearer` — can match autopay secret or a dedicated value)
+
+Optional dedicated secrets:
+
+- `BILL_REMITTANCE_CRON_SECRET`
+- `BILL_PLATFORM_FEE_CRON_SECRET`
+
+Deploy guide: `docs/DEPLOY_VERCEL.md`
+
 ## Recommended Operational Variables
 
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (distributed rate limits on Vercel)
+- `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` (async Stripe webhook processing)
+- `CRM_DEFAULT_LIST_LIMIT` (optional, e.g. `50` — server-side default pagination for clients/jobs)
 - `SUPER_ADMIN_EMAIL`
 
 This is not universally required for startup, but it should be set if production super-admin bootstrap or privilege assignment depends on email matching.
@@ -97,6 +115,7 @@ If you want the smallest safe production set for the current app as checked toda
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SESSION_SECRET`
+- `ENCRYPTION_KEY`
 - `APP_URL`
 - `APP_BASE_URL`
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`

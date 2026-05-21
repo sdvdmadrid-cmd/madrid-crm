@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 
 import {
   BILL_PAYMENT_METHOD_TABLE,
@@ -8,9 +8,37 @@ import {
   requireBillPaymentsAccess,
   serializeBillPaymentTransaction,
 } from "@/lib/bill-payments";
+import {
+  BILL_PAY_MAX_BULK_COUNT,
+  getTrustedClientIp,
+  validateBulkPayAmounts,
+} from "@/lib/bill-payments-security";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
+import {
+  checkBillPaymentsRateLimit,
+  getRequestIp,
+  recordBillPaymentsRateLimit,
+} from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeUuid } from "@/lib/supabase-db";
+
+function rateLimitedResponse(retryAfterSeconds) {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: "Too many payment attempts. Please wait and try again.",
+      code: "RATE_LIMITED",
+      retryAfterSeconds,
+    }),
+    {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(retryAfterSeconds),
+      },
+    },
+  );
+}
 
 export async function POST(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
@@ -18,6 +46,18 @@ export async function POST(request) {
   const access = await requireBillPaymentsAccess(request, "sensitive");
   if (access.response) return access.response;
   const { context } = access;
+
+  const ip = getRequestIp(request);
+  const limitState = await checkBillPaymentsRateLimit({
+    tenantId: context.tenantDbId,
+    userId: context.userId,
+    ip,
+    action: "pay",
+  });
+  if (!limitState.allowed) {
+    return rateLimitedResponse(limitState.retryAfterSeconds);
+  }
+
   const body = await request.json().catch(() => ({}));
   const billIds = Array.isArray(body.billIds)
     ? body.billIds.map(normalizeUuid).filter(Boolean)
@@ -33,6 +73,16 @@ export async function POST(request) {
         status: 400,
         headers: { "Content-Type": "application/json" },
       },
+    );
+  }
+
+  if (billIds.length > BILL_PAY_MAX_BULK_COUNT) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: `You can pay up to ${BILL_PAY_MAX_BULK_COUNT} bills at once`,
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
@@ -99,18 +149,39 @@ export async function POST(request) {
     );
   }
 
+  if ((bills || []).length !== billIds.length) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "One or more bills were not found in your workspace",
+      }),
+      { status: 404, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const amountCheck = validateBulkPayAmounts(bills);
+  if (!amountCheck.ok) {
+    return new Response(
+      JSON.stringify({ success: false, error: amountCheck.error }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  await recordBillPaymentsRateLimit({
+    tenantId: context.tenantDbId,
+    userId: context.userId,
+    ip,
+    action: "pay",
+  });
+
   const bulkBatchId = billIds.length > 1 ? crypto.randomUUID() : null;
   const results = [];
   const failures = [];
   let subtotal = 0;
   let totalFees = 0;
   let totalCharged = 0;
-  const forwardedFor = String(request.headers.get("x-forwarded-for") || "")
-    .split(",")
-    .map((value) => value.trim())
-    .find(Boolean);
   const paymentContext = {
-    ipAddress: forwardedFor || "127.0.0.1",
+    ipAddress: getTrustedClientIp(request),
     userAgent:
       String(request.headers.get("user-agent") || "").trim() ||
       "FieldBase Bill Payments",

@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import styles from "./subscriptions.module.css";
 
 export default function SubscriptionsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,24 +14,14 @@ export default function SubscriptionsPage() {
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
-  const sourceParam = String(searchParams?.get("source") || "").trim().toLowerCase();
-  const isBillPaymentsFlow = sourceParam === "bill-payments";
-  const goBackPath = isBillPaymentsFlow ? "/bill-payments" : "/dashboard";
-  const planDisplay = isBillPaymentsFlow
-    ? {
-        title: "Bill Payments",
-        price: "$5 al mes",
-        trial: "2 facturas gratis para probar",
-        cta: "Activar Bill Payments",
-        creating: "Activando Bill Payments...",
-      }
-    : {
-        title: "Suscripción",
-        price: "$35 al mes",
-        trial: "mes gratis como período de prueba",
-        cta: "Comenzar período de prueba",
-        creating: "Creando suscripción...",
-      };
+  const goBackPath = "/dashboard";
+  const planDisplay = {
+    title: "Suscripción",
+    price: "$35 al mes",
+    trial: "mes gratis como período de prueba",
+    cta: "Comenzar período de prueba",
+    creating: "Creando suscripción...",
+  };
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -74,7 +63,7 @@ export default function SubscriptionsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          source: isBillPaymentsFlow ? "bill-payments" : "app",
+          source: "app",
         }),
       });
 
@@ -129,7 +118,7 @@ export default function SubscriptionsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          source: isBillPaymentsFlow ? "bill-payments" : "app",
+          source: "app",
         }),
       });
 
@@ -208,15 +197,13 @@ export default function SubscriptionsPage() {
           className={styles.backButton}
           onClick={() => router.push(goBackPath)}
         >
-          ← {isBillPaymentsFlow ? "Volver a Bill Payments" : "Volver"}
+          ← Volver
         </button>
 
         <div className={styles.header}>
           <h1>{planDisplay.title}</h1>
           <p>
-            {isBillPaymentsFlow
-              ? "Activa la suscripción de Bill Payments"
-              : "Gestiona tu suscripción a la plataforma"}
+            Gestiona tu suscripción a la plataforma
           </p>
         </div>
 
@@ -234,12 +221,11 @@ export default function SubscriptionsPage() {
               <div className={styles.features}>
                 <h3>Incluye:</h3>
                 <ul>
-                  <li>✓ Gestión de pagos de facturas</li>
-                  <li>✓ Programación de AutoPay</li>
-                  <li>✓ Historial de transacciones</li>
-                  <li>✓ Envío de facturas por email</li>
-                  <li>✓ Acceso a la aplicación móvil</li>
-                  <li>✓ Soporte prioritario</li>
+                  <li>Clientes, trabajos y estimados</li>
+                  <li>Facturas con enlace de pago en línea (Stripe)</li>
+                  <li>Envío de facturas por email</li>
+                  <li>Registro de pagos en efectivo, cheque o transferencia</li>
+                  <li>Soporte prioritario</li>
                 </ul>
               </div>
 
@@ -325,15 +311,6 @@ export default function SubscriptionsPage() {
 
               {subscription.status !== "cancelled" && (
                 <>
-                  {isBillPaymentsFlow && (
-                    <button
-                      className={styles.buttonSecondary}
-                      onClick={() => router.push("/bill-payments")}
-                    >
-                      Continuar en Bill Payments
-                    </button>
-                  )}
-
                   <button
                     className={styles.buttonPrimary}
                     onClick={handleManageBilling}

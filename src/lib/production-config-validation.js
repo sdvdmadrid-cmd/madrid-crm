@@ -123,6 +123,15 @@ export function validateProductionConfig() {
     );
   }
 
+  if (
+    process.env.NODE_ENV === "production" &&
+    !validateEnvVar("BILL_AUTOPAY_CRON_SECRET", "Bill autopay cron auth", false)
+  ) {
+    warnings.push(
+      "BILL_AUTOPAY_CRON_SECRET not set - Vercel crons for Bill Payments will fail"
+    );
+  }
+
   // === Output Results ===
   if (errors.length > 0) {
     console.error("\n❌ CRITICAL CONFIGURATION ERRORS:\n");
@@ -152,14 +161,4 @@ export function validateProductionConfig() {
   };
 }
 
-/**
- * Run validation on startup (only in production)
- */
-if (process.env.NODE_ENV === "production") {
-  try {
-    validateProductionConfig();
-  } catch (error) {
-    console.error("[Production Config] Validation failed:", error.message);
-    process.exit(1);
-  }
-}
+// Startup validation is invoked from instrumentation.js via startup-config.js

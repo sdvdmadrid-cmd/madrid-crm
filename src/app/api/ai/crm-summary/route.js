@@ -1,3 +1,4 @@
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -63,6 +64,9 @@ async function getTenantCrmSnapshot(tenantId) {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const enabled = await isPlatformFeatureEnabled("feature_ai_crm_summary", true);
     if (!enabled) {
       return Response.json(

@@ -33,6 +33,16 @@ const nextConfig = {
         destination: "/website",
         permanent: true,
       },
+      {
+        source: "/admin",
+        destination: "/owner/overview",
+        permanent: false,
+      },
+      {
+        source: "/dev/admin",
+        destination: "/owner/overview",
+        permanent: false,
+      },
     ];
   },
   async headers() {

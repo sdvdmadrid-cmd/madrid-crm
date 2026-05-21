@@ -56,6 +56,12 @@ export function canManageSensitiveData(role) {
   return isAdminRole(role);
 }
 
+/** Bill Payments: financial reads/writes — not for read-only viewers */
+export function canAccessBillPayments(role) {
+  const normalized = normalizeAppRole(role);
+  return normalized !== "viewer" && canReadTenantData(normalized);
+}
+
 export function canSendExternalCommunications(role) {
   return isAdminRole(role);
 }
@@ -71,6 +77,7 @@ export function getRoleCapabilities(role) {
     canWriteOperationalData: canWriteOperationalData(normalizedRole),
     canDeleteRecords: canDeleteRecords(normalizedRole),
     canManageSensitiveData: canManageSensitiveData(normalizedRole),
+    canAccessBillPayments: canAccessBillPayments(normalizedRole),
     canSendExternalCommunications:
       canSendExternalCommunications(normalizedRole),
   };

@@ -26,7 +26,7 @@ export default async function OwnerWorkspacePage() {
   const userRole = String(userData?.user?.app_metadata?.role || "").toLowerCase();
 
   if (userRole === "super_admin") {
-    redirect("/admin/settings");
+    redirect("/owner/settings");
   }
 
   redirect("/dashboard");

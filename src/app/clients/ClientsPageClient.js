@@ -21,7 +21,7 @@ export default function ClientsPageClient() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/supabase/clients");
+      const res = await apiFetch("/api/clients");
       const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
       setClients(data);
     } catch (err) {
@@ -76,8 +76,8 @@ export default function ClientsPageClient() {
 
       const method = selectedId ? "PATCH" : "POST";
       const url = selectedId
-        ? `/api/supabase/clients/${selectedId}`
-        : "/api/supabase/clients";
+        ? `/api/clients/${selectedId}`
+        : "/api/clients";
 
       const res = await apiFetch(url, {
         method,
@@ -141,7 +141,7 @@ export default function ClientsPageClient() {
 
     try {
       setError("");
-      const res = await apiFetch(`/api/supabase/clients/${id}`, {
+      const res = await apiFetch(`/api/clients/${id}`, {
         method: "DELETE",
       });
       await getJsonOrThrow(res, t("clients.errors.delete"));

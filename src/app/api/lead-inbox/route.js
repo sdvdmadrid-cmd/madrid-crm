@@ -3,6 +3,8 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { scopeByTenant } from "@/lib/tenant-scope";
+import { isSuperAdminRole } from "@/lib/access-control";
 
 function serializeLead(row) {
   return {
@@ -66,9 +68,9 @@ export async function GET(request) {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if ((role || "").toLowerCase() !== "super_admin") {
-      leadsQuery = leadsQuery.eq("tenant_id", tenantDbId);
-      requestsQuery = requestsQuery.eq("tenant_id", tenantDbId);
+    if (!isSuperAdminRole(role)) {
+      leadsQuery = scopeByTenant(leadsQuery, { tenantDbId, role });
+      requestsQuery = scopeByTenant(requestsQuery, { tenantDbId, role });
     }
 
     const [leadsResult, requestsResult] = await Promise.allSettled([leadsQuery, requestsQuery]);

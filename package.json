@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/ensure-dev-env.mjs && next dev",
+    "env:ensure": "node scripts/ensure-dev-env.mjs",
     "dev:restart": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1",
     "dev:stop": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1 -NoStart",
     "build": "next build",

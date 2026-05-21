@@ -46,13 +46,34 @@ function mapSupabaseRow(row = {}) {
   };
 }
 
-function toSupabaseRow(tenantId, profile = {}, userId) {
-  return {
+function isMissingColumnError(error, columnName) {
+  const message = String(error?.message || error || "").toLowerCase();
+  const column = String(columnName || "").toLowerCase();
+  return (
+    message.includes(column) &&
+    (message.includes("schema cache") ||
+      message.includes("does not exist") ||
+      message.includes("could not find"))
+  );
+}
+
+function toSupabaseRow(tenantId, profile = {}, userId, { includeExtendedColumns = true } = {}) {
+  const row = {
     tenant_id: tenantId,
     company_name: profile.companyName || "",
+    business_type: profile.businessType || "",
+    updated_by: userId || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!includeExtendedColumns) {
+    return row;
+  }
+
+  return {
+    ...row,
     public_display_name:
       profile.publicDisplayName || profile.companyName || "",
-    business_type: profile.businessType || "",
     logo_data_url: profile.logoDataUrl || "",
     website_url: profile.websiteUrl || "",
     google_reviews_url: profile.googleReviewsUrl || "",
@@ -69,8 +90,6 @@ function toSupabaseRow(tenantId, profile = {}, userId) {
       typeof profile.serviceCatalogPreferences === "object"
         ? profile.serviceCatalogPreferences
         : {},
-    updated_by: userId || null,
-    updated_at: new Date().toISOString(),
   };
 }
 
@@ -97,19 +116,34 @@ export async function upsertCompanyProfileForTenant({
   profile,
   userId,
 }) {
-  const supabaseRow = toSupabaseRow(tenantId, profile, userId);
+  const payload = {
+    ...toSupabaseRow(tenantId, profile, userId, { includeExtendedColumns: true }),
+    created_by: userId || null,
+  };
 
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from("company_profiles")
-    .upsert(
-      {
-        ...supabaseRow,
-        created_by: userId || null,
-      },
-      { onConflict: "tenant_id" },
-    )
+    .upsert(payload, { onConflict: "tenant_id" })
     .select("*")
     .single();
+
+  if (error && isMissingColumnError(error, "public_display_name")) {
+    console.warn(
+      "[company-profile-store] Retrying upsert without extended columns",
+      error.message,
+    );
+    const minimalPayload = {
+      ...toSupabaseRow(tenantId, profile, userId, {
+        includeExtendedColumns: false,
+      }),
+      created_by: userId || null,
+    };
+    ({ data, error } = await supabaseAdmin
+      .from("company_profiles")
+      .upsert(minimalPayload, { onConflict: "tenant_id" })
+      .select("*")
+      .single());
+  }
 
   if (error) {
     throw new Error(error.message);

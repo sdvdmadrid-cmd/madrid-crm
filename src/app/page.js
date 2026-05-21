@@ -103,6 +103,40 @@ const STATS = [
   { number: "38%", label: "Revenue growth in first year" },
 ];
 
+const LANDING_PILLARS = [
+  {
+    id: "run",
+    accent: "#14b8a6",
+    tagline: "Field ops",
+    title: "Run the day",
+    desc: "Clients, jobs, and calendar — the Jobber-style command center without the clutter.",
+    links: [
+      { href: "/login?mode=register", label: "Start free" },
+      { href: "#features", label: "See scheduling" },
+    ],
+  },
+  {
+    id: "paid",
+    accent: "#6366f1",
+    tagline: "Money in",
+    title: "Get paid",
+    desc: "Invoices and Stripe checkout so clients pay you online — QuickBooks-level collections, built for the field.",
+    links: [
+      { href: "/login?mode=register", label: "Collect faster" },
+    ],
+  },
+  {
+    id: "grow",
+    accent: "#f59e0b",
+    tagline: "Growth",
+    title: "Win the next job",
+    desc: "AI estimates, lead inbox, and your site — growth tools inspired by modern marketing stacks, original to FieldBase.",
+    links: [
+      { href: "#features", label: "AI estimates" },
+    ],
+  },
+];
+
 const FEATURES = [
   {
     Icon: IconCustomerCenter,
@@ -130,7 +164,7 @@ const FEATURES = [
   {
     Icon: IconPayment,
     title: "Flexible Payments",
-    desc: "Accept credit card, bank transfer, Zelle, or cash. Store payment methods for recurring jobs so getting paid is never an afterthought.",
+    desc: "Send invoices with a secure online payment link (Stripe). Record cash, check, Zelle, or bank transfer when clients pay offline.",
     link: false,
   },
   {
@@ -221,9 +255,6 @@ function Navbar() {
         <Link href="#industries" className="hover:text-white transition-colors">Industries</Link>
         <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
         <Link href="#resources" className="hover:text-white transition-colors">Resources</Link>
-        <Link href="/public/bill-payments" className="hover:text-white transition-colors font-bold" style={{ color: "#38bdf8" }}>
-          Bill payments for just $5/mo
-        </Link>
       </div>
 
       <div className="hidden md:flex items-center gap-4">
@@ -251,9 +282,6 @@ function Navbar() {
           <Link href="#industries" className="hover:text-white">Industries</Link>
           <Link href="#pricing" className="hover:text-white">Pricing</Link>
           <Link href="#resources" className="hover:text-white">Resources</Link>
-          <Link href="/public/bill-payments" className="hover:text-white font-bold" style={{ color: "#38bdf8" }}>
-            Bill payments for just $5/mo
-          </Link>
           <Link href="/login?mode=login" className="hover:text-white">Log In</Link>
           <Link href="/login?mode=register" className="font-bold px-4 py-2 rounded-md text-center"
             style={{ background: "#1d4ed8", color: "#ffffff" }}>
@@ -322,13 +350,13 @@ export default function MarketingPage() {
           {/* Left text */}
           <div className="flex-1 pb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-4" style={{ background: "rgba(29,78,216,0.2)", color: "#93c5fd" }}>
-              ✨ AI-powered estimates &nbsp;·&nbsp; 🌤 Weather-aware scheduling
+              Run · Get paid · Grow — one platform for contractors
             </div>
             <h1 className="text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
-              Win more jobs.<br />Get paid faster.<br />Stay in control.
+              Run the crew.<br />Collect on the job.<br />Win the next lead.
             </h1>
             <p className="text-lg mb-4 max-w-lg" style={{ color: "#94a3b8" }}>
-              FieldBase is the all-in-one platform built for contractors — from your first estimate to your final payment, powered by AI and synced with Google Calendar.
+              FieldBase blends what you love from field-service ops, contractor invoicing, and AI growth tools — original, focused, and built for the truck, not the back office only.
             </p>
             <p className="text-sm font-semibold mb-8 px-4 py-2 rounded-lg inline-block" style={{ background: "rgba(29,78,216,0.15)", color: "#93c5fd" }}>
               🎉 Try free for 15 days — then just $35/month. No credit card required.
@@ -416,7 +444,48 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      <WaveDivider fromColor="#1e293b" toColor="#eff6ff" />
+      {/* ── Three pillars ── */}
+      <section style={{ background: "#0f172a" }} className="py-14 px-6">
+        <div className="max-w-6xl mx-auto">
+          <p className="text-center text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#64748b" }}>
+            How FieldBase is different
+          </p>
+          <h2 className="text-3xl lg:text-4xl font-extrabold text-white text-center mb-3">
+            Three moves. One login.
+          </h2>
+          <p className="text-center max-w-2xl mx-auto mb-10 text-base" style={{ color: "#94a3b8" }}>
+            Not a clone of Jobber, QuickBooks, or a growth bot — a tighter stack that does what contractors actually do every day.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {LANDING_PILLARS.map((pillar) => (
+              <article
+                key={pillar.id}
+                className="rounded-2xl p-6 flex flex-col gap-3"
+                style={{ border: "1px solid rgba(148,163,184,0.18)", background: "rgba(17,24,39,0.92)" }}
+              >
+                <div style={{ width: 44, height: 4, borderRadius: 999, background: pillar.accent }} />
+                <p className="text-xs font-bold uppercase tracking-widest m-0" style={{ color: "#94a3b8" }}>{pillar.tagline}</p>
+                <h3 className="text-xl font-extrabold text-white m-0">{pillar.title}</h3>
+                <p className="text-sm flex-1 m-0" style={{ color: "#94a3b8", lineHeight: 1.55 }}>{pillar.desc}</p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {pillar.links.map((link) => (
+                    <Link
+                      key={link.href + link.label}
+                      href={link.href}
+                      className="text-xs font-semibold px-3 py-2 rounded-full transition-colors"
+                      style={{ border: "1px solid rgba(148,163,184,0.25)", color: "#e2e8f0", background: "rgba(30,41,59,0.8)" }}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <WaveDivider fromColor="#0f172a" toColor="#eff6ff" />
 
       {/* ── Photo strip ── */}
       <section style={{ background: "#eff6ff", overflow: "hidden" }}>

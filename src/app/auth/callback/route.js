@@ -16,6 +16,7 @@ function getSafeRedirectPath(value) {
 }
 
 import { verifyEmailConfirmToken } from "@/lib/auth";
+import { trialEndFromNow } from "@/lib/trial-config";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -125,7 +126,7 @@ export async function GET(request) {
 
     if (!user.email_confirmed_at) {
       const now = new Date().toISOString();
-      const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const trialEnd = trialEndFromNow().toISOString();
       const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(
         user.id,
         {
@@ -152,7 +153,7 @@ export async function GET(request) {
       const status = String(user.user_metadata?.status || "");
       if (!status || status === "pending_verification") {
         const now = new Date().toISOString();
-        const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        const trialEnd = trialEndFromNow().toISOString();
         supabaseAdmin.auth.admin.updateUserById(user.id, {
           user_metadata: {
             ...user.user_metadata,
