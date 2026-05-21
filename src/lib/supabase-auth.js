@@ -6,6 +6,7 @@ import { getSessionFromRequest } from "@/lib/auth";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
 
 let supabaseAdminClientPromise = null;
+const DEFAULT_DEV_ORIGIN = "http://localhost:3000";
 
 async function getSupabaseAdminClient() {
   if (!supabaseAdminClientPromise) {
@@ -189,24 +190,16 @@ function getFirstHeaderValue(value) {
     .trim();
 }
 
-function getHeaderRequestOrigin(request) {
-  const originHeader = normalizeOrigin(request?.headers?.get("origin"));
-  if (originHeader) {
-    return originHeader;
-  }
+function getProxyOrHostRequestOrigin(request) {
+  const forwardedProto = getFirstHeaderValue(
+    request?.headers?.get("x-forwarded-proto"),
+  ).toLowerCase();
+  const forwardedHost = getFirstHeaderValue(
+    request?.headers?.get("x-forwarded-host"),
+  ).toLowerCase();
 
-  const refererHeader = normalizeOrigin(request?.headers?.get("referer"));
-  if (refererHeader) {
-    return refererHeader;
-  }
-
-  const proto = getFirstHeaderValue(request?.headers?.get("x-forwarded-proto"))
-    .toLowerCase();
-  const host = getFirstHeaderValue(request?.headers?.get("x-forwarded-host"))
-    .toLowerCase();
-
-  if (proto && host) {
-    return normalizeOrigin(`${proto}://${host}`);
+  if (forwardedProto && forwardedHost) {
+    return normalizeOrigin(`${forwardedProto}://${forwardedHost}`);
   }
 
   const directHost = getFirstHeaderValue(request?.headers?.get("host")).toLowerCase();
@@ -214,9 +207,53 @@ function getHeaderRequestOrigin(request) {
     return "";
   }
 
-  const inferredProto =
-    proto || (process.env.NODE_ENV === "production" ? "https" : "http");
+  let inferredProto = forwardedProto;
+  if (!inferredProto) {
+    inferredProto = normalizeOrigin(request?.url).startsWith("https://")
+      ? "https"
+      : process.env.NODE_ENV === "production"
+        ? "https"
+        : "http";
+  }
+
   return normalizeOrigin(`${inferredProto}://${directHost}`);
+}
+
+function getHeaderRequestOrigin(request) {
+  const hostOrigin = getProxyOrHostRequestOrigin(request);
+  const isProduction = process.env.NODE_ENV === "production";
+  const originHeader = normalizeOrigin(request?.headers?.get("origin"));
+  if (
+    originHeader &&
+    (!isProduction || !hostOrigin || originHeader === hostOrigin)
+  ) {
+    return originHeader;
+  }
+
+  const refererHeader = normalizeOrigin(request?.headers?.get("referer"));
+  if (
+    refererHeader &&
+    (!isProduction || !hostOrigin || refererHeader === hostOrigin)
+  ) {
+    return refererHeader;
+  }
+
+  if (isProduction && hostOrigin) {
+    if (originHeader && originHeader !== hostOrigin) {
+      console.warn("[supabase-auth] Ignoring mismatched Origin header", {
+        originHeader,
+        hostOrigin,
+      });
+    }
+    if (refererHeader && refererHeader !== hostOrigin) {
+      console.warn("[supabase-auth] Ignoring mismatched Referer header", {
+        refererHeader,
+        hostOrigin,
+      });
+    }
+  }
+
+  return hostOrigin;
 }
 
 function isUsableRequestOrigin(origin, isProduction) {
@@ -290,7 +327,7 @@ export function getAuthCallbackUrl(origin) {
 
   return process.env.NODE_ENV === "production"
     ? ""
-    : "http://localhost:3000/auth/callback";
+    : `${DEFAULT_DEV_ORIGIN}/auth/callback`;
 }
 
 export async function generateSignupVerificationLink({ email, origin, userId }) {
