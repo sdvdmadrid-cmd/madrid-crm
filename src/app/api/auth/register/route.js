@@ -357,7 +357,7 @@ export async function POST(request) {
       role: assignedRole,
     });
 
-    // Super admin skips email verification — they own the server config.
+    // Super admins are verified immediately and do not need an email-link origin.
     if (isSuperAdmin) {
       if (companyName) {
         await upsertCompanyProfileForTenant({
