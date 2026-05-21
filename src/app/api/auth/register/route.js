@@ -1,5 +1,6 @@
 ﻿import { normalizeAppRole } from "@/lib/access-control";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { createVerificationOriginUnavailableResponse } from "@/lib/auth-route-errors";
 import { getSessionFromRequest } from "@/lib/auth";
 import { upsertCompanyProfileForTenant } from "@/lib/company-profile-store";
 import { logEmailAttempt, sendEmail } from "@/lib/email";
@@ -47,21 +48,6 @@ function sanitizeTenantSlug(value) {
 function tenantSeedFromEmail(email) {
   const localPart = String(email || "").split("@")[0] || "workspace";
   return sanitizeTenantSlug(localPart) || "workspace";
-}
-
-function verificationOriginUnavailableResponse() {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      error:
-        "We could not generate a verification link for this request. Open the app using its public URL or configure APP_URL / APP_BASE_URL, then try again.",
-      code: "VERIFICATION_LINK_ORIGIN_UNAVAILABLE",
-    }),
-    {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    },
-  );
 }
 
 export async function POST(request) {
@@ -162,7 +148,7 @@ export async function POST(request) {
           try {
             const origin = getRequestOrigin(request);
             if (!origin) {
-              return verificationOriginUnavailableResponse();
+              return createVerificationOriginUnavailableResponse();
             }
 
             const { verifyUrl } = await generateSignupVerificationLink({
@@ -313,7 +299,7 @@ export async function POST(request) {
     const verificationOrigin = isSuperAdmin ? "" : getRequestOrigin(request);
 
     if (!isSuperAdmin && !verificationOrigin) {
-      return verificationOriginUnavailableResponse();
+      return createVerificationOriginUnavailableResponse();
     }
 
     const now = new Date();

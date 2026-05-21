@@ -1,4 +1,5 @@
-﻿import { logEmailAttempt, sendEmail } from "@/lib/email";
+import { createVerificationOriginUnavailableResponse } from "@/lib/auth-route-errors";
+import { logEmailAttempt, sendEmail } from "@/lib/email";
 import {
   findAuthUserByEmail,
   generateSignupVerificationLink,
@@ -14,18 +15,6 @@ const OK = new Response(
   }),
   { status: 200, headers: { "Content-Type": "application/json" } },
 );
-
-function verificationOriginUnavailableResponse() {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      error:
-        "We could not generate a verification link for this request. Open the app using its public URL or configure APP_URL / APP_BASE_URL, then try again.",
-      code: "VERIFICATION_LINK_ORIGIN_UNAVAILABLE",
-    }),
-    { status: 503, headers: { "Content-Type": "application/json" } },
-  );
-}
 
 export async function POST(request) {
   try {
@@ -44,7 +33,7 @@ export async function POST(request) {
 
     const origin = getRequestOrigin(request);
     if (!origin) {
-      return verificationOriginUnavailableResponse();
+      return createVerificationOriginUnavailableResponse();
     }
     const { verifyUrl } = await generateSignupVerificationLink({
       email,

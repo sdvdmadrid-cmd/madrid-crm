@@ -219,6 +219,10 @@ function getHeaderRequestOrigin(request) {
   return normalizeOrigin(`${inferredProto}://${directHost}`);
 }
 
+function isUsableRequestOrigin(origin, isProduction) {
+  return Boolean(origin) && (!isProduction || !isLocalOrigin(origin));
+}
+
 export function getRequestOrigin(request) {
   const isProduction = process.env.NODE_ENV === "production";
   const configuredOrigin =
@@ -240,12 +244,12 @@ export function getRequestOrigin(request) {
   }
 
   const headerOrigin = getHeaderRequestOrigin(request);
-  if (headerOrigin && (!isProduction || !isLocalOrigin(headerOrigin))) {
+  if (isUsableRequestOrigin(headerOrigin, isProduction)) {
     return headerOrigin;
   }
 
   const requestOrigin = normalizeOrigin(request?.url);
-  if (requestOrigin && (!isProduction || !isLocalOrigin(requestOrigin))) {
+  if (isUsableRequestOrigin(requestOrigin, isProduction)) {
     return requestOrigin;
   }
 
