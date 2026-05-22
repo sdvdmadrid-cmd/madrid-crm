@@ -12,6 +12,11 @@ import AppFooter from "@/components/site/AppFooter";
 import AiBubbleClient from "@/components/AiBubbleClient";
 import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";
+import {
+  isOwnerCommandCenterPath,
+  isTenantContractorAppPath,
+  resolvePostLoginPath,
+} from "@/lib/auth-redirect";
 import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
@@ -166,21 +171,13 @@ export default function AuthShell({ children }) {
     featureAdminAiAssistant: true,
   });
 
-  const resolveAuthRedirect = useCallback(
-    (user) => {
-      if (typeof window === "undefined") return "/dashboard";
-      const params = new URLSearchParams(window.location.search);
-      const redirectParam = (params.get("redirect") || "").trim();
-      if (redirectParam.startsWith("/")) {
-        return redirectParam;
-      }
-      if (String(user?.role || "").toLowerCase() === "super_admin") {
-        return "/owner/overview";
-      }
-      return "/dashboard";
-    },
-    [],
-  );
+  const resolveAuthRedirect = useCallback((user) => {
+    if (typeof window === "undefined") return "/dashboard";
+    const params = new URLSearchParams(window.location.search);
+    return resolvePostLoginPath(user, params.get("redirect") || "");
+  }, []);
+
+  const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
 
   useEffect(() => {
     setHasMounted(true);
@@ -200,6 +197,13 @@ export default function AuthShell({ children }) {
     resolveAuthRedirect,
     router,
   ]);
+
+  useEffect(() => {
+    if (!hasMounted || !authChecked || !authUser) return;
+    if (String(authUser.role || "").toLowerCase() !== "super_admin") return;
+    if (!isTenantContractorAppPath(pathname)) return;
+    router.replace("/owner/overview");
+  }, [hasMounted, authChecked, authUser, pathname, router]);
 
   useEffect(() => {
     if (!hasMounted || !authChecked || authUser) return;
@@ -992,6 +996,14 @@ export default function AuthShell({ children }) {
     return <AuthBootShell />;
   }
 
+  if (isOwnerCommandCenter) {
+    return (
+      <div className="auth-shell-owner-root" style={{ minHeight: "100vh" }}>
+        {children}
+      </div>
+    );
+  }
+
   // ─── SVG icon helpers ────────────────────────────────────────────────────
   const Icon = ({ d, size = 16 }) => (
     <svg
@@ -1269,7 +1281,9 @@ export default function AuthShell({ children }) {
       style={{
         display: "flex",
         minHeight: "100vh",
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: isPremiumWorkspace
+          ? "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif"
+          : "'Inter', system-ui, sans-serif",
         position: "relative",
       }}
     >

@@ -12,6 +12,7 @@ import {
   reconcileUserRoleOnLogin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
+import { resolvePostLoginPath } from "@/lib/auth-redirect";
 import { writeSecurityAudit } from "@/lib/security-audit";
 
 export async function POST(request) {
@@ -130,10 +131,7 @@ export async function POST(request) {
     );
 
     const token = createSessionToken(sessionUser);
-    const redirectTo =
-      String(sessionUser.role || "").toLowerCase() === "super_admin"
-        ? "/owner/overview"
-        : "/dashboard";
+    const redirectTo = resolvePostLoginPath(sessionUser);
 
     return new Response(
       JSON.stringify({ success: true, data: sessionUser, redirectTo }),

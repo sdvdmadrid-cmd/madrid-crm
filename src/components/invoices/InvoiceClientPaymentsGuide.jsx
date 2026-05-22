@@ -24,6 +24,8 @@ export default function InvoiceClientPaymentsGuide({
   const [setup, setSetup] = useState(null);
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [copyNotice, setCopyNotice] = useState("");
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [connectError, setConnectError] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -86,8 +88,33 @@ export default function InvoiceClientPaymentsGuide({
   }, [setup?.webhookEndpointUrl, t]);
 
   const ready =
+    setup?.cardPaymentsReady ??
     setup?.ready ??
     (stripePublishableConfigured && setup?.secretKeyConfigured);
+
+  const connect = setup?.connect || null;
+
+  const startConnectOnboarding = useCallback(async () => {
+    setConnectError("");
+    setConnectLoading(true);
+    try {
+      const res = await apiFetch("/api/payments/connect/onboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await getJsonOrThrow(res, "Unable to start Stripe Connect");
+      const url = String(json?.data?.url || "").trim();
+      if (!url) {
+        throw new Error("Missing onboarding URL");
+      }
+      window.location.href = url;
+    } catch (err) {
+      setConnectError(err?.message || "Connect onboarding failed");
+    } finally {
+      setConnectLoading(false);
+    }
+  }, []);
 
   const steps = [
     {
@@ -193,6 +220,33 @@ export default function InvoiceClientPaymentsGuide({
                 </li>
               ))}
             </ul>
+          ) : null}
+          {connect?.enabled ? (
+            <div className={styles.webhookBox} style={{ marginTop: 12 }}>
+              <div>
+                <strong>Contractor payouts (Stripe Connect)</strong>
+              </div>
+              <p style={{ margin: "8px 0", fontSize: 14 }}>
+                {connect.onboarded
+                  ? "Payout account connected — card payments route to your Stripe balance."
+                  : "Connect Stripe to receive customer card payments with automatic payouts."}
+              </p>
+              {!connect.onboarded ? (
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  disabled={connectLoading}
+                  onClick={startConnectOnboarding}
+                >
+                  {connectLoading ? "Opening Stripe…" : "Connect payout account"}
+                </button>
+              ) : null}
+              {connectError ? (
+                <p style={{ marginTop: 8, color: "#fca5a5", fontSize: 13 }}>
+                  {connectError}
+                </p>
+              ) : null}
+            </div>
           ) : null}
           {setup?.webhookEndpointUrl ? (
             <div className={styles.webhookBox}>

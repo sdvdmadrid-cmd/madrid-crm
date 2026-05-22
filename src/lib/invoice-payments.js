@@ -115,6 +115,43 @@ export function sanitizePaymentList(values = []) {
     .filter((item) => item.amount > 0);
 }
 
+/** API/UI invoice shape from Supabase row */
+export function serializeInvoiceRow(doc = {}) {
+  const amount = Number(
+    doc.amount ?? (Number(doc.total_cents || 0) / 100 || 0),
+  );
+  const base = {
+    _id: doc.id,
+    id: doc.id,
+    tenantId: doc.tenant_id || "",
+    userId: doc.user_id || null,
+    invoiceNumber: doc.invoice_number || "",
+    invoiceTitle: doc.invoice_title || "",
+    quoteId: doc.quote_id || null,
+    quoteNumber: doc.quote_number || "",
+    jobId: doc.job_id || "",
+    clientId: doc.client_id || "",
+    clientName: doc.client_name || "",
+    clientEmail: doc.client_email || "",
+    amount: amount ? String(amount) : "",
+    dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
+    lineItems: Array.isArray(doc.items) ? doc.items : [],
+    notes: doc.notes || "",
+    preferredPaymentMethod: normalizePaymentMethod(doc.preferred_payment_method),
+    payments: Array.isArray(doc.payments) ? doc.payments : [],
+    paidAmount: Number(doc.paid_amount || 0),
+    balanceDue: Number(doc.balance_due || 0),
+    status: doc.status || "Unpaid",
+    createdAt: doc.created_at || null,
+    updatedAt: doc.updated_at || null,
+  };
+
+  return {
+    ...base,
+    ...computeInvoicePaymentState(base),
+  };
+}
+
 export function computeInvoicePaymentState(invoice = {}) {
   const amount = normalizeMoney(invoice.amount);
   const payments = sanitizePaymentList(invoice.payments || []);

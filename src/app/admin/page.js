@@ -19,7 +19,7 @@ export default async function AdminPage() {
   const role = String(session?.role || "").toLowerCase();
 
   if (!session || role !== "super_admin") {
-    redirect("/login?next=/owner/overview");
+    redirect("/login?redirect=/owner/overview");
   }
 
   redirect("/owner/overview");

@@ -63,7 +63,8 @@ export function shouldShowCrmNav(pathname) {
     return false;
   }
   const section = path.split("/").filter(Boolean)[0] || "";
-  return Boolean(TENANT_SECTIONS[section] || section === "owner");
+  if (section === "owner") return false;
+  return Boolean(TENANT_SECTIONS[section]);
 }
 
 export function getBackFallbackPath(pathname) {

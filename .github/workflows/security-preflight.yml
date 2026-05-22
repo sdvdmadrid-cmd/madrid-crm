@@ -26,6 +26,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: sb_secret_ci_dummy
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_dummy
       STRIPE_SECRET_KEY: sk_test_ci_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_ci_dummy_security_preflight_only
       ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       BILL_AUTOPAY_CRON_SECRET: ci-bill-autopay-cron-secret-for-build-only
       EMAIL_PROVIDER: mock

@@ -1,4 +1,5 @@
 import { getRequestOrigin } from "@/lib/supabase-auth";
+import { getConnectStatusForTenant } from "@/lib/stripe-connect";
 import {
   getStripeSecretKey,
   getStripeWebhookSecret,
@@ -39,6 +40,23 @@ export async function GET(request) {
     webhookSecretConfigured &&
     appUrlConfigured;
 
+  let connect = {
+    enabled: false,
+    configured: false,
+    onboarded: false,
+    chargesEnabled: false,
+    payoutsEnabled: false,
+  };
+  try {
+    connect = await getConnectStatusForTenant(context.tenantDbId);
+  } catch (error) {
+    console.error("[api/invoices/payment-setup-status] connect status", error);
+  }
+
+  const connectRequired = Boolean(connect.enabled);
+  const cardPaymentsReady =
+    ready && (!connectRequired || connect.onboarded);
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -48,7 +66,9 @@ export async function GET(request) {
         webhookSecretConfigured,
         appUrlConfigured,
         ready,
+        cardPaymentsReady,
         webhookEndpointUrl,
+        connect,
       },
     }),
     { status: 200, headers: { "Content-Type": "application/json" } },
