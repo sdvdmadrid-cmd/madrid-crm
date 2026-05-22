@@ -30,3 +30,20 @@ Run with `npm run dev` (or staging URL) after Phase 0/1+ changes.
 
 - [ ] Deploy preview: server logs `[startup] Production configuration validated.`
 - [ ] Missing `SESSION_SECRET` fails startup in production
+
+## Production smoke (fieldbaseapp.net) — 2026-05-22
+
+Automated checks:
+
+- [x] `GET /api/health` → 200, `success: true`
+- [x] `GET /login` → 200
+- [x] `GET /robots.txt` → reachable
+- [x] Supabase migration `20260523100000_payments_hardening_connect_prep.sql` applied (manual SQL Editor)
+- [x] `STRIPE_CONNECT_ENABLED=false` on Vercel Production
+
+Manual (your account):
+
+- [ ] Login contractor → `/dashboard` (premium UI)
+- [ ] Create client → job → invoice → Stripe checkout link
+- [ ] Login owner (`SUPER_ADMIN_EMAIL`) → `/owner/overview` (not contractor CRM)
+- [ ] `POST /api/payments/connect/onboard` → 503 `connect_not_enabled` (expected until Connect live)
