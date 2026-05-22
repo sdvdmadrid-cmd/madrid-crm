@@ -53,12 +53,28 @@ export function validateProductionConfig() {
   }
 
   // === HIGH: Email & Notifications ===
-  if (!validateEnvVar("RESEND_API_KEY", "Email delivery service", true)) {
+  const emailProvider = String(process.env.EMAIL_PROVIDER || "mock")
+    .trim()
+    .toLowerCase();
+  const resendRequired = emailProvider === "resend";
+  if (
+    !validateEnvVar(
+      "RESEND_API_KEY",
+      "Email delivery service (required when EMAIL_PROVIDER=resend)",
+      resendRequired,
+    )
+  ) {
     warnings.push(
-      "RESEND_API_KEY not configured - email delivery will fail"
+      "RESEND_API_KEY not configured - email delivery will fail when using resend",
     );
   }
-  if (!validateEnvVar("EMAIL_WEBHOOK_SECRET", "Email webhook signature", true)) {
+  if (
+    !validateEnvVar(
+      "EMAIL_WEBHOOK_SECRET",
+      "Email webhook signature",
+      emailProvider !== "mock",
+    )
+  ) {
     warnings.push("EMAIL_WEBHOOK_SECRET not configured");
   }
 
@@ -123,6 +139,15 @@ export function validateProductionConfig() {
     );
   }
 
+  if (
+    process.env.NODE_ENV === "production" &&
+    !validateEnvVar("BILL_AUTOPAY_CRON_SECRET", "Bill autopay cron auth", false)
+  ) {
+    warnings.push(
+      "BILL_AUTOPAY_CRON_SECRET not set - Vercel crons for Bill Payments will fail"
+    );
+  }
+
   // === Output Results ===
   if (errors.length > 0) {
     console.error("\n❌ CRITICAL CONFIGURATION ERRORS:\n");
@@ -152,14 +177,4 @@ export function validateProductionConfig() {
   };
 }
 
-/**
- * Run validation on startup (only in production)
- */
-if (process.env.NODE_ENV === "production") {
-  try {
-    validateProductionConfig();
-  } catch (error) {
-    console.error("[Production Config] Validation failed:", error.message);
-    process.exit(1);
-  }
-}
+// Startup validation is invoked from instrumentation.js via startup-config.js

@@ -1,3 +1,4 @@
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -15,6 +16,9 @@ const SYSTEM_PROMPT =
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const descriptionEnabled = await isPlatformFeatureEnabled("feature_ai_description", true);
     if (!descriptionEnabled) {
       return new Response(

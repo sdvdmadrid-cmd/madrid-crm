@@ -2,7 +2,6 @@ const FALLBACK_SECRET_KEYS = [
   "SESSION_SECRET",
   "SESSION_JWT_SECRET",
   "JWT_SECRET",
-  "SUPABASE_SERVICE_ROLE_KEY",
 ];
 
 export function resolveSessionSecret() {
@@ -14,6 +13,12 @@ export function resolveSessionSecret() {
         source: key,
       };
     }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.error(
+      "[session-secret] SESSION_SECRET is missing. Run: npm run env:ensure  (or copy .env.example → .env.local)",
+    );
   }
 
   return {

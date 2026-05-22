@@ -1,4 +1,5 @@
 import { generateContractAssistant } from "@/lib/document-ai";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -8,6 +9,8 @@ import {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
     const { role, authenticated } = await getAuthenticatedTenantContext(request);
     if (!authenticated) {
       return unauthenticatedResponse();

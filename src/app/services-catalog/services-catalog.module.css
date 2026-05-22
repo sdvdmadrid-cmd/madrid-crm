@@ -1,0 +1,130 @@
+.formCard {
+  margin-bottom: var(--fb-space-6, 24px);
+  padding: 22px;
+  border-radius: var(--fb-radius-2xl, 1.35rem);
+  border: 1px solid var(--fb-border-strong);
+  background: var(--fb-card-gradient);
+  box-shadow: var(--fb-shadow-md);
+}
+
+.formTitle {
+  margin: 0 0 16px;
+  font-family: var(--fb-font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--fb-text-heading);
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 640px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--fb-radius-md);
+  border: 1px solid var(--fb-border-strong);
+  background: var(--fb-surface-input);
+  color: var(--fb-text);
+  font-size: 14px;
+}
+
+.field:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 0 0 3px var(--fb-accent-blue-soft);
+}
+
+.textarea {
+  margin-top: 12px;
+  min-height: 100px;
+  resize: vertical;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.categories {
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--fb-text-muted);
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.serviceCard {
+  padding: 16px 18px;
+  border-radius: var(--fb-radius-xl);
+  border: 1px solid var(--fb-border);
+  background: var(--fb-card-gradient-subtle);
+  transition:
+    border-color var(--fb-duration) var(--fb-ease),
+    transform var(--fb-duration) var(--fb-ease);
+}
+
+.serviceCard:hover {
+  border-color: rgba(96, 165, 250, 0.28);
+  transform: translateY(-1px);
+}
+
+.serviceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.serviceName {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--fb-text-heading);
+}
+
+.serviceMeta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--fb-text-muted);
+}
+
+.serviceDesc {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fb-text-muted);
+}
+
+.cardActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.btnDanger {
+  padding: 8px 12px;
+  border-radius: var(--fb-radius-md);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.35);
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDanger:hover {
+  background: rgba(153, 27, 27, 0.45);
+}

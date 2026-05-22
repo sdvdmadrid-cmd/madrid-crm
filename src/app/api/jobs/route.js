@@ -2,12 +2,14 @@ import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError, normalizeUuid } from "@/lib/supabase-db";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
 
 const JOBS = "jobs";
 
@@ -84,25 +86,18 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = Math.max(1, Number(searchParams.get("page") || 0));
-    const limit = Math.min(
-      100,
-      Math.max(1, Number(searchParams.get("limit") || 0)),
+    const { paginate, page, limit, from, to } =
+      getListPaginationParams(searchParams);
+
+    let query = scopeByTenant(
+      supabaseAdmin
+        .from(JOBS)
+        .select("*", { count: paginate ? "exact" : undefined })
+        .order("created_at", { ascending: false }),
+      { tenantDbId, role },
     );
-    const paginate = searchParams.has("page") || searchParams.has("limit");
-
-    let query = supabaseAdmin
-      .from(JOBS)
-      .select("*", { count: paginate ? "exact" : undefined })
-      .order("created_at", { ascending: false });
-
-    if ((role || "").toLowerCase() !== "super_admin") {
-      query = query.eq("tenant_id", tenantDbId);
-    }
 
     if (paginate) {
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
       query = query.range(from, to);
     }
 
@@ -158,6 +153,9 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {

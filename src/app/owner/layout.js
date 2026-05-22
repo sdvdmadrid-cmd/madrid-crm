@@ -14,7 +14,7 @@ export default async function OwnerLayout({ children }) {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect('/login?next=/owner/overview');
+    redirect('/login?redirect=/owner/overview');
   }
 
   if (String(session.role || '').toLowerCase() !== 'super_admin') {

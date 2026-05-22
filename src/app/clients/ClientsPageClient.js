@@ -6,6 +6,8 @@ import { useCurrentUserAccess } from "@/lib/current-user-client";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientsList from "@/components/clients/ClientsList";
+import PremiumPageShell from "@/components/workspace/PremiumPageShell";
+import ws from "@/styles/workspace-dark.module.css";
 
 export default function ClientsPageClient() {
   const { t } = useTranslation();
@@ -21,7 +23,7 @@ export default function ClientsPageClient() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/supabase/clients");
+      const res = await apiFetch("/api/clients");
       const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
       setClients(data);
     } catch (err) {
@@ -76,8 +78,8 @@ export default function ClientsPageClient() {
 
       const method = selectedId ? "PATCH" : "POST";
       const url = selectedId
-        ? `/api/supabase/clients/${selectedId}`
-        : "/api/supabase/clients";
+        ? `/api/clients/${selectedId}`
+        : "/api/clients";
 
       const res = await apiFetch(url, {
         method,
@@ -141,7 +143,7 @@ export default function ClientsPageClient() {
 
     try {
       setError("");
-      const res = await apiFetch(`/api/supabase/clients/${id}`, {
+      const res = await apiFetch(`/api/clients/${id}`, {
         method: "DELETE",
       });
       await getJsonOrThrow(res, t("clients.errors.delete"));
@@ -154,42 +156,12 @@ export default function ClientsPageClient() {
   };
 
   return (
-    <main
-      style={{
-        padding: "24px 24px 40px",
-        maxWidth: 1120,
-        margin: "0 auto",
-      }}
+    <PremiumPageShell
+      title={t("clients.title")}
+      subtitle={t("clients.description")}
     >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: "32px", margin: 0 }}>{t("clients.title")}</h1>
-          <p style={{ margin: "10px 0 0 0", color: "#555" }}>
-            {t("clients.description")}
-          </p>
-        </div>
-      </header>
-
-      {error && (
-        <div style={{ marginTop: "20px", color: "#b00020" }}>{error}</div>
-      )}
-      <div
-        className="cf-clients-layout"
-        style={{
-          marginTop: 24,
-          display: "grid",
-          gap: 16,
-          alignItems: "start",
-        }}
-      >
+      {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
+      <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
         <ClientForm
           t={t}
           form={form}
@@ -209,17 +181,6 @@ export default function ClientsPageClient() {
           canDelete={capabilities.canDeleteRecords}
         />
       </div>
-      <style jsx>{`
-        .cf-clients-layout {
-          grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-        }
-
-        @media (max-width: 900px) {
-          .cf-clients-layout {
-            grid-template-columns: minmax(0, 1fr);
-          }
-        }
-      `}</style>
-    </main>
+    </PremiumPageShell>
   );
 }

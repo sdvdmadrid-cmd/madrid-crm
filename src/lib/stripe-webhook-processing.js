@@ -8,6 +8,8 @@ const BILL_PAYMENT_TRANSACTIONS = "bill_payment_transactions";
 const BILLS = "bills";
 const CONTRACTOR_SUBSCRIPTIONS = "contractor_subscriptions";
 const SUBSCRIPTION_INVOICES = "subscription_invoices";
+const STRIPE_WEBHOOK_EVENTS = "stripe_webhook_events";
+const COMPANY_PROFILES = "company_profiles";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -26,6 +28,92 @@ function getBillPaymentStatusFromEvent(eventType) {
     return "failed";
   }
   return "processing";
+}
+
+async function claimStripeWebhookEvent(event) {
+  const eventId = String(event?.id || "").trim();
+  if (!eventId) {
+    return { claimed: true, duplicate: false };
+  }
+
+  const { data: existing, error: readError } = await supabaseAdmin
+    .from(STRIPE_WEBHOOK_EVENTS)
+    .select("id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (readError) {
+    const missingTable =
+      readError.code === "42P01" ||
+      String(readError.message || "").includes("stripe_webhook_events");
+    if (missingTable) {
+      return { claimed: true, duplicate: false, tableMissing: true };
+    }
+    throw new Error(readError.message);
+  }
+
+  if (existing?.id) {
+    return { claimed: false, duplicate: true };
+  }
+
+  const { error: insertError } = await supabaseAdmin
+    .from(STRIPE_WEBHOOK_EVENTS)
+    .insert({
+      id: eventId,
+      event_type: String(event?.type || ""),
+      metadata: { livemode: Boolean(event?.livemode) },
+    });
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      return { claimed: false, duplicate: true };
+    }
+    const missingTable =
+      insertError.code === "42P01" ||
+      String(insertError.message || "").includes("stripe_webhook_events");
+    if (missingTable) {
+      return { claimed: true, duplicate: false, tableMissing: true };
+    }
+    throw new Error(insertError.message);
+  }
+
+  return { claimed: true, duplicate: false };
+}
+
+async function handleConnectAccountUpdated(account) {
+  const accountId = String(account?.id || "").trim();
+  const tenantId = String(account?.metadata?.tenant_id || "").trim();
+  if (!accountId) {
+    return null;
+  }
+
+  const chargesEnabled = Boolean(account?.charges_enabled);
+  const payoutsEnabled = Boolean(account?.payouts_enabled);
+  const onboardedAt =
+    chargesEnabled && payoutsEnabled ? new Date().toISOString() : null;
+
+  let query = supabaseAdmin
+    .from(COMPANY_PROFILES)
+    .update({
+      stripe_connect_charges_enabled: chargesEnabled,
+      stripe_connect_payouts_enabled: payoutsEnabled,
+      stripe_connect_onboarded_at: onboardedAt,
+    })
+    .eq("stripe_connect_account_id", accountId);
+
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+
+  const { error } = await query;
+  if (error) {
+    logSupabaseError(
+      "[stripe-webhook-processing][account.updated]",
+      error,
+      { accountId, tenantId },
+    );
+  }
+  return null;
 }
 
 async function handleSubscriptionEvent(event) {
@@ -419,6 +507,21 @@ async function handleBillPaymentIntentEvent(intent, eventType) {
 }
 
 export async function processStripeWebhookEvent(event) {
+  const claim = await claimStripeWebhookEvent(event);
+  if (!claim.claimed && claim.duplicate) {
+    return jsonResponse({
+      success: true,
+      skipped: true,
+      reason: "Duplicate Stripe event",
+      eventId: event.id,
+    });
+  }
+
+  if (event.type === "account.updated") {
+    await handleConnectAccountUpdated(event.data.object);
+    return jsonResponse({ success: true, eventType: event.type });
+  }
+
   if (
     event.type.startsWith("customer.subscription.") ||
     event.type.startsWith("invoice.")

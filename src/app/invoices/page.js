@@ -1,5 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
+import styles from "./invoices.module.css";
 import UniversalShareButton from "@/components/UniversalShareButton";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
@@ -101,21 +104,6 @@ const parseInvoiceLineItems = (value = "") =>
       };
     });
 
-const actionIconButtonStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  height: 30,
-  padding: "0 10px",
-  borderRadius: 999,
-  border: "1px solid #d1d5db",
-  background: "#fff",
-  color: "#334155",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
 function IconPencil() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -139,6 +127,7 @@ function IconTrash() {
 
 export default function InvoicesPage() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { capabilities } = useCurrentUserAccess();
   const stripePublishableConfigured = Boolean(
     String(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim(),
@@ -151,6 +140,10 @@ export default function InvoicesPage() {
   const [paymentDraftById, setPaymentDraftById] = useState({});
   const [openPaymentFormId, setOpenPaymentFormId] = useState("");
   const [savingPaymentId, setSavingPaymentId] = useState("");
+  const searchParams = useSearchParams();
+  const showClientPaymentsBanner =
+    searchParams.get("focus") === "client-payments";
+  const [paymentNotice, setPaymentNotice] = useState("");
   const [error, setError] = useState("");
   const [quoteLookup, setQuoteLookup] = useState(null);
   const [quoteLookupLoading, setQuoteLookupLoading] = useState(false);
@@ -249,6 +242,23 @@ export default function InvoicesPage() {
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
+
+  const [paymentNoticeTone, setPaymentNoticeTone] = useState("success");
+
+  useEffect(() => {
+    const payment = searchParams.get("payment");
+    if (payment === "success") {
+      setPaymentNotice(t("invoices.guide.paymentSuccess"));
+      setPaymentNoticeTone("success");
+      fetchInvoices();
+    } else if (payment === "cancel") {
+      setPaymentNotice(t("invoices.guide.paymentCancelled"));
+      setPaymentNoticeTone("info");
+    } else {
+      return;
+    }
+    router.replace("/invoices", { scroll: false });
+  }, [searchParams, router, fetchInvoices, t]);
 
   const resetForm = () => {
     setForm(initialInvoice);
@@ -545,67 +555,51 @@ export default function InvoicesPage() {
   }, []);
 
   return (
-    <main
-      style={{
-        padding: "24px",
-        fontFamily: "Arial, sans-serif",
-        maxWidth: 1000,
-        margin: "0 auto",
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
-      >
+    <main className={styles.page}>
+      <header>
         <div>
-          <h1 style={{ fontSize: "32px", margin: 0 }}>{t("invoices.title")}</h1>
-          <p style={{ margin: "10px 0 0 0", color: "#555" }}>
-            {t("invoices.description")}
-          </p>
+          <h1 className={styles.headerTitle}>{t("invoices.title")}</h1>
+          <p className={styles.headerSub}>{t("invoices.description")}</p>
         </div>
       </header>
 
-      {error && (
-        <div style={{ marginTop: "20px", color: "#b00020" }}>{error}</div>
-      )}
-      {loading && (
-        <div style={{ marginTop: "20px", color: "#333" }}>
-          {t("invoices.loading")}
+      {capabilities.canManageSensitiveData ? (
+        <InvoiceClientPaymentsGuide
+          defaultExpanded={showClientPaymentsBanner}
+          stripePublishableConfigured={stripePublishableConfigured}
+        />
+      ) : null}
+
+      {paymentNotice ? (
+        <div
+          className={
+            paymentNoticeTone === "success"
+              ? styles.noticeSuccess
+              : styles.noticeInfo
+          }
+        >
+          {paymentNotice}
         </div>
-      )}
+      ) : null}
+
+      {error && <div className={styles.error}>{error}</div>}
+      {loading && <div className={styles.loading}>{t("invoices.loading")}</div>}
 
       {capabilities.canManageSensitiveData
-        ? <section
-            style={{
-              marginTop: "24px",
-              padding: "20px",
-              border: "1px solid #ddd",
-              borderRadius: "16px",
-              background: "#fff",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>
+        ? <section className={styles.card}>
+            <h2 className={styles.cardTitle}>
               {selectedId
                 ? t("invoices.formTitleEdit")
                 : t("invoices.formTitleNew")}
             </h2>
-            <div style={{ display: "grid", gap: "12px" }}>
+            <div className={styles.formGrid}>
               <input
                 placeholder={t("invoices.placeholders.invoiceNumber")}
                 value={form.invoiceNumber}
                 onChange={(e) =>
                   setForm({ ...form, invoiceNumber: e.target.value })
                 }
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               />
               <input
                 placeholder={t("invoices.placeholders.client")}
@@ -613,11 +607,7 @@ export default function InvoicesPage() {
                 onChange={(e) =>
                   setForm({ ...form, clientName: e.target.value })
                 }
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               />
               <input
                 placeholder={t("invoices.placeholders.invoiceTitle")}
@@ -625,11 +615,7 @@ export default function InvoicesPage() {
                 onChange={(e) =>
                   setForm({ ...form, invoiceTitle: e.target.value })
                 }
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               />
               <input
                 placeholder="Estimate / Quote # (e.g. EST-0002 or #2)"
@@ -638,54 +624,30 @@ export default function InvoicesPage() {
                   setForm({ ...form, quoteNumber: e.target.value })
                 }
                 onBlur={(e) => lookupEstimate(e.target.value)}
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               />
               {quoteLookupLoading && (
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: -6 }}>
-                  Searching estimates…
-                </div>
+                <div className={styles.quoteSearching}>Searching estimates…</div>
               )}
               {quoteLookup && (
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  background: "#f0fdf4",
-                  border: "1px solid #86efac",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  fontSize: 13,
-                  marginTop: -6,
-                }}>
+                <div className={styles.quoteLookup}>
                   <span>
-                    ✓ <strong>{quoteLookup.estimateNumber}</strong> — {quoteLookup.clientName || "Unknown client"}
-                    {quoteLookup.total > 0 && ` · $${Number(quoteLookup.total).toFixed(2)}`}
+                    <strong>{quoteLookup.estimateNumber}</strong> —{" "}
+                    {quoteLookup.clientName || "Unknown client"}
+                    {quoteLookup.total > 0 &&
+                      ` · $${Number(quoteLookup.total).toFixed(2)}`}
                   </span>
                   {quoteLookup.clientName && !form.clientName && (
                     <button
                       type="button"
+                      className={styles.quoteLookupBtn}
                       onClick={() => {
-                        setForm(f => ({
+                        setForm((f) => ({
                           ...f,
                           clientName: quoteLookup.clientName,
                           quoteNumber: quoteLookup.estimateNumber,
                         }));
                         setQuoteLookup(null);
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 6,
-                        border: "1px solid #22c55e",
-                        background: "#fff",
-                        color: "#16a34a",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontSize: 12,
                       }}
                     >
                       Use client
@@ -697,32 +659,20 @@ export default function InvoicesPage() {
                 placeholder={t("invoices.placeholders.amount")}
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               />
               <input
                 type="date"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               />
               <select
                 value={form.preferredPaymentMethod}
                 onChange={(e) =>
                   setForm({ ...form, preferredPaymentMethod: e.target.value })
                 }
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                }}
+                className={styles.field}
               >
                 {paymentMethodOptions(t).map((option) => (
                   <option key={option.value} value={option.value}>
@@ -736,36 +686,21 @@ export default function InvoicesPage() {
                 onChange={(e) =>
                   setForm({ ...form, lineItemsText: e.target.value })
                 }
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                  minHeight: "110px",
-                }}
+                className={styles.fieldTextareaTall}
               />
               <textarea
                 placeholder={t("invoices.placeholders.notes")}
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                style={{
-                  padding: "12px",
-                  borderRadius: "10px",
-                  border: "1px solid #ccc",
-                  minHeight: "100px",
-                }}
+                className={styles.fieldTextareaNotes}
               />
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <div className={styles.formActions}>
                 <button
                   type="button"
                   onClick={runInvoiceAI}
                   disabled={aiLoading}
-                  style={{
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    border: "1px solid #ccc",
-                    background: "white",
-                    cursor: aiLoading ? "wait" : "pointer",
-                  }}
+                  className={styles.btnAi}
+                  style={{ cursor: aiLoading ? "wait" : "pointer" }}
                 >
                   {aiLoading
                     ? t("invoices.buttons.aiLoading")
@@ -774,14 +709,7 @@ export default function InvoicesPage() {
                 <button
                   type="button"
                   onClick={saveInvoice}
-                  style={{
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: "black",
-                    color: "white",
-                    cursor: "pointer",
-                  }}
+                  className={styles.btnPrimary}
                 >
                   {selectedId
                     ? t("invoices.buttons.update")
@@ -790,13 +718,7 @@ export default function InvoicesPage() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  style={{
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    border: "1px solid #ccc",
-                    background: "white",
-                    cursor: "pointer",
-                  }}
+                  className={styles.btnGhost}
                 >
                   {t("invoices.buttons.clear")}
                 </button>
@@ -805,50 +727,33 @@ export default function InvoicesPage() {
           </section>
         : null}
 
-      <section style={{ marginTop: "24px" }}>
-        <h2>{t("invoices.listTitle")}</h2>
-        <div style={{ display: "grid", gap: "14px" }}>
+      <section className={styles.listSection}>
+        <h2 className={styles.listTitle}>{t("invoices.listTitle")}</h2>
+        <div className={styles.listGrid}>
           {invoices.map((invoice) => (
-            <div
-              key={invoice._id}
-              style={{
-                padding: "18px",
-                border: "1px solid #ddd",
-                borderRadius: "14px",
-                background: "#fff",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  flexWrap: "wrap",
-                }}
-              >
+            <div key={invoice._id} className={styles.invoiceCard}>
+              <div className={styles.invoiceCardHeader}>
                 <div>
-                  <h3 style={{ margin: 0 }}>
+                  <h3 className={styles.invoiceTitle}>
                     {invoice.invoiceNumber || t("invoices.labels.untitled")}
                   </h3>
-                  <p style={{ margin: "8px 0 0 0", color: "#555" }}>
+                  <p className={styles.muted}>
                     {invoice.clientName} |{" "}
                     {t(`invoices.statusOptions.${invoice.status}`) ||
                       invoice.status}
                   </p>
                   {invoice.invoiceTitle
-                    ? <p style={{ margin: "8px 0 0 0", color: "#444" }}>
-                        {invoice.invoiceTitle}
-                      </p>
+                    ? <p className={styles.muted}>{invoice.invoiceTitle}</p>
                     : null}
                   {invoice.quoteNumber
-                    ? <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                    ? <p className={styles.muted}>
                         Quote ID: {invoice.quoteNumber}
                       </p>
                     : null}
-                  <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                  <p className={styles.muted}>
                     {t("invoices.labels.amount")}: ${invoice.amount}
                   </p>
-                  <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                  <p className={styles.muted}>
                     {t("invoices.labels.paid")}: $
                     {Number(invoice.paidAmount || 0).toFixed(2)} |
                     {t("invoices.labels.balance")}: $
@@ -856,33 +761,21 @@ export default function InvoicesPage() {
                       2,
                     )}
                   </p>
-                  <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                  <p className={styles.muted}>
                     {t("invoices.labels.preferredMethod")}:{" "}
                     {paymentMethodLabel(invoice.preferredPaymentMethod, t)}
                   </p>
-                  <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                  <p className={styles.muted}>
                     {t("invoices.labels.dueDate")}:{" "}
                     {invoice.dueDate || t("invoices.labels.noDate")}
                   </p>
                   {invoice.lineItems?.length
-                    ? <p
-                        style={{
-                          margin: "8px 0 0 0",
-                          color: "#777",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      >
+                    ? <p className={styles.mutedPre}>
                         {formatInvoiceLineItems(invoice.lineItems)}
                       </p>
                     : null}
                   {invoice.payments?.length
-                    ? <p
-                        style={{
-                          margin: "8px 0 0 0",
-                          color: "#4a4a4a",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      >
+                    ? <p className={styles.paymentsPre}>
                         {invoice.payments
                           .map(
                             (item) =>
@@ -892,19 +785,12 @@ export default function InvoicesPage() {
                       </p>
                     : null}
                 </div>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <div className={styles.actions}>
                   {capabilities.canSendExternalCommunications
                     ? <button
                         type="button"
                         onClick={() => sendInvoiceEmail(invoice)}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#0f766e",
-                          color: "white",
-                          cursor: "pointer",
-                        }}
+                        className={styles.btnTeal}
                       >
                         {t("invoices.buttons.sendInvoiceEmail")}
                       </button>
@@ -913,14 +799,7 @@ export default function InvoicesPage() {
                     ? <button
                         type="button"
                         onClick={() => sendInvoiceText(invoice)}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#1d4ed8",
-                          color: "white",
-                          cursor: "pointer",
-                        }}
+                        className={styles.btnBlue}
                       >
                         {t("invoices.buttons.sendInvoiceText")}
                       </button>
@@ -946,14 +825,7 @@ export default function InvoicesPage() {
                     ? <button
                         type="button"
                         onClick={() => payOnline(invoice)}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#635bff",
-                          color: "white",
-                          cursor: "pointer",
-                        }}
+                        className={styles.btnStripe}
                       >
                         {t("invoices.buttons.chargeOnline")}
                       </button>
@@ -962,14 +834,7 @@ export default function InvoicesPage() {
                     ? <button
                         type="button"
                         onClick={() => startRegisterPayment(invoice)}
-                        style={{
-                          padding: "10px 16px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#1d6f42",
-                          color: "white",
-                          cursor: "pointer",
-                        }}
+                        className={styles.btnGreen}
                       >
                         {t("invoices.buttons.registerPayment")}
                       </button>
@@ -978,7 +843,7 @@ export default function InvoicesPage() {
                     ? <button
                         type="button"
                         onClick={() => editInvoice(invoice)}
-                        style={actionIconButtonStyle}
+                        className={styles.btnIcon}
                       >
                         <IconPencil />
                         {t("invoices.buttons.edit")}
@@ -988,11 +853,7 @@ export default function InvoicesPage() {
                     ? <button
                         type="button"
                         onClick={() => deleteInvoice(invoice._id)}
-                        style={{
-                          ...actionIconButtonStyle,
-                          border: "1px solid #fecaca",
-                          color: "#b91c1c",
-                        }}
+                        className={styles.btnIconDanger}
                       >
                         <IconTrash />
                         {t("invoices.buttons.delete")}
@@ -1001,26 +862,9 @@ export default function InvoicesPage() {
                 </div>
               </div>
               {openPaymentFormId === invoice._id
-                ? <div
-                    style={{
-                      marginTop: "12px",
-                      padding: "12px",
-                      border: "1px solid #d9e3d9",
-                      borderRadius: "10px",
-                      background: "#f7fbf7",
-                      display: "grid",
-                      gap: "10px",
-                    }}
-                  >
+                ? <div className={styles.paymentPanel}>
                     <strong>{t("invoices.labels.paymentFormTitle")}</strong>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(180px, 1fr))",
-                        gap: "10px",
-                      }}
-                    >
+                    <div className={styles.paymentGrid}>
                       <input
                         placeholder={t("invoices.placeholders.paymentAmount")}
                         value={paymentDraftById[invoice._id]?.amount || ""}
@@ -1034,11 +878,7 @@ export default function InvoicesPage() {
                             },
                           }))
                         }
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid #cfd4dd",
-                        }}
+                        className={styles.fieldCompact}
                       />
                       <input
                         type="date"
@@ -1055,11 +895,7 @@ export default function InvoicesPage() {
                             },
                           }))
                         }
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid #cfd4dd",
-                        }}
+                        className={styles.fieldCompact}
                       />
                       <select
                         value={
@@ -1077,11 +913,7 @@ export default function InvoicesPage() {
                             },
                           }))
                         }
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid #cfd4dd",
-                        }}
+                        className={styles.fieldCompact}
                       >
                         {paymentMethodOptions(t).map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1102,11 +934,7 @@ export default function InvoicesPage() {
                             },
                           }))
                         }
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: "1px solid #cfd4dd",
-                        }}
+                        className={styles.fieldCompact}
                       />
                     </div>
                     <textarea
@@ -1122,28 +950,14 @@ export default function InvoicesPage() {
                           },
                         }))
                       }
-                      style={{
-                        padding: "10px",
-                        borderRadius: "8px",
-                        border: "1px solid #cfd4dd",
-                        minHeight: "72px",
-                      }}
+                      className={styles.fieldCompactTall}
                     />
-                    <div
-                      style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
-                    >
+                    <div className={styles.formActions}>
                       <button
                         type="button"
                         onClick={() => registerPayment(invoice)}
                         disabled={savingPaymentId === invoice._id}
-                        style={{
-                          padding: "10px 14px",
-                          borderRadius: "8px",
-                          border: "none",
-                          background: "#1d6f42",
-                          color: "#fff",
-                          cursor: "pointer",
-                        }}
+                        className={styles.btnGreen}
                       >
                         {savingPaymentId === invoice._id
                           ? t("invoices.buttons.savingPayment")
@@ -1152,13 +966,7 @@ export default function InvoicesPage() {
                       <button
                         type="button"
                         onClick={() => setOpenPaymentFormId("")}
-                        style={{
-                          padding: "10px 14px",
-                          borderRadius: "8px",
-                          border: "1px solid #ccc",
-                          background: "#fff",
-                          cursor: "pointer",
-                        }}
+                        className={styles.btnGhost}
                       >
                         {t("invoices.buttons.cancel")}
                       </button>
@@ -1168,7 +976,7 @@ export default function InvoicesPage() {
             </div>
           ))}
           {invoices.length === 0 && !loading && (
-            <p style={{ color: "#777" }}>{t("invoices.empty")}</p>
+            <p className={styles.empty}>{t("invoices.empty")}</p>
           )}
         </div>
       </section>

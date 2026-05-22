@@ -1,13 +1,16 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { logEmailAttempt, normalizeRecipients, sendEmail } from "@/lib/email";
+import { INNGEST_EVENTS, isInngestEnabled, sendInngestEvent } from "@/lib/inngest";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
 import { sendTextMessage } from "@/lib/sms";
+import { sendWebsiteLeadClientConfirmation } from "@/lib/website-lead-confirm";
 import {
   checkWebsiteLeadRateLimit,
   getRequestIp,
   recordWebsiteLeadAttempt,
 } from "@/lib/rate-limit";
+import { isTurnstileConfigured, verifyTurnstileToken } from "@/lib/turnstile";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_FORM_FILL_MS = 1200;
@@ -168,6 +171,14 @@ export async function POST(request, { params }) {
 
   try {
     const body = await request.json();
+
+    if (isTurnstileConfigured()) {
+      const captcha = await verifyTurnstileToken(body.turnstileToken, ip);
+      if (!captcha.ok) {
+        return Response.json({ error: captcha.error || "CAPTCHA failed" }, { status: 400 });
+      }
+    }
+
     await recordWebsiteLeadAttempt({ slug, ip });
     const nowIso = new Date().toISOString();
     const {
@@ -372,6 +383,14 @@ export async function POST(request, { params }) {
       console.error("notifications insert failed:", notificationError);
     }
 
+    const companyProfile = await getCompanyProfileByTenant({ tenantId: website.tenantId }).catch(
+      () => null,
+    );
+    const confirmLocale =
+      website.companyProfile?.documentLanguage ||
+      companyProfile?.documentLanguage ||
+      "en";
+
     await notifyContractorOfWebsiteLead({
       tenantId: website.tenantId,
       leadName: cleanName,
@@ -384,69 +403,31 @@ export async function POST(request, { params }) {
       console.warn("contractor lead notification failed", error?.message || error);
     });
 
-    // --- CLIENT CONFIRMATION (EMAIL + SMS, MULTILINGUAL) ---
-    const clientConfirmSubject = {
-      en: "We received your request!",
-      es: "¡Hemos recibido tu solicitud!",
-      pl: "Otrzymalismy Twoje zgloszenie!",
-    };
-    const clientConfirmText = {
-      en: `Thank you, ${cleanName}!\n\nWe received your request for: ${cleanServiceNeeded}.\nA contractor will contact you soon.\n\nIf you have questions, reply to this email or call the number on the website.`,
-      es: `¡Gracias, ${cleanName}!\n\nHemos recibido tu solicitud para: ${cleanServiceNeeded}.\nUn contratista se pondrá en contacto contigo pronto.\n\nSi tienes preguntas, responde a este correo o llama al número en el sitio web.`,
-      pl: `Dziekujemy, ${cleanName}!\n\nOtrzymalismy Twoje zgloszenie dotyczace: ${cleanServiceNeeded}.\nWkrotce skontaktuje sie z Toba wykonawca.\n\nW razie pytan odpowiedz na tego maila lub zadzwon pod numer na stronie.`,
-    };
-    const clientConfirmHtml = {
-      en: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px"><h2 style="color:#0f172a;margin-bottom:12px">Thank you for your request!</h2><p>We received your request for: <strong>${cleanServiceNeeded}</strong>.</p><p>A contractor will contact you soon.</p><p>If you have questions, reply to this email or call the number on the website.</p></div>`,
-      es: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px"><h2 style="color:#0f172a;margin-bottom:12px">¡Gracias por tu solicitud!</h2><p>Hemos recibido tu solicitud para: <strong>${cleanServiceNeeded}</strong>.</p><p>Un contratista se pondrá en contacto contigo pronto.</p><p>Si tienes preguntas, responde a este correo o llama al número en el sitio web.</p></div>`,
-      pl: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px"><h2 style="color:#0f172a;margin-bottom:12px">Dziekujemy za zgloszenie!</h2><p>Otrzymalismy Twoje zgloszenie dotyczace: <strong>${cleanServiceNeeded}</strong>.</p><p>Wkrotce skontaktuje sie z Toba wykonawca.</p><p>W razie pytan odpowiedz na tego maila lub zadzwon pod numer na stronie.</p></div>`,
-    };
-    // Send email confirmation (if email provided)
-    if (cleanEmail) {
-      await Promise.all([
-        sendEmail({
-          to: [cleanEmail],
-          subject: clientConfirmSubject.en,
-          text: clientConfirmText.en,
-          html: clientConfirmHtml.en,
-          metadata: { type: "website_lead_client_confirmation", lang: "en", slug },
-        }),
-        sendEmail({
-          to: [cleanEmail],
-          subject: clientConfirmSubject.es,
-          text: clientConfirmText.es,
-          html: clientConfirmHtml.es,
-          metadata: { type: "website_lead_client_confirmation", lang: "es", slug },
-        }),
-        sendEmail({
-          to: [cleanEmail],
-          subject: clientConfirmSubject.pl,
-          text: clientConfirmText.pl,
-          html: clientConfirmHtml.pl,
-          metadata: { type: "website_lead_client_confirmation", lang: "pl", slug },
-        }),
-      ]).catch((err) => {
-        console.warn("client confirmation email failed", err?.message || err);
+    if (isInngestEnabled()) {
+      const { emails } = await resolveContractorNotificationTargets(website.tenantId);
+      await sendInngestEvent(INNGEST_EVENTS.WEBSITE_LEAD, {
+        tenantId: website.tenantId,
+        slug,
+        leadId: `${slug}-${nowIso}`,
+        contractorEmails: emails,
+        leadData: {
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          message: cleanDescription,
+          serviceNeeded: cleanServiceNeeded,
+        },
       });
     }
-    // Send SMS confirmation (if phone provided)
-    if (cleanPhone) {
-      await Promise.all([
-        sendTextMessage({
-          to: cleanPhone,
-          text: clientConfirmText.en,
-        }),
-        sendTextMessage({
-          to: cleanPhone,
-          text: clientConfirmText.es,
-        }),
-        sendTextMessage({
-          to: cleanPhone,
-          text: clientConfirmText.pl,
-        }),
-      ]).catch((err) => {
-        console.warn("client confirmation sms failed", err?.message || err);
-      });
-    }
+
+    await sendWebsiteLeadClientConfirmation({
+      locale: confirmLocale,
+      email: cleanEmail,
+      phone: cleanPhone,
+      name: cleanName,
+      serviceNeeded: cleanServiceNeeded,
+      slug,
+    });
 
     return Response.json(
       {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TurnstileField from "@/components/security/TurnstileField";
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
@@ -13,7 +14,12 @@ function fileToDataUrl(file) {
   });
 }
 
-export default function RequestServiceForm({ slug, serviceOptions = [], initialService = "" }) {
+export default function RequestServiceForm({
+  slug,
+  serviceOptions = [],
+  initialService = "",
+  showEmailField = false,
+}) {
   const resolvedInitialService =
     initialService && serviceOptions.includes(initialService)
       ? initialService
@@ -21,6 +27,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
 
   const [form, setForm] = useState({
     name: "",
+    email: "",
     phone: "",
     address: "",
     serviceNeeded: resolvedInitialService,
@@ -33,6 +40,8 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [submitState, setSubmitState] = useState("idle");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -73,7 +82,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
       const res = await fetch(`/api/site/${slug}/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, turnstileToken }),
       });
 
       if (!res.ok) {
@@ -85,6 +94,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
       setSubmitState("success");
       setForm({
         name: "",
+        email: "",
         phone: "",
         address: "",
         serviceNeeded: resolvedInitialService,
@@ -93,6 +103,8 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
         website: "",
         formStartedAt: String(Date.now()),
       });
+      setTurnstileToken("");
+      setTurnstileResetKey((k) => k + 1);
       setTimeout(() => {
         setSuccess(false);
         setSubmitState("idle");
@@ -100,6 +112,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
     } catch (err) {
       setError(err.message || "Something went wrong");
       setSubmitState("error");
+      setTurnstileResetKey((k) => k + 1);
     } finally {
       setLoading(false);
     }
@@ -235,7 +248,7 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} data-lead-form="website-request">
         <input
           type="text"
           name="website"
@@ -257,6 +270,20 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
           <label style={labelStyle}>Phone *</label>
           <input type="tel" name="phone" value={form.phone} onChange={handleChange} required style={inputStyle} />
         </div>
+
+        {showEmailField ? (
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Email (optional)</label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              style={inputStyle}
+              placeholder="you@email.com"
+            />
+          </div>
+        ) : null}
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>Address *</label>
@@ -312,6 +339,8 @@ export default function RequestServiceForm({ slug, serviceOptions = [], initialS
             </div>
           )}
         </div>
+
+        <TurnstileField onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
         <button
           type="submit"

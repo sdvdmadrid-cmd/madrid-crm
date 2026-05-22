@@ -152,7 +152,7 @@ export default function WeatherLocationAutocomplete({
       ) : null}
 
       {open && suggestions.length > 0 ? (
-        <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-[9999] m-0 max-h-64 list-none overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-[0_10px_30px_rgba(15,23,42,0.14)]">
+        <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-[9999] m-0 max-h-64 list-none overflow-y-auto rounded-xl border border-slate-200/30 bg-slate-900/95 py-1 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-md">
           {suggestions.map((suggestion, index) => (
             <li
               key={suggestion.id}

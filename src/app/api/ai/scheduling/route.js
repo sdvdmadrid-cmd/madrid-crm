@@ -1,3 +1,4 @@
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -10,6 +11,9 @@ import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const enabled = await isPlatformFeatureEnabled("feature_ai_scheduling", true);
     if (!enabled) {
       return Response.json(

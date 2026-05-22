@@ -47,6 +47,24 @@ export async function GET() {
   const authHealthy =
     !requiresStrongSecret || (secretHealth.configured && secretHealth.strong);
 
+  // GitHub Security Preflight: local next start with dummy Supabase URLs.
+  if (process.env.SECURITY_PREFLIGHT_CI === "true") {
+    const ok = authHealthy;
+    return new Response(
+      JSON.stringify({
+        success: ok,
+        status: ok ? "ok" : "degraded",
+        mode: "security_preflight_ci",
+        responseMs: Date.now() - startedAt,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: ok ? 200 : 503,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
   try {
     const dbStatus = await checkSupabase();
     const dbLabel = "supabase";

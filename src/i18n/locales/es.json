@@ -26,14 +26,18 @@
     "invoiceWithoutNumber": "Factura sin numero"
   },
   "dashboardControl": {
-    "operationsLabel": "Centro de control operativo",
-    "title": "Dashboard",
-    "subtitle": "Aqui tienes tu negocio de un vistazo.",
+    "operationsLabel": "Operar · Cobrar · Crecer",
+    "title": "Centro de mando",
+    "subtitle": "Tu negocio en tres movimientos: operaciones, cobros y crecimiento.",
     "subtitleWithName": "Bienvenido de nuevo, {{name}}. Aqui tienes tu negocio de un vistazo.",
     "actions": {
+      "collectPayment": "Cobrar pago",
       "newEstimate": "Nuevo estimado",
       "newJob": "Nuevo trabajo",
       "addClient": "Agregar cliente"
+    },
+    "pillars": {
+      "ariaLabel": "Operar, cobrar y crecer"
     },
     "metrics": {
       "revenue": "Ingresos",
@@ -78,13 +82,38 @@
       "jobsDesc": "Gestiona trabajos activos, asignaciones y progreso.",
       "jobsAction": "Abrir trabajos",
       "invoicesTitle": "Facturas",
-      "invoicesDesc": "Envia facturas, cobra pagos y controla balances.",
-      "invoicesAction": "Ver facturas"
+      "invoicesDesc": "Envia enlace Stripe para que el cliente te pague en linea, o registra efectivo y Zelle.",
+      "invoicesAction": "Facturas y cobro online"
     },
     "statuses": {
       "paid": "Pagado",
       "pending": "Pendiente",
       "overdue": "Vencido"
+    }
+  },
+  "pillars": {
+    "run": {
+      "title": "Opera el dia",
+      "tagline": "Operaciones",
+      "desc": "Clientes, trabajos y calendario en un solo flujo: agenda cuadrillas, sigue el trabajo y no pierdas contexto en campo.",
+      "linkClients": "Clientes",
+      "linkJobs": "Trabajos",
+      "linkCalendar": "Calendario"
+    },
+    "paid": {
+      "title": "Cobra",
+      "tagline": "Dinero",
+      "desc": "Factura al terminar el trabajo. El cliente paga con tarjeta por Stripe; tambien puedes registrar efectivo o Zelle.",
+      "linkInvoices": "Facturas",
+      "linkCollect": "Configurar cobro online"
+    },
+    "grow": {
+      "title": "Gana el siguiente trabajo",
+      "tagline": "Crecimiento",
+      "desc": "Estimados con IA, bandeja de leads y tu sitio web: convierte interes en trabajo firmado sin cinco apps distintas.",
+      "linkEstimates": "Estimados",
+      "linkLeads": "Leads",
+      "linkWebsite": "Sitio web"
     }
   },
   "sections": {
@@ -421,6 +450,17 @@
       "invoiceTextMessage": "Hola, tu factura {invoice} por {amount} esta lista. Paga en linea aqui: {link}"
     }
   },
+  "nav": {
+    "ariaLabel": "Navegación de página",
+    "back": "Volver",
+    "currentPage": "Página actual",
+    "ownerTenants": "Inquilinos",
+    "ownerActivity": "Actividad",
+    "ownerEmails": "Correos",
+    "ownerFeatureFlags": "Feature flags",
+    "ownerMonitoring": "Monitoreo",
+    "ownerPaymentCards": "Tarjetas"
+  },
   "sidebar": {
     "main": "Principal",
     "secondary": "Secundario",
@@ -432,6 +472,8 @@
     "jobs": "Trabajos",
     "invoices": "Facturas",
     "billPayments": "Pago de facturas",
+    "payBills": "Pagar facturas",
+    "paymentMethods": "Métodos de pago",
     "subscriptions": "Suscripción",
     "calendar": "Calendario",
     "insights": "Estadisticas",
@@ -499,6 +541,7 @@
     "passwordStrengthTitle": "Requisitos de contrasena",
     "passwordStrengthError": "La contrasena debe tener al menos 12 caracteres e incluir mayuscula, minuscula, numero y caracter especial.",
     "passwordRuleLength": "Al menos 12 caracteres",
+    "passwordRuleLengthRegister": "La contrasena debe tener al menos 8 caracteres",
     "passwordRuleUpper": "Al menos una letra mayuscula",
     "passwordRuleLower": "Al menos una letra minuscula",
     "passwordRuleNumber": "Al menos un numero",
@@ -772,6 +815,38 @@
   "invoices": {
     "title": "Facturas",
     "description": "Genera, edita y administra facturas.",
+    "clientPaymentsBanner": "Cobra a tus clientes en línea: envía la factura por email o abre el enlace de pago. Tarjeta y banco van por Stripe a tu negocio. Esto no sirve para pagar tus propias facturas de luz, tarjeta de crédito, etc.",
+    "guide": {
+      "title": "Cobra en línea a tus clientes",
+      "subtitle": "Tu cliente te paga a ti por el trabajo (factura), no a una compañía de servicios. En cada factura guardada usa: email, texto, compartir enlace o cobrar en línea.",
+      "step1Title": "Crea y guarda la factura",
+      "step1Body": "Cliente, monto y fecha de vencimiento. Guarda para que aparezca en la lista.",
+      "step2Title": "Envía el enlace de pago",
+      "step2Body": "Usa Enviar por email, Enviar por texto o Compartir enlace. El cliente paga en Stripe con tarjeta o banco.",
+      "step3Title": "El cliente paga en Stripe",
+      "step3Body": "El dinero va a tu cuenta Stripe conectada a FieldBase. La factura se marca pagada cuando el webhook confirma el pago.",
+      "step4Title": "¿Efectivo o Zelle? Regístralo manual",
+      "step4Body": "Si pagó fuera de la app, usa Registrar pago (efectivo, cheque, Zelle, etc.).",
+      "stripeTitle": "Configuración Stripe (necesaria para enlaces)",
+      "stripeLoading": "Comprobando configuración...",
+      "stripeReady": "Listo: los clientes pueden pagar en línea.",
+      "stripeNotReady": "Incompleto: los enlaces fallarán hasta configurar todo en Vercel (o .env.local).",
+      "checkPublishable": "Clave publicable (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)",
+      "checkSecret": "Clave secreta (STRIPE_SECRET_KEY)",
+      "checkWebhook": "Secreto del webhook (STRIPE_WEBHOOK_SECRET)",
+      "checkAppUrl": "URL pública de la app (APP_URL o APP_BASE_URL)",
+      "webhookHint": "En Stripe → Developers → Webhooks, agrega este endpoint y eventos de checkout y payment_intent:",
+      "webhookEvents": "Eventos: checkout.session.completed, checkout.session.async_payment_succeeded, payment_intent.succeeded (y fallos relacionados).",
+      "copyWebhook": "Copiar URL",
+      "copied": "URL del webhook copiada.",
+      "copyFailed": "No se pudo copiar. Selecciona la URL manualmente.",
+      "dismiss": "Ocultar guía",
+      "show": "Cómo cobrar en línea",
+      "collapsedHint": "Envía facturas con enlace Stripe para que tus clientes te paguen.",
+      "setupLoadError": "No se pudo cargar el estado de pagos.",
+      "paymentSuccess": "Pago recibido. La lista de facturas mostrará el saldo actualizado.",
+      "paymentCancelled": "Pago cancelado. No se realizó ningún cargo."
+    },
     "loading": "Cargando facturas...",
     "formTitleNew": "Nueva factura",
     "formTitleEdit": "Editar factura",
@@ -1113,6 +1188,121 @@
       "signInToAccept": "Inicia sesion para aceptar estos terminos.",
       "signInLink": "Iniciar sesion",
       "complianceNote": "Tu aceptacion queda registrada con fecha, hora y direccion IP para cumplimiento."
+    }
+  },
+  "ownerNav": {
+    "commandCenter": "Centro de mando",
+    "platform": "Plataforma",
+    "groupCommand": "Comando",
+    "groupOps": "Operaciones",
+    "groupTrust": "Confianza",
+    "overview": "Resumen",
+    "paymentCards": "Tarjetas y uso",
+    "revenue": "Ingresos",
+    "tenants": "Inquilinos",
+    "aiOps": "IA Ops",
+    "monitoring": "Monitoreo",
+    "emails": "Correos",
+    "featureFlags": "Flags",
+    "activity": "Actividad",
+    "support": "Soporte",
+    "security": "Seguridad",
+    "settings": "Ajustes",
+    "backToApp": "App tenant"
+  },
+  "ownerPaymentCards": {
+    "title": "Tarjetas y uso",
+    "subtitle": "Tarjetas y cuentas Stripe de todos los tenants con volumen de pagos.",
+    "from": "Desde",
+    "to": "Hasta",
+    "type": "Tipo",
+    "allTypes": "Todos",
+    "cardsOnly": "Solo tarjetas",
+    "banksOnly": "Solo bancos",
+    "search": "Buscar",
+    "searchPlaceholder": "Email, marca, últimos 4…",
+    "refresh": "Actualizar",
+    "retry": "Reintentar",
+    "volumeTrend": "Tendencia de volumen",
+    "brandMix": "Marcas",
+    "topTenants": "Top tenants",
+    "allMethods": "Todos los métodos",
+    "noData": "Sin datos",
+    "truncated": "Muestra limitada de transacciones.",
+    "metrics": {
+      "methods": "Métodos guardados",
+      "cards": "tarjetas",
+      "banks": "bancos",
+      "tenants": "Tenants con wallet",
+      "volume": "Volumen",
+      "cardVolume": "Tarjeta:",
+      "payments": "Pagos",
+      "paid": "pagados",
+      "failed": "fallidos",
+      "autopay": "Autopay activo"
+    },
+    "table": {
+      "tenant": "Tenant",
+      "methods": "Métodos",
+      "payments": "Pagos",
+      "volume": "Volumen",
+      "failed": "Fallidos",
+      "user": "Usuario",
+      "method": "Método",
+      "type": "Tipo",
+      "usage": "Usos",
+      "lastUsed": "Último uso"
+    }
+  },
+  "billPayHub": {
+    "eyebrow": "Pago de facturas",
+    "title": "Paga facturas en un solo lugar",
+    "subtitle": "Agrega beneficiarios, programa pagos y administra tarjetas y bancos de forma segura.",
+    "tabsLabel": "Secciones de pago",
+    "tabBills": "Pagar facturas",
+    "tabWallet": "Tarjetas y bancos",
+    "tabActivity": "Actividad",
+    "badgeStripe": "Protegido con Stripe",
+    "badgeTenant": "Solo tu espacio de trabajo",
+    "badgeMasked": "Números de cuenta enmascarados",
+    "badgeLimits": "Límites y topes",
+    "findPayee": "Buscar beneficiario",
+    "allCategories": "Todas"
+  },
+  "paymentMethods": {
+    "title": "Métodos de pago",
+    "subtitle": "Guarda tarjetas y cuentas con Stripe. Ve el uso real de tus pagos.",
+    "addCard": "Agregar tarjeta",
+    "linkBank": "Vincular banco (Plaid)",
+    "linkingBank": "Abriendo Plaid…",
+    "openBillPayments": "Pago de facturas",
+    "backToBills": "Volver a facturas",
+    "walletTitle": "Tu billetera",
+    "emptyTitle": "Sin métodos de pago",
+    "emptyBody": "Agrega una tarjeta o cuenta para pagar facturas y autopay.",
+    "default": "Predeterminado",
+    "makeDefault": "Hacer predeterminado",
+    "remove": "Eliminar",
+    "reconnect": "Reconectar",
+    "payments": "pagos",
+    "lastUsed": "Último uso",
+    "recentActivity": "Actividad reciente",
+    "payment": "Pago",
+    "bankAccount": "Cuenta bancaria",
+    "plaidNote": "Cuentas Plaid son para verificación; los cargos usan métodos Stripe.",
+    "defaultHint": "Predeterminado: {{label}}",
+    "saved": "Guardado {{label}}",
+    "defaultUpdated": "Método predeterminado actualizado.",
+    "removed": "Método eliminado.",
+    "bankLinked": "Banco vinculado.",
+    "stripeMissing": "Stripe no está configurado.",
+    "metrics": {
+      "saved": "Guardados",
+      "cards": "tarjetas",
+      "banks": "bancos",
+      "payments90d": "Pagos (90d)",
+      "volume90d": "Volumen (90d)",
+      "successRate": "Tasa de éxito"
     }
   }
 }

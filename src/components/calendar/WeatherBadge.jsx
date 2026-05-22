@@ -26,7 +26,7 @@ export default function WeatherBadge({ weather, compact = false }) {
   if (compact) {
     return (
       <span
-        className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border font-medium leading-tight ${style}`}
+        className={`fb-weather-badge inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border font-medium leading-tight ${style}`}
         title={`${weather.description ? weather.description.charAt(0).toUpperCase() + weather.description.slice(1) : weather.condition} · ${weather.temp}°F · Humidity ${weather.humidity}%`}
       >
         <span aria-hidden="true">{weather.emoji}</span>
@@ -37,7 +37,7 @@ export default function WeatherBadge({ weather, compact = false }) {
 
   return (
     <div
-      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium ${style}`}
+      className={`fb-weather-badge flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border font-medium ${style}`}
     >
       <span className="text-base leading-none" aria-hidden="true">
         {weather.emoji}

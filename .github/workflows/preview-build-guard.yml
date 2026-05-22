@@ -19,8 +19,13 @@ jobs:
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_ci_dummy
       STRIPE_SECRET_KEY: sk_test_ci_dummy
       ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      BILL_AUTOPAY_CRON_SECRET: ci-bill-autopay-cron-secret-for-build-only
+      EMAIL_PROVIDER: mock
+      EMAIL_FROM: FieldBase <noreply@example.com>
+      EMAIL_WEBHOOK_SECRET: ci-email-webhook-secret-0123456789abcdef
       DEV_LOGIN_ENABLED: false
       NEXT_PUBLIC_DEV_LOGIN_ENABLED: false
+      ALLOW_INSECURE_DEV_WEBHOOKS: false
 
     steps:
       - name: Checkout

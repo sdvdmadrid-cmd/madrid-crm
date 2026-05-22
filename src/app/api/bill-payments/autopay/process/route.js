@@ -10,26 +10,23 @@ import {
   shouldSendAutopayReminder,
 } from "@/lib/bill-payments";
 import {
-  enforceSameOriginForMutation,
-  timingSafeEqualString,
-} from "@/lib/request-security";
+  isCronAuthorized,
+  unauthorizedCronResponse,
+} from "@/lib/cron-auth";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+
+const CRON_ENV_KEYS = ["BILL_AUTOPAY_CRON_SECRET"];
+
+export async function GET(request) {
+  return POST(request);
+}
 
 export async function POST(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
-  const cronSecret = String(process.env.BILL_AUTOPAY_CRON_SECRET || "").trim();
-  const requestSecret = String(
-    request.headers.get("x-cron-secret") || "",
-  ).trim();
-  if (!cronSecret || !timingSafeEqualString(requestSecret, cronSecret)) {
-    return new Response(
-      JSON.stringify({ success: false, error: "Unauthorized" }),
-      {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+  if (!isCronAuthorized(request, CRON_ENV_KEYS)) {
+    return unauthorizedCronResponse();
   }
 
   const { data: rules, error } = await supabaseAdmin
@@ -66,6 +63,7 @@ export async function POST(request) {
             .select("*")
             .eq("id", rule.payment_method_id)
             .eq("tenant_id", rule.tenant_id)
+            .eq("user_id", rule.user_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
     ]);

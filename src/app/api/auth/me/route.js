@@ -1,9 +1,10 @@
 import { getTenantContext } from "@/lib/tenant";
 import { cookies } from "next/headers";
-import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { buildSessionCookie, createSessionToken, getSessionFromRequest } from "@/lib/auth";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import {
   buildAppSessionFromSupabaseUser,
+  reconcileUserRoleOnLogin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
@@ -20,6 +21,7 @@ export async function GET(request) {
     }
 
     const session = getTenantContext(request);
+    const appSession = getSessionFromRequest(request);
 
     if (!session?.authenticated) {
       const cookieStore = await cookies();
@@ -89,27 +91,84 @@ export async function GET(request) {
       });
     }
 
+    const cookieStore = await cookies();
+    const supabase = createSupabaseRouteHandlerClient(cookieStore);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let responseBody = {
+      userId: session.userId,
+      tenantId: session.tenantId,
+      tenantDbId: session.tenantDbId,
+      email: session.email,
+      name: session.name,
+      companyName: session.companyName || "",
+      role: session.role,
+      capabilities: session.capabilities,
+      businessType: session.businessType || session.industry || "",
+      industry: session.businessType || session.industry || "",
+      isSubscribed: session.isSubscribed === true,
+      trialEndDate: session.trialEndDate || null,
+    };
+
+    let setCookieHeader = null;
+
+    if (user?.id) {
+      // Dev-login pins tenant CRM role for E2E; skip operator reconcile overwriting admin.
+      if (
+        appSession?.devProfile &&
+        String(appSession.devProfile).toLowerCase() !== "super_admin"
+      ) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: responseBody,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const reconciled = await reconcileUserRoleOnLogin(user);
+      const profile = await resolveProfileForUser(reconciled, {
+        tenantId: session.tenantDbId || reconciled.id,
+        role: session.role,
+      });
+      const appSession = buildAppSessionFromSupabaseUser(reconciled, null, profile);
+      if (appSession.role !== session.role) {
+        const token = createSessionToken(appSession);
+        setCookieHeader = buildSessionCookie(token);
+        responseBody = {
+          userId: appSession.userId,
+          tenantId: appSession.tenantId,
+          tenantDbId: appSession.tenantDbId,
+          email: appSession.email,
+          name: appSession.name,
+          companyName: appSession.companyName || "",
+          role: appSession.role,
+          capabilities: getRoleCapabilities(normalizeAppRole(appSession.role)),
+          businessType: appSession.businessType || "",
+          industry: appSession.businessType || "",
+          isSubscribed: appSession.isSubscribed === true,
+          trialEndDate: appSession.trialEndDate || null,
+        };
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
-        data: {
-          userId: session.userId,
-          tenantId: session.tenantId,
-          tenantDbId: session.tenantDbId,
-          email: session.email,
-          name: session.name,
-          companyName: session.companyName || "",
-          role: session.role,
-          capabilities: session.capabilities,
-          businessType: session.businessType || session.industry || "",
-          industry: session.businessType || session.industry || "",
-          isSubscribed: session.isSubscribed === true,
-          trialEndDate: session.trialEndDate || null,
-        },
+        data: responseBody,
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(setCookieHeader ? { "Set-Cookie": setCookieHeader } : {}),
+        },
       },
     );
   } catch (error) {

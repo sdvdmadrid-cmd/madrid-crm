@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { normalizeAppRole } from "@/lib/access-control";
+import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { getSessionFromRequest } from "@/lib/auth";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
 
@@ -59,9 +60,8 @@ export function normalizeAuthUser(user, profile = null) {
       user?.id ||
       null,
     role: normalizeAppRole(
-      // app_metadata.role=super_admin always wins — profiles table constraint
-      // does not allow that value so it can only come from app_metadata.
-      appMetadata.role === "super_admin"
+      // Platform operator emails always resolve to super_admin (Mission Control).
+      appMetadata.role === "super_admin" || isPlatformOperatorEmail(user?.email)
         ? "super_admin"
         : profile?.role || appMetadata.role || userMetadata.role,
     ),
@@ -75,6 +75,124 @@ export function normalizeAuthUser(user, profile = null) {
   };
 }
 
+/**
+ * Ensures platform operator emails keep super_admin in app_metadata after login.
+ * Strips mistaken super_admin from tenant users.
+ */
+export async function reconcileUserRoleOnLogin(user) {
+  if (!user?.id || !user?.email) {
+    return user;
+  }
+
+  const email = String(user.email).trim().toLowerCase();
+  const currentRole = String(user.app_metadata?.role || "").toLowerCase();
+  const shouldBeSuperAdmin = isPlatformOperatorEmail(email);
+
+  if (shouldBeSuperAdmin && currentRole !== "super_admin") {
+    try {
+      const supabaseAdmin = await getSupabaseAdminClient();
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+        user.id,
+        {
+          app_metadata: {
+            ...(user.app_metadata || {}),
+            role: "super_admin",
+          },
+        },
+      );
+      if (error) {
+        console.warn("[supabase-auth] reconcileUserRoleOnLogin failed", error.message);
+        return user;
+      }
+      return data?.user || user;
+    } catch (error) {
+      console.warn(
+        "[supabase-auth] reconcileUserRoleOnLogin error",
+        error instanceof Error ? error.message : error,
+      );
+      return user;
+    }
+  }
+
+  if (!shouldBeSuperAdmin && currentRole === "super_admin") {
+    const fallbackRole =
+      String(user.user_metadata?.role || "").toLowerCase() === "owner"
+        ? "owner"
+        : "owner";
+    try {
+      const supabaseAdmin = await getSupabaseAdminClient();
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+        user.id,
+        {
+          app_metadata: {
+            ...(user.app_metadata || {}),
+            role: fallbackRole,
+          },
+        },
+      );
+      if (error) {
+        console.warn(
+          "[supabase-auth] reconcileUserRoleOnLogin downgrade failed",
+          error.message,
+        );
+        return user;
+      }
+      return data?.user || user;
+    } catch (error) {
+      console.warn(
+        "[supabase-auth] reconcileUserRoleOnLogin downgrade error",
+        error instanceof Error ? error.message : error,
+      );
+      return user;
+    }
+  }
+
+  return user;
+}
+
+export async function syncTenantDbIdToAppMetadata(user, profile = null) {
+  if (!user?.id) {
+    return user;
+  }
+
+  const tenantDbId =
+    profile?.tenantId ||
+    profile?.tenant_id ||
+    user.app_metadata?.tenant_db_id ||
+    user.app_metadata?.tenantDbId ||
+    user.id;
+
+  const current =
+    user.app_metadata?.tenant_db_id || user.app_metadata?.tenantDbId || null;
+
+  if (String(current) === String(tenantDbId)) {
+    return user;
+  }
+
+  try {
+    const supabaseAdmin = await getSupabaseAdminClient();
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      app_metadata: {
+        ...(user.app_metadata || {}),
+        tenant_db_id: tenantDbId,
+      },
+    });
+
+    if (error) {
+      console.warn("[supabase-auth] syncTenantDbIdToAppMetadata failed", error.message);
+      return user;
+    }
+
+    return data?.user || user;
+  } catch (error) {
+    console.warn(
+      "[supabase-auth] syncTenantDbIdToAppMetadata unexpected error",
+      error instanceof Error ? error.message : error,
+    );
+    return user;
+  }
+}
+
 export async function resolveProfileForUser(user, fallback = {}) {
   if (!user?.id) {
     return null;
@@ -82,6 +200,7 @@ export async function resolveProfileForUser(user, fallback = {}) {
 
   const existing = await getProfileByUserId(user.id);
   if (existing) {
+    await syncTenantDbIdToAppMetadata(user, existing);
     return existing;
   }
 
@@ -91,12 +210,14 @@ export async function resolveProfileForUser(user, fallback = {}) {
     user?.app_metadata?.tenantDbId ||
     user?.id;
 
-  return ensureProfileForUser({
+  const created = await ensureProfileForUser({
     userId: user.id,
     tenantId: fallbackTenantId,
     role:
       fallback.role || user?.app_metadata?.role || user?.user_metadata?.role,
   });
+  await syncTenantDbIdToAppMetadata(user, created);
+  return created;
 }
 
 export function buildAppSessionFromSupabaseUser(

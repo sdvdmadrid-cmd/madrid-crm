@@ -1,5 +1,11 @@
-﻿import { normalizeAppRole } from "@/lib/access-control";
+import { normalizeAppRole } from "@/lib/access-control";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import {
+  buildLegalCookieValue,
+  LEGAL_COOKIE_MAX_AGE,
+  LEGAL_COOKIE_NAME,
+} from "@/lib/legal";
+import { getCurrentLegalVersionForTenant } from "@/lib/legal-versions";
 import { upsertProfile } from "@/lib/profiles";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -18,12 +24,12 @@ const DEV_PROFILES = {
     role: "super_admin",
   },
   admin: {
-    tenantId: process.env.DEV_ADMIN_TENANT_ID || "tenant-admin",
-    email: (process.env.DEV_ADMIN_EMAIL || "admin@FieldBase.local")
+    tenantId: process.env.DEV_ADMIN_TENANT_ID || "platform",
+    email: (process.env.DEV_ADMIN_EMAIL || "contractor@FieldBase.local")
       .trim()
       .toLowerCase(),
     password: String(process.env.DEV_ADMIN_PASSWORD || "").trim(),
-    name: process.env.DEV_ADMIN_NAME || "Admin Dev",
+    name: process.env.DEV_ADMIN_NAME || "Contractor Admin",
     role: "admin",
   },
   viewer: {
@@ -92,10 +98,16 @@ function isAllowed(request) {
   );
 }
 
-function getRedirectTarget(request) {
+function getRedirectTarget(request, role) {
   const url = new URL(request.url);
-  const redirect = url.searchParams.get("redirect") || "/";
-  return redirect.startsWith("/") ? redirect : "/";
+  const redirect = url.searchParams.get("redirect");
+  if (redirect?.startsWith("/")) {
+    return redirect;
+  }
+  if (String(role || "").toLowerCase() === "super_admin") {
+    return "/owner/overview";
+  }
+  return "/dashboard";
 }
 
 function getProfile(request) {
@@ -186,14 +198,43 @@ export async function GET(request) {
       tenantId: user.id,
       role: normalizeAppRole(DEV_PROFILES[profile]?.role),
     });
-    const sessionUser = buildAppSessionFromSupabaseUser(user, null, profileRow);
+    const devProfileRole = normalizeAppRole(DEV_PROFILES[profile]?.role || "admin");
+    let sessionUser = buildAppSessionFromSupabaseUser(user, null, profileRow);
+    // Honor the selected dev profile so E2E/local QA can exercise tenant CRM routes
+    // even when the dev admin email is also listed in SUPER_ADMIN_EMAIL(S).
+    if (devProfileRole !== "super_admin") {
+      sessionUser = { ...sessionUser, role: devProfileRole };
+    }
+
+    const cookieHeaders = [
+      buildSessionCookie(
+        createSessionToken({ ...sessionUser, devProfile: profile }),
+      ),
+    ];
+    try {
+      const legal = await getCurrentLegalVersionForTenant({
+        tenantId: sessionUser.tenantDbId || user.id,
+        userId: user.id,
+      });
+      const legalValue = buildLegalCookieValue(
+        sessionUser.tenantDbId || user.id,
+        legal?.version_name,
+      );
+      if (legalValue) {
+        cookieHeaders.push(
+          `${LEGAL_COOKIE_NAME}=${encodeURIComponent(legalValue)}; Path=/; Max-Age=${LEGAL_COOKIE_MAX_AGE}; SameSite=Lax`,
+        );
+      }
+    } catch (legalError) {
+      console.warn("[dev-login] legal cookie bootstrap skipped", legalError);
+    }
 
     return new Response(null, {
       status: 302,
       headers: {
-        Location: getRedirectTarget(request),
+        Location: getRedirectTarget(request, devProfileRole),
         "Cache-Control": "no-store",
-        "Set-Cookie": buildSessionCookie(createSessionToken(sessionUser)),
+        "Set-Cookie": cookieHeaders,
       },
     });
   } catch (error) {

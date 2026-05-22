@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { verifyEdgeSessionToken } from "./src/lib/auth-edge";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
 
@@ -13,6 +13,32 @@ function cookieNames(request) {
 const LEGAL_COOKIE_NAME = "cf_legal";
 
 const AUTH_FLOW_BYPASS_PREFIXES = ["/auth", "/verify-email"];
+
+/** Bill pay to utilities/lenders is not live — contractors collect via Invoices + Stripe. */
+const DISABLED_BILL_PAY_PAGE_PREFIXES = ["/bill-payments", "/payment-methods"];
+const DISABLED_PUBLIC_BILL_PAY_PREFIX = "/public/bill-payments";
+const DISABLED_BILL_PAY_API_PREFIX = "/api/bill-payments";
+
+function resolveDisabledBillPayTarget(pathname) {
+  if (
+    pathname === DISABLED_PUBLIC_BILL_PAY_PREFIX ||
+    pathname.startsWith(`${DISABLED_PUBLIC_BILL_PAY_PREFIX}/`)
+  ) {
+    return "public";
+  }
+  if (
+    pathname === DISABLED_BILL_PAY_API_PREFIX ||
+    pathname.startsWith(`${DISABLED_BILL_PAY_API_PREFIX}/`)
+  ) {
+    return "api";
+  }
+  for (const prefix of DISABLED_BILL_PAY_PAGE_PREFIXES) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      return "page";
+    }
+  }
+  return "";
+}
 
 // ── Distributed Rate Limiter (Edge Runtime, Upstash Redis HTTP) ──────────────
 // Uses Upstash Redis when UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN
@@ -246,6 +272,33 @@ function unauthenticatedApiResponse() {
   );
 }
 
+async function resolveSlugByCustomHostnameEdge(hostname) {
+  const host = String(hostname || "").trim().toLowerCase();
+  if (!host || host === "localhost" || host.endsWith(".localhost")) return "";
+
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!base || !key) return "";
+
+  try {
+    const res = await fetch(
+      `${base}/rest/v1/contractor_website_domains?hostname=eq.${encodeURIComponent(host)}&verified_at=not.is.null&select=slug&limit=1`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+        next: { revalidate: 300 },
+      },
+    );
+    if (!res.ok) return "";
+    const rows = await res.json();
+    return String(rows?.[0]?.slug || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 function resolveWebsiteSlugFromHost(request) {
   const hostHeader = String(request.headers.get("host") || "").trim().toLowerCase();
   if (!hostHeader) return "";
@@ -283,6 +336,14 @@ export async function middleware(request) {
 
   // Legacy public quote links may use /quotes/<token>. Redirect those to /quote/<token>
   // so clients never land on authenticated dashboard routes.
+  const disabledBillPayTarget = resolveDisabledBillPayTarget(pathname);
+  if (disabledBillPayTarget === "public") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/";
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+
   if (pathname.startsWith("/quotes/")) {
     const maybeToken = String(pathname.split("/")[2] || "").trim();
     const isTokenLike = /^[a-zA-Z0-9_]{24,}$/.test(maybeToken);
@@ -370,7 +431,9 @@ export async function middleware(request) {
     }
     if (edgeSession || hasConfirmedSupabaseUser) {
       const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
+      const sessionRole = String(edgeSession?.role || "").toLowerCase();
+      url.pathname =
+        sessionRole === "super_admin" ? "/owner/overview" : "/dashboard";
       if (AUTH_LOG_VERBOSE) {
         console.info("[middleware] redirect public auth page -> dashboard", {
           pathname,
@@ -395,7 +458,10 @@ export async function middleware(request) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  const subdomainSlug = resolveWebsiteSlugFromHost(request);
+  const hostHeader = String(request.headers.get("host") || "").trim().toLowerCase();
+  const hostname = hostHeader.split(":")[0];
+  const customDomainSlug = await resolveSlugByCustomHostnameEdge(hostname);
+  const subdomainSlug = customDomainSlug || resolveWebsiteSlugFromHost(request);
   if (subdomainSlug) {
     // Public tenant subdomains must only serve the published website.
     // This prevents app/dashboard/API mixing on the public share URL.
@@ -470,6 +536,46 @@ export async function middleware(request) {
       });
     }
     return response;
+  }
+
+  const sessionRole = String(session?.role || "").toLowerCase();
+
+  if (disabledBillPayTarget === "api" && sessionRole !== "super_admin") {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Bill pay to external billers is not available. Use Invoices to send your clients a secure payment link.",
+        code: "BILL_PAY_DISABLED",
+      },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+
+  if (disabledBillPayTarget === "page") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/invoices";
+    redirectUrl.search = "focus=client-payments";
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  const isPlatformOperatorPath =
+    pathname.startsWith("/owner") ||
+    pathname.startsWith("/api/admin") ||
+    pathname.startsWith("/api/platform") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/");
+
+  if (isPlatformOperatorPath && sessionRole !== "super_admin") {
+    if (isApiPath(pathname)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden: platform access required" },
+        { status: 403 },
+      );
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
   }
 
   // Sesión válida, continuar

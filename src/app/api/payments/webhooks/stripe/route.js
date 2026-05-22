@@ -66,6 +66,7 @@ export async function POST(request) {
         "customer.subscription.deleted",
         "invoice.payment_succeeded",
         "invoice.payment_failed",
+        "account.updated",
       ].includes(event.type)
     ) {
       return new Response(

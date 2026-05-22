@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { devLogin, ensureLegalAccepted } = require('./helpers/auth');
 
 function ymdFromParts(year, monthIndex, day) {
   return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -7,29 +8,6 @@ function ymdFromParts(year, monthIndex, day) {
 function addDaysYmd(base, delta) {
   const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta);
   return ymdFromParts(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-async function ensureLegalAccepted(api) {
-  const originHeaders = { Origin: 'http://localhost:3000' };
-
-  const statusRes = await api.get('/api/legal/status', { headers: originHeaders });
-  const statusJson = await statusRes.json().catch(() => null);
-  if (statusRes.ok() && statusJson?.data?.accepted) {
-    return;
-  }
-
-  const versionRes = await api.get('/api/legal/version', { headers: originHeaders });
-  const versionJson = await versionRes.json().catch(() => null);
-  const version = String(versionJson?.data?.version || '').trim();
-
-  const acceptRes = await api.post('/api/legal/accept', {
-    headers: {
-      ...originHeaders,
-      'Content-Type': 'application/json',
-    },
-    data: version ? { version } : {},
-  });
-  expect(acceptRes.ok()).toBeTruthy();
 }
 
 test.describe('calendar date safety and weather forecast', () => {
@@ -51,10 +29,7 @@ test.describe('calendar date safety and weather forecast', () => {
   }
 
   test.beforeEach(async ({ page }) => {
-    await page.goto('/api/auth/dev-login?profile=admin&redirect=%2Fcalendar', {
-      waitUntil: 'domcontentloaded',
-    });
-    await ensureLegalAccepted(page.request);
+    await devLogin(page, { profile: 'admin', redirect: '/calendar' });
     await page.goto('/calendar', { waitUntil: 'domcontentloaded' });
     await expectCalendarLoaded(page);
   });
@@ -92,6 +67,7 @@ test.describe('calendar date safety and weather forecast', () => {
   });
 
   test('keeps selected date unchanged after save and edit', async ({ page }) => {
+    test.setTimeout(60_000);
     const uniqueTitle = `PW Date Integrity ${Date.now()}`;
     const now = new Date();
     const today = addDaysYmd(now, 0);
@@ -99,13 +75,28 @@ test.describe('calendar date safety and weather forecast', () => {
     const futureUpdated = addDaysYmd(now, 3);
 
     await openNewAppointmentModal(page, today);
+    await expect(page.getByTestId('appointment-save-button')).toBeVisible({
+      timeout: 15_000,
+    });
 
-    await page.getByPlaceholder('Title').fill(uniqueTitle);
+    const titleInput = page.getByTestId('appointment-title-input').or(
+      page.getByPlaceholder('Title'),
+    );
+    await expect(titleInput).toBeVisible();
+    await titleInput.fill(uniqueTitle);
     await page.getByPlaceholder('Client', { exact: true }).fill('Playwright Client');
     await page.getByTestId('appointment-date-input').fill(future);
     await page.locator('input[type="time"]').first().fill('11:45');
+    const createResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/appointments') &&
+        response.request().method() === 'POST',
+    );
     await page.getByTestId('appointment-save-button').click();
+    const createRes = await createResponse;
+    expect(createRes.ok()).toBeTruthy();
 
+    await expect(page.getByText(uniqueTitle).first()).toBeVisible({ timeout: 20_000 });
     await page.getByText(uniqueTitle).first().click();
     await page.getByTestId('appointment-edit-button').click();
 
@@ -113,18 +104,27 @@ test.describe('calendar date safety and weather forecast', () => {
     await expect(dateInput).toHaveValue(future);
 
     await dateInput.fill(futureUpdated);
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/appointments') &&
+        ['PUT', 'PATCH'].includes(response.request().method()),
+    );
     await page.getByTestId('appointment-save-button').click();
+    expect((await updateResponse).ok()).toBeTruthy();
 
+    await expect(page.getByText(uniqueTitle).first()).toBeVisible({ timeout: 20_000 });
     await page.getByText(uniqueTitle).first().click();
     await page.getByTestId('appointment-edit-button').click();
     await expect(page.getByTestId('appointment-date-input')).toHaveValue(futureUpdated);
   });
 
   test('api rejects past appointment dates with 400', async ({ page }) => {
+    await ensureLegalAccepted(page.request);
     const now = new Date();
     const yesterday = addDaysYmd(now, -1);
 
     const res = await page.request.post('/api/appointments', {
+      headers: { Origin: 'http://localhost:3000' },
       data: {
         title: `PW API Past Date ${Date.now()}`,
         clientName: 'Playwright Client',

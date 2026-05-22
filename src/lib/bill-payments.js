@@ -22,6 +22,9 @@ import {
 import { getPlaidProcessorToken } from "@/lib/plaid-integration";
 import { attachPlaidBankAccountToStripeCustomer } from "@/lib/stripe-payments";
 import { decryptSensitive, encryptSensitive } from "@/lib/encryption";
+import { shouldPersistPlaidAccessToken } from "@/lib/bill-payments-security";
+import { BILL_CATEGORY_IDS } from "@/lib/bill-payments-catalog";
+import { canAccessBillPayments } from "@/lib/access-control";
 
 export const BILL_TABLE = "bills";
 export const BILL_PROVIDER_TABLE = "bill_providers";
@@ -102,6 +105,13 @@ export async function requireBillPaymentsAccess(request, mode = "read") {
   }
 
   if (mode === "sensitive" && !canManageSensitive(context.role)) {
+    return { response: forbiddenResponse() };
+  }
+
+  if (
+    (mode === "read" || mode === "write" || mode === "sensitive") &&
+    !canAccessBillPayments(context.role)
+  ) {
     return { response: forbiddenResponse() };
   }
 
@@ -1227,7 +1237,8 @@ export function buildBillWritePayload(body, currentBill = null) {
     throw new Error(accountNumberError);
   }
 
-  const categoryId = String(body.category || "general").trim().toLowerCase();
+  const rawCategory = String(body.category || "general").trim().toLowerCase();
+  const categoryId = BILL_CATEGORY_IDS.has(rawCategory) ? rawCategory : "general";
   const providerIdentifiers = normalizeProviderIdentifiers(body.providerIdentifiers);
 
   const payload = {
@@ -1891,12 +1902,17 @@ export async function savePlaidPaymentMethod({
       plaid_account_id: accountId,
       plaid_account_mask: last4,
       plaid_account_name: bankName,
-      plaid_access_token: encryptSensitive(String(accessToken || "").trim()),
       reconnect_required: false,
       access_token_present: Boolean(accessToken),
     },
     updated_at: nowIso,
   };
+
+  if (shouldPersistPlaidAccessToken() && accessToken) {
+    row.metadata.plaid_access_token = encryptSensitive(
+      String(accessToken || "").trim(),
+    );
+  }
 
   const { data: existingMethod, error: existingMethodError } = await supabaseAdmin
     .from(BILL_PAYMENT_METHOD_TABLE)

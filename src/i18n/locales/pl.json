@@ -26,14 +26,18 @@
     "invoiceWithoutNumber": "Faktura bez numeru"
   },
   "dashboardControl": {
-    "operationsLabel": "Centrum operacyjne",
-    "title": "Panel",
-    "subtitle": "Tutaj widzisz swoja firme w jednym miejscu.",
+    "operationsLabel": "Prowadz · Zbieraj · Rozwijaj",
+    "title": "Centrum dowodzenia",
+    "subtitle": "Twoja firma w trzech ruchach: operacje, platnosci i rozwoj.",
     "subtitleWithName": "Witaj ponownie, {{name}}. Tutaj widzisz swoja firme w jednym miejscu.",
     "actions": {
+      "collectPayment": "Pobierz platnosc",
       "newEstimate": "Nowa wycena",
       "newJob": "Nowe zlecenie",
       "addClient": "Dodaj klienta"
+    },
+    "pillars": {
+      "ariaLabel": "Prowadz firme, zbieraj platnosci i rozwijaj"
     },
     "metrics": {
       "revenue": "Przychod",
@@ -78,13 +82,38 @@
       "jobsDesc": "Zarzadzaj aktywnymi zleceniami i postepem prac.",
       "jobsAction": "Otworz zlecenia",
       "invoicesTitle": "Faktury",
-      "invoicesDesc": "Wysylaj faktury, przyjmuj platnosci i kontroluj salda.",
-      "invoicesAction": "Zobacz faktury"
+      "invoicesDesc": "Wyslij link Stripe, aby klient placil online, lub zarejestruj gotowke i Zelle.",
+      "invoicesAction": "Faktury i platnosci online"
     },
     "statuses": {
       "paid": "Oplacone",
       "pending": "Oczekujace",
       "overdue": "Po terminie"
+    }
+  },
+  "pillars": {
+    "run": {
+      "title": "Prowadz dzien",
+      "tagline": "Operacje",
+      "desc": "Klienci, zlecenia i kalendarz w jednym miejscu — planuj ekipy, sledz prace i nie gub kontekstu w terenie.",
+      "linkClients": "Klienci",
+      "linkJobs": "Zlecenia",
+      "linkCalendar": "Kalendarz"
+    },
+    "paid": {
+      "title": "Zbieraj platnosci",
+      "tagline": "Finanse",
+      "desc": "Wystaw fakture po zakonczeniu pracy. Klient placi karta przez Stripe; mozesz tez zapisac gotowke lub Zelle.",
+      "linkInvoices": "Faktury",
+      "linkCollect": "Ustaw platnosci online"
+    },
+    "grow": {
+      "title": "Wygraj kolejne zlecenie",
+      "tagline": "Rozwoj",
+      "desc": "Wyceny AI, skrzynka leadow i strona — zamien zainteresowanie w podpisana prace bez pieciu aplikacji.",
+      "linkEstimates": "Wyceny",
+      "linkLeads": "Leady",
+      "linkWebsite": "Strona"
     }
   },
   "sections": {
@@ -421,6 +450,17 @@
       "invoiceTextMessage": "Czesc, Twoja faktura {invoice} na kwote {amount} jest gotowa. Oplac online tutaj: {link}"
     }
   },
+  "nav": {
+    "ariaLabel": "Nawigacja strony",
+    "back": "Wstecz",
+    "currentPage": "Biezaca strona",
+    "ownerTenants": "Najemcy",
+    "ownerActivity": "Aktywnosc",
+    "ownerEmails": "E-maile",
+    "ownerFeatureFlags": "Flagi funkcji",
+    "ownerMonitoring": "Monitoring",
+    "ownerPaymentCards": "Karty"
+  },
   "sidebar": {
     "main": "Glowne",
     "secondary": "Dodatkowe",
@@ -432,6 +472,8 @@
     "jobs": "Zlecenia",
     "invoices": "Faktury",
     "billPayments": "Platnosci rachunkow",
+    "payBills": "Plac rachunki",
+    "paymentMethods": "Metody platnosci",
     "subscriptions": "Subskrypcja",
     "calendar": "Kalendarz",
     "insights": "Statystyki",
@@ -499,6 +541,7 @@
     "passwordStrengthTitle": "Wymagania hasla",
     "passwordStrengthError": "Haslo musi miec co najmniej 12 znakow oraz zawierac wielka litere, mala litere, cyfre i znak specjalny.",
     "passwordRuleLength": "Co najmniej 12 znakow",
+    "passwordRuleLengthRegister": "Haslo musi miec co najmniej 8 znakow",
     "passwordRuleUpper": "Co najmniej jedna wielka litera",
     "passwordRuleLower": "Co najmniej jedna mala litera",
     "passwordRuleNumber": "Co najmniej jedna cyfra",
@@ -772,6 +815,38 @@
   "invoices": {
     "title": "Faktury",
     "description": "Tworz, edytuj i zarzadzaj fakturami.",
+    "clientPaymentsBanner": "Pobieraj platnosci od klientow online: wyslij fakture e-mailem lub link platnosci. Karta i bank przez Stripe do Twojej firmy. To nie sluzy do placenia wlasnych rachunkow za media czy karty.",
+    "guide": {
+      "title": "Pobieraj platnosci online od klientow",
+      "subtitle": "Klient placi Tobie za prace (faktura), nie firmie mediowej. Na kazdej zapisanej fakturze: e-mail, SMS, udostepnij link lub pobierz online.",
+      "step1Title": "Utworz i zapisz fakture",
+      "step1Body": "Klient, kwota i termin. Zapisz, aby pojawila sie na liscie.",
+      "step2Title": "Wyslij link platnosci",
+      "step2Body": "E-mail, SMS lub udostepnij link. Klient placi w Stripe karta lub bankiem.",
+      "step3Title": "Klient placi w Stripe",
+      "step3Body": "Srodki trafiaja na Twoje konto Stripe w FieldBase. Faktura oznaczona jako oplacona po potwierdzeniu webhookiem.",
+      "step4Title": "Gotowka lub Zelle? Zarejestruj recznie",
+      "step4Body": "Jesli zaplacil poza aplikacja, uzyj Zarejestruj platnosc.",
+      "stripeTitle": "Konfiguracja Stripe (wymagana do linkow)",
+      "stripeLoading": "Sprawdzanie konfiguracji...",
+      "stripeReady": "Gotowe: klienci moga placic online.",
+      "stripeNotReady": "Niekompletne: linki nie zadzialaja bez pelnej konfiguracji w Vercel (lub .env.local).",
+      "checkPublishable": "Klucz publiczny (NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)",
+      "checkSecret": "Klucz tajny (STRIPE_SECRET_KEY)",
+      "checkWebhook": "Sekret webhooka (STRIPE_WEBHOOK_SECRET)",
+      "checkAppUrl": "Publiczny URL aplikacji (APP_URL lub APP_BASE_URL)",
+      "webhookHint": "W Stripe → Developers → Webhooks dodaj ten endpoint i zdarzenia checkout oraz payment_intent:",
+      "webhookEvents": "Zdarzenia: checkout.session.completed, checkout.session.async_payment_succeeded, payment_intent.succeeded (i powiazane bledy).",
+      "copyWebhook": "Kopiuj URL",
+      "copied": "URL webhooka skopiowany.",
+      "copyFailed": "Nie udalo sie skopiowac. Zaznacz URL recznie.",
+      "dismiss": "Ukryj przewodnik",
+      "show": "Jak pobierac platnosci online",
+      "collapsedHint": "Wysylaj faktury z linkiem Stripe, aby klienci mogli Ci zaplacic.",
+      "setupLoadError": "Nie mozna zaladowac statusu platnosci.",
+      "paymentSuccess": "Platnosc otrzymana. Lista faktur pokaze zaktualizowane saldo.",
+      "paymentCancelled": "Platnosc anulowana. Nie pobrano srodkow."
+    },
     "loading": "Ladowanie faktur...",
     "formTitleNew": "Nowa faktura",
     "formTitleEdit": "Edytuj fakture",
@@ -1113,6 +1188,121 @@
       "signInToAccept": "Zaloguj sie, aby zaakceptowac te warunki.",
       "signInLink": "Zaloguj sie",
       "complianceNote": "Twoja akceptacja jest rejestrowana ze znacznikiem czasu i adresem IP dla celow zgodnosci."
+    }
+  },
+  "ownerNav": {
+    "commandCenter": "Centrum dowodzenia",
+    "platform": "Platforma",
+    "groupCommand": "Dowodzenie",
+    "groupOps": "Operacje",
+    "groupTrust": "Zaufanie",
+    "overview": "Przeglad",
+    "paymentCards": "Karty i uzycie",
+    "revenue": "Przychody",
+    "tenants": "Najemcy",
+    "aiOps": "AI Ops",
+    "monitoring": "Monitoring",
+    "emails": "E-maile",
+    "featureFlags": "Flagi",
+    "activity": "Aktywnosc",
+    "support": "Wsparcie",
+    "security": "Bezpieczenstwo",
+    "settings": "Ustawienia",
+    "backToApp": "Aplikacja"
+  },
+  "ownerPaymentCards": {
+    "title": "Karty i uzycie",
+    "subtitle": "Karty i konta Stripe wszystkich najemcow z wolumenem platnosci.",
+    "from": "Od",
+    "to": "Do",
+    "type": "Typ",
+    "allTypes": "Wszystkie",
+    "cardsOnly": "Tylko karty",
+    "banksOnly": "Tylko banki",
+    "search": "Szukaj",
+    "searchPlaceholder": "E-mail, marka, ostatnie 4…",
+    "refresh": "Odswiez",
+    "retry": "Sprobuj ponownie",
+    "volumeTrend": "Trend wolumenu",
+    "brandMix": "Marki kart",
+    "topTenants": "Top najemcy",
+    "allMethods": "Wszystkie metody",
+    "noData": "Brak danych",
+    "truncated": "Probka transakcji ograniczona.",
+    "metrics": {
+      "methods": "Zapisane metody",
+      "cards": "kart",
+      "banks": "bankow",
+      "tenants": "Najemcy z portfelem",
+      "volume": "Wolumen",
+      "cardVolume": "Karta:",
+      "payments": "Platnosci",
+      "paid": "oplacone",
+      "failed": "nieudane",
+      "autopay": "Autopay wlaczony"
+    },
+    "table": {
+      "tenant": "Najemca",
+      "methods": "Metody",
+      "payments": "Platnosci",
+      "volume": "Wolumen",
+      "failed": "Nieudane",
+      "user": "Uzytkownik",
+      "method": "Metoda",
+      "type": "Typ",
+      "usage": "Uzycia",
+      "lastUsed": "Ostatnio"
+    }
+  },
+  "billPayHub": {
+    "eyebrow": "Platnosci rachunkow",
+    "title": "Plac rachunki w jednym miejscu",
+    "subtitle": "Dodawaj odbiorcow, planuj platnosci i zarzadzaj kartami i kontami bezpiecznie.",
+    "tabsLabel": "Sekcje platnosci",
+    "tabBills": "Plac rachunki",
+    "tabWallet": "Karty i banki",
+    "tabActivity": "Aktywnosc",
+    "badgeStripe": "Zabezpieczone Stripe",
+    "badgeTenant": "Tylko Twoja przestrzen",
+    "badgeMasked": "Zamaskowane numery kont",
+    "badgeLimits": "Limity i limity zbiorcze",
+    "findPayee": "Znajdz odbiorce",
+    "allCategories": "Wszystkie"
+  },
+  "paymentMethods": {
+    "title": "Metody platnosci",
+    "subtitle": "Zapisuj karty i konta przez Stripe. Zobacz rzeczywiste uzycie platnosci.",
+    "addCard": "Dodaj karte",
+    "linkBank": "Polacz bank (Plaid)",
+    "linkingBank": "Otwieranie Plaid…",
+    "openBillPayments": "Platnosci rachunkow",
+    "backToBills": "Wroc do rachunkow",
+    "walletTitle": "Twoj portfel",
+    "emptyTitle": "Brak metod platnosci",
+    "emptyBody": "Dodaj karte lub konto, aby placic rachunki i autopay.",
+    "default": "Domyslna",
+    "makeDefault": "Ustaw domyslna",
+    "remove": "Usun",
+    "reconnect": "Polacz ponownie",
+    "payments": "platnosci",
+    "lastUsed": "Ostatnio",
+    "recentActivity": "Ostatnia aktywnosc",
+    "payment": "Platnosc",
+    "bankAccount": "Konto bankowe",
+    "plaidNote": "Konta Plaid sluza do weryfikacji; obciazenia uzywaja Stripe.",
+    "defaultHint": "Domyslna: {{label}}",
+    "saved": "Zapisano {{label}}",
+    "defaultUpdated": "Domyslna metoda zaktualizowana.",
+    "removed": "Metoda usunieta.",
+    "bankLinked": "Bank polaczony.",
+    "stripeMissing": "Stripe nie jest skonfigurowany.",
+    "metrics": {
+      "saved": "Zapisane",
+      "cards": "kart",
+      "banks": "bankow",
+      "payments90d": "Platnosci (90d)",
+      "volume90d": "Wolumen (90d)",
+      "successRate": "Skutecznosc"
     }
   }
 }

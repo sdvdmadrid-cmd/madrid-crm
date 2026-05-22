@@ -1,0 +1,318 @@
+.hub {
+  display: grid;
+  gap: 24px;
+  color: #0f172a;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #0f766e 0%, #134e4a 48%, #1e293b 100%);
+  color: #f8fafc;
+  box-shadow: 0 24px 48px rgba(15, 118, 110, 0.22);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.heroSub {
+  margin: 8px 0 0;
+  max-width: 52ch;
+  color: rgba(248, 250, 252, 0.82);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.metricLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.metricValue {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.metricHint {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.panel {
+  padding: 22px;
+  border-radius: 22px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+}
+
+.panelHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.methodGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.methodCard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.methodCard:hover {
+  border-color: rgba(15, 118, 110, 0.28);
+  box-shadow: 0 10px 28px rgba(15, 118, 110, 0.08);
+}
+
+.methodCardDefault {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 72%);
+}
+
+.methodIcon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(15, 118, 110, 0.1);
+  font-size: 1.5rem;
+}
+
+.methodName {
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.methodMeta {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.methodStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.statPill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.methodActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.badgeDefault {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #059669;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.emptyState {
+  padding: 32px 24px;
+  text-align: center;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.03);
+  color: #64748b;
+}
+
+.emptyTitle {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.activityList {
+  display: grid;
+  gap: 10px;
+}
+
+.activityRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.btnPrimary {
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #fff;
+  padding: 11px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.25);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 11px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnGhost {
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  color: #0f172a;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnDanger {
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: #fff5f5;
+  color: #b91c1c;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.setupForm {
+  display: grid;
+  gap: 14px;
+}
+
+.stripeElementWrap {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+}
+
+.setupActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+}
+
+.alertError {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.alertSuccess {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.alertWarn {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.loading {
+  padding: 48px;
+  text-align: center;
+  color: #64748b;
+}
+
+@media (max-width: 720px) {
+  .methodCard {
+    grid-template-columns: 1fr;
+  }
+
+  .methodActions {
+    justify-content: flex-start;
+  }
+}

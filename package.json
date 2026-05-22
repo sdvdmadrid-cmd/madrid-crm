@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/ensure-dev-env.mjs && next dev",
+    "env:ensure": "node scripts/ensure-dev-env.mjs",
     "dev:restart": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1",
     "dev:stop": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1 -NoStart",
     "build": "next build",
@@ -9,7 +10,10 @@
     "bill:platform-fee": "powershell -ExecutionPolicy Bypass -File scripts/run-bill-platform-fee.ps1",
     "bill:remittance": "powershell -ExecutionPolicy Bypass -File scripts/run-bill-remittance.ps1",
     "generate:favicons": "node scripts/generate-favicons.mjs",
+    "db:migrate": "node scripts/apply-supabase-migrations.mjs",
+    "setup:website-production": "node scripts/setup-website-production.mjs",
     "test:e2e": "playwright test",
+    "test:e2e:website": "playwright test tests/e2e/website-funnel.spec.js",
     "test:e2e:ui": "playwright test --ui",
     "pooling:enable": "node scripts/auto-pooling.mjs",
     "pooling:verify": "node scripts/verify-pooling.mjs",
@@ -17,6 +21,7 @@
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "indexing:verify": "node scripts/verify-indexing-postdeploy.mjs",
     "release:prod:indexing": "powershell -ExecutionPolicy Bypass -File scripts/release-prod-indexing.ps1",
+    "release:automate": "powershell -ExecutionPolicy Bypass -File scripts/release-automation.ps1 -SkipE2E",
     "env:backup": "powershell -ExecutionPolicy Bypass -File scripts/env-backup.ps1",
     "env:restore": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1",
     "env:backups": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1 -List"

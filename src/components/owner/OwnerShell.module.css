@@ -1,60 +1,201 @@
-.owner-shell {
+.ownerShell {
   display: flex;
   min-height: 100vh;
-  background: linear-gradient(120deg, #181c24 0%, #232a36 100%);
+  background:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99, 102, 241, 0.18), transparent),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(15, 118, 110, 0.15), transparent),
+    linear-gradient(165deg, #1e2433 0%, #2a3347 45%, #323d52 100%);
 }
-.owner-sidebar {
-  width: 240px;
-  background: rgba(24,28,36,0.98);
-  border-right: 1px solid #232a36;
-  color: #fff;
-  padding: 32px 0 0 0;
+
+.ownerSidebar {
+  width: 268px;
+  flex-shrink: 0;
+  background: rgba(12, 15, 20, 0.92);
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 24px 0 32px;
   min-height: 100vh;
   position: sticky;
   top: 0;
   z-index: 10;
+  backdrop-filter: blur(12px);
 }
-.owner-main {
+
+.ownerBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px 28px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  margin-bottom: 20px;
+}
+
+.ownerBrandMark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #6366f1, #0f766e);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: -0.02em;
+}
+
+.ownerBrandTitle {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+}
+
+.ownerBrandSub {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ownerNav {
+  display: grid;
+  gap: 20px;
+}
+
+.ownerNavGroup {
+  padding: 0 12px;
+}
+
+.ownerNavGroupLabel {
+  padding: 0 12px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #475569;
+}
+
+.ownerNav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ownerNavLink,
+.ownerNavLinkActive {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #94a3b8;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ownerNavLink:hover {
+  background: rgba(148, 163, 184, 0.08);
+  color: #e2e8f0;
+}
+
+.ownerNavLinkActive {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.22), rgba(15, 118, 110, 0.18));
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.ownerNavIcon {
+  font-size: 1rem;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.ownerMain {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
-.owner-header {
-  background: rgba(24,28,36,0.85);
-  border-bottom: 1px solid #232a36;
-  padding: 24px 32px 16px 32px;
-  color: #fff;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -1px;
-  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
-}
-.owner-content {
-  flex: 1;
-  padding: 32px 40px 40px 40px;
+
+.ownerHeader {
   display: flex;
-  flex-direction: column;
-  gap: 32px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px 36px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  background: rgba(12, 15, 20, 0.5);
+  backdrop-filter: blur(8px);
 }
-.owner-sidebar nav ul {
-  list-style: none;
-  padding: 0;
+
+.ownerHeaderEyebrow {
   margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #64748b;
 }
-.owner-sidebar nav ul li {
-  margin-bottom: 12px;
+
+.ownerHeaderTitle {
+  margin: 4px 0 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #f8fafc;
 }
-.owner-sidebar nav ul li a {
+
+.ownerHeaderActions {
+  display: flex;
+  gap: 10px;
+}
+
+.ownerHeaderLink {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
   color: #cbd5e1;
   text-decoration: none;
-  font-size: 1.08rem;
-  padding: 10px 32px;
-  display: block;
-  border-radius: 8px 0 0 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
   transition: background 0.15s, color 0.15s;
 }
-.owner-sidebar nav ul li a:hover, .owner-sidebar nav ul li a.active {
-  background: #232a36;
-  color: #fff;
+
+.ownerHeaderLink:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: #f8fafc;
+}
+
+.ownerContent {
+  flex: 1;
+  padding: 28px 36px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+@media (max-width: 900px) {
+  .ownerShell {
+    flex-direction: column;
+  }
+
+  .ownerSidebar {
+    width: 100%;
+    min-height: auto;
+    position: relative;
+    padding-bottom: 16px;
+  }
+
+  .ownerNav {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .ownerNavGroup {
+    padding: 0 8px;
+  }
 }

@@ -5,10 +5,93 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
-import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
-import { getIndustryProfile } from "@/lib/industry-profiles";
+import {
+  getCompanyProfileByTenant,
+  withDefaultCompanyProfile,
+} from "@/lib/company-profile-store";
+import {
+  buildIndustryAiSystemPrompt,
+  buildIndustryWebsiteDefaults,
+  getWebsiteBuilderPack,
+  personalizeGeneratedContent,
+  resolveWebsiteIndustryFromProfile,
+  sanitizeIndustryWebsiteContent,
+} from "@/lib/website-builder-industry";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
 import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
+
+function buildPromptForSection(section, pack, ctx) {
+  const forbiddenNote = `FORBIDDEN topics (never mention): unrelated trades outside ${pack.label}.`;
+
+  if (section === "hero") {
+    return `
+Company: ${ctx.companyName}
+Industry: ${pack.label} ONLY
+City: ${ctx.city || "local area"}
+${forbiddenNote}
+
+Generate hero copy for a ${pack.label} website. JSON only:
+{
+  "headline": "max 10 words, ${pack.label} specific",
+  "subheadline": "max 28 words",
+  "ctaText": "max 5 words"
+}
+Examples of acceptable themes: ${pack.defaultHeadline}, ${pack.defaultSubheadline}
+`.trim();
+  }
+
+  if (section === "services") {
+    return `
+Company: ${ctx.companyName}
+Industry: ${pack.label} ONLY
+${forbiddenNote}
+
+Services list:
+${ctx.topServices || ctx.defaultServiceNames}
+
+Return JSON: { "services": [{ "name": "", "description": "", "price": "" }] }
+Up to 6 services. Only ${pack.label} services.
+`.trim();
+  }
+
+  if (section === "trust") {
+    return `
+Industry: ${pack.label}
+Return JSON: {
+  "testimonials": [{ "quote": "", "name": "First L.", "role": "" }],
+  "trustBadges": [""]
+}
+2 testimonials, 4 badges. ${pack.label} customers only.
+`.trim();
+  }
+
+  return `
+Company name: ${ctx.companyName}
+Industry: ${pack.label} (${pack.key}) — THIS IS THE ONLY ALLOWED INDUSTRY
+Brand tone: ${pack.tone}
+City/area: ${ctx.city || "(not provided)"}
+Phone: ${ctx.phone || "(not provided)"}
+
+Services offered:
+${ctx.topServices || ctx.defaultServiceNames}
+
+${forbiddenNote}
+Required themes: ${pack.requestServices.join(", ")}
+
+Generate website content. JSON only:
+{
+  "headline": "max 10 words",
+  "subheadline": "max 28 words",
+  "aboutText": "max 90 words",
+  "ctaText": "max 5 words",
+  "services": [{ "name": "", "description": "", "price": "" }],
+  "testimonials": [{ "quote": "", "name": "", "role": "" }],
+  "trustBadges": [""]
+}
+Up to 6 services, 2 testimonials, 4 badges.
+First person plural (We/Our). ${pack.label} ONLY — never landscaping for cleaning, never cleaning for roofing, etc.
+`.trim();
+}
 
 export async function POST(request) {
   const websiteBuilderEnabled = await isPlatformFeatureEnabled("feature_website_builder", true);
@@ -33,50 +116,34 @@ export async function POST(request) {
 
   const body = await request.json().catch(() => ({}));
   const services = Array.isArray(body.services) ? body.services : [];
+  const section = String(body.section || "all").trim().toLowerCase();
 
-  const profile = await getCompanyProfileByTenant({
-    tenantId: access.tenantDbId,
-  });
+  const profile = withDefaultCompanyProfile(
+    await getCompanyProfileByTenant({
+      tenantId: access.tenantDbId,
+    }),
+    access.tenantDbId,
+  );
 
   const companyName = profile.publicDisplayName || profile.companyName || "Our Company";
-  const businessType = profile.businessType || "contractor";
-  const industryProfile = getIndustryProfile(businessType);
-  const phone = profile.phone || "";
-  const address = profile.businessAddress || "";
+  const industryKey = resolveWebsiteIndustryFromProfile(profile);
+  const pack = getWebsiteBuilderPack(industryKey);
+  const defaults = buildIndustryWebsiteDefaults(pack, profile);
 
   const topServices = services
     .slice(0, 12)
     .map((s) => `- ${s.name}${s.description ? `: ${s.description.slice(0, 80)}` : ""}`)
     .join("\n");
 
-  const userPrompt = `
-Company name: ${companyName}
-Business type: ${businessType}
-Phone: ${phone || "(not provided)"}
-Address: ${address || "(not provided)"}
+  const ctx = {
+    companyName,
+    city: profile.businessCity || profile.city || "",
+    phone: profile.phone || "",
+    topServices,
+    defaultServiceNames: pack.defaultServices.map((s) => s.name).join(", "),
+  };
 
-Services offered:
-${topServices || "(no services listed yet)"}
-
-Industry profile:
-- Industry key: ${industryProfile.key}
-- Industry label: ${industryProfile.label}
-- Suggested services: ${(industryProfile.websiteServices || []).join(", ")}
-
-Generate professional website content for this contractor. Return ONLY a valid JSON object with these exact keys:
-{
-  "headline": "Short punchy hero headline (max 10 words)",
-  "subheadline": "Supporting sentence that builds trust and describes the business (max 25 words)",
-  "aboutText": "2-3 sentence professional about paragraph (max 80 words)",
-  "ctaText": "Call to action button text (max 5 words, e.g. 'Request Estimate')",
-  "services": [
-    { "name": "Service name", "description": "1-2 sentence description" }
-  ]
-}
-Include up to 8 of the most important services in the services array.
-Write in first person plural (We/Our). Be professional and confident.
-Return ONLY the JSON object. No markdown, no code blocks, no extra text.
-`.trim();
+  const userPrompt = buildPromptForSection(section, pack, ctx);
 
   let raw = "{}";
   try {
@@ -87,15 +154,11 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text.
       feature: "website_builder_generate",
       modelTier: "mini",
       messages: [
-        {
-          role: "system",
-          content:
-            "You write concise contractor website copy. Return only valid JSON exactly as requested.",
-        },
+        { role: "system", content: buildIndustryAiSystemPrompt(pack) },
         { role: "user", content: userPrompt },
       ],
-      maxTokens: 720,
-      temperature: 0.6,
+      maxTokens: section === "hero" ? 280 : 900,
+      temperature: 0.35,
     });
     raw = response.text || "{}";
   } catch (error) {
@@ -115,7 +178,6 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text.
   try {
     parsed = JSON.parse(raw);
   } catch {
-    // Attempt to extract JSON from response if model added extra text
     const match = raw.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -134,24 +196,70 @@ Return ONLY the JSON object. No markdown, no code blocks, no extra text.
     }
   }
 
+  let content;
+  if (section === "hero") {
+    content = sanitizeIndustryWebsiteContent(
+      {
+        headline: parsed.headline || defaults.headline,
+        subheadline: parsed.subheadline || defaults.subheadline,
+        ctaText: parsed.ctaText || defaults.ctaText,
+        services: defaults.services,
+        testimonials: defaults.testimonials,
+        trustBadges: defaults.trustBadges,
+      },
+      pack,
+      profile,
+    );
+    return Response.json({
+      success: true,
+      data: {
+        headline: content.headline,
+        subheadline: content.subheadline,
+        ctaText: content.ctaText,
+        themeColor: pack.defaultThemeColor,
+      },
+    });
+  }
+
+  if (section === "services") {
+    content = sanitizeIndustryWebsiteContent(
+      { services: parsed.services, headline: defaults.headline, subheadline: defaults.subheadline },
+      pack,
+      profile,
+    );
+    return Response.json({
+      success: true,
+      data: { services: content.services, themeColor: pack.defaultThemeColor },
+    });
+  }
+
+  if (section === "trust") {
+    content = sanitizeIndustryWebsiteContent(
+      {
+        testimonials: parsed.testimonials,
+        trustBadges: parsed.trustBadges,
+        headline: defaults.headline,
+        subheadline: defaults.subheadline,
+      },
+      pack,
+      profile,
+    );
+    return Response.json({
+      success: true,
+      data: {
+        testimonials: content.testimonials,
+        trustBadges: content.trustBadges,
+      },
+    });
+  }
+
+  content = personalizeGeneratedContent(parsed, pack, profile);
+
   return Response.json({
     success: true,
     data: {
-      headline: String(parsed.headline || "").slice(0, 200),
-      subheadline: String(parsed.subheadline || "").slice(0, 300),
-      aboutText: String(parsed.aboutText || "").slice(0, 2000),
-      ctaText: String(parsed.ctaText || "Request Estimate").slice(0, 100),
-      services: Array.isArray(parsed.services)
-        ? parsed.services.slice(0, 8).map((s) => ({
-            name: String(s.name || "").slice(0, 100),
-            description: String(s.description || "").slice(0, 400),
-            price: "",
-          }))
-        : (industryProfile.websiteServices || []).slice(0, 8).map((name) => ({
-            name,
-            description: "",
-            price: "",
-          })),
+      ...content,
+      themeColor: pack.defaultThemeColor,
     },
   });
 }

@@ -6,8 +6,8 @@ function Dashboard() {
       <Link href="/dashboard" className="dashboardLink">
         Dashboard
       </Link>
-      <Link href="/bill-payments" className="billPaymentsLink">
-        Bill Payments
+      <Link href="/invoices" className="invoicesLink">
+        Invoices
       </Link>
     </nav>
   );

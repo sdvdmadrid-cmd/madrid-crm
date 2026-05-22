@@ -18,6 +18,11 @@ const WEBSITE_LEAD_SLUG_MAX_ATTEMPTS = 12;
 const AI_REQUEST_IP_MAX_ATTEMPTS = 45;
 const AI_REQUEST_TENANT_MAX_ATTEMPTS = 160;
 const AI_REQUEST_FEATURE_MAX_ATTEMPTS = 90;
+const BILL_PAY_IP_MAX_ATTEMPTS = 40;
+const BILL_PAY_TENANT_MAX_ATTEMPTS = 120;
+const BILL_PAY_USER_MAX_ATTEMPTS = 60;
+const BILL_PAY_PLAID_IP_MAX_ATTEMPTS = 15;
+const BILL_PAY_PLAID_USER_MAX_ATTEMPTS = 8;
 
 const memoryStore = new Map();
 
@@ -356,5 +361,52 @@ export async function recordAiRateLimitAttempt({ tenantId, ip, feature }) {
       key: buildKey("ai:feature", feature),
       maxAttempts: AI_REQUEST_FEATURE_MAX_ATTEMPTS,
     },
+  ]);
+}
+
+export async function checkBillPaymentsRateLimit({
+  tenantId,
+  userId,
+  ip,
+  action = "pay",
+}) {
+  const prefix =
+    action === "plaid" ? "bill-pay:plaid" : `bill-pay:${action}`;
+  const maxIp =
+    action === "plaid" ? BILL_PAY_PLAID_IP_MAX_ATTEMPTS : BILL_PAY_IP_MAX_ATTEMPTS;
+  const maxUser =
+    action === "plaid"
+      ? BILL_PAY_PLAID_USER_MAX_ATTEMPTS
+      : BILL_PAY_USER_MAX_ATTEMPTS;
+
+  return checkScopedRateLimit([
+    { key: buildKey(`${prefix}:ip`, ip) },
+    { key: buildKey(`${prefix}:tenant`, tenantId) },
+    { key: buildKey(`${prefix}:user`, userId) },
+  ]);
+}
+
+export async function recordBillPaymentsRateLimit({
+  tenantId,
+  userId,
+  ip,
+  action = "pay",
+}) {
+  const prefix =
+    action === "plaid" ? "bill-pay:plaid" : `bill-pay:${action}`;
+  const maxIp =
+    action === "plaid" ? BILL_PAY_PLAID_IP_MAX_ATTEMPTS : BILL_PAY_IP_MAX_ATTEMPTS;
+  const maxUser =
+    action === "plaid"
+      ? BILL_PAY_PLAID_USER_MAX_ATTEMPTS
+      : BILL_PAY_USER_MAX_ATTEMPTS;
+
+  return recordScopedAttempt([
+    { key: buildKey(`${prefix}:ip`, ip), maxAttempts: maxIp },
+    {
+      key: buildKey(`${prefix}:tenant`, tenantId),
+      maxAttempts: BILL_PAY_TENANT_MAX_ATTEMPTS,
+    },
+    { key: buildKey(`${prefix}:user`, userId), maxAttempts: maxUser },
   ]);
 }

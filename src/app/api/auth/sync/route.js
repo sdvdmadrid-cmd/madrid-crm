@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
 import {
   buildAppSessionFromSupabaseUser,
+  reconcileUserRoleOnLogin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
@@ -60,11 +61,17 @@ export async function POST(request) {
     );
   }
 
-  const profile = await resolveProfileForUser(user, {
-    tenantId: user.id,
-    role: user.app_metadata?.role,
+  const reconciledUser = await reconcileUserRoleOnLogin(user);
+
+  const profile = await resolveProfileForUser(reconciledUser, {
+    tenantId: reconciledUser.id,
+    role: reconciledUser.app_metadata?.role,
   });
-  const appSession = buildAppSessionFromSupabaseUser(user, null, profile);
+  const appSession = buildAppSessionFromSupabaseUser(
+    reconciledUser,
+    null,
+    profile,
+  );
   const token = createSessionToken(appSession);
 
   return new Response(

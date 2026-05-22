@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
+import { FIELDBASE_PILLARS } from "@/lib/fieldbase-pillars";
 import styles from "./page.module.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -111,7 +112,7 @@ export default function RevenueDashboardPage() {
         const sessionPayload = await sessionResult.value.json().catch(() => null);
         const sessionRole = String(sessionPayload?.data?.role || "").toLowerCase();
         if (sessionRole === "super_admin") {
-          router.replace("/admin");
+          router.replace("/owner/overview");
           return;
         }
         setUserName(String(sessionPayload?.data?.name || "").trim());
@@ -241,22 +242,46 @@ export default function RevenueDashboardPage() {
           </p>
         </div>
         <div className={styles.quickActions}>
+          <Link href="/invoices" className={styles.collectAction}>
+            {t("dashboardControl.actions.collectPayment")}
+          </Link>
           <Link href="/estimates/new" className={styles.primaryAction}>
             <PlusIcon />
             {t("dashboardControl.actions.newEstimate")}
           </Link>
-          <Link href="/jobs" className={styles.secondaryAction}>{t("dashboardControl.actions.newJob")}</Link>
+          <Link href="/jobs?action=new" className={styles.secondaryAction}>{t("dashboardControl.actions.newJob")}</Link>
           <Link href="/clients" className={styles.secondaryAction}>{t("dashboardControl.actions.addClient")}</Link>
         </div>
       </header>
+
+      <section className={styles.pillarsGrid} aria-label={t("dashboardControl.pillars.ariaLabel")}>
+        {FIELDBASE_PILLARS.map((pillar) => (
+          <article key={pillar.id} className={styles.pillarCard}>
+            <div
+              className={styles.pillarAccent}
+              style={{ background: pillar.accent }}
+            />
+            <p className={styles.pillarTag}>{t(pillar.taglineKey)}</p>
+            <h2 className={styles.pillarTitle}>{t(pillar.titleKey)}</h2>
+            <p className={styles.pillarDesc}>{t(pillar.descKey)}</p>
+            <div className={styles.pillarLinks}>
+              {pillar.links.map((link) => (
+                <Link key={link.href} href={link.href} className={styles.pillarLink}>
+                  {t(link.labelKey)}
+                </Link>
+              ))}
+            </div>
+          </article>
+        ))}
+      </section>
 
       <div className={styles.grid12}>
         <section className={`${styles.panel} ${styles.span12}`}>
           {loading ? (
             <div className={styles.metricSkeletonGrid}>
-              <div className={`${styles.skeletonCard} ${styles.skeletonLarge}`} />
-              <div className={styles.skeletonCard} />
-              <div className={styles.skeletonCard} />
+              <div className={`fb-shimmer ${styles.skeletonCard} ${styles.skeletonLarge}`} />
+              <div className={`fb-shimmer ${styles.skeletonCard}`} />
+              <div className={`fb-shimmer ${styles.skeletonCard}`} />
             </div>
           ) : (
             <div className={styles.metricTopGrid}>

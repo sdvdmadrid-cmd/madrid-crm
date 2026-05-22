@@ -10,6 +10,14 @@ import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
 import AiBubbleClient from "@/components/AiBubbleClient";
+import CrmNavBar from "@/components/crm/CrmNavBar";
+import PublicPageShell from "@/components/PublicPageShell";
+import {
+  isOwnerCommandCenterPath,
+  isTenantContractorAppPath,
+  resolvePostLoginPath,
+} from "@/lib/auth-redirect";
+import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -61,10 +69,25 @@ function isStrongPassword(value) {
   return true;
 }
 
+/** Static shell for SSR + client boot — avoids hydration mismatch from i18n/auth state. */
+function AuthBootShell({ dark = false }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: dark ? "#13161c" : "#f4f5f7",
+      }}
+      aria-busy="true"
+      aria-label="Loading"
+    />
+  );
+}
+
 export default function AuthShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const isDedicatedLoginPage = pathname === "/login";
+  const isRegisterPage = pathname === "/register";
   const isResetPasswordPage = pathname === "/reset-password";
   const isVerifyEmailPage = pathname === "/verify-email";
   const [trialExpiredParam, setTrialExpiredParam] = useState(false);
@@ -116,6 +139,7 @@ export default function AuthShell({ children }) {
   const isPublicBillPaymentsPage = pathname?.startsWith("/public/bill-payments");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";
+  const isPremiumWorkspace = isPremiumWorkspacePath(pathname);
   const isPublicPage =
     isPublicQuotePage ||
     isPublicEstimatePage ||
@@ -124,7 +148,8 @@ export default function AuthShell({ children }) {
     isPublicLegalPage ||
     isMarketingHomePage ||
     isVerifyEmailPage;
-  const [loading, setLoading] = useState(!isPublicPage);
+  const [hasMounted, setHasMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [authHydrating, setAuthHydrating] = useState(!isPublicPage);
   const authBootstrappedRef = useRef(false);
   const [authUser, setAuthUser] = useState(null);
@@ -146,12 +171,61 @@ export default function AuthShell({ children }) {
     featureAdminAiAssistant: true,
   });
 
-  const resolveAuthRedirect = useCallback(() => {
+  const resolveAuthRedirect = useCallback((user) => {
     if (typeof window === "undefined") return "/dashboard";
     const params = new URLSearchParams(window.location.search);
-    const redirectParam = (params.get("redirect") || "").trim();
-    return redirectParam.startsWith("/") ? redirectParam : "/dashboard";
+    return resolvePostLoginPath(user, params.get("redirect") || "");
   }, []);
+
+  const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted || !authChecked || !authUser) return;
+    if (!isDedicatedLoginPage && !isResetPasswordPage && !isRegisterPage) return;
+    router.replace(resolveAuthRedirect(authUser));
+  }, [
+    hasMounted,
+    authChecked,
+    authUser,
+    isDedicatedLoginPage,
+    isRegisterPage,
+    isResetPasswordPage,
+    resolveAuthRedirect,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!hasMounted || !authChecked || !authUser) return;
+    if (String(authUser.role || "").toLowerCase() !== "super_admin") return;
+    if (!isTenantContractorAppPath(pathname)) return;
+    router.replace("/owner/overview");
+  }, [hasMounted, authChecked, authUser, pathname, router]);
+
+  useEffect(() => {
+    if (!hasMounted || !authChecked || authUser) return;
+    if (isRegisterPage) {
+      router.replace("/login?mode=register");
+      return;
+    }
+    if (isPublicPage) return;
+    if (isDedicatedLoginPage || isResetPasswordPage) return;
+    const target = `${pathname}${window.location.search}`;
+    router.replace(`/login?redirect=${encodeURIComponent(target)}`);
+  }, [
+    hasMounted,
+    authChecked,
+    authUser,
+    isPublicPage,
+    isDedicatedLoginPage,
+    isRegisterPage,
+    isResetPasswordPage,
+    pathname,
+    router,
+  ]);
 
   useEffect(() => {
     if (isPublicPage) return;
@@ -184,6 +258,13 @@ export default function AuthShell({ children }) {
     }
 
     setAuthHydrating(true);
+
+    // Resolve hydration immediately when there is no browser session (avoids stuck Loading).
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setAuthHydrating(false);
+      }
+    });
 
     // Listen for Supabase browser-side SIGNED_IN events (password login, token refresh).
     // Only sync when Supabase has an ACTIVE session — never call sync with null to
@@ -290,7 +371,7 @@ export default function AuthShell({ children }) {
     if (!isDedicatedLoginPage && !isResetPasswordPage) return;
     if (typeof window === "undefined") return;
 
-    router.replace(resolveAuthRedirect());
+    router.replace(resolveAuthRedirect(authUser));
   }, [
     authUser,
     isDedicatedLoginPage,
@@ -528,50 +609,42 @@ export default function AuthShell({ children }) {
   }, [authUser]);
 
   useEffect(() => {
+    if (!hasMounted) return;
+
     if (isPublicPage) {
-      setLoading(false);
+      setAuthChecked(true);
       return;
     }
 
-    let mounted = true;
+    let active = true;
     const run = async () => {
       if (!authBootstrappedRef.current) {
         console.info("[dashboard-protection] loading auth context", {
           pathname,
-          loading: true,
-          authHydrating,
         });
-        setLoading(true);
-        await fetchMe();
-        if (!mounted) return;
-        authBootstrappedRef.current = true;
-        setLoading(authHydrating);
-        console.info("[dashboard-protection] auth context loaded", {
-          pathname,
-          loading: authHydrating,
-        });
+        try {
+          await fetchMe();
+        } finally {
+          if (active) {
+            authBootstrappedRef.current = true;
+            setAuthChecked(true);
+            console.info("[dashboard-protection] auth context loaded", {
+              pathname,
+            });
+          }
+        }
         return;
       }
 
-      // Keep current UI visible and refresh auth context in the background.
       await fetchMe();
-      if (!mounted) return;
-      setLoading(authHydrating);
     };
 
     run();
 
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [isPublicPage, fetchMe, pathname, authHydrating]);
-
-  useEffect(() => {
-    if (isPublicPage) return;
-    if (!authHydrating && authBootstrappedRef.current) {
-      setLoading(false);
-    }
-  }, [isPublicPage, authHydrating]);
+  }, [hasMounted, isPublicPage, fetchMe, pathname]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -593,7 +666,7 @@ export default function AuthShell({ children }) {
   }, [isPublicPage, authUser, t]);
 
   if (isPublicPage) {
-    return children;
+    return <PublicPageShell>{children}</PublicPageShell>;
   }
 
   const submitLogin = async () => {
@@ -650,7 +723,9 @@ export default function AuthShell({ children }) {
       }
       setLoginFailedAttempts(0);
       setAuthUser(payload.data);
-      router.replace(resolveAuthRedirect());
+      const destination =
+        payload.redirectTo || resolveAuthRedirect(payload.data);
+      router.replace(destination);
       router.refresh();
     } catch (err) {
       setError(err.message || t("auth.authError"));
@@ -663,6 +738,34 @@ export default function AuthShell({ children }) {
     setSubmitting(true);
     setError("");
     setNotice("");
+
+    const password = String(registerForm.password || "");
+    if (password.length < 8) {
+      setError(t("auth.passwordRuleLengthRegister"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError(t("auth.passwordRuleUpper"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError(t("auth.passwordRuleLower"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError(t("auth.passwordRuleNumber"));
+      setSubmitting(false);
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      setError(t("auth.passwordRuleSpecial"));
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const res = await apiFetch("/api/auth/register", {
         method: "POST",
@@ -833,46 +936,13 @@ export default function AuthShell({ children }) {
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "#f4f5f7",
-          fontFamily: "'Inter', system-ui, sans-serif",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 800,
-              fontSize: 16,
-              margin: "0 auto 16px",
-            }}
-          >
-            FB
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            {t("auth.loading")}
-          </p>
-        </div>
-      </div>
-    );
+  if (!hasMounted || !authChecked) {
+    return <AuthBootShell dark={isPremiumWorkspace} />;
   }
 
   if (!authUser) {
-    if (isPublicPage) {
-      return children;
+    if (!isDedicatedLoginPage && !isResetPasswordPage) {
+      return <AuthBootShell dark={isPremiumWorkspace} />;
     }
 
     return (
@@ -923,38 +993,13 @@ export default function AuthShell({ children }) {
   }
 
   if (isDedicatedLoginPage || isResetPasswordPage) {
+    return <AuthBootShell />;
+  }
+
+  if (isOwnerCommandCenter) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "#f4f5f7",
-          fontFamily: "'Inter', system-ui, sans-serif",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 800,
-              fontSize: 16,
-              margin: "0 auto 16px",
-            }}
-          >
-            FB
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            {t("auth.loading")}
-          </p>
-        </div>
+      <div className="auth-shell-owner-root" style={{ minHeight: "100vh" }}>
+        {children}
       </div>
     );
   }
@@ -1023,6 +1068,11 @@ export default function AuthShell({ children }) {
       "M8 20h8",
       "M12 15v5",
     ],
+    subscriptions: [
+      "M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2z",
+      "M8 10h8",
+      "M8 14h5",
+    ],
     smart: ["M13 2L3 14h9l-1 8 10-12h-9l1-8z"],
     services: [
       "M8 6h13",
@@ -1071,6 +1121,12 @@ export default function AuthShell({ children }) {
             iconKey: "dashboard",
           },
           { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
+          {
+            href: "/estimates",
+            label: t("sidebar.estimates"),
+            iconKey: "estimates",
+            exact: true,
+          },
           { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
           {
             href: "/invoices",
@@ -1098,11 +1154,6 @@ export default function AuthShell({ children }) {
           iconKey: "invoices",
         },
         {
-          href: "/bill-payments",
-          label: t("sidebar.billPayments"),
-          iconKey: "billPayments",
-        },
-        {
           href: "/subscriptions",
           label: t("sidebar.subscriptions"),
           iconKey: "subscriptions",
@@ -1128,6 +1179,11 @@ export default function AuthShell({ children }) {
           iconKey: "billPayments",
         },
         {
+          href: "/owner/payment-cards",
+          label: t("ownerNav.paymentCards"),
+          iconKey: "billPayments",
+        },
+        {
           href: "/owner/security",
           label: t("sidebar.adminSecurity"),
           iconKey: "services",
@@ -1146,7 +1202,7 @@ export default function AuthShell({ children }) {
     : isContractorRole
       ? [
           {
-            href: "/website-builder",
+            href: "/website",
             label: t("sidebar.websiteBuilder"),
             iconKey: "websiteBuilder",
           },
@@ -1163,7 +1219,7 @@ export default function AuthShell({ children }) {
         ]
     : [
         {
-          href: "/website-builder",
+          href: "/website",
           label: t("sidebar.websiteBuilder"),
           iconKey: "websiteBuilder",
         },
@@ -1186,7 +1242,7 @@ export default function AuthShell({ children }) {
 
   const bottomNavItems = [
     {
-      href: isSuperAdminRole ? "/owner/settings" : "/workspace-owner",
+      href: isSuperAdminRole ? "/owner/settings" : "/subscriptions",
       label: t("sidebar.settings"),
       iconKey: "settings",
     },
@@ -1196,7 +1252,9 @@ export default function AuthShell({ children }) {
   // and prevent accidental duplicate entries across nav groups.
   const normalizedMainNavItems = isSuperAdminRole
     ? mainNavItems
-    : mainNavItems.filter((item) => item.href !== "/website-builder");
+    : mainNavItems.filter(
+        (item) => item.href !== "/website-builder" && item.href !== "/website",
+      );
   const normalizedSecondaryNavItems = secondaryNavItems.filter(
     (item, index, arr) =>
       arr.findIndex((candidate) => candidate.href === item.href) === index,
@@ -1217,69 +1275,32 @@ export default function AuthShell({ children }) {
     }
   };
 
-  const getBackFallbackPath = () => {
-    const currentPath = String(pathname || "").split("?")[0];
-    const segments = currentPath.split("/").filter(Boolean);
-
-    if (segments.length <= 1) {
-      return "/dashboard";
-    }
-
-    const section = segments[0];
-    if (section === "admin") {
-      return "/admin";
-    }
-
-    if (section === "owner") {
-      return "/owner/overview";
-    }
-
-    return `/${section}`;
-  };
-
-  const globalBackDisabledPaths = new Set([
-    "/",
-    "/dashboard",
-    "/admin",
-    "/login",
-    "/reset-password",
-    "/verify-email",
-  ]);
-
-  const shouldShowGlobalBackButton =
-    Boolean(authUser) &&
-    !isPublicPage &&
-    !globalBackDisabledPaths.has(String(pathname || ""));
-
-  const handleGlobalBack = () => {
-    const target = getBackFallbackPath();
-    if (typeof window !== "undefined") {
-      window.location.assign(target);
-      return;
-    }
-    router.push(target);
-  };
-
   return (
     <div
       className="auth-shell"
       style={{
         display: "flex",
         minHeight: "100vh",
-        fontFamily: "'Inter', system-ui, sans-serif",
+        fontFamily: isPremiumWorkspace
+          ? "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif"
+          : "'Inter', system-ui, sans-serif",
         position: "relative",
       }}
     >
       <header
-        className="auth-shell-mobile-header"
+        className={`auth-shell-mobile-header${isPremiumWorkspace ? " fb-mobile-header" : ""}`}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           height: 64,
-          background: "linear-gradient(180deg, #0f172a 0%, #111827 100%)",
-          borderBottom: "1px solid rgba(148,163,184,0.2)",
+          background: isPremiumWorkspace
+            ? undefined
+            : "linear-gradient(180deg, #0f172a 0%, #111827 100%)",
+          borderBottom: isPremiumWorkspace
+            ? undefined
+            : "1px solid rgba(148,163,184,0.2)",
           display: isMobileViewport ? "flex" : "none",
           alignItems: "center",
           justifyContent: "space-between",
@@ -1361,20 +1382,24 @@ export default function AuthShell({ children }) {
 
       {/* ─── Fixed left sidebar ───────────────────────────── */}
       <aside
-        className={`auth-shell-aside${mobileSidebarOpen ? " auth-shell-aside--open" : ""}`}
+        className={`auth-shell-aside${isPremiumWorkspace ? " fb-sidebar" : ""}${mobileSidebarOpen ? " auth-shell-aside--open" : ""}`}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           bottom: 0,
-          width: isMobileViewport ? "min(86vw, 320px)" : 248,
-          background: "linear-gradient(180deg, #0f172a 0%, #111827 62%, #0b1220 100%)",
+          width: isMobileViewport ? "min(86vw, 320px)" : "var(--fb-sidebar-width, 252px)",
           display: "flex",
           flexDirection: "column",
           zIndex: 50,
           overflowY: "auto",
           overflowX: "hidden",
-          borderRight: "1px solid rgba(148,163,184,0.18)",
+          borderRight: isPremiumWorkspace
+            ? undefined
+            : "1px solid rgba(148,163,184,0.18)",
+          background: isPremiumWorkspace
+            ? undefined
+            : "linear-gradient(180deg, #0f172a 0%, #111827 62%, #0b1220 100%)",
           transform: isMobileViewport
             ? (mobileSidebarOpen ? "translateX(0)" : "translateX(-102%)")
             : "translateX(0)",
@@ -1382,7 +1407,7 @@ export default function AuthShell({ children }) {
         }}
       >
         {/* Logo */}
-        <div style={{ padding: "22px 16px 16px" }}>
+        <div className={isPremiumWorkspace ? "fb-sidebar-brand" : undefined} style={isPremiumWorkspace ? undefined : { padding: "22px 16px 16px" }}>
           <div
             style={{
               display: "flex",
@@ -1392,14 +1417,19 @@ export default function AuthShell({ children }) {
             }}
           >
             <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 12,
-                background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
-                position: "relative",
-                flexShrink: 0,
-              }}
+              className={isPremiumWorkspace ? "fb-sidebar-logo" : undefined}
+              style={
+                isPremiumWorkspace
+                  ? { position: "relative", flexShrink: 0 }
+                  : {
+                      width: 36,
+                      height: 36,
+                      borderRadius: 12,
+                      background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
+                      position: "relative",
+                      flexShrink: 0,
+                    }
+              }
             >
               <span style={{ position: "absolute", left: 8, top: 9, width: 20, height: 7, borderRadius: 999, background: "linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.18) 100%)" }} />
               <span style={{ position: "absolute", right: 8, bottom: 8, width: 7, height: 7, borderRadius: "50%", background: "#f59e0b" }} />
@@ -1672,13 +1702,12 @@ export default function AuthShell({ children }) {
 
       {/* ─── Main content area ────────────────────────────── */}
       <div
-        className="auth-shell-main"
+        className={`auth-shell-main${isPremiumWorkspace ? " fb-workspace" : " fb-workspace-light"}`}
         style={{
-          marginLeft: isMobileViewport ? 0 : 248,
+          marginLeft: isMobileViewport ? 0 : "var(--fb-sidebar-width, 252px)",
           flex: 1,
           minWidth: 0,
           minHeight: "100vh",
-          background: "#f3f5fa",
           display: "flex",
           flexDirection: "column",
           paddingTop: isMobileViewport ? 64 : 0,
@@ -1689,29 +1718,7 @@ export default function AuthShell({ children }) {
           trialExpired={trialExpiredParam}
           t={t}
         />
-        {shouldShowGlobalBackButton ? (
-          <div
-            style={{
-              padding: isMobileViewport ? "12px 14px 0" : "14px 22px 0",
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleGlobalBack}
-              style={{
-                border: 0,
-                background: "transparent",
-                color: "#1d4ed8",
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: "pointer",
-                padding: 0,
-              }}
-            >
-              ← Volver
-            </button>
-          </div>
-        ) : null}
+        <CrmNavBar />
         {children}
         <AppFooter />
       </div>

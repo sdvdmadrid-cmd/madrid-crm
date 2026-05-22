@@ -4,9 +4,26 @@
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
-import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+import {
+  getCompanyProfileByTenant,
+  isMissingColumnError,
+  withDefaultCompanyProfile,
+} from "@/lib/company-profile-store";
 import { getIndustryProfile } from "@/lib/industry-profiles";
+import {
+  buildIndustryWebsiteDefaults,
+  detectWebsiteContentMismatch,
+  getWebsiteBuilderPack,
+  normalizeHeroPhotos,
+  resolveWebsiteIndustryFromProfile,
+} from "@/lib/website-builder-industry";
+import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { normalizeSiteAnalytics } from "@/lib/site-analytics";
+import {
+  persistGalleryPhotosForStorage,
+  persistHeroPhotosForStorage,
+} from "@/lib/website-media-storage";
 
 const WEBSITE_TABLE = "contractor_websites";
 
@@ -31,51 +48,112 @@ function normalizeWebsiteCta(value, fallback = DEFAULT_CTA_TEXT) {
 }
 
 function buildDefaultWebsiteContent(companyProfile) {
-  const companyName = String(
-    companyProfile?.publicDisplayName || companyProfile?.companyName || "FieldBase",
-  ).trim() || "FieldBase";
+  const industryKey = resolveWebsiteIndustryFromProfile(companyProfile);
+  const pack = getWebsiteBuilderPack(industryKey);
+  const defaults = buildIndustryWebsiteDefaults(pack, companyProfile);
+  return {
+    headline: defaults.headline,
+    subheadline: defaults.subheadline,
+    aboutText: defaults.aboutText,
+    ctaText: defaults.ctaText || DEFAULT_CTA_TEXT,
+    themeColor: defaults.themeColor || DEFAULT_THEME_COLOR,
+    galleryPhotos: [],
+    heroPhotos: defaults.heroPhotos,
+    services: defaults.services,
+    testimonials: defaults.testimonials,
+    trustBadges: defaults.trustBadges,
+    requestServices: defaults.requestServices,
+  };
+}
+
+function readSiteMeta(row, pack) {
+  const meta = row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : {};
+  const testimonials =
+    Array.isArray(meta.testimonials) && meta.testimonials.length > 0
+      ? meta.testimonials
+      : pack.testimonials;
+  const trustBadges =
+    Array.isArray(meta.trustBadges) && meta.trustBadges.length > 0
+      ? meta.trustBadges
+      : pack.trustBadges;
+  const heroPhotos = normalizeHeroPhotos(meta.heroPhotos, pack);
+  return {
+    testimonials: testimonials.slice(0, 4).map((t) => ({
+      quote: String(t?.quote || "").slice(0, 280),
+      name: String(t?.name || "Customer").slice(0, 60),
+      role: String(t?.role || "Local customer").slice(0, 80),
+    })),
+    trustBadges: trustBadges.slice(0, 6).map((b) => String(b).slice(0, 80)),
+    heroPhotos,
+  };
+}
+
+function serializeWebsiteRow(row, profile, request) {
+  const industryKey = resolveWebsiteIndustryFromProfile(profile);
+  const pack = getWebsiteBuilderPack(industryKey);
+  const industryProfile = getIndustryProfile(profile.businessType || "");
+  const defaults = buildDefaultWebsiteContent(profile);
+  const meta = readSiteMeta(row, pack);
+  const socialLinks =
+    row?.site_meta?.socialLinks && typeof row.site_meta.socialLinks === "object"
+      ? {
+          facebook: String(row.site_meta.socialLinks.facebook || "").slice(0, 500),
+          instagram: String(row.site_meta.socialLinks.instagram || "").slice(0, 500),
+          yelp: String(row.site_meta.socialLinks.yelp || "").slice(0, 500),
+          tiktok: String(row.site_meta.socialLinks.tiktok || "").slice(0, 500),
+          linkedin: String(row.site_meta.socialLinks.linkedin || "").slice(0, 500),
+          google: String(row.site_meta.socialLinks.google || "").slice(0, 500),
+        }
+      : {
+          facebook: "",
+          instagram: "",
+          yelp: "",
+          tiktok: "",
+          linkedin: "",
+          google: "",
+        };
+  const normalizedCtaText = normalizeWebsiteCta(row.cta_text, defaults.ctaText);
+  const effectiveServices =
+    Array.isArray(row.services) && row.services.length > 0 ? row.services : defaults.services;
+
+  const savedForMismatch = {
+    headline: row.headline || "",
+    subheadline: row.subheadline || "",
+    aboutText: row.about_text || "",
+    services: effectiveServices,
+  };
+  const industryMismatch =
+    Boolean(row.headline || row.subheadline || row.about_text) &&
+    detectWebsiteContentMismatch(savedForMismatch, industryKey);
 
   return {
-    headline: "Win more jobs. Get paid faster. Stay in control.",
-    subheadline:
-      "All-in-one platform for contractors, from first estimate to final payment, powered by AI and synced with Google Calendar.",
-    aboutText:
-      `${companyName} helps service businesses run smarter with AI estimates, calendar scheduling, automated follow-ups, and faster payments in one workspace.`,
-    ctaText: DEFAULT_CTA_TEXT,
-    themeColor: DEFAULT_THEME_COLOR,
-    galleryPhotos: [],
-    services: [
-      {
-        name: "AI-Powered Estimates",
-        description: "Generate professional estimates in seconds from job details.",
-        price: "Included",
-      },
-      {
-        name: "Google Calendar + Weather",
-        description: "Schedule crews with live weather context to avoid costly delays.",
-        price: "Included",
-      },
-      {
-        name: "Branded Quotes",
-        description: "Send polished quotes clients can review and approve quickly.",
-        price: "Included",
-      },
-      {
-        name: "Fast Invoicing + Payments",
-        description: "Invoice on-site and collect payments without waiting days.",
-        price: "Included",
-      },
-      {
-        name: "Automated Follow-Ups",
-        description: "Keep leads warm and invoices moving with automatic reminders.",
-        price: "Included",
-      },
-      {
-        name: "Client CRM Timeline",
-        description: "Track quotes, jobs, notes, and invoices in one client view.",
-        price: "Included",
-      },
-    ],
+    id: row.id,
+    slug: row.slug,
+    publicUrl: getPublicWebsiteUrl(row.slug, request),
+    websitePath: `/site/${row.slug}`,
+    headline: row.headline || defaults.headline,
+    subheadline: row.subheadline || defaults.subheadline,
+    aboutText: row.about_text || defaults.aboutText,
+    ctaText: normalizedCtaText,
+    themeColor: row.theme_color || defaults.themeColor,
+    galleryPhotos: Array.isArray(row.gallery_photos) ? row.gallery_photos : defaults.galleryPhotos,
+    services: effectiveServices,
+    testimonials: meta.testimonials,
+    trustBadges: meta.trustBadges,
+    heroPhotos: meta.heroPhotos,
+    socialLinks,
+    analytics: normalizeSiteAnalytics(row?.site_meta?.analytics),
+    industryMismatch,
+    published: row.published === true,
+    industry: industryKey,
+    industryLabel: pack.label || industryProfile.label,
+    industryIcon: pack.icon,
+    industryTone: pack.tone,
+    themePresets: pack.themeColors,
+    imagePresets: pack.imagePresets,
+    ctaOptions: pack.ctaOptions,
+    requestServices: pack.requestServices,
+    companyProfile: profile,
   };
 }
 
@@ -111,7 +189,7 @@ async function findOrCreateWebsite(tenantDbId, companyProfile) {
 
   if (existing) return existing;
 
-  const baseSlug = generateSlug(companyProfile.companyName);
+  const baseSlug = generateSlug(companyProfile?.companyName);
   let slug = baseSlug;
   let attempt = 0;
 
@@ -142,12 +220,14 @@ export async function GET(request) {
   const access = await getAuthenticatedTenantContext(request);
   if (!access.authenticated) return unauthenticatedResponse();
 
-  const profile = await getCompanyProfileByTenant({
-    tenantId: access.tenantDbId,
-  });
+  const profile = withDefaultCompanyProfile(
+    await getCompanyProfileByTenant({
+      tenantId: access.tenantDbId,
+    }),
+    access.tenantDbId,
+  );
 
   let row = await findOrCreateWebsite(access.tenantDbId, profile);
-  const industryProfile = getIndustryProfile(profile.businessType || "");
   const defaults = buildDefaultWebsiteContent(profile);
   const normalizedCtaText = normalizeWebsiteCta(row.cta_text, defaults.ctaText);
 
@@ -164,30 +244,9 @@ export async function GET(request) {
     }
   }
 
-  const effectiveServices =
-    Array.isArray(row.services) && row.services.length > 0
-      ? row.services
-      : defaults.services;
-
   return Response.json({
     success: true,
-    data: {
-      id: row.id,
-      slug: row.slug,
-      publicUrl: getPublicWebsiteUrl(row.slug, request),
-      websitePath: `/site/${row.slug}`,
-      headline: row.headline || defaults.headline,
-      subheadline: row.subheadline || defaults.subheadline,
-      aboutText: row.about_text || defaults.aboutText,
-      ctaText: normalizeWebsiteCta(row.cta_text, defaults.ctaText),
-      themeColor: row.theme_color || defaults.themeColor,
-      galleryPhotos: Array.isArray(row.gallery_photos) ? row.gallery_photos : defaults.galleryPhotos,
-      services: effectiveServices,
-      published: row.published === true,
-      industry: industryProfile.key,
-      industryLabel: industryProfile.label,
-      companyProfile: profile,
-    },
+    data: serializeWebsiteRow(row, profile, request),
   });
 }
 
@@ -200,9 +259,12 @@ export async function POST(request) {
 
   const body = await request.json().catch(() => ({}));
 
-  const profile = await getCompanyProfileByTenant({
-    tenantId: access.tenantDbId,
-  });
+  const profile = withDefaultCompanyProfile(
+    await getCompanyProfileByTenant({
+      tenantId: access.tenantDbId,
+    }),
+    access.tenantDbId,
+  );
   const defaults = buildDefaultWebsiteContent(profile);
 
   const row = await findOrCreateWebsite(access.tenantDbId, profile);
@@ -225,43 +287,104 @@ export async function POST(request) {
     }));
   }
   if (Array.isArray(body.galleryPhotos)) {
-    patch.gallery_photos = body.galleryPhotos
-      .slice(0, 8)
-      .map((photo) => ({
-        src: String(photo?.src || "").slice(0, 4_000_000),
+    patch.gallery_photos = await persistGalleryPhotosForStorage(
+      access.tenantDbId,
+      row.slug,
+      body.galleryPhotos.slice(0, 8).map((photo) => ({
+        src: String(photo?.src || ""),
         alt: String(photo?.alt || "Completed project photo").slice(0, 160),
-      }))
-      .filter((photo) => photo.src.startsWith("data:image/"));
+      })),
+    );
   }
   if (typeof body.published === "boolean") patch.published = body.published;
+
+  const existingMeta =
+    row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : {};
+  const nextMeta = { ...existingMeta };
+  let metaChanged = false;
+
+  if (Array.isArray(body.testimonials)) {
+    nextMeta.testimonials = body.testimonials.slice(0, 4).map((t) => ({
+      quote: String(t?.quote || "").slice(0, 280),
+      name: String(t?.name || "Customer").slice(0, 60),
+      role: String(t?.role || "Local customer").slice(0, 80),
+    }));
+    metaChanged = true;
+  }
+  if (Array.isArray(body.trustBadges)) {
+    nextMeta.trustBadges = body.trustBadges.slice(0, 6).map((b) => String(b).slice(0, 80));
+    metaChanged = true;
+  }
+  if (Array.isArray(body.heroPhotos)) {
+    const pack = getWebsiteBuilderPack(resolveWebsiteIndustryFromProfile(profile));
+    const normalized = normalizeHeroPhotos(body.heroPhotos, pack);
+    nextMeta.heroPhotos = await persistHeroPhotosForStorage(
+      access.tenantDbId,
+      row.slug,
+      normalized,
+    );
+    metaChanged = true;
+  }
+  if (body.analytics && typeof body.analytics === "object") {
+    nextMeta.analytics = normalizeSiteAnalytics(body.analytics);
+    metaChanged = true;
+  }
+  if (body.socialLinks && typeof body.socialLinks === "object") {
+    const social = body.socialLinks;
+    const pickUrl = (v) => {
+      const s = String(v || "").trim();
+      return s.startsWith("http") ? s.slice(0, 500) : "";
+    };
+    nextMeta.socialLinks = {
+      facebook: pickUrl(social.facebook),
+      instagram: pickUrl(social.instagram),
+      yelp: pickUrl(social.yelp),
+      tiktok: pickUrl(social.tiktok),
+      linkedin: pickUrl(social.linkedin),
+      google: pickUrl(social.google),
+    };
+    metaChanged = true;
+  }
+  if (metaChanged) {
+    patch.site_meta = nextMeta;
+  }
+
   patch.updated_at = new Date().toISOString();
 
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from(WEBSITE_TABLE)
     .update(patch)
     .eq("id", row.id)
     .select("*")
     .single();
 
+  if (error && patch.site_meta && isMissingColumnError(error, "site_meta")) {
+    const { site_meta: _ignored, ...patchWithoutMeta } = patch;
+    ({ data, error } = await supabaseAdmin
+      .from(WEBSITE_TABLE)
+      .update(patchWithoutMeta)
+      .eq("id", row.id)
+      .select("*")
+      .single());
+    if (data && !data.site_meta) {
+      data.site_meta = nextMeta;
+    }
+  }
+
   if (error) {
     console.error("[api/website-builder][PATCH] DB error", error);
     return Response.json({ success: false, error: "Unable to save website" }, { status: 500 });
   }
 
+  const publishedSlug = data.slug || row.slug;
+  if (publishedSlug) {
+    revalidatePath(`/site/${publishedSlug}`);
+    revalidatePath(`/site/${publishedSlug}/request`);
+  }
+
     return Response.json({
       success: true,
-      data: {
-        id: data.id,
-        slug: data.slug,
-        headline: data.headline || "",
-        subheadline: data.subheadline || "",
-        aboutText: data.about_text || "",
-        ctaText: normalizeWebsiteCta(data.cta_text, defaults.ctaText),
-        themeColor: data.theme_color || "#16a34a",
-        galleryPhotos: Array.isArray(data.gallery_photos) ? data.gallery_photos : [],
-        services: Array.isArray(data.services) ? data.services : [],
-        published: data.published === true,
-      },
+      data: serializeWebsiteRow(data, profile, request),
     });
   } catch (err) {
     console.error("[api/website-builder][POST] unhandled error", err);

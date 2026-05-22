@@ -31,17 +31,16 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   );
 }
 
-// Pooled URL uses port 6543 (PgBouncer) instead of 5432 (direct)
-// Falls back to standard URL if pooled not configured
-const pooledUrl =
-  process.env.SUPABASE_POOLED_URL || supabaseUrl;
+// The JS client must use the HTTPS REST URL, not a postgresql:// pooled DSN.
+// SUPABASE_POOLED_URL (port 6543) is for direct SQL drivers (pg), not @supabase/supabase-js.
+const restUrl = supabaseUrl;
 
 /**
- * Pooled Supabase client — use for all standard CRUD operations.
- * Backed by PgBouncer when SUPABASE_POOLED_URL is configured.
- * Maximises connection reuse under high concurrent load.
+ * Service-role REST client (same endpoint as supabaseAdmin).
+ * Use @/lib/supabase-admin for app code; this module exists for scripts that
+ * import a named "pooled" export without duplicating env reads.
  */
-export const supabasePooled = createClient(pooledUrl, supabaseServiceRoleKey, {
+export const supabasePooled = createClient(restUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,

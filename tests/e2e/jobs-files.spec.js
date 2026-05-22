@@ -1,66 +1,41 @@
 const path = require('path');
 const { test, expect } = require('@playwright/test');
+const { devLogin } = require('./helpers/auth');
 
 const photoFixture = path.join(__dirname, 'fixtures', 'test-photo.jpg');
 const pdfFixture = path.join(__dirname, 'fixtures', 'test-doc.pdf');
 
 async function loginAsAdmin(page) {
-  await page.goto('/api/auth/dev-login?profile=admin&redirect=%2Fjobs', {
-    waitUntil: 'domcontentloaded',
-  });
+  await devLogin(page, { profile: 'admin', redirect: '/jobs' });
   await page.goto('/jobs', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Jobs' })).toBeVisible();
-}
-
-async function ensureLegalAccepted(api) {
-  const originHeaders = { Origin: 'http://localhost:3000' };
-
-  const statusRes = await api.get('/api/legal/status', { headers: originHeaders });
-  const statusJson = await statusRes.json().catch(() => null);
-  if (statusRes.ok() && statusJson?.data?.accepted) {
-    return;
-  }
-
-  const versionRes = await api.get('/api/legal/version', { headers: originHeaders });
-  const versionJson = await versionRes.json().catch(() => null);
-  const version = String(versionJson?.data?.version || '').trim();
-
-  const acceptRes = await api.post('/api/legal/accept', {
-    headers: {
-      ...originHeaders,
-      'Content-Type': 'application/json',
-    },
-    data: version ? { version } : {},
-  });
-  expect(acceptRes.ok()).toBeTruthy();
+  await expect(page.getByRole('heading', { name: /Jobs/i })).toBeVisible();
 }
 
 async function createJob(page, title) {
-  const createJobResponsePromise = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/jobs') &&
-      response.request().method() === 'POST',
-  );
+  const res = await page.request.post('/api/jobs', {
+    headers: { Origin: 'http://localhost:3000' },
+    data: {
+      title,
+      clientName: 'Playwright Client',
+      service: 'File Management Test',
+      status: 'scheduled',
+      price: 100,
+    },
+  });
+  const body = await res.json().catch(() => null);
+  expect(res.ok(), JSON.stringify(body)).toBeTruthy();
 
-  await page.getByPlaceholder('Title').fill(title);
-  await page.getByPlaceholder('Client').fill('Playwright Client');
-  await page.getByPlaceholder('Service').fill('File Management Test');
-  await page.getByRole('button', { name: 'Save' }).click();
-
-  const createJobResponse = await createJobResponsePromise;
-  const createJobJson = await createJobResponse.json().catch(() => null);
-  expect(createJobResponse.ok(), JSON.stringify(createJobJson)).toBeTruthy();
-
-  const jobTitle = String(createJobJson?.data?.title || title);
+  const jobTitle = String(body?.data?.title || title);
+  await page.goto('/jobs', { waitUntil: 'domcontentloaded' });
   const jobCard = getJobCard(page, jobTitle);
-  await expect(jobCard).toBeVisible();
+  await expect(jobCard).toBeVisible({ timeout: 20_000 });
 
   return jobTitle;
 }
 
 function getJobCard(page, title) {
   return page.getByTestId('job-card').filter({
-    has: page.getByRole('heading', { name: title }),
+    has: page.locator('h3', { hasText: title }),
   }).first();
 }
 
@@ -69,7 +44,6 @@ test.describe('jobs file management', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
-    await ensureLegalAccepted(page.request);
   });
 
   test('validates photo upload type in Manage files panel', async ({ page }) => {

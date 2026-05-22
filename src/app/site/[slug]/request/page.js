@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import PublicSiteFooter from "@/components/site/PublicSiteFooter";
+import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
+import { buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { getWebsiteBuilderPack, resolveWebsiteIndustryKey } from "@/lib/website-builder-industry";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 function normalizeRequestedService(rawValue, options) {
   const value = String(rawValue || "").trim();
@@ -15,10 +19,9 @@ export async function generateMetadata({ params }) {
   const { slug } = await params;
   const data = await getPublicWebsiteBySlug(slug);
 
-  return {
-    title: data?.headline ? `Request Service | ${data.headline}` : "Request Service",
-    description: "Request a quote and send your project details.",
-  };
+  if (!data) return { title: "Request Service" };
+
+  return buildPublicSiteMetadata(data, { page: "request" });
 }
 
 export default async function PublicContractorRequestPage({ params, searchParams }) {
@@ -31,132 +34,92 @@ export default async function PublicContractorRequestPage({ params, searchParams
 
   const companyName =
     data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "Contractor";
-  // Forzar una lista amplia de servicios para el select
-  const serviceOptions = [
-    "Interior Painting",
-    "Exterior Painting",
-    "Roof Inspection",
-    "Leak Repair",
-    "Shingle Repair",
-    "Full Roof Replacement",
-    "Lawn Maintenance",
-    "Mulch / Rock",
-    "Irrigation",
-    "Hardscape Install",
-    "Yard Cleanup",
-    "Deep Cleaning",
-    "Recurring Cleaning",
-    "Move-In / Move-Out",
-    "Post-Construction Cleaning",
-    "Panel Upgrade",
-    "Wiring Repair",
-    "Lighting Install",
-    "Outlet / Switch",
-    "Plumbing Repair",
-    "Water Heater",
-    "Fixture Install",
-    "AC Repair",
-    "Heating Repair",
-    "Ductwork",
-    "General Handyman",
-    "Other"
-  ];
+  const pack = getWebsiteBuilderPack(
+    resolveWebsiteIndustryKey(data.companyProfile?.businessType),
+  );
+  const serviceOptions =
+    Array.isArray(data.requestServices) && data.requestServices.length > 0
+      ? data.requestServices
+      : pack.requestServices;
   const initialService = normalizeRequestedService(
     resolvedSearchParams?.service,
     serviceOptions,
   );
+  const theme = data.themeColor || "#1d4ed8";
+  const phone = data.companyProfile?.phone || "";
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(180deg, #0f172a 0%, #1e293b 38%, #f8fafc 38%, #f8fafc 100%)",
-        padding: "32px 16px 72px",
-      }}
-    >
-      <div style={{ maxWidth: 920, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 16,
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginBottom: 28,
-          }}
-        >
-          <div>
-            <p style={{ color: "#93c5fd", fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-              CLIENT REQUEST INTAKE
-            </p>
-            <h1 style={{ color: "#ffffff", fontSize: "clamp(2rem, 4vw, 3.25rem)", fontWeight: 900, letterSpacing: -1.5, marginBottom: 10 }}>
-              Request a Quote from {companyName}
-            </h1>
-            <p style={{ color: "#cbd5e1", maxWidth: 620, lineHeight: 1.7, fontSize: 16 }}>
-              Enter your contact information, location, and the type of work you need.
-              The contractor receives your request and can follow up quickly.
-            </p>
-          </div>
+    <main style={{ minHeight: "100vh", background: "#f8fafc" }}>
+      <PublicSiteNav
+        slug={slug}
+        companyName={companyName}
+        logoUrl={data.companyProfile?.logoDataUrl || ""}
+        phone={phone}
+        ctaText={data.ctaText || "Get a Quote"}
+        themeColor={theme}
+      />
 
+      <div style={{ maxWidth: 920, margin: "0 auto", padding: "32px 16px 0" }}>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ color: "#64748b", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+            REQUEST A QUOTE
+          </p>
+          <h1
+            style={{
+              color: "#0f172a",
+              fontSize: "clamp(1.75rem, 4vw, 2.75rem)",
+              fontWeight: 900,
+              letterSpacing: -1,
+              marginBottom: 10,
+            }}
+          >
+            Tell {companyName} about your project
+          </h1>
+          <p style={{ color: "#475569", maxWidth: 620, lineHeight: 1.7 }}>
+            Submit once — your request goes straight to the contractor CRM. Typical response:
+            same day.
+          </p>
           <Link
             href={`/site/${slug}`}
             style={{
-              color: "#ffffff",
-              textDecoration: "none",
-              border: "1px solid rgba(255,255,255,0.2)",
-              borderRadius: 999,
-              padding: "10px 16px",
+              display: "inline-block",
+              marginTop: 14,
+              color: theme,
               fontWeight: 700,
+              textDecoration: "none",
             }}
           >
-            Back to Site
+            ← Back to website
           </Link>
         </div>
 
         <section
           style={{
             background: "#1e293b",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 24,
-            padding: 24,
-            marginBottom: 28,
-            display: "grid",
-            gap: 18,
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          }}
-        >
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 18, padding: 18 }}>
-            <p style={{ color: "#94a3b8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Service Type</p>
-            <p style={{ color: "#ffffff", fontSize: 18, fontWeight: 800 }}>
-              {initialService || "Choose the job category"}
-            </p>
-          </div>
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 18, padding: 18 }}>
-            <p style={{ color: "#94a3b8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Response Promise</p>
-            <p style={{ color: "#ffffff", fontSize: 18, fontWeight: 800 }}>Same-day follow-up</p>
-          </div>
-          <div style={{ background: "rgba(255,255,255,0.04)", borderRadius: 18, padding: 18 }}>
-            <p style={{ color: "#94a3b8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>Submission</p>
-            <p style={{ color: "#ffffff", fontSize: 18, fontWeight: 800 }}>No obligation quote request</p>
-          </div>
-        </section>
-
-        <section
-          style={{
-            background: "#1e293b",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 24,
+            borderRadius: 20,
             padding: "28px 20px",
-            boxShadow: "0 30px 80px rgba(15, 23, 42, 0.28)",
+            boxShadow: "0 24px 60px rgba(15, 23, 42, 0.18)",
+            marginBottom: 0,
           }}
         >
           <RequestServiceForm
             slug={slug}
             serviceOptions={serviceOptions}
             initialService={initialService}
+            showEmailField
           />
         </section>
       </div>
+
+      <PublicSiteFooter
+        slug={slug}
+        companyName={companyName}
+        phone={phone}
+        businessAddress={data.companyProfile?.businessAddress || ""}
+        socialLinks={data.socialLinks || {}}
+        googleReviewsUrl={data.companyProfile?.googleReviewsUrl || ""}
+        themeColor={theme}
+      />
     </main>
   );
 }

@@ -1,0 +1,390 @@
+.page {
+  --bg: var(--fb-bg, #1e2433);
+  --bg-elevated: var(--fb-surface-elevated, rgba(28, 35, 50, 0.92));
+  --bg-input: var(--fb-surface-input, rgba(22, 28, 40, 0.95));
+  --border: var(--fb-border-strong, rgba(148, 163, 184, 0.2));
+  --text: var(--fb-text, #e8ecf4);
+  --text-muted: var(--fb-text-muted, #94a3b8);
+  --text-heading: var(--fb-text-heading, #f4f6fb);
+  --accent: var(--fb-accent-emerald, #2dd4a8);
+  --accent-blue: var(--fb-accent-blue, #60a5fa);
+  --accent-stripe: #635bff;
+  --danger: #f87171;
+
+  padding: var(--fb-space-6, 24px);
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: calc(100vh - 48px);
+  font-family: var(--fb-font-sans, "Plus Jakarta Sans", system-ui, sans-serif);
+  background: transparent;
+  color: var(--text);
+}
+
+.headerTitle {
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  margin: 0;
+  color: var(--text-heading);
+  letter-spacing: -0.02em;
+}
+
+.headerSub {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.noticeSuccess {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+}
+
+.noticeInfo {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  color: #fcd34d;
+}
+
+.error {
+  margin-top: 20px;
+  color: #fca5a5;
+}
+
+.loading {
+  margin-top: 20px;
+  color: var(--text-muted);
+}
+
+.card {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--fb-radius-xl, 1.15rem);
+  background: var(--fb-card-gradient);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--fb-shadow-md, 0 8px 32px rgba(0, 0, 0, 0.35));
+  background: rgba(17, 24, 39, 0.92);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.cardTitle {
+  margin-top: 0;
+  color: var(--text-heading);
+}
+
+.listSection {
+  margin-top: 24px;
+}
+
+.listTitle {
+  color: var(--text-heading);
+}
+
+.listGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.invoiceCard {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(48, 58, 78, 0.9);
+}
+
+.invoiceCardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.invoiceTitle {
+  margin: 0;
+  color: var(--text-heading);
+}
+
+.muted {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+
+.mutedPre {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
+
+.paymentsPre {
+  margin: 8px 0 0;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.field {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+}
+
+.field::placeholder {
+  color: #64748b;
+}
+
+.field option {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+.fieldTextarea {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  resize: vertical;
+}
+
+.fieldTextareaTall {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  resize: vertical;
+  min-height: 110px;
+}
+
+.fieldTextareaNotes {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  resize: vertical;
+  min-height: 100px;
+}
+
+.fieldCompact {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+}
+
+.fieldCompactTall {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+  min-height: 72px;
+  resize: vertical;
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btnTeal {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #fff;
+}
+
+.btnBlue {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  color: #fff;
+}
+
+.btnStripe {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: #635bff;
+  color: #fff;
+}
+
+.btnGreen {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: #15803d;
+  color: #fff;
+}
+
+.btnPrimary {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  color: #fff;
+}
+
+.btnSave {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.btnGhost {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: transparent;
+  color: var(--text);
+}
+
+.btnAi {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  background: rgba(30, 41, 59, 0.8);
+  color: var(--text);
+}
+
+.btnIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(30, 41, 59, 0.9);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnIconDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(30, 41, 59, 0.9);
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.paymentPanel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  border-radius: 10px;
+  background: rgba(6, 78, 59, 0.18);
+  display: grid;
+  gap: 10px;
+  color: var(--text);
+}
+
+.paymentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.empty {
+  color: var(--text-muted);
+}
+
+.quoteLookup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(6, 78, 59, 0.35);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-top: -6px;
+  color: #a7f3d0;
+}
+
+.quoteLookupBtn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: rgba(48, 58, 78, 0.85);
+  color: #6ee7b7;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.quoteSearching {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: -6px;
+}

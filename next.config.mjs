@@ -1,7 +1,7 @@
 const isProd = process.env.NODE_ENV === "production";
 const cspScriptSrc = isProd
-  ? "script-src 'self' 'unsafe-inline' https://js.stripe.com https://maps.googleapis.com https://maps.gstatic.com"
-  : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://maps.gstatic.com";
+  ? "script-src 'self' 'unsafe-inline' https://js.stripe.com https://maps.googleapis.com https://maps.gstatic.com https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://plausible.io"
+  : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://maps.googleapis.com https://maps.gstatic.com https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://plausible.io";
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -12,8 +12,8 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://*.supabase.co https://api.stripe.com https://maps.googleapis.com https://maps.gstatic.com https://*.upstash.io",
-  "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+  "connect-src 'self' https://*.supabase.co https://api.stripe.com https://maps.googleapis.com https://maps.gstatic.com https://*.upstash.io https://challenges.cloudflare.com https://www.google-analytics.com https://plausible.io",
+  "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
   "upgrade-insecure-requests",
 ].join('; ');
 
@@ -24,6 +24,7 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "**.supabase.co" },
     ],
   },
   async redirects() {
@@ -32,6 +33,16 @@ const nextConfig = {
         source: "/website-builder",
         destination: "/website",
         permanent: true,
+      },
+      {
+        source: "/admin",
+        destination: "/owner/overview",
+        permanent: false,
+      },
+      {
+        source: "/dev/admin",
+        destination: "/owner/overview",
+        permanent: false,
       },
     ];
   },

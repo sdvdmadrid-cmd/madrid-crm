@@ -1,15 +1,14 @@
-
-import styles from './OwnerShell.module.css';
-import OwnerSidebar from './OwnerSidebar';
-import OwnerHeader from './OwnerHeader';
+import styles from "./OwnerShell.module.css";
+import OwnerHeader from "./OwnerHeader";
+import OwnerSidebar from "./OwnerSidebar";
 
 export default function OwnerShell({ children }) {
   return (
-    <div className={styles['owner-shell']}>
+    <div className={styles.ownerShell}>
       <OwnerSidebar />
-      <div className={styles['owner-main']}>
+      <div className={styles.ownerMain}>
         <OwnerHeader />
-        <main className={styles['owner-content']}>{children}</main>
+        <main className={styles.ownerContent}>{children}</main>
       </div>
     </div>
   );

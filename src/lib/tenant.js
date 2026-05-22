@@ -14,8 +14,6 @@ import {
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
 
-const DEFAULT_TENANT_ID = "default";
-
 export function getTenantContext(request) {
   const session = getSessionFromRequest(request);
   if (session?.tenantId) {
@@ -33,6 +31,7 @@ export function getTenantContext(request) {
       isSubscribed: session.isSubscribed === true,
       billPaymentsSubscribed: session.billPaymentsSubscribed === true,
       trialEndDate: session.trialEndDate || null,
+      isAdmin: capabilities.isAdmin,
       isSuperAdmin: isSuperAdminRole(normalizedRole),
       authenticated: true,
       capabilities,
@@ -99,6 +98,7 @@ export async function getAuthenticatedTenantContext(request) {
       isSubscribed: normalized.isSubscribed === true,
       billPaymentsSubscribed: normalized.billPaymentsSubscribed === true,
       trialEndDate: normalized.trialEndDate || null,
+      isAdmin: capabilities.isAdmin,
       isSuperAdmin: isSuperAdminRole(normalized.role),
       authenticated: true,
       supabaseUser: user,
@@ -147,30 +147,13 @@ export function unauthenticatedResponse() {
   );
 }
 
-function tenantQuery(tenantId) {
-  if (tenantId === DEFAULT_TENANT_ID) {
-    return {
-      $or: [{ tenantId: DEFAULT_TENANT_ID }, { tenantId: { $exists: false } }],
-    };
-  }
-
-  return { tenantId };
-}
-
 /**
- * Scope a data query to a specific tenant.
- * Pass the user's `role` as the third argument so that super_admin callers
- * receive an unscoped query and can access data across all companies.
- *
- * @param {object} baseQuery   - Your existing filter object.
- * @param {string} tenantId    - The tenant identifier from the session.
- * @param {string} [role]      - The user's role. "super_admin" bypasses scoping.
+ * @deprecated Legacy Mongo-style helper — unused with Supabase.
+ * Use `scopeByTenant()` from `@/lib/tenant-scope` on PostgREST query builders.
  */
 export function withTenant(baseQuery, tenantId, role) {
-  if ((role || "").toLowerCase() === "super_admin") {
-    // Super admins see all tenants — do not inject a tenant filter.
+  if (isSuperAdminRole(role)) {
     return baseQuery;
   }
-  const scoped = tenantQuery(tenantId);
-  return { ...baseQuery, ...scoped };
+  return { ...baseQuery, tenantId };
 }

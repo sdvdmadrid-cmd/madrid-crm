@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import PlatformSettingsClient from "@/components/platform/PlatformSettingsClient";
 
 export default function OwnerSettingsPage() {
-  redirect('/admin/settings');
-  return null;
+  return <PlatformSettingsClient />;
 }

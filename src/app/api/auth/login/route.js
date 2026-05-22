@@ -9,8 +9,11 @@ import {
   buildAppSessionFromSupabaseUser,
   createSupabaseServerAuthClient,
   findAuthUserByEmail,
+  reconcileUserRoleOnLogin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
+import { resolvePostLoginPath } from "@/lib/auth-redirect";
+import { writeSecurityAudit } from "@/lib/security-audit";
 
 export async function POST(request) {
   try {
@@ -34,6 +37,10 @@ export async function POST(request) {
 
     const limitState = await checkLoginRateLimit({ email, ip });
     if (!limitState.allowed) {
+      await writeSecurityAudit({
+        action: "auth.login.rate_limited",
+        metadata: { email, ip, retryAfterSeconds: limitState.retryAfterSeconds },
+      });
       return new Response(
         JSON.stringify({
           success: false,
@@ -75,6 +82,15 @@ export async function POST(request) {
       }
 
       await recordFailedLoginAttempt({ email, ip });
+      await writeSecurityAudit({
+        action: "auth.login.failed",
+        userId: authUser?.id || "anonymous",
+        tenantId:
+          authUser?.app_metadata?.tenant_id ||
+          authUser?.user_metadata?.tenant_id ||
+          "",
+        metadata: { email, ip },
+      });
       return new Response(
         JSON.stringify({ success: false, error: "Invalid credentials" }),
         {
@@ -101,20 +117,25 @@ export async function POST(request) {
 
     await clearLoginRateLimit({ email, ip });
 
-    const profile = await resolveProfileForUser(data.user, {
+    const reconciledUser = await reconcileUserRoleOnLogin(data.user);
+
+    const profile = await resolveProfileForUser(reconciledUser, {
       tenantId: data.user.id,
       role: data.user.app_metadata?.role,
     });
 
     const sessionUser = buildAppSessionFromSupabaseUser(
-      data.user,
+      reconciledUser,
       data.session,
       profile,
     );
 
     const token = createSessionToken(sessionUser);
+    const redirectTo = resolvePostLoginPath(sessionUser);
 
-    return new Response(JSON.stringify({ success: true, data: sessionUser }), {
+    return new Response(
+      JSON.stringify({ success: true, data: sessionUser, redirectTo }),
+      {
       status: 200,
       headers: {
         "Content-Type": "application/json",

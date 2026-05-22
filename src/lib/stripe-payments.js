@@ -6,7 +6,14 @@ import {
   computeInvoicePaymentState,
   normalizeMoney,
   sanitizePaymentEntry,
+  serializeInvoiceRow,
+  validatePaymentInput,
 } from "@/lib/invoice-payments";
+import {
+  computePlatformFeeCents,
+  getConnectStatusForTenant,
+  isStripeConnectEnabled,
+} from "@/lib/stripe-connect";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getRequestOrigin } from "@/lib/supabase-auth";
 import { logSupabaseError } from "@/lib/supabase-db";
@@ -368,15 +375,23 @@ export async function listInvoicePayments(invoiceId, tenantId) {
 
 function mapCompletedPaymentRowToInvoicePayment(row) {
   const completedAt = row.completed_at || row.updated_at || row.created_at;
+  const meta =
+    row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  const isStripe = String(row.provider || "").toLowerCase() === "stripe";
   return sanitizePaymentEntry({
     amount: row.amount,
-    method: row.provider === "stripe" ? "credit_card" : "other",
-    date: completedAt ? String(completedAt).slice(0, 10) : "",
-    reference: row.stripe_session_id || row.id,
+    method: meta.method || (isStripe ? "credit_card" : "other"),
+    date:
+      meta.paymentDate ||
+      (completedAt ? String(completedAt).slice(0, 10) : ""),
+    reference:
+      meta.reference ||
+      row.stripe_session_id ||
+      row.stripe_payment_intent_id ||
+      row.id,
     notes:
-      row.provider === "stripe"
-        ? "Paid via Stripe Checkout"
-        : "Imported payment record",
+      meta.notes ||
+      (isStripe ? "Paid via Stripe Checkout" : "Recorded manual payment"),
   });
 }
 
@@ -438,6 +453,80 @@ export async function syncInvoicePaymentSummary(invoice) {
   }
 
   return summary;
+}
+
+export async function recordManualInvoicePayment({ access, body }) {
+  const validation = validatePaymentInput(body, {
+    maxAmount: summarizeInvoicePayments(
+      access.invoice,
+      await listInvoicePayments(access.invoice.id, access.invoice.tenant_id),
+    ).balanceDue,
+  });
+
+  if (!validation.valid) {
+    return {
+      response: buildResourceError(validation.error, 400),
+    };
+  }
+
+  const payment = validation.payment;
+  const paymentId = crypto.randomUUID();
+  const nowIso = new Date().toISOString();
+  const completedAt = payment.date
+    ? `${payment.date}T12:00:00.000Z`
+    : nowIso;
+
+  const { error: insertError } = await supabaseAdmin
+    .schema("public")
+    .from(PAYMENTS)
+    .insert({
+      id: paymentId,
+      tenant_id: access.invoice.tenant_id,
+      contractor_id: access.invoice.tenant_id,
+      user_id: access.context.userId || null,
+      invoice_id: access.invoice.id,
+      job_id: access.invoice.job_id || null,
+      client_id: access.invoice.client_id || null,
+      amount: payment.amount,
+      currency: "usd",
+      provider: "manual",
+      status: "paid",
+      metadata: {
+        source: "manual_registration",
+        method: payment.method,
+        reference: payment.reference,
+        notes: payment.notes,
+        paymentDate: payment.date,
+        recordedBy: access.context.userId || null,
+      },
+      completed_at: completedAt,
+      created_by: access.context.userId || null,
+      created_at: nowIso,
+      updated_at: nowIso,
+    });
+
+  if (insertError) {
+    logSupabaseError("[stripe-payments] manual payment insert error", insertError, {
+      invoiceId: access.invoice.id,
+      paymentId,
+    });
+    throw new Error(insertError.message);
+  }
+
+  await syncInvoicePaymentSummary(access.invoice);
+
+  const { data: updated, error: fetchError } = await supabaseAdmin
+    .from(INVOICES)
+    .select("*")
+    .eq("id", access.invoice.id)
+    .eq("tenant_id", access.invoice.tenant_id)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw new Error(fetchError.message);
+  }
+
+  return { invoice: serializeInvoiceRow(updated || access.invoice) };
 }
 
 export async function createStripeCheckoutSessionForAccess({
@@ -526,16 +615,39 @@ export async function createStripeCheckoutSessionForAccess({
   const safeBase = String(baseUrl || "").replace(/\/$/, "");
   const amountCents = Math.round(payableAmount * 100);
 
+  let connectAccountId = "";
+  let applicationFeeCents = 0;
+  if (isStripeConnectEnabled()) {
+    const connect = await getConnectStatusForTenant(access.invoice.tenant_id);
+    if (!connect.onboarded || !connect.accountId) {
+      return {
+        response: buildResourceError(
+          "Connect your Stripe payout account before accepting card payments online.",
+          400,
+        ),
+      };
+    }
+    connectAccountId = connect.accountId;
+    applicationFeeCents = computePlatformFeeCents(amountCents);
+  }
+
   try {
     const stripe = requireStripeClient();
+    const paymentIntentData = {
+      statement_descriptor_suffix: getStatementDescriptorSuffix(),
+    };
+
+    if (connectAccountId) {
+      paymentIntentData.application_fee_amount = applicationFeeCents;
+      paymentIntentData.transfer_data = { destination: connectAccountId };
+    }
+
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
         success_url: `${safeBase}/invoices?payment=success&invoiceId=${access.invoice.id}`,
         cancel_url: `${safeBase}/invoices?payment=cancel&invoiceId=${access.invoice.id}`,
-        payment_intent_data: {
-          statement_descriptor_suffix: getStatementDescriptorSuffix(),
-        },
+        payment_intent_data: paymentIntentData,
         customer_email:
           String(access.invoice.client_email || "")
             .trim()
@@ -572,6 +684,8 @@ export async function createStripeCheckoutSessionForAccess({
           invoiceNumber: String(access.invoice.invoice_number || ""),
           paymentAmount: payableAmount.toFixed(2),
           source,
+          stripeConnectAccountId: connectAccountId || "",
+          applicationFeeCents: String(applicationFeeCents),
         },
       },
       {

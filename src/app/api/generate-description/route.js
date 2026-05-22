@@ -1,4 +1,5 @@
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
   forbiddenResponse,
@@ -10,6 +11,9 @@ import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
 
 export async function POST(request) {
   try {
+    const csrfBlock = applyMutationCsrfGuard(request);
+    if (csrfBlock) return csrfBlock;
+
     const descriptionEnabled = await isPlatformFeatureEnabled("feature_ai_description", true);
     if (!descriptionEnabled) {
       return new Response(

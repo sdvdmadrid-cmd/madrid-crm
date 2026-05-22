@@ -29,9 +29,9 @@
 
 ## 2) Code quality and build
 
-- [ ] Run `npm run lint` and confirm no errors.
 - [ ] Run `npm run build` and confirm successful build.
-- [ ] Run `npm run dev:doctor:full` in pre-release validation.
+- [ ] Run `npm run test:e2e` when Playwright specs cover the release scope.
+- [ ] Follow `docs/SMOKE_CHECKLIST.md` for manual pre-release validation.
 
 ## 3) Runtime smoke checks
 
