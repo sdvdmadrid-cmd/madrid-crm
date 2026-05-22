@@ -34,6 +34,7 @@ jobs:
       EMAIL_FROM: FieldBase <noreply@example.com>
       EMAIL_WEBHOOK_SECRET: ci-email-webhook-secret-0123456789abcdef
       STRIPE_CONNECT_ENABLED: "false"
+      SECURITY_PREFLIGHT_CI: "true"
       DEV_LOGIN_ENABLED: false
       NEXT_PUBLIC_DEV_LOGIN_ENABLED: false
       ALLOW_INSECURE_DEV_WEBHOOKS: false
