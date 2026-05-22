@@ -17,8 +17,9 @@ jobs:
     name: Run Security Preflight
     runs-on: ubuntu-latest
     env:
-      APP_BASE_URL: http://127.0.0.1:3000
-      APP_URL: http://127.0.0.1:3000
+      # Production-mode boot rejects localhost APP_URL; health checks still hit 127.0.0.1 below.
+      APP_BASE_URL: https://fieldbaseapp.net
+      APP_URL: https://fieldbaseapp.net
       SESSION_SECRET: ci-session-secret-0123456789abcdef0123456789abcdef
       SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
