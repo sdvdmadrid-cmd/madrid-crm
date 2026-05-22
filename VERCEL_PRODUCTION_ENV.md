@@ -20,6 +20,7 @@ Set these in the Vercel Production environment before deploy:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `BILL_AUTOPAY_CRON_SECRET`
+- `STRIPE_CONNECT_ENABLED` — keep `false` until Stripe Connect is approved in the Dashboard
 
 These are required because the codebase includes live invoice checkout and Bill Payments flows.
 
