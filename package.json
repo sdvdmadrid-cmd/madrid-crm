@@ -21,6 +21,7 @@
     "indexnow:submit": "node scripts/submit-indexnow.mjs",
     "indexing:verify": "node scripts/verify-indexing-postdeploy.mjs",
     "release:prod:indexing": "powershell -ExecutionPolicy Bypass -File scripts/release-prod-indexing.ps1",
+    "release:automate": "powershell -ExecutionPolicy Bypass -File scripts/release-automation.ps1 -SkipE2E",
     "env:backup": "powershell -ExecutionPolicy Bypass -File scripts/env-backup.ps1",
     "env:restore": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1",
     "env:backups": "powershell -ExecutionPolicy Bypass -File scripts/env-restore.ps1 -List"

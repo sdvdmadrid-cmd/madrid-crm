@@ -53,12 +53,28 @@ export function validateProductionConfig() {
   }
 
   // === HIGH: Email & Notifications ===
-  if (!validateEnvVar("RESEND_API_KEY", "Email delivery service", true)) {
+  const emailProvider = String(process.env.EMAIL_PROVIDER || "mock")
+    .trim()
+    .toLowerCase();
+  const resendRequired = emailProvider === "resend";
+  if (
+    !validateEnvVar(
+      "RESEND_API_KEY",
+      "Email delivery service (required when EMAIL_PROVIDER=resend)",
+      resendRequired,
+    )
+  ) {
     warnings.push(
-      "RESEND_API_KEY not configured - email delivery will fail"
+      "RESEND_API_KEY not configured - email delivery will fail when using resend",
     );
   }
-  if (!validateEnvVar("EMAIL_WEBHOOK_SECRET", "Email webhook signature", true)) {
+  if (
+    !validateEnvVar(
+      "EMAIL_WEBHOOK_SECRET",
+      "Email webhook signature",
+      emailProvider !== "mock",
+    )
+  ) {
     warnings.push("EMAIL_WEBHOOK_SECRET not configured");
   }
 
