@@ -13,7 +13,7 @@ export default function PremiumPageShell({
   fullBleed = false,
 }) {
   return (
-    <div className={ws.page}>
+    <div className={`${ws.page} fb-animate-in`}>
       <div className={fullBleed ? ws.pageFullBleed : ws.pageInner}>
         {title || subtitle || actions ? (
           <header className={ws.topBar}>

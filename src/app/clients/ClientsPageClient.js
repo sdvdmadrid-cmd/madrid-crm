@@ -161,15 +161,7 @@ export default function ClientsPageClient() {
       subtitle={t("clients.description")}
     >
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
-      <div
-        className="cf-clients-layout"
-        style={{
-          marginTop: 24,
-          display: "grid",
-          gap: 16,
-          alignItems: "start",
-        }}
-      >
+      <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
         <ClientForm
           t={t}
           form={form}
@@ -189,17 +181,6 @@ export default function ClientsPageClient() {
           canDelete={capabilities.canDeleteRecords}
         />
       </div>
-      <style jsx>{`
-        .cf-clients-layout {
-          grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
-        }
-
-        @media (max-width: 900px) {
-          .cf-clients-layout {
-            grid-template-columns: minmax(0, 1fr);
-          }
-        }
-      `}</style>
     </PremiumPageShell>
   );
 }

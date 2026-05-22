@@ -11,6 +11,7 @@
     "bill:remittance": "powershell -ExecutionPolicy Bypass -File scripts/run-bill-remittance.ps1",
     "generate:favicons": "node scripts/generate-favicons.mjs",
     "db:migrate": "node scripts/apply-supabase-migrations.mjs",
+    "setup:website-production": "node scripts/setup-website-production.mjs",
     "test:e2e": "playwright test",
     "test:e2e:website": "playwright test tests/e2e/website-funnel.spec.js",
     "test:e2e:ui": "playwright test --ui",

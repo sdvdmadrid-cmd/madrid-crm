@@ -231,8 +231,8 @@ export default function PlacesAutocomplete({
             transform: "translateY(-50%)",
             width: 14,
             height: 14,
-            border: "2px solid #e2e8f0",
-            borderTopColor: "#64748b",
+            border: "2px solid rgba(148,163,184,0.25)",
+            borderTopColor: "#60a5fa",
             borderRadius: "50%",
             animation: "places-spin 0.65s linear infinite",
             pointerEvents: "none",
@@ -252,10 +252,10 @@ export default function PlacesAutocomplete({
             margin: 0,
             padding: "4px 0",
             listStyle: "none",
-            background: "#fff",
-            borderRadius: 10,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            background: "linear-gradient(165deg, rgba(36,44,60,0.98), rgba(18,24,36,0.98))",
+            borderRadius: 12,
+            border: "1px solid rgba(148,163,184,0.22)",
+            boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
             maxHeight: 260,
             overflowY: "auto",
           }}
@@ -275,7 +275,7 @@ export default function PlacesAutocomplete({
                 gap: 1,
                 padding: "9px 14px",
                 cursor: "pointer",
-                background: idx === activeIndex ? "#f1f5f9" : "transparent",
+                background: idx === activeIndex ? "rgba(79,140,255,0.18)" : "transparent",
                 transition: "background 0.1s",
               }}
             >
@@ -283,7 +283,7 @@ export default function PlacesAutocomplete({
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: "#0f172a",
+                  color: "#f4f7fc",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -295,7 +295,7 @@ export default function PlacesAutocomplete({
                 <span
                   style={{
                     fontSize: 11,
-                    color: "#94a3b8",
+                    color: "#8b9bb8",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",

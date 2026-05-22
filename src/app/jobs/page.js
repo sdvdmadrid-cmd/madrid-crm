@@ -69,45 +69,17 @@ function ConfirmationModal({
 }) {
   if (!open) return null;
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15,23,42,0.45)",
-        zIndex: 1200,
-        display: "grid",
-        placeItems: "center",
-        padding: 18,
-      }}
-    >
-      <div
-        style={{
-          width: "min(560px, 100%)",
-          borderRadius: 16,
-          background: "#fff",
-          border: "1px solid rgba(15,23,42,0.10)",
-          padding: 20,
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 22, color: "#0f172a" }}>{title}</h3>
-        <p style={{ margin: 0, color: "#334155", lineHeight: 1.5 }}>{message}</p>
+    <div className={jobStyles.modalOverlay}>
+      <div className={jobStyles.modalPanel}>
+        <h3 className={jobStyles.modalTitle}>{title}</h3>
+        <p className={jobStyles.modalMessage}>{message}</p>
         {children}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+        <div className={jobStyles.modalActions}>
           <button
             type="button"
             onClick={onCancel}
             disabled={loading}
-            style={{
-              borderRadius: 10,
-              border: "1px solid #cbd5e1",
-              background: "#fff",
-              color: "#0f172a",
-              fontWeight: 600,
-              padding: "10px 14px",
-              cursor: "pointer",
-            }}
+            className={jobStyles.modalBtnCancel}
           >
             {cancelLabel || "Cancel"}
           </button>
@@ -115,15 +87,7 @@ function ConfirmationModal({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            style={{
-              borderRadius: 10,
-              border: "1px solid transparent",
-              background: danger ? "#dc2626" : "#0f766e",
-              color: "#fff",
-              fontWeight: 700,
-              padding: "10px 14px",
-              cursor: "pointer",
-            }}
+            className={`${jobStyles.modalBtnConfirm} ${danger ? jobStyles.modalBtnDanger : ""}`}
           >
             {loading ? "Working..." : confirmLabel || "Confirm"}
           </button>
@@ -741,14 +705,7 @@ export default function JobsPage() {
                   type="button"
                   onClick={generateEstimate}
                   disabled={estimating}
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "#1d6f42",
-                    color: "white",
-                    cursor: "pointer",
-                  }}
+                  className={jobStyles.btnEstimate}
                 >
                   {estimating
                     ? t("jobs.estimator.calculating")
@@ -758,110 +715,57 @@ export default function JobsPage() {
                   type="button"
                   onClick={useRecommendedPrice}
                   disabled={!estimateResult?.recommendedPrice}
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: "8px",
-                    border: "1px solid #1d6f42",
-                    background: "white",
-                    color: "#1d6f42",
-                    cursor: "pointer",
-                  }}
+                  className={jobStyles.btnEstimateOutline}
                 >
                   {t("jobs.estimator.useRecommended")}
                 </button>
               </div>
             </div>
             {estimateResult
-              ? <div
-                  style={{ marginTop: "16px", display: "grid", gap: "12px" }}
-                >
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(150px, 1fr))",
-                      gap: "12px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "10px",
-                        background: "#fff",
-                      }}
-                    >
-                      <div style={{ color: "#62706a", fontSize: "12px" }}>
+              ? <div className={jobStyles.statGrid}>
+                  <div className={jobStyles.statRow}>
+                    <div className={jobStyles.statCard}>
+                      <div className={jobStyles.statLabel}>
                         {t("jobs.estimator.recommendedPrice")}
                       </div>
-                      <div style={{ fontSize: "26px", fontWeight: 700 }}>
+                      <div className={jobStyles.statValue}>
                         ${estimateResult.recommendedPrice}
                       </div>
                     </div>
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "10px",
-                        background: "#fff",
-                      }}
-                    >
-                      <div style={{ color: "#62706a", fontSize: "12px" }}>
+                    <div className={jobStyles.statCard}>
+                      <div className={jobStyles.statLabel}>
                         {t("jobs.estimator.range")}
                       </div>
-                      <div style={{ fontSize: "18px", fontWeight: 700 }}>
+                      <div className={jobStyles.statValueSm}>
                         ${estimateResult.lowPrice} - ${estimateResult.highPrice}
                       </div>
                     </div>
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "10px",
-                        background: "#fff",
-                      }}
-                    >
-                      <div style={{ color: "#62706a", fontSize: "12px" }}>
+                    <div className={jobStyles.statCard}>
+                      <div className={jobStyles.statLabel}>
                         {t("jobs.estimator.hours")}
                       </div>
-                      <div style={{ fontSize: "18px", fontWeight: 700 }}>
+                      <div className={jobStyles.statValueSm}>
                         {estimateResult.estimatedHours} h
                       </div>
                     </div>
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "10px",
-                        background: "#fff",
-                      }}
-                    >
-                      <div style={{ color: "#62706a", fontSize: "12px" }}>
+                    <div className={jobStyles.statCard}>
+                      <div className={jobStyles.statLabel}>
                         {t("jobs.estimator.confidence")}
                       </div>
-                      <div style={{ fontSize: "18px", fontWeight: 700 }}>
+                      <div className={jobStyles.statValueSm}>
                         {estimateResult.confidence}%
                       </div>
                     </div>
                   </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(220px, 1fr))",
-                      gap: "12px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "10px",
-                        background: "#fff",
-                      }}
-                    >
+                  <div className={jobStyles.statRow}>
+                    <div className={jobStyles.statCard}>
                       <strong>{t("jobs.estimator.breakdown")}</strong>
                       <div
                         style={{
                           marginTop: "8px",
                           display: "grid",
                           gap: "6px",
-                          color: "#444",
+                          color: "var(--fb-text-muted)",
                         }}
                       >
                         {estimateResult.lineItems?.map((item) => (
@@ -879,20 +783,14 @@ export default function JobsPage() {
                         ))}
                       </div>
                     </div>
-                    <div
-                      style={{
-                        padding: "12px",
-                        borderRadius: "10px",
-                        background: "#fff",
-                      }}
-                    >
+                    <div className={jobStyles.statCard}>
                       <strong>{t("jobs.estimator.assumptions")}</strong>
                       <div
                         style={{
                           marginTop: "8px",
                           display: "grid",
                           gap: "6px",
-                          color: "#444",
+                          color: "var(--fb-text-muted)",
                         }}
                       >
                         {estimateResult.assumptions?.map((item) => (
@@ -925,30 +823,14 @@ export default function JobsPage() {
               value={proposalContext}
               onChange={(e) => setProposalContext(e.target.value)}
               placeholder="Optional context for AI (materials, warranty terms, exclusions, payment rules)..."
-              style={{
-                width: "100%",
-                marginTop: 12,
-                minHeight: 72,
-                padding: "10px",
-                borderRadius: 8,
-                border: "1px solid #c4b5fd",
-                background: "#fff",
-              }}
+              className={`${jobStyles.textAreaDark} ${jobStyles.textAreaContext}`}
             />
             {proposalDraft ? (
               <textarea
                 value={proposalDraft}
                 onChange={(e) => setProposalDraft(e.target.value)}
                 placeholder="Generated proposal will appear here"
-                style={{
-                  width: "100%",
-                  marginTop: 12,
-                  minHeight: 220,
-                  padding: "12px",
-                  borderRadius: 10,
-                  border: "1px solid #c4b5fd",
-                  background: "#fff",
-                }}
+                className={`${jobStyles.textAreaDark} ${jobStyles.textAreaProposal}`}
               />
             ) : null}
           </div>

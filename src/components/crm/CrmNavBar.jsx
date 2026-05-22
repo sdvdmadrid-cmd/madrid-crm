@@ -8,7 +8,6 @@ import {
   getCrmBreadcrumbs,
   shouldShowCrmNav,
 } from "@/lib/crm-navigation";
-import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 
 export default function CrmNavBar() {
   const pathname = usePathname();
@@ -20,11 +19,9 @@ export default function CrmNavBar() {
 
   const crumbs = getCrmBreadcrumbs(pathname);
   const backHref = getBackFallbackPath(pathname);
-  const isDark = isPremiumWorkspacePath(pathname);
-
   return (
     <nav
-      className={`crm-nav-bar crm-nav-premium${isDark ? " crm-nav-premium--dark" : ""}`}
+      className={`crm-nav-bar crm-nav-premium crm-nav-premium--dark`}
       aria-label={t("nav.ariaLabel")}
     >
       <Link href={backHref} className="crm-nav-back">

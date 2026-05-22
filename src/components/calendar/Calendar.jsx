@@ -526,7 +526,7 @@ export default function Calendar() {
   };
 
   return (
-    <div className="min-h-screen min-w-0 overflow-x-hidden flex flex-col bg-slate-100/70">
+    <div className="fb-calendar-page min-h-screen min-w-0 overflow-x-hidden flex flex-col">
       {/* Header */}
       <CalendarHeader
         currentDate={currentDate}
@@ -544,7 +544,7 @@ export default function Calendar() {
 
       {/* Always-visible 15-day weather forecast */}
       <div className="relative z-0 px-3 sm:px-6 md:px-8 pt-3 flex-none">
-        <div className="fb-surface-light fb-calendar-weather min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm max-h-[50vh] overflow-y-auto">
+        <div className="fb-calendar-weather min-w-0 rounded-xl border border-slate-200/30 px-3 py-3 shadow-sm max-h-[50vh] overflow-y-auto">
           <div className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">

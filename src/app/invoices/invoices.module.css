@@ -1,32 +1,22 @@
 .page {
-  --bg: #0b1220;
-  --bg-elevated: #111827;
-  --bg-input: #1e293b;
-  --border: rgba(148, 163, 184, 0.2);
-  --text: #e2e8f0;
-  --text-muted: #94a3b8;
-  --text-heading: #f8fafc;
-  --accent: #14b8a6;
-  --accent-blue: #3b82f6;
+  --bg: var(--fb-bg, #1e2433);
+  --bg-elevated: var(--fb-surface-elevated, rgba(28, 35, 50, 0.92));
+  --bg-input: var(--fb-surface-input, rgba(22, 28, 40, 0.95));
+  --border: var(--fb-border-strong, rgba(148, 163, 184, 0.2));
+  --text: var(--fb-text, #e8ecf4);
+  --text-muted: var(--fb-text-muted, #94a3b8);
+  --text-heading: var(--fb-text-heading, #f4f6fb);
+  --accent: var(--fb-accent-emerald, #2dd4a8);
+  --accent-blue: var(--fb-accent-blue, #60a5fa);
   --accent-stripe: #635bff;
   --danger: #f87171;
 
-  padding: 24px;
+  padding: var(--fb-space-6, 24px);
   max-width: 1280px;
   margin: 0 auto;
   min-height: calc(100vh - 48px);
-  font-family: "Segoe UI", system-ui, sans-serif;
-  background: radial-gradient(
-      circle at 0% 0%,
-      rgba(20, 184, 166, 0.08),
-      transparent 40%
-    ),
-    radial-gradient(
-      circle at 100% 100%,
-      rgba(59, 130, 246, 0.06),
-      transparent 45%
-    ),
-    var(--bg);
+  font-family: var(--fb-font-sans, "Plus Jakarta Sans", system-ui, sans-serif);
+  background: transparent;
   color: var(--text);
 }
 
@@ -77,7 +67,10 @@
   margin-top: 24px;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--fb-radius-xl, 1.15rem);
+  background: var(--fb-card-gradient);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--fb-shadow-md, 0 8px 32px rgba(0, 0, 0, 0.35));
   background: rgba(17, 24, 39, 0.92);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
@@ -104,7 +97,7 @@
   padding: 18px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.88);
+  background: rgba(48, 58, 78, 0.9);
 }
 
 .invoiceCardHeader {
@@ -383,7 +376,7 @@
   padding: 4px 10px;
   border-radius: 6px;
   border: 1px solid rgba(52, 211, 153, 0.45);
-  background: rgba(15, 23, 42, 0.8);
+  background: rgba(48, 58, 78, 0.85);
   color: #6ee7b7;
   font-weight: 600;
   cursor: pointer;

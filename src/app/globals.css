@@ -3,6 +3,7 @@
 @import "tailwindcss";
 @import "./theme/design-tokens.css";
 @import "../styles/premium-design.css";
+@import "../styles/premium-components.css";
 
 :root {
   /* Backgrounds */

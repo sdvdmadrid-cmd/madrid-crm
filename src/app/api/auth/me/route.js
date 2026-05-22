@@ -1,6 +1,6 @@
 import { getTenantContext } from "@/lib/tenant";
 import { cookies } from "next/headers";
-import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { buildSessionCookie, createSessionToken, getSessionFromRequest } from "@/lib/auth";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import {
   buildAppSessionFromSupabaseUser,
@@ -21,6 +21,7 @@ export async function GET(request) {
     }
 
     const session = getTenantContext(request);
+    const appSession = getSessionFromRequest(request);
 
     if (!session?.authenticated) {
       const cookieStore = await cookies();
@@ -114,6 +115,23 @@ export async function GET(request) {
     let setCookieHeader = null;
 
     if (user?.id) {
+      // Dev-login pins tenant CRM role for E2E; skip operator reconcile overwriting admin.
+      if (
+        appSession?.devProfile &&
+        String(appSession.devProfile).toLowerCase() !== "super_admin"
+      ) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: responseBody,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
       const reconciled = await reconcileUserRoleOnLogin(user);
       const profile = await resolveProfileForUser(reconciled, {
         tenantId: session.tenantDbId || reconciled.id,

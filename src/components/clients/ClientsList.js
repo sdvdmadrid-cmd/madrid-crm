@@ -1,25 +1,10 @@
 "use client";
 
-const actionIconButtonStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  height: 30,
-  padding: "0 10px",
-  borderRadius: 999,
-  border: "1px solid #d1d5db",
-  background: "#fff",
-  color: "#334155",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
 function IconPencil() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+      <path d="M16.5 3.5a2.12 2.12 0 113 3 3L7 19l-4 1 1-4 12.5-12.5z" />
     </svg>
   );
 }
@@ -52,96 +37,68 @@ export default function ClientsList({
   canDelete,
 }) {
   return (
-    <section className="cf-card" style={{ padding: 20 }}>
-      <h2 style={{ marginTop: 0, fontSize: 20 }}>{t("clients.listTitle")}</h2>
+    <section className="cf-card" style={{ padding: 22 }}>
+      <h2 style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 800 }}>{t("clients.listTitle")}</h2>
 
-      {loading
-        ? <p style={{ color: "#64748b" }}>{t("clients.loading")}</p>
-        : null}
+      {loading ? <p className="cf-muted">{t("clients.loading")}</p> : null}
 
-      {!loading && clients.length === 0
-        ? <p style={{ color: "#64748b" }}>{t("clients.empty")}</p>
-        : null}
+      {!loading && clients.length === 0 ? (
+        <div className="fb-empty" style={{ marginTop: 16 }}>
+          <p className="fb-empty-title">{t("clients.empty")}</p>
+          <p className="fb-empty-desc">{t("clients.description")}</p>
+        </div>
+      ) : null}
 
-      <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gap: 12, marginTop: loading ? 12 : 0 }}>
         {clients.map((client) => (
-          <article key={client.id} className="cf-panel" style={{ padding: 14 }}>
+          <article key={client.id} className="cf-panel cf-client-card" style={{ padding: 16 }}>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                gap: 10,
+                gap: 12,
                 flexWrap: "wrap",
               }}
             >
               <div>
-                <h3 style={{ margin: 0, fontSize: 16 }}>
-                  {client.name || "-"}
-                </h3>
-                <p
-                  style={{ margin: "6px 0 0", color: "#475569", fontSize: 14 }}
-                >
+                <h3>{client.name || "-"}</h3>
+                <p className="cf-muted" style={{ margin: "6px 0 0" }}>
                   {client.company || "-"}
                 </p>
-                <p
-                  style={{ margin: "6px 0 0", color: "#475569", fontSize: 14 }}
-                >
+                <p className="cf-muted" style={{ margin: "4px 0 0" }}>
                   {client.phone || "-"}
                 </p>
-                <p
-                  style={{ margin: "6px 0 0", color: "#475569", fontSize: 14 }}
-                >
+                <p className="cf-muted" style={{ margin: "4px 0 0" }}>
                   {client.email || "-"}
                 </p>
-                <p
-                  style={{ margin: "6px 0 0", color: "#475569", fontSize: 14 }}
-                >
+                <p className="cf-muted" style={{ margin: "4px 0 0" }}>
                   {client.address || "-"}
                 </p>
-                {client.notes
-                  ? <p
-                      style={{
-                        margin: "6px 0 0",
-                        color: "#64748b",
-                        fontSize: 13,
-                      }}
-                    >
-                      {client.notes}
-                    </p>
-                  : null}
-                <p
-                  style={{ margin: "6px 0 0", color: "#64748b", fontSize: 12 }}
-                >
-                  {t("clients.labels.createdAt")}:{" "}
-                  {formatCreatedAt(client.created_at)}
+                {client.notes ? (
+                  <p className="cf-muted" style={{ margin: "8px 0 0", fontSize: 13 }}>
+                    {client.notes}
+                  </p>
+                ) : null}
+                <p className="cf-muted" style={{ margin: "8px 0 0", fontSize: 12, opacity: 0.85 }}>
+                  {t("clients.labels.createdAt")}: {formatCreatedAt(client.created_at)}
                 </p>
               </div>
 
-              <div
-                style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
-              >
-                <button
-                  type="button"
-                  onClick={() => onEdit(client)}
-                  style={actionIconButtonStyle}
-                >
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <button type="button" onClick={() => onEdit(client)} className="cf-action-btn">
                   <IconPencil />
                   {t("clients.buttons.edit")}
                 </button>
-                {canDelete
-                  ? <button
-                      type="button"
-                      onClick={() => onDelete(client.id)}
-                      style={{
-                        ...actionIconButtonStyle,
-                        borderColor: "#fecaca",
-                        color: "#b91c1c",
-                      }}
-                    >
-                      <IconTrash />
-                      {t("clients.buttons.delete")}
-                    </button>
-                  : null}
+                {canDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(client.id)}
+                    className="cf-action-btn cf-action-btn--danger"
+                  >
+                    <IconTrash />
+                    {t("clients.buttons.delete")}
+                  </button>
+                ) : null}
               </div>
             </div>
           </article>

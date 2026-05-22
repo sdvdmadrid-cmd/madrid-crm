@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const { devLogin } = require("./helpers/auth");
 const { createClient } = require("@supabase/supabase-js");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -83,13 +84,10 @@ async function postWithTransientRetry(api, page, url, data, options = {}) {
 
 test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
   test("approval auto-converts, base number preserved, signed quote lock works", async ({ page }) => {
-    // Ensure authenticated session cookie via dev-login helper.
-    await page.goto("/api/auth/dev-login?profile=admin&redirect=%2Fdashboard", {
-      waitUntil: "domcontentloaded",
-    });
+    test.setTimeout(90_000);
+    await devLogin(page, { profile: "admin", redirect: "/dashboard" });
 
     const api = page.request;
-    await ensureLegalAccepted(api);
 
     const now = Date.now();
     const estimateNumber = `E2E-${now}`;

@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import PremiumPageShell from "@/components/workspace/PremiumPageShell";
+import ws from "@/styles/workspace-dark.module.css";
+import sc from "./services-catalog.module.css";
 
 const EMPTY_FORM = {
   name: "",
@@ -112,188 +115,113 @@ export default function ServicesCatalogPage() {
     }
   }
 
+  const headerActions = (
+    <button type="button" onClick={loadServices} disabled={loading} className={ws.btnSecondary}>
+      Refresh
+    </button>
+  );
+
   return (
-    <main
-      style={{
-        padding: 24,
-        maxWidth: 1100,
-        margin: "0 auto",
-        fontFamily: "Arial, sans-serif",
-      }}
+    <PremiumPageShell
+      title="Service Catalog"
+      subtitle="Manage reusable services and pricing for estimates and your website."
+      actions={headerActions}
     >
-      <header style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 32, color: "#0f172a" }}>Service Catalog</h1>
-        <p style={{ margin: "8px 0 0 0", color: "#64748b" }}>
-          Manage reusable services and pricing for your business.
-        </p>
-      </header>
+      {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
-      {error ? (
-        <div
-          style={{
-            marginBottom: 16,
-            background: "#fee2e2",
-            color: "#991b1b",
-            border: "1px solid #fecaca",
-            borderRadius: 10,
-            padding: "10px 12px",
-            fontSize: 14,
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
-
-      <section
-        style={{
-          border: "1px solid #e2e8f0",
-          borderRadius: 14,
-          background: "#fff",
-          padding: 18,
-          marginBottom: 20,
-        }}
-      >
-        <h2 style={{ marginTop: 0, fontSize: 18 }}>
-          {selectedId ? "Edit service" : "Add service"}
-        </h2>
-        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
+      <section className={sc.formCard}>
+        <h2 className={sc.formTitle}>{selectedId ? "Edit service" : "Add service"}</h2>
+        <div className={sc.formGrid}>
           <input
+            className={sc.field}
             placeholder="Service name"
             value={form.name}
             onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-            style={{ padding: 10, borderRadius: 8, border: "1px solid #cbd5e1" }}
           />
           <input
+            className={sc.field}
             placeholder="Category"
             value={form.category}
             onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}
-            style={{ padding: 10, borderRadius: 8, border: "1px solid #cbd5e1" }}
           />
           <input
+            className={sc.field}
             placeholder="Min price"
             value={form.priceMin}
             onChange={(e) => setForm((s) => ({ ...s, priceMin: e.target.value }))}
-            style={{ padding: 10, borderRadius: 8, border: "1px solid #cbd5e1" }}
           />
           <input
+            className={sc.field}
             placeholder="Max price"
             value={form.priceMax}
             onChange={(e) => setForm((s) => ({ ...s, priceMax: e.target.value }))}
-            style={{ padding: 10, borderRadius: 8, border: "1px solid #cbd5e1" }}
           />
         </div>
         <textarea
+          className={`${sc.field} ${sc.textarea}`}
           placeholder="Description"
           value={form.description}
           onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
           rows={4}
-          style={{
-            marginTop: 10,
-            width: "100%",
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #cbd5e1",
-          }}
         />
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button
-            type="button"
-            onClick={saveService}
-            disabled={saving}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "none",
-              background: "#2563eb",
-              color: "#fff",
-              cursor: "pointer",
-            }}
-          >
+        <div className={sc.formActions}>
+          <button type="button" onClick={saveService} disabled={saving} className={ws.btnPrimary}>
             {saving ? "Saving..." : selectedId ? "Update service" : "Add service"}
           </button>
-          <button
-            type="button"
-            onClick={resetForm}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" onClick={resetForm} className={ws.btnSecondary}>
             Clear
           </button>
         </div>
       </section>
 
       <section>
-        <div style={{ marginBottom: 10, color: "#475569", fontSize: 14 }}>
+        <p className={sc.categories}>
           Categories: {categories.length > 0 ? categories.join(", ") : "No categories yet"}
-        </div>
+        </p>
         {loading ? (
-          <p style={{ color: "#64748b" }}>Loading services...</p>
+          <p style={{ color: "var(--fb-text-muted)" }}>Loading services...</p>
         ) : services.length === 0 ? (
-          <p style={{ color: "#64748b" }}>No services yet.</p>
+          <div className="fb-empty">
+            <p className="fb-empty-title">No services yet</p>
+            <p className="fb-empty-desc">Add your first service above to use it in estimates.</p>
+          </div>
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className={sc.list}>
             {services.map((service) => (
-              <div
-                key={service.id || service._id}
-                style={{
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 12,
-                  background: "#fff",
-                  padding: 14,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <article key={service.id || service._id} className={sc.serviceCard}>
+                <div className={sc.serviceRow}>
                   <div>
-                    <div style={{ fontWeight: 700, color: "#0f172a" }}>{service.name}</div>
-                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>
-                      {service.category} • ${Number(service.priceMin || 0).toFixed(2)} - ${Number(service.priceMax || 0).toFixed(2)}
+                    <div className={sc.serviceName}>{service.name}</div>
+                    <div className={sc.serviceMeta}>
+                      {service.category} • ${Number(service.priceMin || 0).toFixed(2)} – $
+                      {Number(service.priceMax || 0).toFixed(2)}
                     </div>
                     {service.description ? (
-                      <div style={{ marginTop: 8, color: "#334155", fontSize: 14 }}>
-                        {service.description}
-                      </div>
+                      <p className={sc.serviceDesc}>{service.description}</p>
                     ) : null}
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div className={sc.cardActions}>
                     <button
                       type="button"
                       onClick={() => editService(service)}
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #cbd5e1",
-                        background: "#fff",
-                        cursor: "pointer",
-                      }}
+                      className={ws.btnSecondary}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteService(service.id || service._id)}
-                      style={{
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        border: "1px solid #fecaca",
-                        color: "#b91c1c",
-                        background: "#fff",
-                        cursor: "pointer",
-                      }}
+                      className={sc.btnDanger}
                     >
                       Delete
                     </button>
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
       </section>
-    </main>
+    </PremiumPageShell>
   );
 }

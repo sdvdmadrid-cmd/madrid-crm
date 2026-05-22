@@ -353,6 +353,7 @@ export default function AppointmentModal({
               </label>
               <input
                 type="text"
+                data-testid="appointment-title-input"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder={t("calendar.placeholders.title")}

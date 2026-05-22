@@ -58,16 +58,17 @@ if (!env.get("ENCRYPTION_KEY") || env.get("ENCRYPTION_KEY").length < 64) {
 }
 
 if (!env.get("APP_BASE_URL")) {
-  additions.push("APP_BASE_URL=https://localhost:3000");
+  additions.push("APP_BASE_URL=http://localhost:3000");
 }
 
 if (!env.get("APP_URL")) {
-  additions.push("APP_URL=https://localhost:3000");
+  additions.push("APP_URL=http://localhost:3000");
 }
 
 if (!env.get("SUPER_ADMIN_EMAIL")) {
-  const devAdmin = env.get("DEV_ADMIN_EMAIL") || "admin@fieldbase.local";
-  additions.push(`SUPER_ADMIN_EMAIL=${devAdmin}`);
+  const ownerEmail =
+    env.get("DEV_SUPERADMIN_EMAIL") || "owner@fieldbase.local";
+  additions.push(`SUPER_ADMIN_EMAIL=${ownerEmail}`);
 }
 
 if (!env.get("SUPER_ADMIN_EMAILS")) {
