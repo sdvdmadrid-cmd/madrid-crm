@@ -249,7 +249,7 @@ export default function RevenueDashboardPage() {
             <PlusIcon />
             {t("dashboardControl.actions.newEstimate")}
           </Link>
-          <Link href="/jobs" className={styles.secondaryAction}>{t("dashboardControl.actions.newJob")}</Link>
+          <Link href="/jobs?action=new" className={styles.secondaryAction}>{t("dashboardControl.actions.newJob")}</Link>
           <Link href="/clients" className={styles.secondaryAction}>{t("dashboardControl.actions.addClient")}</Link>
         </div>
       </header>

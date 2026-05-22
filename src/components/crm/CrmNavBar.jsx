@@ -8,6 +8,7 @@ import {
   getCrmBreadcrumbs,
   shouldShowCrmNav,
 } from "@/lib/crm-navigation";
+import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 
 export default function CrmNavBar() {
   const pathname = usePathname();
@@ -19,11 +20,7 @@ export default function CrmNavBar() {
 
   const crumbs = getCrmBreadcrumbs(pathname);
   const backHref = getBackFallbackPath(pathname);
-  const isDark =
-    pathname?.startsWith("/invoices") ||
-    pathname?.startsWith("/dashboard") ||
-    pathname?.startsWith("/estimates") ||
-    pathname?.startsWith("/jobs");
+  const isDark = isPremiumWorkspacePath(pathname);
 
   return (
     <nav

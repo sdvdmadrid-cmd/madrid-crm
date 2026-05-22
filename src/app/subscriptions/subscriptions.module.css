@@ -1,63 +1,50 @@
-.container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
+/* Premium dark — lives inside .fb-workspace via PremiumPageShell */
 
 .backButton {
-  background: transparent;
-  border: 0;
-  color: #007bff;
+  background: rgba(34, 40, 52, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  color: #93c5fd;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 13px;
   font-weight: 600;
-  margin-bottom: 1rem;
-  padding: 0;
+  padding: 10px 14px;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .backButton:hover {
-  color: #0056b3;
-}
-
-.header {
-  margin-bottom: 2rem;
-}
-
-.header h1 {
-  font-size: 2rem;
-  margin: 0 0 0.5rem 0;
-  color: var(--color-text-primary, #1a1a1a);
-}
-
-.header p {
-  font-size: 1rem;
-  color: var(--color-text-secondary, #666);
-  margin: 0;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #bfdbfe;
 }
 
 .errorBanner {
-  background-color: #fee;
-  border: 1px solid #fcc;
-  border-radius: 0.5rem;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  border-radius: 12px;
   padding: 1rem;
   margin-bottom: 1.5rem;
-  color: #c33;
+  color: #fda4af;
   font-size: 0.95rem;
 }
 
 .card {
-  background: white;
-  border: 1px solid var(--color-border, #e0e0e0);
-  border-radius: 0.75rem;
+  background: linear-gradient(
+    180deg,
+    rgba(36, 43, 56, 0.92) 0%,
+    rgba(28, 33, 43, 0.88) 100%
+  );
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 1.25rem;
   padding: 2rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
 }
 
 .card h2 {
   margin: 0 0 1.5rem 0;
   font-size: 1.5rem;
-  color: var(--color-text-primary, #1a1a1a);
+  color: #f8fafc;
 }
 
 .cardHeader {
@@ -78,17 +65,19 @@
 .noSubscriptionContent h2 {
   margin: 0 0 1rem 0;
   font-size: 1.75rem;
+  color: #f8fafc;
 }
 
 .noSubscriptionContent p {
   font-size: 1.1rem;
-  color: var(--color-text-secondary, #666);
+  color: #94a3b8;
   margin: 0 0 2rem 0;
 }
 
 .features {
-  background: #f5f5f5;
-  border-radius: 0.5rem;
+  background: rgba(34, 40, 52, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 1rem;
   padding: 1.5rem;
   margin: 2rem 0;
   text-align: left;
@@ -97,6 +86,7 @@
 .features h3 {
   margin: 0 0 1rem 0;
   font-size: 1rem;
+  color: #e8ecf4;
 }
 
 .features ul {
@@ -110,7 +100,7 @@
 
 .features li {
   padding: 0.5rem 0;
-  color: var(--color-text-secondary, #666);
+  color: #94a3b8;
 }
 
 .subscriptionGrid {
@@ -136,7 +126,7 @@
   display: flex;
   justify-content: space-between;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .detailRow:last-child {
@@ -144,47 +134,47 @@
 }
 
 .label {
-  color: var(--color-text-secondary, #666);
+  color: #94a3b8;
   font-weight: 500;
 }
 
 .value {
-  color: var(--color-text-primary, #1a1a1a);
+  color: #f8fafc;
   font-weight: 600;
 }
 
 .badge {
   display: inline-block;
   padding: 0.4rem 0.8rem;
-  border-radius: 0.25rem;
+  border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .badge-info {
-  background-color: #e3f2fd;
-  color: #1565c0;
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
 }
 
 .badge-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
 }
 
 .badge-warning {
-  background-color: #fff3e0;
-  color: #e65100;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
 }
 
 .badge-danger {
-  background-color: #ffebee;
-  color: #c62828;
+  background: rgba(244, 63, 94, 0.2);
+  color: #fda4af;
 }
 
 .badge-secondary {
-  background-color: #f5f5f5;
-  color: #666;
+  background: rgba(100, 116, 139, 0.25);
+  color: #cbd5e1;
 }
 
 .invoicesList {
@@ -198,37 +188,33 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: #fafafa;
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-border, #e0e0e0);
-}
-
-.invoiceInfo {
-  flex: 1;
+  background: rgba(34, 40, 52, 0.55);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .invoiceDate {
   font-weight: 600;
-  color: var(--color-text-primary, #1a1a1a);
+  color: #f8fafc;
   margin-bottom: 0.25rem;
 }
 
 .invoicePeriod {
   font-size: 0.9rem;
-  color: var(--color-text-secondary, #666);
+  color: #94a3b8;
 }
 
 .invoiceAmount {
   margin: 0 1rem;
   font-weight: 600;
-  color: var(--color-text-primary, #1a1a1a);
+  color: #f8fafc;
   min-width: 100px;
   text-align: right;
 }
 
 .emptyState {
   text-align: center;
-  color: var(--color-text-secondary, #666);
+  color: #94a3b8;
   padding: 2rem 0;
   margin: 0;
 }
@@ -238,62 +224,70 @@
 .buttonDanger {
   padding: 0.75rem 1.5rem;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 14px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: filter 0.2s ease, transform 0.2s ease;
   width: 100%;
 }
 
 .buttonPrimary {
-  background-color: #007bff;
-  color: white;
+  background: linear-gradient(135deg, #059669 0%, #10b981 55%, #34d399 100%);
+  color: #fff;
   margin-top: 1rem;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.28);
 }
 
 .buttonPrimary:hover:not(:disabled) {
-  background-color: #0056b3;
+  filter: brightness(1.06);
+  transform: translateY(-1px);
 }
 
 .buttonPrimary:disabled {
-  background-color: #ccc;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .buttonSecondary {
-  background-color: #f5f5f5;
-  border: 1px solid var(--color-border, #e0e0e0);
-  color: var(--color-text-primary, #1a1a1a);
+  background: rgba(34, 40, 52, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #e8ecf4;
   margin-top: 1rem;
 }
 
 .buttonSecondary:hover:not(:disabled) {
-  background-color: #ececec;
+  border-color: rgba(96, 165, 250, 0.35);
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .buttonSecondary:disabled {
-  color: #888;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .buttonDanger {
-  background-color: #dc3545;
-  color: white;
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  color: #fff;
+  border: 1px solid rgba(248, 113, 113, 0.35);
 }
 
 .buttonDanger:hover:not(:disabled) {
-  background-color: #c82333;
+  filter: brightness(1.06);
 }
 
 .buttonDanger:disabled {
-  background-color: #ccc;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.loading {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--color-text-secondary, #666);
-  font-size: 1.1rem;
+.loadingCard {
+  min-height: 120px;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+  font-size: 1rem;
 }

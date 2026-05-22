@@ -6,6 +6,8 @@ import { useCurrentUserAccess } from "@/lib/current-user-client";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientsList from "@/components/clients/ClientsList";
+import PremiumPageShell from "@/components/workspace/PremiumPageShell";
+import ws from "@/styles/workspace-dark.module.css";
 
 export default function ClientsPageClient() {
   const { t } = useTranslation();
@@ -154,33 +156,11 @@ export default function ClientsPageClient() {
   };
 
   return (
-    <main
-      style={{
-        padding: "24px 24px 40px",
-        maxWidth: 1120,
-        margin: "0 auto",
-      }}
+    <PremiumPageShell
+      title={t("clients.title")}
+      subtitle={t("clients.description")}
     >
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: "32px", margin: 0 }}>{t("clients.title")}</h1>
-          <p style={{ margin: "10px 0 0 0", color: "#555" }}>
-            {t("clients.description")}
-          </p>
-        </div>
-      </header>
-
-      {error && (
-        <div style={{ marginTop: "20px", color: "#b00020" }}>{error}</div>
-      )}
+      {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
       <div
         className="cf-clients-layout"
         style={{
@@ -220,6 +200,6 @@ export default function ClientsPageClient() {
           }
         }
       `}</style>
-    </main>
+    </PremiumPageShell>
   );
 }

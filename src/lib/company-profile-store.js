@@ -46,7 +46,7 @@ function mapSupabaseRow(row = {}) {
   };
 }
 
-function isMissingColumnError(error, columnName) {
+export function isMissingColumnError(error, columnName) {
   const message = String(error?.message || error || "").toLowerCase();
   const column = String(columnName || "").toLowerCase();
   return (
@@ -109,6 +109,17 @@ export async function getCompanyProfileByTenant({ tenantId }) {
   }
 
   return mapSupabaseRow(data);
+}
+
+/** Ensures website builder and AI routes never crash when profile row is missing. */
+export function withDefaultCompanyProfile(profile, tenantId = "") {
+  if (profile && typeof profile === "object") {
+    return profile;
+  }
+  return {
+    ...DEFAULT_COMPANY_PROFILE,
+    tenantId: String(tenantId || "").trim(),
+  };
 }
 
 export async function upsertCompanyProfileForTenant({

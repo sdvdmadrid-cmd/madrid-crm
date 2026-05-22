@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
@@ -155,6 +156,7 @@ function IconTrash() {
 
 export default function JobsPage() {
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
   const { capabilities } = useCurrentUserAccess();
   const [jobs, setJobs] = useState([]);
   const [form, setForm] = useState(initialJob);
@@ -223,6 +225,16 @@ export default function JobsPage() {
     setSelectedId(null);
     setEstimateResult(null);
   };
+
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "new") {
+      resetForm();
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+  }, [searchParams]);
 
   const loadJobFiles = useCallback(
     async (jobId, page = 1, append = false) => {

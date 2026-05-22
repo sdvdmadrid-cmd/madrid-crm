@@ -5,7 +5,14 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
-import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+import {
+  getCompanyProfileByTenant,
+  withDefaultCompanyProfile,
+} from "@/lib/company-profile-store";
+import {
+  getWebsiteBuilderPack,
+  resolveWebsiteIndustryFromProfile,
+} from "@/lib/website-builder-industry";
 import { getOpenAiClient } from "@/lib/openai-client";
 import { assertSafeText } from "@/lib/input-sanitizer";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
@@ -99,15 +106,26 @@ export async function POST(request) {
     return badRequest("Image prompt is required");
   }
 
-  const profile = await getCompanyProfileByTenant({
-    tenantId: access.tenantDbId,
-  });
-  const businessType = String(profile?.businessType || "contractor").trim();
+  const profile = withDefaultCompanyProfile(
+    await getCompanyProfileByTenant({
+      tenantId: access.tenantDbId,
+    }),
+    access.tenantDbId,
+  );
+  const pack = getWebsiteBuilderPack(resolveWebsiteIndustryFromProfile(profile));
+  const styleHint = String(body.style || "realistic").trim().slice(0, 40);
+  const companyName = String(
+    profile?.publicDisplayName || profile?.companyName || "",
+  ).trim();
 
   const finalPrompt = [
-    `Professional website hero/gallery photo for a ${businessType} business.`,
+    pack.imagePromptPrefix,
+    `Business: ${companyName || pack.label}.`,
     safePrompt,
-    "Realistic, high quality, clean composition, no logos or text overlays.",
+    `Style: ${styleHint}.`,
+    "Photorealistic, high quality, natural lighting, no logos, no text, no watermarks.",
+    `CRITICAL: Image must ONLY show ${pack.label} work.`,
+    `Do NOT show: other trades, unrelated tools, or generic construction unless industry is construction.`,
   ].join(" ");
 
   try {

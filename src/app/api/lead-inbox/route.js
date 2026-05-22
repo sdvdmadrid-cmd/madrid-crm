@@ -76,7 +76,10 @@ export async function GET(request) {
     const [leadsResult, requestsResult] = await Promise.allSettled([leadsQuery, requestsQuery]);
 
     const leads = leadsResult.status === "fulfilled" ? leadsResult.value?.data || [] : [];
-    const requests = requestsResult.status === "fulfilled" ? requestsResult.value?.data || [] : [];
+    const requestsRaw =
+      requestsResult.status === "fulfilled" ? requestsResult.value?.data || [] : [];
+    // Website form already creates contractor_website_leads — hide duplicate queue rows.
+    const requests = requestsRaw.filter((row) => row?.item !== "website_quote_request");
 
     if (leadsResult.status === "rejected") {
       console.error("[api/lead-inbox][GET] leads query failed", leadsResult.reason);

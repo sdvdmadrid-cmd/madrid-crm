@@ -12,6 +12,7 @@ import AppFooter from "@/components/site/AppFooter";
 import AiBubbleClient from "@/components/AiBubbleClient";
 import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";
+import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -63,10 +64,25 @@ function isStrongPassword(value) {
   return true;
 }
 
+/** Static shell for SSR + client boot — avoids hydration mismatch from i18n/auth state. */
+function AuthBootShell({ dark = false }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: dark ? "#13161c" : "#f4f5f7",
+      }}
+      aria-busy="true"
+      aria-label="Loading"
+    />
+  );
+}
+
 export default function AuthShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const isDedicatedLoginPage = pathname === "/login";
+  const isRegisterPage = pathname === "/register";
   const isResetPasswordPage = pathname === "/reset-password";
   const isVerifyEmailPage = pathname === "/verify-email";
   const [trialExpiredParam, setTrialExpiredParam] = useState(false);
@@ -118,11 +134,7 @@ export default function AuthShell({ children }) {
   const isPublicBillPaymentsPage = pathname?.startsWith("/public/bill-payments");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";
-  const isPremiumWorkspace =
-    pathname?.startsWith("/dashboard") ||
-    pathname?.startsWith("/invoices") ||
-    pathname?.startsWith("/estimates") ||
-    pathname?.startsWith("/jobs");
+  const isPremiumWorkspace = isPremiumWorkspacePath(pathname);
   const isPublicPage =
     isPublicQuotePage ||
     isPublicEstimatePage ||
@@ -131,7 +143,8 @@ export default function AuthShell({ children }) {
     isPublicLegalPage ||
     isMarketingHomePage ||
     isVerifyEmailPage;
-  const [loading, setLoading] = useState(!isPublicPage);
+  const [hasMounted, setHasMounted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [authHydrating, setAuthHydrating] = useState(!isPublicPage);
   const authBootstrappedRef = useRef(false);
   const [authUser, setAuthUser] = useState(null);
@@ -170,6 +183,47 @@ export default function AuthShell({ children }) {
   );
 
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted || !authChecked || !authUser) return;
+    if (!isDedicatedLoginPage && !isResetPasswordPage && !isRegisterPage) return;
+    router.replace(resolveAuthRedirect(authUser));
+  }, [
+    hasMounted,
+    authChecked,
+    authUser,
+    isDedicatedLoginPage,
+    isRegisterPage,
+    isResetPasswordPage,
+    resolveAuthRedirect,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!hasMounted || !authChecked || authUser) return;
+    if (isRegisterPage) {
+      router.replace("/login?mode=register");
+      return;
+    }
+    if (isPublicPage) return;
+    if (isDedicatedLoginPage || isResetPasswordPage) return;
+    const target = `${pathname}${window.location.search}`;
+    router.replace(`/login?redirect=${encodeURIComponent(target)}`);
+  }, [
+    hasMounted,
+    authChecked,
+    authUser,
+    isPublicPage,
+    isDedicatedLoginPage,
+    isRegisterPage,
+    isResetPasswordPage,
+    pathname,
+    router,
+  ]);
+
+  useEffect(() => {
     if (isPublicPage) return;
 
     let cancelled = false;
@@ -200,6 +254,13 @@ export default function AuthShell({ children }) {
     }
 
     setAuthHydrating(true);
+
+    // Resolve hydration immediately when there is no browser session (avoids stuck Loading).
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setAuthHydrating(false);
+      }
+    });
 
     // Listen for Supabase browser-side SIGNED_IN events (password login, token refresh).
     // Only sync when Supabase has an ACTIVE session — never call sync with null to
@@ -544,50 +605,42 @@ export default function AuthShell({ children }) {
   }, [authUser]);
 
   useEffect(() => {
+    if (!hasMounted) return;
+
     if (isPublicPage) {
-      setLoading(false);
+      setAuthChecked(true);
       return;
     }
 
-    let mounted = true;
+    let active = true;
     const run = async () => {
       if (!authBootstrappedRef.current) {
         console.info("[dashboard-protection] loading auth context", {
           pathname,
-          loading: true,
-          authHydrating,
         });
-        setLoading(true);
-        await fetchMe();
-        if (!mounted) return;
-        authBootstrappedRef.current = true;
-        setLoading(authHydrating);
-        console.info("[dashboard-protection] auth context loaded", {
-          pathname,
-          loading: authHydrating,
-        });
+        try {
+          await fetchMe();
+        } finally {
+          if (active) {
+            authBootstrappedRef.current = true;
+            setAuthChecked(true);
+            console.info("[dashboard-protection] auth context loaded", {
+              pathname,
+            });
+          }
+        }
         return;
       }
 
-      // Keep current UI visible and refresh auth context in the background.
       await fetchMe();
-      if (!mounted) return;
-      setLoading(authHydrating);
     };
 
     run();
 
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [isPublicPage, fetchMe, pathname, authHydrating]);
-
-  useEffect(() => {
-    if (isPublicPage) return;
-    if (!authHydrating && authBootstrappedRef.current) {
-      setLoading(false);
-    }
-  }, [isPublicPage, authHydrating]);
+  }, [hasMounted, isPublicPage, fetchMe, pathname]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -879,46 +932,13 @@ export default function AuthShell({ children }) {
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "#f4f5f7",
-          fontFamily: "'Inter', system-ui, sans-serif",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 800,
-              fontSize: 16,
-              margin: "0 auto 16px",
-            }}
-          >
-            FB
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            {t("auth.loading")}
-          </p>
-        </div>
-      </div>
-    );
+  if (!hasMounted || !authChecked) {
+    return <AuthBootShell dark={isPremiumWorkspace} />;
   }
 
   if (!authUser) {
-    if (isPublicPage) {
-      return children;
+    if (!isDedicatedLoginPage && !isResetPasswordPage) {
+      return <AuthBootShell dark={isPremiumWorkspace} />;
     }
 
     return (
@@ -969,40 +989,7 @@ export default function AuthShell({ children }) {
   }
 
   if (isDedicatedLoginPage || isResetPasswordPage) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "#f4f5f7",
-          fontFamily: "'Inter', system-ui, sans-serif",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "linear-gradient(145deg, #0d4fd9 0%, #091220 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 800,
-              fontSize: 16,
-              margin: "0 auto 16px",
-            }}
-          >
-            FB
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            {t("auth.loading")}
-          </p>
-        </div>
-      </div>
-    );
+    return <AuthBootShell />;
   }
 
   // ─── SVG icon helpers ────────────────────────────────────────────────────
@@ -1069,6 +1056,11 @@ export default function AuthShell({ children }) {
       "M8 20h8",
       "M12 15v5",
     ],
+    subscriptions: [
+      "M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2z",
+      "M8 10h8",
+      "M8 14h5",
+    ],
     smart: ["M13 2L3 14h9l-1 8 10-12h-9l1-8z"],
     services: [
       "M8 6h13",
@@ -1117,6 +1109,12 @@ export default function AuthShell({ children }) {
             iconKey: "dashboard",
           },
           { href: "/clients", label: t("sidebar.clients"), iconKey: "clients" },
+          {
+            href: "/estimates",
+            label: t("sidebar.estimates"),
+            iconKey: "estimates",
+            exact: true,
+          },
           { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
           {
             href: "/invoices",
@@ -1192,7 +1190,7 @@ export default function AuthShell({ children }) {
     : isContractorRole
       ? [
           {
-            href: "/website-builder",
+            href: "/website",
             label: t("sidebar.websiteBuilder"),
             iconKey: "websiteBuilder",
           },
@@ -1209,7 +1207,7 @@ export default function AuthShell({ children }) {
         ]
     : [
         {
-          href: "/website-builder",
+          href: "/website",
           label: t("sidebar.websiteBuilder"),
           iconKey: "websiteBuilder",
         },
@@ -1232,7 +1230,7 @@ export default function AuthShell({ children }) {
 
   const bottomNavItems = [
     {
-      href: isSuperAdminRole ? "/owner/settings" : "/dashboard",
+      href: isSuperAdminRole ? "/owner/settings" : "/subscriptions",
       label: t("sidebar.settings"),
       iconKey: "settings",
     },
@@ -1242,7 +1240,9 @@ export default function AuthShell({ children }) {
   // and prevent accidental duplicate entries across nav groups.
   const normalizedMainNavItems = isSuperAdminRole
     ? mainNavItems
-    : mainNavItems.filter((item) => item.href !== "/website-builder");
+    : mainNavItems.filter(
+        (item) => item.href !== "/website-builder" && item.href !== "/website",
+      );
   const normalizedSecondaryNavItems = secondaryNavItems.filter(
     (item, index, arr) =>
       arr.findIndex((candidate) => candidate.href === item.href) === index,

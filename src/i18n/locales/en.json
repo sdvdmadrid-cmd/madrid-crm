@@ -27,7 +27,7 @@
   },
   "dashboardControl": {
     "operationsLabel": "Run · Get paid · Grow",
-    "title": "Dashboard",
+    "title": "Command Center",
     "subtitle": "Your business in three moves — operations, collections, and growth.",
     "subtitleWithName": "Welcome back, {{name}}. Here is your business at a glance.",
     "actions": {

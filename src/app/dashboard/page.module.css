@@ -1,11 +1,32 @@
 /* Premium contractor dashboard — uses tokens from premium-design.css */
 
 .page {
+  position: relative;
+  isolation: isolate;
   min-height: 100%;
   padding: 28px 32px 48px;
   max-width: 1360px;
   margin: 0 auto;
   animation: dashEnter 0.5s var(--fb-ease, ease) both;
+}
+
+/* Premium canvas — visibly lighter/structured than the flat shell behind it */
+.page::before {
+  content: "";
+  position: absolute;
+  inset: 12px 0 0;
+  border-radius: 28px;
+  background:
+    radial-gradient(ellipse 90% 55% at 8% -15%, rgba(59, 130, 246, 0.2), transparent 52%),
+    radial-gradient(ellipse 70% 45% at 92% 5%, rgba(16, 185, 129, 0.14), transparent 48%),
+    radial-gradient(ellipse 50% 40% at 70% 100%, rgba(139, 92, 246, 0.1), transparent 42%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page > * {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes dashEnter {
@@ -29,10 +50,17 @@
   margin-bottom: 28px;
   padding: 28px 32px;
   border-radius: var(--fb-radius-2xl, 1.25rem);
-  border: 1px solid var(--fb-border, rgba(148, 163, 184, 0.12));
-  background: var(--fb-bg-glass, rgba(28, 33, 43, 0.72));
-  backdrop-filter: blur(20px) saturate(1.2);
-  box-shadow: var(--fb-shadow-lg);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: linear-gradient(
+    155deg,
+    rgba(42, 50, 66, 0.92) 0%,
+    rgba(30, 36, 48, 0.88) 100%
+  );
+  backdrop-filter: blur(20px) saturate(1.25);
+  box-shadow:
+    var(--fb-shadow-lg),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 48px -12px rgba(59, 130, 246, 0.35);
   position: relative;
   overflow: hidden;
 }
@@ -157,8 +185,12 @@
 .pillarCard {
   padding: 22px;
   border-radius: var(--fb-radius-2xl, 1.25rem);
-  border: 1px solid var(--fb-border);
-  background: var(--fb-bg-glass);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(
+    165deg,
+    rgba(38, 46, 60, 0.95) 0%,
+    rgba(28, 33, 43, 0.9) 100%
+  );
   backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
@@ -178,10 +210,10 @@
 }
 
 .pillarAccent {
-  width: 48px;
-  height: 4px;
+  width: 56px;
+  height: 5px;
   border-radius: 999px;
-  box-shadow: 0 0 16px currentColor;
+  box-shadow: 0 0 20px currentColor, 0 0 40px -8px currentColor;
 }
 
 .pillarTag {
@@ -248,11 +280,15 @@
 .span4 { grid-column: span 4; }
 
 .panel {
-  border: 1px solid var(--fb-border);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: var(--fb-radius-2xl);
-  background: var(--fb-bg-glass);
+  background: linear-gradient(
+    180deg,
+    rgba(36, 43, 56, 0.92) 0%,
+    rgba(28, 33, 43, 0.85) 100%
+  );
   backdrop-filter: blur(18px) saturate(1.15);
-  box-shadow: var(--fb-shadow-md);
+  box-shadow: var(--fb-shadow-md), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
   padding: 24px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }

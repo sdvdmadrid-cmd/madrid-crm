@@ -27,7 +27,7 @@
   },
   "dashboardControl": {
     "operationsLabel": "Prowadz · Zbieraj · Rozwijaj",
-    "title": "Panel",
+    "title": "Centrum dowodzenia",
     "subtitle": "Twoja firma w trzech ruchach: operacje, platnosci i rozwoj.",
     "subtitleWithName": "Witaj ponownie, {{name}}. Tutaj widzisz swoja firme w jednym miejscu.",
     "actions": {

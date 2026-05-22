@@ -1,10 +1,18 @@
 ﻿import { notFound } from "next/navigation";
 import Image from "next/image";
+import PublicSiteAnalytics from "@/components/site/PublicSiteAnalytics";
+import PublicSiteFooter from "@/components/site/PublicSiteFooter";
+import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
 import { getIndustryProfile } from "@/lib/industry-profiles";
+import { buildLocalBusinessJsonLd, buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import {
+  getWebsiteBuilderPack,
+  resolveWebsiteIndustryKey,
+} from "@/lib/website-builder-industry";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 // ─── Service SVG Icons (same blue-box style as landing) ────────────────
 const SERVICE_ICON_PATHS = [
@@ -49,46 +57,6 @@ const CONTRACTOR_STATS = [
   { number: "Same Day", label: "Response within hours" },
 ];
 
-// ─── Hero background photos ───────────────────────────────────────────
-const HERO_PHOTOS = [
-  { src: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=280&fit=crop", alt: "Professional contractor at work" },
-  { src: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=280&fit=crop", alt: "Expert service team" },
-  { src: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=280&fit=crop", alt: "Outdoor project completed" },
-  { src: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=280&fit=crop", alt: "Construction professionals" },
-  { src: "https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=280&fit=crop", alt: "Skilled tradespeople" },
-  { src: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=280&fit=crop", alt: "Home services professional" },
-];
-
-const REQUEST_SERVICE_OPTIONS = [
-  "Interior Painting",
-  "Exterior Painting",
-  "Roof Inspection",
-  "Leak Repair",
-  "Shingle Repair",
-  "Full Roof Replacement",
-  "Lawn Maintenance",
-  "Mulch / Rock",
-  "Irrigation",
-  "Hardscape Install",
-  "Yard Cleanup",
-  "Deep Cleaning",
-  "Recurring Cleaning",
-  "Move-In / Move-Out",
-  "Post-Construction Cleaning",
-  "Panel Upgrade",
-  "Wiring Repair",
-  "Lighting Install",
-  "Outlet / Switch",
-  "Plumbing Repair",
-  "Water Heater",
-  "Fixture Install",
-  "AC Repair",
-  "Heating Repair",
-  "Ductwork",
-  "General Handyman",
-  "Other",
-];
-
 function normalizePublicCta(value) {
   const fallback = "Request Estimate";
   const trimmed = String(value || "").trim();
@@ -128,10 +96,7 @@ export async function generateMetadata({ params }) {
 
   if (!data) return { title: "Contractor" };
 
-  return {
-    title: data.headline || "Contractor",
-    description: data.subheadline || "",
-  };
+  return buildPublicSiteMetadata(data, { page: "home" });
 }
 
 export default async function PublicContractorSitePage({ params }) {
@@ -153,6 +118,18 @@ export default async function PublicContractorSitePage({ params }) {
   const phone = data.companyProfile?.phone || "";
   const logoUrl = data.companyProfile?.logoDataUrl || "";
   const industryProfile = getIndustryProfile(data.companyProfile?.businessType || "");
+  const industryPack = getWebsiteBuilderPack(
+    resolveWebsiteIndustryKey(data.companyProfile?.businessType),
+  );
+  const testimonials =
+    Array.isArray(data.testimonials) && data.testimonials.length > 0
+      ? data.testimonials
+      : industryPack.testimonials;
+  const requestServiceOptions =
+    Array.isArray(data.requestServices) && data.requestServices.length > 0
+      ? data.requestServices
+      : industryPack.requestServices;
+  const jsonLd = buildLocalBusinessJsonLd(data);
   const services =
     Array.isArray(data.services) && data.services.length > 0
       ? data.services
@@ -162,12 +139,25 @@ export default async function PublicContractorSitePage({ params }) {
           price: "",
         }));
   const galleryPhotos = Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [];
+  const heroDisplayPhotos =
+    Array.isArray(data.heroPhotos) && data.heroPhotos.length > 0
+      ? data.heroPhotos
+      : galleryPhotos.slice(0, 4);
+  const trustBadges = Array.isArray(data.trustBadges) ? data.trustBadges : [];
+  const statTiles =
+    trustBadges.length > 0
+      ? trustBadges.slice(0, 4).map((badge) => ({
+          number: badge,
+          label: data.industryLabel || industryProfile.label,
+        }))
+      : CONTRACTOR_STATS;
 
   // Pad services to at least 3, max 6
   const displayServices = services.slice(0, 6);
 
   return (
     <>
+      <PublicSiteAnalytics analytics={data.analytics} />
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
@@ -290,29 +280,22 @@ export default async function PublicContractorSitePage({ params }) {
 
       <div style={{ "--theme": theme }}>
         {/* ── Navbar ── */}
-        <nav className="s-nav">
-          <a href="#home" className="s-logo">
-            <div className="s-logo-icon">
-              {logoUrl
-                ? <img src={logoUrl} alt={companyName} />
-                : <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
-                    <path d="M9 22V12h6v10" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
-                  </svg>
-              }
-            </div>
-            {companyName}
-          </a>
-          <div className="s-nav-links">
-            <a href="#services">Services</a>
-            <a href="#about">About</a>
-            <a href="#contact">Contact</a>
-          </div>
-          {phone
-            ? <a href={`tel:${phone}`} className="s-nav-cta">{phone}</a>
-            : <a href={requestHref} className="s-nav-cta">Get a Quote</a>
-          }
-        </nav>
+        {jsonLd ? (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+        ) : null}
+
+        <PublicSiteNav
+          slug={slug}
+          companyName={companyName}
+          logoUrl={logoUrl}
+          phone={phone}
+          ctaText={ctaText}
+          themeColor={theme}
+          requestHref={requestHref}
+        />
 
         {/* ── Hero ── */}
         <section className="s-hero" id="home">
@@ -328,31 +311,44 @@ export default async function PublicContractorSitePage({ params }) {
                 <a href={requestHref} className="s-btn-primary">{ctaText || "Request Estimate"}</a>
                 <a href="#services" className="s-btn-secondary">Our Services</a>
               </div>
-              <div className="s-hero-proof">
-                <div className="s-proof-item">
-                  <span className="s-p-num">📱 4.8 ★★★★★</span>
-                  <span className="s-p-label">App Store</span>
+              {trustBadges.length > 1 ? (
+                <div className="s-hero-proof" style={{ gap: 8, flexWrap: "wrap" }}>
+                  {trustBadges.slice(1, 4).map((badge) => (
+                    <span
+                      key={badge}
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: "rgba(255,255,255,0.08)",
+                        color: "#cbd5e1",
+                      }}
+                    >
+                      {badge}
+                    </span>
+                  ))}
                 </div>
-                <div className="s-proof-item">
-                  <span className="s-p-num">▶️ 4.5 ★★★★½</span>
-                  <span className="s-p-label">Google Play</span>
-                </div>
-              </div>
+              ) : null}
             </div>
             <div className="s-hero-right">
-              {HERO_PHOTOS.map((photo, i) => (
-                <div key={i} className="s-hero-photo">
-                  <Image
-                    src={photo.src}
-                    alt={photo.alt}
-                    fill
-                    sizes="(max-width: 768px) 50vw, 25vw"
-                    style={{ objectFit: "cover" }}
-                    unoptimized
-                  />
-                  <div className="s-hero-photo-caption">{photo.alt}</div>
-                </div>
-              ))}
+              {heroDisplayPhotos.length > 0
+                ? heroDisplayPhotos.map((photo, i) => (
+                    <div key={photo.id || `hero-${i}`} className="s-hero-photo">
+                      {String(photo.src || "").trim() ? (
+                        <img
+                          src={photo.src}
+                          alt={photo.alt || `${industryProfile.label} photo ${i + 1}`}
+                          loading={i === 0 ? "eager" : "lazy"}
+                          decoding="async"
+                          fetchPriority={i === 0 ? "high" : "low"}
+                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : null}
+                      <div className="s-hero-photo-caption">{photo.alt || industryProfile.label}</div>
+                    </div>
+                  ))
+                : null}
             </div>
           </div>
         </section>
@@ -360,7 +356,7 @@ export default async function PublicContractorSitePage({ params }) {
         {/* ── Stats bar ── */}
         <section className="s-stats">
           <div className="s-stats-grid">
-            {CONTRACTOR_STATS.map((stat) => (
+            {statTiles.map((stat) => (
               <div key={stat.number} className="s-stat-tile">
                 <div className="s-stat-num">{stat.number}</div>
                 <div className="s-stat-label">{stat.label}</div>
@@ -456,31 +452,24 @@ export default async function PublicContractorSitePage({ params }) {
           </section>
         )}
 
-        {/* ── Testimonials (always shown, generic if no custom) ── */}
-        <section className="s-testimonials">
-          <div className="s-test-grid">
-            <div className="s-test-card">
-              <p className="s-test-quote">&ldquo;They were on time, professional, and did exactly what they promised. I highly recommend their services to anyone in the area.&rdquo;</p>
-              <div className="s-test-author">
-                <div className="s-test-avatar">J</div>
-                <div>
-                  <div className="s-test-name">James R.</div>
-                  <div className="s-test-co">Local homeowner</div>
+        {testimonials.length > 0 ? (
+          <section className="s-testimonials">
+            <div className="s-test-grid">
+              {testimonials.slice(0, 2).map((item, index) => (
+                <div key={`${item.name}-${index}`} className="s-test-card">
+                  <p className="s-test-quote">&ldquo;{item.quote}&rdquo;</p>
+                  <div className="s-test-author">
+                    <div className="s-test-avatar">{(item.name || "C").charAt(0).toUpperCase()}</div>
+                    <div>
+                      <div className="s-test-name">{item.name}</div>
+                      <div className="s-test-co">{item.role}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-            <div className="s-test-card">
-              <p className="s-test-quote">&ldquo;Fair pricing, great communication, and the results exceeded my expectations. This is our go-to company for all future projects.&rdquo;</p>
-              <div className="s-test-author">
-                <div className="s-test-avatar">M</div>
-                <div>
-                  <div className="s-test-name">Maria L.</div>
-                  <div className="s-test-co">Repeat customer</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         <WaveDivider fromColor="#eff6ff" toColor="#1e293b" />
 
@@ -500,7 +489,7 @@ export default async function PublicContractorSitePage({ params }) {
             )}
             <RequestServiceForm
               slug={data.slug}
-              serviceOptions={REQUEST_SERVICE_OPTIONS}
+              serviceOptions={requestServiceOptions}
             />
           </div>
 
@@ -525,16 +514,15 @@ export default async function PublicContractorSitePage({ params }) {
           </div>
         </section>
 
-        {/* ── Footer ── */}
-        <footer className="s-footer">
-          <p>
-            &copy; {new Date().getFullYear()} <strong style={{ color: "rgba(255,255,255,0.7)" }}>{companyName}</strong>.{" "}
-            Powered by{" "}
-            <a href="https://fieldbaseapp.net" target="_blank" rel="noopener noreferrer">
-              FieldBase
-            </a>
-          </p>
-        </footer>
+        <PublicSiteFooter
+          slug={slug}
+          companyName={companyName}
+          phone={phone}
+          businessAddress={data.companyProfile?.businessAddress || ""}
+          socialLinks={data.socialLinks || {}}
+          googleReviewsUrl={data.companyProfile?.googleReviewsUrl || ""}
+          themeColor={theme}
+        />
       </div>
     </>
   );

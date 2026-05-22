@@ -27,7 +27,7 @@
   },
   "dashboardControl": {
     "operationsLabel": "Operar · Cobrar · Crecer",
-    "title": "Dashboard",
+    "title": "Centro de mando",
     "subtitle": "Tu negocio en tres movimientos: operaciones, cobros y crecimiento.",
     "subtitleWithName": "Bienvenido de nuevo, {{name}}. Aqui tienes tu negocio de un vistazo.",
     "actions": {

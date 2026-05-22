@@ -272,6 +272,33 @@ function unauthenticatedApiResponse() {
   );
 }
 
+async function resolveSlugByCustomHostnameEdge(hostname) {
+  const host = String(hostname || "").trim().toLowerCase();
+  if (!host || host === "localhost" || host.endsWith(".localhost")) return "";
+
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!base || !key) return "";
+
+  try {
+    const res = await fetch(
+      `${base}/rest/v1/contractor_website_domains?hostname=eq.${encodeURIComponent(host)}&verified_at=not.is.null&select=slug&limit=1`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+        next: { revalidate: 300 },
+      },
+    );
+    if (!res.ok) return "";
+    const rows = await res.json();
+    return String(rows?.[0]?.slug || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 function resolveWebsiteSlugFromHost(request) {
   const hostHeader = String(request.headers.get("host") || "").trim().toLowerCase();
   if (!hostHeader) return "";
@@ -431,7 +458,10 @@ export async function middleware(request) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  const subdomainSlug = resolveWebsiteSlugFromHost(request);
+  const hostHeader = String(request.headers.get("host") || "").trim().toLowerCase();
+  const hostname = hostHeader.split(":")[0];
+  const customDomainSlug = await resolveSlugByCustomHostnameEdge(hostname);
+  const subdomainSlug = customDomainSlug || resolveWebsiteSlugFromHost(request);
   if (subdomainSlug) {
     // Public tenant subdomains must only serve the published website.
     // This prevents app/dashboard/API mixing on the public share URL.

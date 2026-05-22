@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AuthShell from "@/components/AuthShell";
+import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import styles from "./subscriptions.module.css";
 
 export default function SubscriptionsPage() {
@@ -172,11 +172,9 @@ export default function SubscriptionsPage() {
 
   if (loading) {
     return (
-      <AuthShell>
-        <div className={styles.container}>
-          <div className={styles.loading}>Cargando suscripción...</div>
-        </div>
-      </AuthShell>
+      <PremiumPageShell title={planDisplay.title} subtitle="Cargando suscripción…">
+        <div className={`fb-shimmer ${styles.loadingCard}`}>Cargando suscripción...</div>
+      </PremiumPageShell>
     );
   }
 
@@ -190,8 +188,10 @@ export default function SubscriptionsPage() {
       : null;
 
   return (
-    <AuthShell>
-      <div className={styles.container}>
+    <PremiumPageShell
+      title={planDisplay.title}
+      subtitle="Gestiona tu suscripción a la plataforma"
+      actions={
         <button
           type="button"
           className={styles.backButton}
@@ -199,14 +199,8 @@ export default function SubscriptionsPage() {
         >
           ← Volver
         </button>
-
-        <div className={styles.header}>
-          <h1>{planDisplay.title}</h1>
-          <p>
-            Gestiona tu suscripción a la plataforma
-          </p>
-        </div>
-
+      }
+    >
         {error && <div className={styles.errorBanner}>{error}</div>}
 
         {!subscription ? (
@@ -373,7 +367,6 @@ export default function SubscriptionsPage() {
             </div>
           </div>
         )}
-      </div>
-    </AuthShell>
+    </PremiumPageShell>
   );
 }
