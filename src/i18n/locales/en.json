@@ -545,6 +545,13 @@
       }
     }
   },
+  "workspace": {
+    "yourCompany": "Your company",
+    "publicSite": "Public website",
+    "platformOwner": "FieldBase platform owner",
+    "companyCardAria": "Company: {{company}}",
+    "switcherSoon": "Switch company (coming soon)"
+  },
   "settingsHub": {
     "title": "Settings",
     "subtitle": "Manage your FieldBase account, billing, and how you get paid by clients.",
@@ -609,6 +616,7 @@
     "errors": {
       "loadStatus": "Could not load payment settings.",
       "onboard": "Could not start Stripe onboarding.",
+      "platformConnectRequired": "Stripe Connect is not enabled on the FieldBase platform Stripe account yet. The app owner must complete signup at dashboard.stripe.com/connect, then try again. Suggested copy: docs/STRIPE_CONNECT_APPLICATION_DRAFT.md",
       "dashboard": "Could not open Stripe dashboard.",
       "missingUrl": "Stripe did not return a link."
     }

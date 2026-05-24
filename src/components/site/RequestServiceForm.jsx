@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import TurnstileField from "@/components/security/TurnstileField";
+import { getPublicSiteCopy } from "@/lib/public-site-copy";
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
@@ -18,8 +19,12 @@ export default function RequestServiceForm({
   slug,
   serviceOptions = [],
   initialService = "",
-  showEmailField = false,
+  locale = "en",
+  requireEmail = false,
 }) {
+  const copy = getPublicSiteCopy(locale);
+  const formCopy = copy.form;
+
   const resolvedInitialService =
     initialService && serviceOptions.includes(initialService)
       ? initialService
@@ -53,12 +58,12 @@ export default function RequestServiceForm({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Please upload an image file.");
+      setError(formCopy.imageOnly);
       return;
     }
 
     if (file.size > MAX_IMAGE_SIZE) {
-      setError("Image is too large. Max size is 4MB.");
+      setError(formCopy.imageLarge);
       return;
     }
 
@@ -67,7 +72,7 @@ export default function RequestServiceForm({
       setForm((prev) => ({ ...prev, photoDataUrl: dataUrl }));
       setError("");
     } catch {
-      setError("Failed to read image file.");
+      setError(formCopy.imageReadFailed);
     }
   };
 
@@ -120,12 +125,12 @@ export default function RequestServiceForm({
 
   const submitLabel =
     submitState === "loading"
-      ? "Sending..."
+      ? formCopy.sending
       : submitState === "success"
-        ? "Request Sent"
+        ? formCopy.sent
         : submitState === "error"
-          ? "Try Again"
-          : "Send Request";
+          ? formCopy.tryAgain
+          : formCopy.send;
 
   const submitBackground =
     submitState === "success"
@@ -227,7 +232,7 @@ export default function RequestServiceForm({
             fontWeight: 600,
           }}
         >
-          Request received. We will contact you soon.
+          {formCopy.success}
         </div>
       )}
 
@@ -262,59 +267,57 @@ export default function RequestServiceForm({
         <input type="hidden" name="formStartedAt" value={form.formStartedAt} readOnly />
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Name *</label>
+          <label style={labelStyle}>{formCopy.name}</label>
           <input type="text" name="name" value={form.name} onChange={handleChange} required style={inputStyle} />
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Phone *</label>
+          <label style={labelStyle}>{formCopy.phone}</label>
           <input type="tel" name="phone" value={form.phone} onChange={handleChange} required style={inputStyle} />
         </div>
 
-        {showEmailField ? (
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Email (optional)</label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              style={inputStyle}
-              placeholder="you@email.com"
-            />
-          </div>
-        ) : null}
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>{requireEmail ? formCopy.email : formCopy.emailOptional}</label>
+          <input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={handleChange}
+            required={requireEmail}
+            style={inputStyle}
+            placeholder="you@email.com"
+          />
+        </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Address *</label>
+          <label style={labelStyle}>{formCopy.address}</label>
           <input
             type="text"
             name="address"
             value={form.address}
             onChange={handleChange}
-            required
             style={inputStyle}
-            placeholder="123 Main St, City, State ZIP"
+            placeholder={formCopy.addressPlaceholder}
           />
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Service needed *</label>
+          <label style={labelStyle}>{formCopy.service}</label>
           <select name="serviceNeeded" value={form.serviceNeeded} onChange={handleChange} required style={inputStyle}>
-            <option value="">Select service</option>
+            <option value="">{formCopy.selectService}</option>
             {serviceOptions.map((option) => (
               <option key={option} value={option} style={{ color: "#0f172a" }}>
                 {option}
               </option>
             ))}
             <option value="Other" style={{ color: "#0f172a" }}>
-              Other
+              {formCopy.other}
             </option>
           </select>
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Description *</label>
+          <label style={labelStyle}>{formCopy.message}</label>
           <textarea
             name="description"
             value={form.description}
@@ -322,12 +325,12 @@ export default function RequestServiceForm({
             required
             rows={4}
             style={inputStyle}
-            placeholder="Tell us what you need done"
+            placeholder={formCopy.messagePlaceholder}
           />
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <label style={labelStyle}>Photo upload (optional)</label>
+          <label style={labelStyle}>{formCopy.photo}</label>
           <input type="file" accept="image/*" onChange={handlePhotoChange} style={inputStyle} />
           {form.photoDataUrl && (
             <div style={{ marginTop: 10 }}>
@@ -352,6 +355,7 @@ export default function RequestServiceForm({
             justifyContent: "center",
             gap: 8,
             width: "100%",
+            marginTop: 16,
             padding: "12px 14px",
             borderRadius: 8,
             border: "none",

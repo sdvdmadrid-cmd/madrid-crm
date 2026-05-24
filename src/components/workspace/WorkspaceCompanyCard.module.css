@@ -1,0 +1,43 @@
+.card {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(45, 212, 168, 0.22);
+  background: rgba(45, 212, 168, 0.08);
+}
+
+.cardCompact {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+}
+
+.kicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+}
+
+.name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.link:hover {
+  color: #bfdbfe;
+}

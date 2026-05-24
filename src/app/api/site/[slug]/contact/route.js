@@ -230,8 +230,8 @@ export async function POST(request, { params }) {
       .filter(Boolean)
       .join(", ");
 
-    // Validate
-    if (!cleanName || !cleanPhone || !cleanAddressLine1 || !cleanServiceNeeded || !cleanDescription) {
+    // Validate — name, phone, service, and message are required; address is optional
+    if (!cleanName || !cleanPhone || !cleanServiceNeeded || !cleanDescription) {
       return Response.json(
         { error: "Missing required fields" },
         { status: 400 }

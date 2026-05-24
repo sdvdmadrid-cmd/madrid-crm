@@ -545,6 +545,13 @@
       }
     }
   },
+  "workspace": {
+    "yourCompany": "Tu empresa",
+    "publicSite": "Sitio publico",
+    "platformOwner": "Dueno de plataforma FieldBase",
+    "companyCardAria": "Empresa: {{company}}",
+    "switcherSoon": "Cambiar empresa (proximamente)"
+  },
   "settingsHub": {
     "title": "Ajustes",
     "subtitle": "Administra tu cuenta de FieldBase, tu suscripcion y como cobras a tus clientes.",
@@ -609,6 +616,7 @@
     "errors": {
       "loadStatus": "No se pudieron cargar los ajustes de cobro.",
       "onboard": "No se pudo iniciar la configuracion de Stripe.",
+      "platformConnectRequired": "FieldBase aun no tiene Stripe Connect activado en la cuenta de la plataforma. El dueno de la app debe entrar a dashboard.stripe.com/connect, completar el registro de plataforma, y luego volver a intentar. Texto sugerido: docs/STRIPE_CONNECT_APPLICATION_DRAFT.md",
       "dashboard": "No se pudo abrir el panel de Stripe.",
       "missingUrl": "Stripe no devolvio un enlace."
     }

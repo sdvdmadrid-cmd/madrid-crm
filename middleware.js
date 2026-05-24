@@ -164,6 +164,7 @@ const PUBLIC_PATHS = [
   "/quote",
   "/estimate",
   "/site",
+  "/api/site",
   "/legal",
   "/legal-required",
 ];
@@ -188,6 +189,8 @@ const LEGAL_BYPASS_PREFIXES = [
   "/api/email",
   "/_next",
   "/public",
+  "/site",
+  "/api/site",
   "/favicon.ico",
   "/robots.txt",
 ];
@@ -466,12 +469,21 @@ export async function middleware(request) {
     // Public tenant subdomains must only serve the published website.
     // This prevents app/dashboard/API mixing on the public share URL.
     if (isApiPath(pathname)) {
+      if (pathname.startsWith("/api/site/")) {
+        return response;
+      }
       return notFoundResponse();
     }
 
     if (!isStaticAssetPath(pathname) && !pathname.startsWith("/_next")) {
       const rewriteUrl = request.nextUrl.clone();
-      rewriteUrl.pathname = `/site/${subdomainSlug}`;
+      if (pathname === "/request" || pathname.startsWith("/request/")) {
+        rewriteUrl.pathname = `/site/${subdomainSlug}/request`;
+      } else if (pathname === "/" || pathname === "") {
+        rewriteUrl.pathname = `/site/${subdomainSlug}`;
+      } else {
+        return notFoundResponse();
+      }
       return NextResponse.rewrite(rewriteUrl);
     }
   }

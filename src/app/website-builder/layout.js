@@ -14,7 +14,7 @@ export default async function WebsiteBuilderLayout({ children }) {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/website-builder");
+    redirect("/login?next=/website");
   }
 
   const enabled = await isPlatformFeatureEnabled("feature_website_builder", true);
