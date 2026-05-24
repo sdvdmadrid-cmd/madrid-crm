@@ -1,8 +1,9 @@
 import "server-only";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getStripeServerClient } from "@/lib/stripe-payments";
-
-const COMPANY_PROFILES = "company_profiles";
+import {
+  readConnectProfile,
+  writeConnectProfile,
+} from "@/lib/stripe-connect-storage";
 
 /**
  * Stripe Connect (Express) — scaffold for Phase 1.
@@ -24,7 +25,6 @@ export function computePlatformFeeCents(amountCents) {
   );
   const fromPercent = Math.round((total * bps) / 10000);
   const fee = fromPercent + fixed;
-  // Leave at least 1 cent for the connected account transfer.
   return Math.min(Math.max(0, fee), Math.max(0, total - 1));
 }
 
@@ -34,30 +34,16 @@ export async function getConnectStatusForTenant(tenantId) {
     return { enabled: false, configured: false, onboarded: false };
   }
 
-  const { data, error } = await supabaseAdmin
-    .from(COMPANY_PROFILES)
-    .select(
-      "stripe_connect_account_id, stripe_connect_charges_enabled, stripe_connect_payouts_enabled, stripe_connect_onboarded_at",
-    )
-    .eq("tenant_id", tenantKey)
-    .maybeSingle();
+  const { connect } = await readConnectProfile(tenantKey);
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const accountId = String(data?.stripe_connect_account_id || "").trim();
   return {
     enabled: isStripeConnectEnabled(),
-    configured: Boolean(accountId),
-    accountId,
-    chargesEnabled: Boolean(data?.stripe_connect_charges_enabled),
-    payoutsEnabled: Boolean(data?.stripe_connect_payouts_enabled),
-    onboardedAt: data?.stripe_connect_onboarded_at || null,
-    onboarded:
-      Boolean(accountId) &&
-      Boolean(data?.stripe_connect_charges_enabled) &&
-      Boolean(data?.stripe_connect_payouts_enabled),
+    configured: Boolean(connect.accountId),
+    accountId: connect.accountId,
+    chargesEnabled: connect.chargesEnabled,
+    payoutsEnabled: connect.payoutsEnabled,
+    onboardedAt: connect.onboardedAt,
+    onboarded: connect.onboarded,
   };
 }
 
@@ -76,13 +62,11 @@ export async function createConnectOnboardingLink({ tenantId, returnUrl, refresh
   }
 
   const tenantKey = String(tenantId || "").trim();
-  const { data: profile } = await supabaseAdmin
-    .from(COMPANY_PROFILES)
-    .select("stripe_connect_account_id, public_display_name, company_name")
-    .eq("tenant_id", tenantKey)
-    .maybeSingle();
+  const { connect, profile } = await readConnectProfile(tenantKey, {
+    includeProfile: true,
+  });
 
-  let accountId = String(profile?.stripe_connect_account_id || "").trim();
+  let accountId = connect.accountId;
 
   if (!accountId) {
     const account = await stripe.accounts.create({
@@ -100,15 +84,7 @@ export async function createConnectOnboardingLink({ tenantId, returnUrl, refresh
     });
     accountId = account.id;
 
-    await supabaseAdmin
-      .from(COMPANY_PROFILES)
-      .upsert(
-        {
-          tenant_id: tenantKey,
-          stripe_connect_account_id: accountId,
-        },
-        { onConflict: "tenant_id" },
-      );
+    await writeConnectProfile(tenantKey, { accountId });
   }
 
   const link = await stripe.accountLinks.create({
