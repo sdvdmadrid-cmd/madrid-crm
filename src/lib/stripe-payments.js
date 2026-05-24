@@ -114,6 +114,12 @@ function getServerEnvValue(key) {
     return directValue;
   }
 
+  // Never read .env files for secrets in production — vercel env pull can
+  // leave empty placeholders locally and must not override deployed env.
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
+    return "";
+  }
+
   return String(loadLocalEnvMap()[key] || "").trim();
 }
 
