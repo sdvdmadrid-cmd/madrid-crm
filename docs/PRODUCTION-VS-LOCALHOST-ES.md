@@ -12,7 +12,7 @@ Comprueba en cualquier página de prod (esquina inferior derecha):
 
 | Causa | Qué hacer |
 |-------|-----------|
-| **Eres dueño de plataforma (super_admin)** | En prod entras a **Mission Control** (`/owner/overview`), NO al CRM contractor. En localhost `dev-login` simula **contractor**. En prod: botón **“Abrir workspace contractor”** en Mission Control |
+| **Eres dueño de plataforma (super_admin)** | En prod y local debes entrar a **Mission Control** (`/owner/overview`) de forma automática. Si ves menú contractor con `owner@fieldbase`, revisa rol/sesión y vuelve a loguear |
 | **Cache del navegador o app instalada (PWA)** | Ctrl+Shift+R; en móvil borrar datos del sitio; desinstalar “FieldBase” del home screen y volver a abrir en Safari/Chrome |
 | **Login distinto** | Local: `dev-login` como admin. Prod: tu email real → otro tenant, otros datos, mismo diseño |
 | **Website builder vs sitio público** | El builder es `/website`. El sitio nuevo es `/site/TU-SLUG` solo después de **Publish** |

@@ -94,7 +94,7 @@ Next.js emits hashed assets under `/_next/static/chunks/`. Production CSS chunk 
 | `/website`, `/lead-inbox`, dark CRM | **Mission Control** `/owner/overview` |
 | Same code, different routes | Looks “unchanged” |
 
-**Fix (in app since PR #19):** `/owner/overview` → **“Abrir workspace contractor”** → then open `/website`, `/lead-inbox`, etc.
+**Stabilized behavior:** `super_admin` always resolves to Mission Control (`/owner/*`) in both localhost and production.
 
 ---
 
