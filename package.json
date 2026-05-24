@@ -2,6 +2,7 @@
   "scripts": {
     "dev": "node scripts/ensure-dev-env.mjs && next dev",
     "env:ensure": "node scripts/ensure-dev-env.mjs",
+    "setup:website-ai": "node scripts/ensure-website-builder-ai.mjs",
     "dev:restart": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1",
     "dev:stop": "powershell -ExecutionPolicy Bypass -File scripts/dev-restart.ps1 -NoStart",
     "build": "next build",

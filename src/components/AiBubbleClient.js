@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
 
 const DIRECT_FLAG_ACTION_TERMS = [
   "enable",
@@ -64,6 +65,11 @@ const TEXT = {
     },
     applied: "Suggested feature flags were applied.",
     directApplied: "Command detected. Suggested feature flags were applied automatically.",
+    websiteMode: "Website co-pilot",
+    websitePlaceholder: "Ask about your site draft, missing sections, or copy…",
+    applyPatches: "Apply suggested edits",
+    patchesApplied: "Suggestions applied to your website draft.",
+    runFullGenerate: "Generate full website",
   },
   es: {
     open: "IA",
@@ -88,6 +94,11 @@ const TEXT = {
     },
     applied: "Se aplicaron los feature flags sugeridos.",
     directApplied: "Comando detectado. Se aplicaron automaticamente los feature flags sugeridos.",
+    websiteMode: "Copiloto del sitio",
+    websitePlaceholder: "Pregunta sobre tu borrador, secciones faltantes o textos…",
+    applyPatches: "Aplicar sugerencias",
+    patchesApplied: "Sugerencias aplicadas al borrador.",
+    runFullGenerate: "Generar sitio completo",
   },
   pl: {
     open: "AI",
@@ -112,10 +123,19 @@ const TEXT = {
     },
     applied: "Zastosowano sugerowane feature flagi.",
     directApplied: "Wykryto polecenie. Sugerowane feature flagi zostaly zastosowane automatycznie.",
+    websiteMode: "Asystent strony",
+    websitePlaceholder: "Zapytaj o szkic strony, brakujace sekcje lub teksty…",
+    applyPatches: "Zastosuj sugestie",
+    patchesApplied: "Sugestie zastosowane w szkicu strony.",
+    runFullGenerate: "Wygeneruj cala strone",
   },
 };
 
-export default function AiBubbleClient({ authUser, pathname }) {
+export default function AiBubbleClient({
+  authUser,
+  pathname,
+  websiteBuilderMode = false,
+}) {
   const { i18n } = useTranslation();
   const language = i18n.language?.split("-")[0] || "en";
   const lang = ["en", "es", "pl"].includes(language) ? language : "en";
@@ -132,6 +152,11 @@ export default function AiBubbleClient({ authUser, pathname }) {
   const [error, setError] = useState("");
   const [responseText, setResponseText] = useState("");
   const [flagRecommendations, setFlagRecommendations] = useState([]);
+  const [websitePatches, setWebsitePatches] = useState(null);
+
+  const wbAi = useWebsiteBuilderAi();
+  const onWebsiteBuilder =
+    websiteBuilderMode || Boolean(pathname?.startsWith("/website"));
 
   const applyRecommendations = async (rows) => {
     for (const row of rows) {
@@ -149,6 +174,9 @@ export default function AiBubbleClient({ authUser, pathname }) {
   };
 
   const modeOptions = useMemo(() => {
+    if (onWebsiteBuilder) {
+      return [{ value: "website", label: t.websiteMode }];
+    }
     const base = [
       { value: "proposal", label: t.modes.proposal },
       { value: "crm", label: t.modes.crm },
@@ -163,7 +191,11 @@ export default function AiBubbleClient({ authUser, pathname }) {
       ];
     }
     return base;
-  }, [isSuperAdmin, t.modes]);
+  }, [isSuperAdmin, t.modes, onWebsiteBuilder, t.websiteMode]);
+
+  useEffect(() => {
+    if (onWebsiteBuilder) setMode("website");
+  }, [onWebsiteBuilder]);
 
   const askAi = async () => {
     const prompt = String(question || "").trim();
@@ -173,8 +205,22 @@ export default function AiBubbleClient({ authUser, pathname }) {
     setError("");
     setResponseText("");
     setFlagRecommendations([]);
+    setWebsitePatches(null);
 
     try {
+      if (mode === "website" || onWebsiteBuilder) {
+        const snapshot = wbAi?.getSnapshot?.() || {};
+        const res = await apiFetch("/api/website-builder/assistant", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: prompt, snapshot }),
+        });
+        const payload = await getJsonOrThrow(res, t.errorFallback);
+        setResponseText(String(payload?.data?.answer || ""));
+        setWebsitePatches(payload?.data?.patches || null);
+        return;
+      }
+
       if (mode === "owner") {
         const res = await apiFetch("/api/admin/ai", {
           method: "POST",
@@ -294,6 +340,17 @@ export default function AiBubbleClient({ authUser, pathname }) {
     }
   };
 
+  const applyWebsitePatches = async () => {
+    if (!websitePatches || typeof websitePatches !== "object") return;
+    try {
+      wbAi?.applyPatches?.(websitePatches);
+      setResponseText((prev) => [prev, t.patchesApplied].filter(Boolean).join("\n\n"));
+      setWebsitePatches(null);
+    } catch (err) {
+      setError(err?.message || t.errorFallback);
+    }
+  };
+
   const applyFlagChanges = async () => {
     if (!isSuperAdmin || mode !== "flags" || applying) return;
     if (!Array.isArray(flagRecommendations) || flagRecommendations.length === 0)
@@ -369,6 +426,7 @@ export default function AiBubbleClient({ authUser, pathname }) {
           <select
             value={mode}
             onChange={(event) => setMode(event.target.value)}
+            disabled={onWebsiteBuilder}
             style={{
               width: "100%",
               marginTop: 6,
@@ -389,7 +447,7 @@ export default function AiBubbleClient({ authUser, pathname }) {
           <textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder={t.placeholder}
+            placeholder={onWebsiteBuilder ? t.websitePlaceholder : t.placeholder}
             rows={4}
             style={{
               width: "100%",
@@ -421,6 +479,41 @@ export default function AiBubbleClient({ authUser, pathname }) {
               {loading ? t.sending : t.ask}
             </button>
 
+            {onWebsiteBuilder && websitePatches ? (
+              <button
+                type="button"
+                onClick={applyWebsitePatches}
+                style={{
+                  border: "none",
+                  background: "#16a34a",
+                  color: "white",
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {t.applyPatches}
+              </button>
+            ) : null}
+            {onWebsiteBuilder && wbAi?.runGenerateFull ? (
+              <button
+                type="button"
+                onClick={() => wbAi.runGenerateFull()}
+                disabled={loading}
+                style={{
+                  border: "1px solid rgba(148,163,184,0.35)",
+                  background: "#111827",
+                  color: "#e2e8f0",
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {t.runFullGenerate}
+              </button>
+            ) : null}
             {isSuperAdmin && mode === "flags" ? (
               <button
                 type="button"

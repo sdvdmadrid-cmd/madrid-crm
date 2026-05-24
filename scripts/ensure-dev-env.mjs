@@ -98,3 +98,24 @@ if (missing.length > 0) {
 }
 
 console.log("[ensure-dev-env] OK — SESSION_SECRET and required keys present.");
+
+async function bootstrapWebsiteBuilderAi() {
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, ["scripts/ensure-website-builder-ai.mjs"], {
+      cwd: root,
+      stdio: "inherit",
+      env: process.env,
+    });
+    await new Promise((resolve, reject) => {
+      child.on("exit", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`ensure-website-builder-ai exited ${code}`));
+      });
+    });
+  } catch (err) {
+    console.warn("[ensure-dev-env] Website Builder AI bootstrap skipped:", err.message);
+  }
+}
+
+bootstrapWebsiteBuilderAi();

@@ -142,6 +142,12 @@ export async function getPublicWebsiteBySlug(slug) {
   return {
     slug: website.slug,
     tenantId: website.tenant_id,
+    seoTitle: String(meta.seoTitle || "").trim(),
+    seoDescription: String(meta.seoDescription || "").trim(),
+    footerTagline: String(meta.footerTagline || "").trim(),
+    serviceAreas: Array.isArray(meta.serviceAreas)
+      ? meta.serviceAreas.map((a) => String(a || "").trim()).filter(Boolean)
+      : [],
     headline: website.headline || "",
     subheadline: website.subheadline || "",
     aboutText: website.about_text || "",

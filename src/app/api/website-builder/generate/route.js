@@ -35,6 +35,7 @@ Generate hero copy for a ${pack.label} website. JSON only:
 {
   "headline": "max 10 words, ${pack.label} specific",
   "subheadline": "max 28 words",
+  "aboutText": "max 90 words",
   "ctaText": "max 5 words"
 }
 Examples of acceptable themes: ${pack.defaultHeadline}, ${pack.defaultSubheadline}
@@ -209,6 +210,7 @@ export async function POST(request) {
       {
         headline: parsed.headline || defaults.headline,
         subheadline: parsed.subheadline || defaults.subheadline,
+        aboutText: parsed.aboutText || defaults.aboutText,
         ctaText: parsed.ctaText || defaults.ctaText,
         services: defaults.services,
         testimonials: defaults.testimonials,
@@ -222,6 +224,7 @@ export async function POST(request) {
       data: {
         headline: content.headline,
         subheadline: content.subheadline,
+        aboutText: content.aboutText,
         ctaText: content.ctaText,
         themeColor: pack.defaultThemeColor,
       },

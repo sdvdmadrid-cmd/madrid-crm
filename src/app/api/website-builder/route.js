@@ -172,6 +172,15 @@ function serializeWebsiteRow(row, profile, request) {
     ctaOptions: pack.ctaOptions,
     requestServices: pack.requestServices,
     companyProfile: profile,
+    siteMeta: {
+      seoTitle: String(siteMetaRow.seoTitle || "").trim(),
+      seoDescription: String(siteMetaRow.seoDescription || "").trim(),
+      footerTagline: String(siteMetaRow.footerTagline || "").trim(),
+      serviceAreas: Array.isArray(siteMetaRow.serviceAreas)
+        ? siteMetaRow.serviceAreas.map((a) => String(a || "").trim()).filter(Boolean)
+        : [],
+      aiGeneratedAt: siteMetaRow.aiGeneratedAt || null,
+    },
   };
 }
 
@@ -402,6 +411,28 @@ export async function POST(request) {
       google: pickUrl(social.google),
     };
     metaChanged = true;
+  }
+  if (body.siteMeta && typeof body.siteMeta === "object") {
+    const sm = body.siteMeta;
+    if (typeof sm.seoTitle === "string") {
+      nextMeta.seoTitle = sm.seoTitle.slice(0, 70);
+      metaChanged = true;
+    }
+    if (typeof sm.seoDescription === "string") {
+      nextMeta.seoDescription = sm.seoDescription.slice(0, 160);
+      metaChanged = true;
+    }
+    if (typeof sm.footerTagline === "string") {
+      nextMeta.footerTagline = sm.footerTagline.slice(0, 120);
+      metaChanged = true;
+    }
+    if (Array.isArray(sm.serviceAreas)) {
+      nextMeta.serviceAreas = sm.serviceAreas
+        .map((a) => String(a || "").trim())
+        .filter(Boolean)
+        .slice(0, 8);
+      metaChanged = true;
+    }
   }
   if (metaChanged) {
     patch.site_meta = nextMeta;

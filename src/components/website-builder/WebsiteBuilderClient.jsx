@@ -12,9 +12,13 @@ import {
   buildPublicWebsitePath,
   buildPublicWebsiteRequestPath,
 } from "@/lib/public-website-routing";
+import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
+import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
 import DeployBuildBadge from "@/components/workspace/DeployBuildBadge";
 import HeroImageEditor from "./HeroImageEditor";
-import WebsiteBuilderPreview from "./WebsiteBuilderPreview";
+import WebsiteBuilderLaunch from "./WebsiteBuilderLaunch";
+import WebsiteBuilderFloatingBar from "./WebsiteBuilderFloatingBar";
+import WebsiteBuilderPreview, { SECTION_REGEN_MAP } from "./WebsiteBuilderPreview";
 import { WEBSITE_BUILDER_UI } from "./website-builder-ui";
 import styles from "./website-builder.module.css";
 
@@ -28,12 +32,22 @@ const IMAGE_STYLES = [
 
 const DEFAULT_OPEN = {
   hero: true,
-  heroImages: true,
-  brand: true,
-  services: true,
+  heroImages: false,
+  brand: false,
+  services: false,
   gallery: false,
   trust: false,
   social: false,
+  analytics: false,
+  domain: false,
+};
+
+const SECTION_FILTERS = {
+  all: null,
+  content: ["hero", "brand", "services"],
+  images: ["heroImages", "gallery"],
+  trust: ["trust"],
+  advanced: ["social", "analytics", "domain"],
 };
 
 const AUTOSAVE_MS = 2200;
@@ -74,8 +88,22 @@ function CollapsibleSection({ title, open, onToggle, children }) {
 
 export default function WebsiteBuilderClient() {
   const t = useUiLanguage();
+  const wbAi = useWebsiteBuilderAi();
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState("");
+  const [editorMode, setEditorMode] = useState("launch");
+  const [activeSection, setActiveSection] = useState("all");
+  const [completenessScore, setCompletenessScore] = useState(0);
+  const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
+  const [selectedPreviewSection, setSelectedPreviewSection] = useState(null);
+  const [aiConfigOk, setAiConfigOk] = useState(true);
+  const [siteMeta, setSiteMeta] = useState({
+    seoTitle: "",
+    seoDescription: "",
+    footerTagline: "",
+    serviceAreas: [],
+  });
   const [featureAiDescription, setFeatureAiDescription] = useState(true);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatingSlotId, setGeneratingSlotId] = useState("");
@@ -201,12 +229,46 @@ export default function WebsiteBuilderClient() {
       },
     });
     setIndustryMismatch(data.industryMismatch === true);
+    const sm = data.siteMeta || {};
+    setSiteMeta({
+      seoTitle: sm.seoTitle || "",
+      seoDescription: sm.seoDescription || "",
+      footerTagline: sm.footerTagline || "",
+      serviceAreas: Array.isArray(sm.serviceAreas) ? sm.serviceAreas : [],
+    });
+    const completeness = analyzeWebsiteCompleteness(
+      {
+        headline: data.headline || "",
+        subheadline: data.subheadline || "",
+        aboutText: data.aboutText || "",
+        ctaText: data.ctaText || "",
+        services: Array.isArray(data.services) ? data.services : [],
+        heroPhotos: Array.isArray(data.heroPhotos) ? data.heroPhotos : [],
+        galleryPhotos: Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [],
+        testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
+        trustBadges: Array.isArray(data.trustBadges) ? data.trustBadges : [],
+      },
+      sm,
+    );
+    setCompletenessScore(completeness.score);
+    setEditorMode(completeness.score < 40 ? "launch" : "edit");
     skipAutosave.current = true;
   }, []);
 
   useEffect(() => {
     formRef.current = form;
   }, [form]);
+
+  useEffect(() => {
+    apiFetch("/api/website-builder/setup-status", { suppressUnauthorizedEvent: true })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (payload?.data) {
+          setAiConfigOk(payload.data.ready === true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     apiFetch("/api/website-builder")
@@ -256,6 +318,7 @@ export default function WebsiteBuilderClient() {
             ...sanitized,
             heroPhotos: data.heroPhotos,
             galleryPhotos: data.galleryPhotos,
+            siteMeta: data.siteMeta ?? siteMeta,
           }),
         });
         const payload = await res.json().catch(() => null);
@@ -275,7 +338,16 @@ export default function WebsiteBuilderClient() {
         setSaving(false);
       }
     },
-    [t, showNotice, applyApiPayload, industryKey, companyProfile],
+    [t, showNotice, applyApiPayload, industryKey, companyProfile, siteMeta],
+  );
+
+  const sectionVisible = useCallback(
+    (sectionKey) => {
+      const allowed = SECTION_FILTERS[activeSection];
+      if (!allowed) return true;
+      return allowed.includes(sectionKey);
+    },
+    [activeSection],
   );
 
   useEffect(() => {
@@ -443,6 +515,199 @@ export default function WebsiteBuilderClient() {
     }
   }, [form.services, t, showNotice]);
 
+  const handleGenerateFullSite = useCallback(async () => {
+    if (!featureAiDescription) {
+      showNotice(t.errorGenerate, true);
+      return;
+    }
+    setGenerating(true);
+    setGenProgress(t.genStepCopy);
+    setError("");
+    try {
+      const catalogServices = (form.services || []).slice(0, 20).map((s) => ({
+        name: s?.name || "",
+        description: s?.description || "",
+      }));
+      const res = await apiFetch("/api/website-builder/generate-full", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          services: catalogServices,
+          currentForm: formRef.current || form,
+        }),
+      });
+      const payload = await getJsonOrThrow(res, t.errorGenerate);
+      const d = payload.data || {};
+      const nextSiteMeta = {
+        ...siteMeta,
+        ...(d.siteMeta || {}),
+      };
+      const nextForm = {
+        ...(formRef.current || form),
+        headline: d.headline || "",
+        subheadline: d.subheadline || "",
+        aboutText: d.aboutText || "",
+        ctaText: d.ctaText || "",
+        themeColor: d.themeColor || form.themeColor,
+        services: d.services?.length ? d.services : form.services,
+        testimonials: d.testimonials?.length ? d.testimonials : form.testimonials,
+        trustBadges: d.trustBadges?.length ? d.trustBadges : form.trustBadges,
+        heroPhotos: d.heroPhotos?.length ? d.heroPhotos : form.heroPhotos,
+        galleryPhotos: d.galleryPhotos?.length ? d.galleryPhotos : form.galleryPhotos,
+      };
+      skipAutosave.current = true;
+      formRef.current = nextForm;
+      setForm(nextForm);
+      setSiteMeta(nextSiteMeta);
+      setGenProgress(t.genStepSave);
+      await handleSave({ ...nextForm, siteMeta: nextSiteMeta }, { silent: true });
+
+      const heroSlots = nextForm.heroPhotos || [];
+      const heroTotal = heroSlots.length;
+      for (let i = 0; i < heroTotal; i += 1) {
+        const slot = heroSlots[i];
+        const src = String(slot?.src || "").trim();
+        if (src.startsWith("http") || src.startsWith("data:image/")) continue;
+        const prompt = String(slot?.prompt || imagePresets[i] || "").trim();
+        if (!prompt) continue;
+        setGenProgress(
+          t.genStepHero.replace("{n}", String(i + 1)).replace("{total}", String(heroTotal)),
+        );
+        setGeneratingSlotId(slot.id);
+        try {
+          const imgRes = await apiFetch("/api/website-builder/generate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
+          });
+          const imgPayload = await getJsonOrThrow(imgRes, t.errorGenerateImage);
+          const imageSrc = String(
+            imgPayload?.data?.imageUrl || imgPayload?.data?.imageDataUrl || "",
+          );
+          if (imageSrc.startsWith("data:image/") || /^https?:\/\//i.test(imageSrc)) {
+            const current = formRef.current || nextForm;
+            const updatedHero = [...(current.heroPhotos || [])];
+            updatedHero[i] = {
+              ...updatedHero[i],
+              src: imageSrc,
+              alt: String(imgPayload?.data?.alt || prompt).slice(0, 160),
+              prompt,
+            };
+            const withHero = { ...current, heroPhotos: updatedHero };
+            formRef.current = withHero;
+            setForm(withHero);
+          }
+        } catch {
+          /* continue other slots */
+        } finally {
+          setGeneratingSlotId("");
+        }
+      }
+
+      const galleryPrompts = Array.isArray(d.galleryImagePrompts)
+        ? d.galleryImagePrompts
+        : [];
+      const galleryTotal = Math.min(2, galleryPrompts.length);
+      for (let g = 0; g < galleryTotal; g += 1) {
+        const prompt = String(galleryPrompts[g] || "").trim();
+        if (!prompt) continue;
+        setGenProgress(
+          t.genStepGallery.replace("{n}", String(g + 1)).replace("{total}", String(galleryTotal)),
+        );
+        try {
+          const imgRes = await apiFetch("/api/website-builder/generate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "gallery" }),
+          });
+          const imgPayload = await getJsonOrThrow(imgRes, t.errorGenerateImage);
+          const imageSrc = String(
+            imgPayload?.data?.imageUrl || imgPayload?.data?.imageDataUrl || "",
+          );
+          if (imageSrc.startsWith("data:image/") || /^https?:\/\//i.test(imageSrc)) {
+            const current = formRef.current || nextForm;
+            const withGallery = {
+              ...current,
+              galleryPhotos: [
+                ...(current.galleryPhotos || []),
+                { src: imageSrc, alt: prompt.slice(0, 160) },
+              ].slice(0, MAX_GALLERY_IMAGES),
+            };
+            formRef.current = withGallery;
+            setForm(withGallery);
+          }
+        } catch {
+          /* continue */
+        }
+      }
+
+      await handleSave(
+        { ...(formRef.current || nextForm), siteMeta: nextSiteMeta },
+        { silent: true },
+      );
+      const finalForm = formRef.current || nextForm;
+      const finalMeta = nextSiteMeta;
+      const completeness = analyzeWebsiteCompleteness(finalForm, finalMeta);
+      setCompletenessScore(completeness.score);
+      setEditorMode("edit");
+      setShowAdvancedPanel(false);
+      setSelectedPreviewSection(null);
+      setMobileTab("preview");
+      showNotice(t.generateFullDone);
+    } catch (err) {
+      showNotice(err.message || t.errorGenerate, true);
+    } finally {
+      setGenerating(false);
+      setGenProgress("");
+    }
+  }, [
+    featureAiDescription,
+    form,
+    imagePresets,
+    imageStyle,
+    siteMeta,
+    t,
+    showNotice,
+    handleSave,
+  ]);
+
+  useEffect(() => {
+    if (!wbAi?.registerBuilder) return undefined;
+    wbAi.registerBuilder({
+      getSnapshot: () => ({
+        form: formRef.current || form,
+        siteMeta,
+        published,
+        websitePath: websitePath || (slug ? buildPublicWebsitePath(slug) : ""),
+        industry: industryKey,
+        industryLabel,
+      }),
+      applyPatches: (patches) => {
+        if (!patches || typeof patches !== "object") return;
+        setForm((prev) => {
+          const next = { ...prev, ...patches };
+          formRef.current = next;
+          return next;
+        });
+        showNotice(t.aiPatchesApplied);
+      },
+      runGenerateFull: () => handleGenerateFullSite(),
+    });
+    return () => wbAi.unregisterBuilder();
+  }, [
+    wbAi,
+    form,
+    siteMeta,
+    published,
+    websitePath,
+    slug,
+    industryKey,
+    industryLabel,
+    handleGenerateFullSite,
+    showNotice,
+    t.aiPatchesApplied,
+  ]);
+
   const handleGenerateHeroSlot = useCallback(
     async (index) => {
       const slots = form.heroPhotos || [];
@@ -498,7 +763,7 @@ export default function WebsiteBuilderClient() {
       const res = await apiFetch("/api/website-builder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, published: newPublished }),
+        body: JSON.stringify({ ...form, siteMeta, published: newPublished }),
       });
       await getJsonOrThrow(res, t.errorSave);
       setPublished(newPublished);
@@ -511,8 +776,31 @@ export default function WebsiteBuilderClient() {
   }, [published, form, t, showNotice]);
 
   const setField = useCallback((key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      formRef.current = next;
+      return next;
+    });
   }, []);
+
+  const handlePreviewFieldChange = useCallback((field, value) => {
+    setField(field, value);
+  }, [setField]);
+
+  const handleServiceFieldChange = useCallback((index, key, value) => {
+    setForm((prev) => {
+      const services = [...(prev.services || [])];
+      services[index] = { ...services[index], [key]: value };
+      const next = { ...prev, services };
+      formRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const handleRegeneratePreviewSection = useCallback(() => {
+    const apiSection = SECTION_REGEN_MAP[selectedPreviewSection] || "hero";
+    handleGenerateSection(apiSection);
+  }, [selectedPreviewSection, handleGenerateSection]);
 
   const setServiceField = useCallback((index, key, value) => {
     setForm((prev) => {
@@ -650,7 +938,7 @@ export default function WebsiteBuilderClient() {
 
   return (
     <div className={styles.shell} style={{ "--wb-theme": theme }}>
-      <div className={styles.topBar}>
+      <div className={`${styles.topBar} ${styles.topBarCompact}`}>
         <div className={styles.titleBlock}>
           <div className={styles.eyebrow}>
             <Link href="/dashboard" style={{ color: "inherit", textDecoration: "none" }}>
@@ -661,7 +949,7 @@ export default function WebsiteBuilderClient() {
           </div>
           <h1>{t.title}</h1>
           <p style={{ margin: "6px 0 0", fontSize: "0.82rem", color: "#94a3b8", maxWidth: 520 }}>
-            {t.subtitle}
+            {editorMode === "launch" ? t.launchSubtitle : t.subtitle}
           </p>
         </div>
         <div className={styles.actions}>
@@ -685,98 +973,171 @@ export default function WebsiteBuilderClient() {
               {t.viewSite} ↗
             </a>
           ) : null}
+          {editorMode === "edit" ? (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={() => setEditorMode("launch")}
+            >
+              {t.backToLaunch}
+            </button>
+          ) : null}
           {featureAiDescription ? (
             <button
               type="button"
               className={`${styles.btn} ${styles.btnAi}`}
               disabled={generating}
-              onClick={handleGenerate}
+              onClick={handleGenerateFullSite}
             >
-              {generating ? t.generating : t.generate}
+              {generating
+                ? genProgress || t.generatingFull
+                : editorMode === "launch"
+                  ? t.generateFull
+                  : t.generateFull}
             </button>
           ) : null}
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnSave}`}
-            disabled={saving}
-            onClick={() => handleSave(form)}
-          >
-            {saving ? t.saving : t.save}
-          </button>
-          <button
-            type="button"
-            className={`${styles.btn} ${published ? styles.btnUnpub : styles.btnPub}`}
-            disabled={publishing}
-            onClick={handlePublishToggle}
-          >
-            {publishing ? t.publishing : published ? t.unpublish : t.publish}
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.industryBanner}>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <div className={styles.industryLabel}>
-            {industryIcon} {industryLabel || t.industryPack}
-          </div>
-          <div className={styles.industryMeta}>
-            {t.industryMeta}
-            {industryKeyOverride ? ` (${t.industryOverrideOn})` : ` (${t.industryFromProfile})`}
-          </div>
-          {industryPackOptions.length > 0 ? (
-            <label className={styles.industrySelectWrap}>
-              <span className={styles.industrySelectLabel}>{t.industryOverrideLabel}</span>
-              <select
-                className={styles.industrySelect}
-                value={industryKeyOverride || ""}
-                onChange={handleIndustryOverrideChange}
-                disabled={saving}
-              >
-                <option value="">{t.industryUseProfile}</option>
-                {industryPackOptions.map((opt) => (
-                  <option key={opt.key} value={opt.key}>
-                    {opt.icon ? `${opt.icon} ` : ""}
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {editorMode === "launch" ? (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnSave}`}
+              disabled={saving}
+              onClick={() => handleSave({ ...form, siteMeta })}
+            >
+              {saving ? t.saving : t.save}
+            </button>
           ) : null}
         </div>
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnGhost}`}
-          onClick={handleApplyIndustryPreset}
-          disabled={saving}
-        >
-          {t.applyPreset}
-        </button>
       </div>
 
-      <div className={styles.mobileTabs}>
-        <button
-          type="button"
-          className={`${styles.mobileTab} ${mobileTab === "edit" ? styles.mobileTabActive : ""}`}
-          onClick={() => setMobileTab("edit")}
-        >
-          {t.editLabel}
-        </button>
-        <button
-          type="button"
-          className={`${styles.mobileTab} ${mobileTab === "preview" ? styles.mobileTabActive : ""}`}
-          onClick={() => setMobileTab("preview")}
-        >
-          {t.previewLabel}
-        </button>
-      </div>
+      {editorMode === "edit" ? (
+        <div className={styles.industryBannerCompact}>
+          <span>
+            {industryIcon} {industryLabel}
+            {industryKeyOverride ? ` · ${t.industryOverrideOn}` : ` · ${t.industryFromProfile}`}
+            {completenessScore > 0 ? ` · ${completenessScore}%` : ""}
+          </span>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnGhost}`}
+            onClick={handleApplyIndustryPreset}
+            disabled={saving}
+          >
+            {t.applyPreset}
+          </button>
+        </div>
+      ) : null}
 
-      <div className={styles.workspace}>
-        <div
-          className={`${styles.editor} ${mobileTab === "preview" ? styles.editorHide : ""}`}
-        >
-          {notice ? <div className={styles.notice}>{notice}</div> : null}
-          {error ? <div className={styles.error}>{error}</div> : null}
-          {autoSaved ? <div className={styles.savePulse}>{t.savedAuto}</div> : null}
+      <div className={styles.workspaceVisual}>
+        <div className={styles.visualStage}>
+          {(notice || error || autoSaved) && (
+            <div className={styles.visualToast}>
+              {notice ? <div className={styles.notice}>{notice}</div> : null}
+              {error ? <div className={styles.error}>{error}</div> : null}
+              {autoSaved ? <div className={styles.savePulse}>{t.savedAuto}</div> : null}
+            </div>
+          )}
+          {!aiConfigOk ? (
+            <div className={styles.hintBox} style={{ margin: "8px 16px 0" }}>
+              {t.aiConfigMissing}
+            </div>
+          ) : null}
+          {editorMode === "edit" ? (
+            <p
+              style={{
+                margin: "8px 16px 0",
+                fontSize: "0.78rem",
+                color: "#64748b",
+                textAlign: "center",
+              }}
+            >
+              {t.visualEditHint}
+            </p>
+          ) : null}
+          <div className={styles.previewScrollFull}>
+            <div className={`${styles.previewFrame} ${frameClass}`}>
+              <WebsiteBuilderPreview
+                theme={theme}
+                form={form}
+                companyProfile={companyProfile}
+                industryLabel={industryLabel}
+                requestServices={requestServices}
+                requestUrl={requestUrl}
+                canOpenRequestPage={Boolean(slug)}
+                onRequestBlocked={() =>
+                  showNotice("Save your website first to enable Send Request.", true)
+                }
+                editable={editorMode === "edit"}
+                selectedSection={selectedPreviewSection}
+                onSelectSection={setSelectedPreviewSection}
+                onFieldChange={handlePreviewFieldChange}
+                onServiceChange={handleServiceFieldChange}
+                onGenerateHeroSlot={handleGenerateHeroSlot}
+                generatingSlotId={generatingSlotId}
+              />
+            </div>
+          </div>
+          {editorMode === "edit" ? (
+            <WebsiteBuilderFloatingBar
+              t={t}
+              device={device}
+              onDeviceChange={setDevice}
+              onRegenerate={handleGenerateFullSite}
+              generating={generating}
+              onToggleAdvanced={() => setShowAdvancedPanel((v) => !v)}
+              advancedOpen={showAdvancedPanel}
+              onPublish={handlePublishToggle}
+              publishing={publishing}
+              published={published}
+              saving={saving}
+              themePresets={themePresets}
+              themeColor={form.themeColor}
+              onThemeChange={(c) => setField("themeColor", c)}
+              selectedSection={selectedPreviewSection}
+              onRegenerateSection={handleRegeneratePreviewSection}
+              regeneratingSection={regeneratingSection}
+            />
+          ) : null}
+          {editorMode === "launch" ? (
+            <div className={styles.launchOverlay}>
+              <WebsiteBuilderLaunch
+                t={t}
+                companyProfile={companyProfile}
+                industryLabel={industryLabel}
+                industryIcon={industryIcon}
+                industryPackOptions={industryPackOptions}
+                industryKeyOverride={industryKeyOverride}
+                onIndustryChange={handleIndustryOverrideChange}
+                onGenerate={handleGenerateFullSite}
+                generating={generating}
+                genProgress={genProgress}
+                completenessScore={completenessScore}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {showAdvancedPanel && editorMode === "edit" ? (
+          <aside className={styles.advancedDrawer}>
+              <div className={styles.sectionNav}>
+                {[
+                  ["all", t.sectionNavAll],
+                  ["content", t.sectionNavContent],
+                  ["images", t.sectionNavImages],
+                  ["trust", t.sectionNavTrust],
+                  ["advanced", t.sectionNavAdvanced],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${styles.sectionNavBtn} ${
+                      activeSection === key ? styles.sectionNavBtnActive : ""
+                    }`}
+                    onClick={() => setActiveSection(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
           {industryMismatch ? (
             <div className={styles.mismatchBanner}>
@@ -786,9 +1147,9 @@ export default function WebsiteBuilderClient() {
                   type="button"
                   className={`${styles.btn} ${styles.btnAi}`}
                   disabled={generating}
-                  onClick={handleGenerate}
+                  onClick={handleGenerateFullSite}
                 >
-                  {generating ? t.generating : t.generate}
+                  {generating ? t.generatingFull : t.generateFull}
                 </button>
                 <button
                   type="button"
@@ -845,23 +1206,26 @@ export default function WebsiteBuilderClient() {
             </div>
           ) : null}
 
-          {!published ? <div className={styles.hintBox}>{t.draftPrivateHint}</div> : null}
+          {!published && editorMode === "edit" ? (
+            <div className={styles.hintBox}>{t.draftPrivateHint}</div>
+          ) : null}
 
-          {featureAiDescription ? (
+          {editorMode === "edit" && featureAiDescription && activeSection !== "advanced" ? (
             <div className={styles.aiCard}>
-              <div className={styles.aiCardTitle}>✨ AI Website Generator</div>
+              <div className={styles.aiCardTitle}>✨ {t.launchEyebrow}</div>
               <div className={styles.aiCardHint}>{t.generateHint}</div>
               <button
                 type="button"
                 className={`${styles.btn} ${styles.btnAi}`}
                 disabled={generating}
-                onClick={handleGenerate}
+                onClick={handleGenerateFullSite}
               >
-                {generating ? t.generating : t.generate}
+                {generating ? genProgress || t.generatingFull : t.generateFull}
               </button>
             </div>
           ) : null}
 
+          {sectionVisible("heroImages") ? (
           <CollapsibleSection
             title={t.sectionHeroImages}
             open={openSections.heroImages}
@@ -891,7 +1255,9 @@ export default function WebsiteBuilderClient() {
               <p className={styles.hintBox}>{t.galleryHint}</p>
             )}
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("hero") ? (
           <CollapsibleSection
             title={t.sectionHero}
             open={openSections.hero}
@@ -936,7 +1302,9 @@ export default function WebsiteBuilderClient() {
               />
             </div>
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("brand") ? (
           <CollapsibleSection
             title={t.sectionBrand}
             open={openSections.brand}
@@ -979,7 +1347,9 @@ export default function WebsiteBuilderClient() {
               </div>
             </div>
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("services") ? (
           <CollapsibleSection
             title={t.sectionServices}
             open={openSections.services}
@@ -1039,7 +1409,9 @@ export default function WebsiteBuilderClient() {
               </button>
             ) : null}
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("gallery") ? (
           <CollapsibleSection
             title={t.sectionGallery}
             open={openSections.gallery}
@@ -1151,7 +1523,9 @@ export default function WebsiteBuilderClient() {
               </div>
             )}
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("social") ? (
           <CollapsibleSection
             title={t.sectionSocial}
             open={openSections.social !== false}
@@ -1183,7 +1557,9 @@ export default function WebsiteBuilderClient() {
               </div>
             ))}
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("analytics") ? (
           <CollapsibleSection
             title="Analytics & tracking"
             open={openSections.analytics !== false}
@@ -1210,7 +1586,9 @@ export default function WebsiteBuilderClient() {
               </div>
             ))}
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("domain") ? (
           <CollapsibleSection
             title="Custom domain"
             open={openSections.domain === true}
@@ -1264,7 +1642,9 @@ export default function WebsiteBuilderClient() {
               </button>
             </div>
           </CollapsibleSection>
+          ) : null}
 
+          {sectionVisible("trust") ? (
           <CollapsibleSection
             title={t.sectionTrust}
             open={openSections.trust}
@@ -1314,60 +1694,20 @@ export default function WebsiteBuilderClient() {
               </div>
             ))}
           </CollapsibleSection>
+          ) : null}
 
           <div className={styles.saveRow}>
             <button
               type="button"
               className={`${styles.btn} ${styles.btnSave}`}
               disabled={saving}
-              onClick={() => handleSave(form)}
+              onClick={() => handleSave({ ...form, siteMeta })}
             >
               {saving ? t.saving : t.save}
             </button>
           </div>
-        </div>
-
-        <div
-          className={`${styles.previewPanel} ${mobileTab === "preview" ? styles.previewPanelShow : ""}`}
-        >
-          <div className={styles.previewToolbar}>
-            <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8" }}>
-              {t.previewLabel}
-            </span>
-            <div className={styles.deviceGroup}>
-              {["desktop", "tablet", "mobile"].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  className={`${styles.deviceBtn} ${device === d ? styles.deviceBtnActive : ""}`}
-                  onClick={() => setDevice(d)}
-                >
-                  {d === "desktop"
-                    ? t.deviceDesktop
-                    : d === "tablet"
-                      ? t.deviceTablet
-                      : t.deviceMobile}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className={styles.previewScroll}>
-            <div className={`${styles.previewFrame} ${frameClass}`}>
-              <WebsiteBuilderPreview
-                theme={theme}
-                form={form}
-                companyProfile={companyProfile}
-                industryLabel={industryLabel}
-                requestServices={requestServices}
-                requestUrl={requestUrl}
-                canOpenRequestPage={Boolean(slug)}
-                onRequestBlocked={() =>
-                  showNotice("Save your website first to enable Send Request.", true)
-                }
-              />
-            </div>
-          </div>
-        </div>
+          </aside>
+        ) : null}
       </div>
       <DeployBuildBadge className={styles.buildBadge} />
     </div>
