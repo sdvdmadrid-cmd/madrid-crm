@@ -1202,6 +1202,11 @@ export default function AuthShell({ children }) {
     : isContractorRole
       ? [
           {
+            href: "/settings/payments",
+            label: t("sidebar.clientPayments"),
+            iconKey: "invoices",
+          },
+          {
             href: "/website",
             label: t("sidebar.websiteBuilder"),
             iconKey: "websiteBuilder",
@@ -1218,6 +1223,11 @@ export default function AuthShell({ children }) {
           },
         ]
     : [
+        {
+          href: "/settings/payments",
+          label: t("sidebar.clientPayments"),
+          iconKey: "invoices",
+        },
         {
           href: "/website",
           label: t("sidebar.websiteBuilder"),
@@ -1242,7 +1252,7 @@ export default function AuthShell({ children }) {
 
   const bottomNavItems = [
     {
-      href: isSuperAdminRole ? "/owner/settings" : "/subscriptions",
+      href: isSuperAdminRole ? "/owner/settings" : "/settings",
       label: t("sidebar.settings"),
       iconKey: "settings",
     },

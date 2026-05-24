@@ -242,7 +242,7 @@ export default function RevenueDashboardPage() {
           </p>
         </div>
         <div className={styles.quickActions}>
-          <Link href="/invoices" className={styles.collectAction}>
+          <Link href="/settings/payments" className={styles.collectAction}>
             {t("dashboardControl.actions.collectPayment")}
           </Link>
           <Link href="/estimates/new" className={styles.primaryAction}>
