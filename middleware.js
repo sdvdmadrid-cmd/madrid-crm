@@ -4,6 +4,18 @@ import { readContractorWorkspaceCookie } from "./src/lib/workspace-mode";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+
+function attachDeployHeaders(response) {
+  const sha = String(
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.NEXT_PUBLIC_BUILD_SHA ||
+      "",
+  ).slice(0, 12);
+  if (sha) {
+    response.headers.set("X-Fieldbase-Commit", sha);
+  }
+  return response;
+}
 const AUTH_LOG_VERBOSE =
   AUTH_DEBUG && process.env.NODE_ENV !== "production";
 
@@ -373,10 +385,10 @@ export async function middleware(request) {
         note: "callback is never blocked by middleware before exchange",
       });
     }
-    return NextResponse.next();
+    return attachDeployHeaders(NextResponse.next());
   }
 
-  const response = NextResponse.next();
+  const response = attachDeployHeaders(NextResponse.next());
 
   const sessionCookie =
     request.cookies.get("__Host-madrid_session")?.value ||
@@ -645,7 +657,7 @@ export async function middleware(request) {
     }
   }
 
-  return NextResponse.next();
+  return attachDeployHeaders(NextResponse.next());
 }
 
 export const config = {
