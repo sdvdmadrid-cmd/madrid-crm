@@ -1,4 +1,5 @@
-import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { publicWebsiteJson } from "@/lib/api-zone-guard";
+import { resolveWebsiteForLeadSubmission } from "@/lib/public-website-lead";
 import {
   LEAD_BUDGET_OPTIONS,
   LEAD_CONTACT_PREFERENCES,
@@ -8,11 +9,20 @@ import {
 
 export async function GET(_request, { params }) {
   const { slug } = await params;
-  const data = await getPublicWebsiteBySlug(slug);
+  const resolved = await resolveWebsiteForLeadSubmission(slug);
 
-  if (!data) {
-    return Response.json({ success: false, error: "Website not found" }, { status: 404 });
+  if (!resolved.ok) {
+    return publicWebsiteJson(
+      {
+        success: false,
+        error: resolved.message,
+        code: resolved.reason,
+      },
+      { status: resolved.status },
+    );
   }
+
+  const data = resolved.website;
 
   const services = resolveWebsiteRequestServices(data);
   const companyName =
@@ -20,10 +30,10 @@ export async function GET(_request, { params }) {
     data.companyProfile?.companyName ||
     "Our team";
 
-  return Response.json({
+  return publicWebsiteJson({
     success: true,
     data: {
-      slug: data.slug,
+      slug: resolved.slug,
       companyName,
       industryLabel: data.industryLabel || "",
       themeColor: data.themeColor || "#1d4ed8",

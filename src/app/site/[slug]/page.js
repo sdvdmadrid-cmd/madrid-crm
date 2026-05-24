@@ -550,7 +550,7 @@ export default async function PublicContractorSitePage({ params }) {
         </section>
 
         <PublicSiteFooter
-          slug={slug}
+          slug={data.slug}
           companyName={companyName}
           phone={phone}
           businessAddress={data.companyProfile?.businessAddress || ""}

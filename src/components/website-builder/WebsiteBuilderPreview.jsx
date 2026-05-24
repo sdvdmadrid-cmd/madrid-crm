@@ -360,6 +360,7 @@ export default function WebsiteBuilderPreview({
               serviceOptions={requestServices}
               themeColor={theme}
               locale={locale}
+              liveSubmit={false}
             />
           ) : (
             <div className={styles.previewFormPlaceholder}>

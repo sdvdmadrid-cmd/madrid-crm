@@ -104,15 +104,8 @@ async function fetchPublishedWebsiteRow(slug) {
   return data;
 }
 
-export async function getPublicWebsiteBySlug(slug) {
-  const normalizedSlug = normalizeSlug(slug);
-  if (!normalizedSlug) return null;
-
-  const website = await fetchPublishedWebsiteRow(normalizedSlug);
-
-  if (!website?.tenant_id) {
-    return null;
-  }
+export async function assemblePublicWebsiteFromRow(website) {
+  if (!website?.tenant_id) return null;
 
   const { data: companyProfile } = await supabaseAdmin
     .from("company_profiles")
@@ -185,6 +178,16 @@ export async function getPublicWebsiteBySlug(slug) {
       documentLanguage: companyProfile?.document_language || "en",
     },
   };
+}
+
+export async function getPublicWebsiteBySlug(slug) {
+  const normalizedSlug = normalizeSlug(slug);
+  if (!normalizedSlug) return null;
+
+  const website = await fetchPublishedWebsiteRow(normalizedSlug);
+  if (!website?.tenant_id) return null;
+
+  return assemblePublicWebsiteFromRow(website);
 }
 
 export async function listPublishedPublicWebsiteSlugs(limit = 5000) {

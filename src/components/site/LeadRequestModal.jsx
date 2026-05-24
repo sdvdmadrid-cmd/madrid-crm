@@ -12,6 +12,7 @@ export default function LeadRequestModal({
   locale = "en",
   themeColor = "#1d4ed8",
   companyName = "",
+  liveSubmit = true,
 }) {
   const panelRef = useRef(null);
 
@@ -79,6 +80,7 @@ export default function LeadRequestModal({
           initialService={initialService}
           locale={locale}
           themeColor={themeColor}
+          liveSubmit={liveSubmit}
         />
       </div>
     </div>

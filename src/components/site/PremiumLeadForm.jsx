@@ -8,6 +8,7 @@ import {
   LEAD_CONTACT_PREFERENCES,
   LEAD_TIMELINE_OPTIONS,
 } from "@/lib/website-lead-form";
+import { normalizeWebsiteSlug, parsePublicWebsiteSlug } from "@/lib/public-website-routing";
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 const STEPS = 4;
@@ -26,6 +27,21 @@ function pickInitialService(options, initialService) {
   return options[0] || "";
 }
 
+function mapLeadApiError(json, fallback) {
+  const code = String(json?.code || "").trim();
+  const message = String(json?.error || "").trim();
+  if (message && !/^website not found$/i.test(message)) {
+    return message;
+  }
+  if (code === "unpublished") {
+    return "Online quote requests are not active yet. Please call the contractor or refresh after they publish their site.";
+  }
+  if (code === "not_found" || code === "invalid_slug") {
+    return "This page could not be matched to an active contractor website. Please refresh and try again.";
+  }
+  return fallback;
+}
+
 export default function PremiumLeadForm({
   slug,
   serviceOptions: serviceOptionsProp = [],
@@ -33,7 +49,9 @@ export default function PremiumLeadForm({
   locale: localeProp = "en",
   requireEmail = false,
   themeColor: themeColorProp = "#1d4ed8",
+  liveSubmit = true,
 }) {
+  const [canonicalSlug, setCanonicalSlug] = useState(() => parsePublicWebsiteSlug(slug));
   const [configLoading, setConfigLoading] = useState(Boolean(slug));
   const [configError, setConfigError] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -76,7 +94,11 @@ export default function PremiumLeadForm({
   const [leadId, setLeadId] = useState("");
 
   useEffect(() => {
-    if (!slug) {
+    setCanonicalSlug(parsePublicWebsiteSlug(slug));
+  }, [slug]);
+
+  useEffect(() => {
+    if (!canonicalSlug || !liveSubmit) {
       setConfigLoading(false);
       setServiceOptions(serviceOptionsProp);
       return;
@@ -87,11 +109,18 @@ export default function PremiumLeadForm({
       setConfigLoading(true);
       setConfigError("");
       try {
-        const res = await fetch(`/api/site/${encodeURIComponent(slug)}/lead-form-config`);
+        const res = await fetch(
+          `/api/site/${encodeURIComponent(canonicalSlug)}/lead-form-config`,
+        );
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json.error || "Unable to load form");
+        if (!res.ok) {
+          throw new Error(mapLeadApiError(json, "Unable to load form"));
+        }
         if (cancelled) return;
         const data = json.data || {};
+        if (data.slug) {
+          setCanonicalSlug(parsePublicWebsiteSlug(data.slug));
+        }
         const services = Array.isArray(data.services) ? data.services : [];
         setCompanyName(data.companyName || "");
         setServiceOptions(services.length ? services : serviceOptionsProp);
@@ -137,7 +166,7 @@ export default function PremiumLeadForm({
     return () => {
       cancelled = true;
     };
-  }, [slug, serviceOptionsProp, initialService, localeProp, themeColorProp]);
+  }, [canonicalSlug, liveSubmit, serviceOptionsProp, initialService, localeProp, themeColorProp]);
 
   const trustPills = useMemo(
     () => [
@@ -206,7 +235,11 @@ export default function PremiumLeadForm({
       setStep(2);
       return;
     }
-    if (!slug) {
+    if (!liveSubmit) {
+      setError(formCopy.previewSubmitBlocked || formCopy.saveSiteFirst);
+      return;
+    }
+    if (!canonicalSlug) {
       setError(formCopy.saveSiteFirst);
       return;
     }
@@ -218,14 +251,17 @@ export default function PremiumLeadForm({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/site/${encodeURIComponent(slug)}/contact`, {
+      const res = await fetch(`/api/site/${encodeURIComponent(canonicalSlug)}/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, turnstileToken }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(json.error || formCopy.submitFailed);
+        throw new Error(mapLeadApiError(json, formCopy.submitFailed));
+      }
+      if (json.slug) {
+        setCanonicalSlug(parsePublicWebsiteSlug(json.slug));
       }
       setLeadId(json.leadId || "");
       setSuccess(true);

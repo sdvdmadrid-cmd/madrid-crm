@@ -55,16 +55,16 @@ export default async function PublicContractorRequestPage({ params, searchParams
 
   return (
     <PublicSiteLeadExperience
-      slug={slug}
+      slug={data.slug}
       serviceOptions={serviceOptions}
       locale={locale}
       themeColor={theme}
       companyName={companyName}
     >
     <main style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)" }}>
-      <PublicSiteEnhancements stickyCtaHref={`/sites/${slug}#request-service`} stickyCtaLabel={ctaText} />
+      <PublicSiteEnhancements stickyCtaHref={`/sites/${data.slug}#request-service`} stickyCtaLabel={ctaText} />
       <PublicSiteNav
-        slug={slug}
+        slug={data.slug}
         companyName={companyName}
         logoUrl={data.companyProfile?.logoDataUrl || ""}
         phone={phone}
@@ -91,7 +91,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
           </h1>
           <p style={{ color: "#475569", maxWidth: 620, lineHeight: 1.7 }}>{copy.request.subtitle}</p>
           <Link
-            href={`/sites/${slug}`}
+            href={`/sites/${data.slug}`}
             style={{
               display: "inline-block",
               marginTop: 14,
@@ -117,7 +117,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
           }}
         >
           <RequestServiceForm
-            slug={slug}
+            slug={data.slug}
             serviceOptions={serviceOptions}
             initialService={initialService}
             locale={locale}
@@ -128,7 +128,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
       </div>
 
       <PublicSiteFooter
-        slug={slug}
+        slug={data.slug}
         companyName={companyName}
         phone={phone}
         businessAddress={data.companyProfile?.businessAddress || ""}

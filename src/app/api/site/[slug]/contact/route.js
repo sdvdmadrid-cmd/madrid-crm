@@ -2,7 +2,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { logEmailAttempt, normalizeRecipients, sendEmail } from "@/lib/email";
 import { INNGEST_EVENTS, isInngestEnabled, sendInngestEvent } from "@/lib/inngest";
-import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { publicWebsiteJson } from "@/lib/api-zone-guard";
+import { resolveWebsiteForLeadSubmission } from "@/lib/public-website-lead";
 import { sendTextMessage } from "@/lib/sms";
 import { sendWebsiteLeadClientConfirmation } from "@/lib/website-lead-confirm";
 import {
@@ -182,12 +183,20 @@ export async function POST(request, { params }) {
     );
   }
 
-  // Find the website
-  const website = await getPublicWebsiteBySlug(slug);
-
-  if (!website) {
-    return Response.json({ error: "Website not found" }, { status: 404 });
+  const resolved = await resolveWebsiteForLeadSubmission(slug);
+  if (!resolved.ok) {
+    return publicWebsiteJson(
+      {
+        success: false,
+        error: resolved.message,
+        code: resolved.reason,
+      },
+      { status: resolved.status },
+    );
   }
+
+  const website = resolved.website;
+  const canonicalSlug = resolved.slug;
 
   try {
     const body = await request.json();
@@ -271,7 +280,7 @@ export async function POST(request, { params }) {
     if (cleanPhotoDataUrl) {
       photoUrl = await uploadWebsiteImageFromDataUrl({
         tenantId: website.tenantId,
-        slug,
+        slug: canonicalSlug,
         dataUrl: cleanPhotoDataUrl,
         kind: "lead-photo",
       });
@@ -279,9 +288,9 @@ export async function POST(request, { params }) {
 
     const leadInsertBase = {
       tenant_id: website.tenantId,
-      slug,
+      slug: canonicalSlug,
       name: cleanName,
-      email: cleanEmail || `${slug}+${Date.now()}@no-email.local`,
+      email: cleanEmail || `${canonicalSlug}+${Date.now()}@no-email.local`,
       phone: cleanPhone,
       address_line_1: cleanAddressLine1,
       city: cleanCity,
@@ -382,7 +391,7 @@ export async function POST(request, { params }) {
           email: cleanEmail || null,
           phone: cleanPhone,
           address: fullAddress,
-          notes: `Website lead (${slug})\nService needed: ${cleanServiceNeeded}\n${cleanDescription}`,
+          notes: `Website lead (${canonicalSlug})\nService needed: ${cleanServiceNeeded}\n${cleanDescription}`,
           lead_status: "new_lead",
           estimate_sent: false,
           created_at: nowIso,
@@ -435,7 +444,7 @@ export async function POST(request, { params }) {
         message: `${cleanName} requested ${cleanServiceNeeded}.`,
         metadata: {
           source: "website",
-          slug,
+          slug: canonicalSlug,
           serviceNeeded: cleanServiceNeeded,
           phone: cleanPhone,
         },
@@ -463,7 +472,7 @@ export async function POST(request, { params }) {
       leadPhone: cleanPhone,
       serviceNeeded: cleanServiceNeeded,
       description: cleanDescription,
-      slug,
+      slug: canonicalSlug,
       budgetRange: cleanBudgetRange,
       timeline: cleanTimeline,
       contactPreference: cleanContactPreference,
@@ -476,8 +485,8 @@ export async function POST(request, { params }) {
       const { emails } = await resolveContractorNotificationTargets(website.tenantId);
       await sendInngestEvent(INNGEST_EVENTS.WEBSITE_LEAD, {
         tenantId: website.tenantId,
-        slug,
-        leadId: leadId || `${slug}-${nowIso}`,
+        slug: canonicalSlug,
+        leadId: leadId || `${canonicalSlug}-${nowIso}`,
         contractorEmails: emails,
         leadData: {
           name: cleanName,
@@ -495,13 +504,14 @@ export async function POST(request, { params }) {
       phone: cleanPhone,
       name: cleanName,
       serviceNeeded: cleanServiceNeeded,
-      slug,
+      slug: canonicalSlug,
     });
 
-    return Response.json(
+    return publicWebsiteJson(
       {
         success: true,
         leadId,
+        slug: canonicalSlug,
         message: "Quote request submitted. We'll contact you soon!",
       },
       { status: 200 },
@@ -512,9 +522,13 @@ export async function POST(request, { params }) {
       process.env.NODE_ENV === "production"
         ? undefined
         : String(err?.message || err?.code || "unknown_error");
-    return Response.json(
-      { error: "Failed to submit. Please try again.", detail },
-      { status: 500 }
+    return publicWebsiteJson(
+      {
+        success: false,
+        error: "We couldn’t send your request right now. Please try again in a moment or call us directly.",
+        detail,
+      },
+      { status: 500 },
     );
   }
 }
