@@ -2,6 +2,7 @@ import { getTenantContext } from "@/lib/tenant";
 import { cookies } from "next/headers";
 import { buildSessionCookie, createSessionToken, getSessionFromRequest } from "@/lib/auth";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
+import { enrichAuthMeData } from "@/lib/auth-me-workspace";
 import {
   buildAppSessionFromSupabaseUser,
   reconcileUserRoleOnLogin,
@@ -56,24 +57,24 @@ export async function GET(request) {
       const appSession = buildAppSessionFromSupabaseUser(user, null, profile);
       const token = createSessionToken(appSession);
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            userId: appSession.userId,
-            tenantId: appSession.tenantId,
-            tenantDbId: appSession.tenantDbId,
-            email: appSession.email,
-            name: appSession.name,
-            companyName: appSession.companyName || "",
-            role: appSession.role,
-            capabilities: getRoleCapabilities(normalizeAppRole(appSession.role)),
-            businessType: appSession.businessType || appSession.industry || "",
-            industry: appSession.businessType || appSession.industry || "",
-            isSubscribed: appSession.isSubscribed === true,
-            trialEndDate: appSession.trialEndDate || null,
-          },
-        }),
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: await enrichAuthMeData({
+              userId: appSession.userId,
+              tenantId: appSession.tenantId,
+              tenantDbId: appSession.tenantDbId,
+              email: appSession.email,
+              name: appSession.name,
+              companyName: appSession.companyName || "",
+              role: appSession.role,
+              capabilities: getRoleCapabilities(normalizeAppRole(appSession.role)),
+              businessType: appSession.businessType || appSession.industry || "",
+              industry: appSession.businessType || appSession.industry || "",
+              isSubscribed: appSession.isSubscribed === true,
+              trialEndDate: appSession.trialEndDate || null,
+            }),
+          }),
         {
           status: 200,
           headers: {
@@ -123,7 +124,7 @@ export async function GET(request) {
         return new Response(
           JSON.stringify({
             success: true,
-            data: responseBody,
+            data: await enrichAuthMeData(responseBody),
           }),
           {
             status: 200,
@@ -161,7 +162,7 @@ export async function GET(request) {
     return new Response(
       JSON.stringify({
         success: true,
-        data: responseBody,
+        data: await enrichAuthMeData(responseBody),
       }),
       {
         status: 200,

@@ -545,6 +545,13 @@
       }
     }
   },
+  "workspace": {
+    "yourCompany": "Your company",
+    "publicSite": "Public website",
+    "platformOwner": "FieldBase platform owner",
+    "companyCardAria": "Company: {{company}}",
+    "switcherSoon": "Switch company (coming soon)"
+  },
   "settingsHub": {
     "title": "Settings",
     "subtitle": "Manage your FieldBase account, billing, and how you get paid by clients.",

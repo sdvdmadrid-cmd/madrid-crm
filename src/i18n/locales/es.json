@@ -545,6 +545,13 @@
       }
     }
   },
+  "workspace": {
+    "yourCompany": "Tu empresa",
+    "publicSite": "Sitio publico",
+    "platformOwner": "Dueno de plataforma FieldBase",
+    "companyCardAria": "Empresa: {{company}}",
+    "switcherSoon": "Cambiar empresa (proximamente)"
+  },
   "settingsHub": {
     "title": "Ajustes",
     "subtitle": "Administra tu cuenta de FieldBase, tu suscripcion y como cobras a tus clientes.",

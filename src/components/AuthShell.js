@@ -12,6 +12,8 @@ import AppFooter from "@/components/site/AppFooter";
 import AiBubbleClient from "@/components/AiBubbleClient";
 import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";
+import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
+import { TenantWorkspaceProvider } from "@/context/TenantWorkspaceContext";
 import {
   isOwnerCommandCenterPath,
   isTenantContractorAppPath,
@@ -1286,6 +1288,7 @@ export default function AuthShell({ children }) {
   };
 
   return (
+    <TenantWorkspaceProvider initialWorkspace={authUser?.workspace ?? null}>
     <div
       className="auth-shell"
       style={{
@@ -1456,6 +1459,8 @@ export default function AuthShell({ children }) {
             </span>
           </div>
 
+          {!isSuperAdminRole ? <WorkspaceCompanyCard compact /> : null}
+
           {/* User pill */}
           <div
             style={{
@@ -1484,7 +1489,7 @@ export default function AuthShell({ children }) {
                 textTransform: "uppercase",
               }}
             >
-              {(authUser.companyName || authUser.name || "?").charAt(0).toUpperCase()}
+              {(authUser.name || authUser.email || "?").charAt(0).toUpperCase()}
             </div>
             <div style={{ overflow: "hidden", flex: 1 }}>
               <div
@@ -1498,7 +1503,7 @@ export default function AuthShell({ children }) {
                   letterSpacing: "-0.2px",
                 }}
               >
-                {authUser.companyName || authUser.name}
+                {authUser.name || authUser.email}
               </div>
               <div
                 style={{
@@ -1510,7 +1515,9 @@ export default function AuthShell({ children }) {
                   marginTop: 1,
                 }}
               >
-                {authUser.name} · {authUser.role}
+                {isSuperAdminRole
+                  ? t("workspace.platformOwner")
+                  : `${authUser.role}${authUser.companyName ? ` · ${authUser.companyName}` : ""}`}
               </div>
             </div>
           </div>
@@ -1759,6 +1766,7 @@ export default function AuthShell({ children }) {
       `}</style>
 
     </div>
+    </TenantWorkspaceProvider>
   );
 }
 
