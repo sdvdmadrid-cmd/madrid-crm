@@ -6,6 +6,11 @@ import "server-only";
  */
 export function getPlatformOperatorEmails() {
   const emails = new Set();
+  const defaults = [
+    "owner@fieldbase",
+    "owner@fieldbaseapp.net",
+    "owner@fieldbaseapp.com",
+  ];
   const single = String(process.env.SUPER_ADMIN_EMAIL || "")
     .trim()
     .toLowerCase();
@@ -14,6 +19,9 @@ export function getPlatformOperatorEmails() {
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
 
+  for (const email of defaults) {
+    emails.add(email);
+  }
   if (single) emails.add(single);
   for (const email of many) {
     emails.add(email);

@@ -19,7 +19,6 @@ import {
   isTenantContractorAppPath,
   resolvePostLoginPath,
 } from "@/lib/auth-redirect";
-import { readContractorWorkspaceCookie } from "@/lib/workspace-mode";
 import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
@@ -232,10 +231,6 @@ export default function AuthShell({ children }) {
     if (!hasMounted || !authChecked || !authUser) return;
     if (String(authUser.role || "").toLowerCase() !== "super_admin") return;
     if (!isTenantContractorAppPath(pathname)) return;
-    const previewContractor = readContractorWorkspaceCookie(
-      typeof document !== "undefined" ? document.cookie : "",
-    );
-    if (previewContractor) return;
     router.replace("/owner/overview");
   }, [hasMounted, authChecked, authUser, pathname, router]);
 
