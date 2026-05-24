@@ -1,11 +1,13 @@
 import { AdminFinancialDashboardClient } from "@/components/admin/AdminFinancialDashboardClient";
 import AdminAiMonitoringClient from "@/components/admin/AdminAiMonitoringClient";
 import AdminCapacitySnapshotClient from "@/components/admin/AdminCapacitySnapshotClient";
+import ContractorWorkspaceModeSwitch from "@/components/workspace/ContractorWorkspaceModeSwitch";
 import Link from "next/link";
 
 export default function OwnerOverviewPage() {
   return (
     <section style={{ display: "grid", gap: 28 }}>
+      <ContractorWorkspaceModeSwitch />
       <div
         style={{
           padding: "28px 32px",
