@@ -45,7 +45,10 @@ function gitMainSha() {
 }
 
 async function fetchJson(path) {
-  const res = await fetch(`${base}${path}`, { cache: "no-store" });
+  const nonce = `__cb=${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `${base}${path}${separator}${nonce}`;
+  const res = await fetch(url, { cache: "no-store" });
   const text = await res.text();
   let json = null;
   try {
@@ -89,6 +92,21 @@ async function main() {
         `prod=${prodSha} git=${localShort}`,
       );
     }
+  }
+  const healthHeaderCommit = String(
+    healthRes.headers.get("x-fieldbase-commit") || "",
+  ).slice(0, 12);
+  if (healthHeaderCommit) {
+    if (prodSha && !prodSha.startsWith(healthHeaderCommit)) {
+      fail(
+        "Health header commit matches body",
+        `header=${healthHeaderCommit} body=${prodSha}`,
+      );
+    } else {
+      pass("Health header commit matches body", healthHeaderCommit);
+    }
+  } else {
+    warn("Health header commit present", "missing x-fieldbase-commit");
   }
 
   const { json: features } = await fetchJson("/api/deploy-features");

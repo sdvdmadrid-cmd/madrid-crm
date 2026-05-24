@@ -40,6 +40,20 @@ function getSecretHealth() {
   return getSessionSecretHealth(MIN_SECRET_LENGTH);
 }
 
+function healthHeaders(commitSha = "") {
+  const headers = {
+    "Content-Type": "application/json",
+    "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
+  };
+  const normalized = String(commitSha || "").slice(0, 12);
+  if (normalized) {
+    headers["X-Fieldbase-Commit"] = normalized;
+  }
+  return headers;
+}
+
 export async function GET() {
   const startedAt = Date.now();
   const secretHealth = getSecretHealth();
@@ -50,17 +64,23 @@ export async function GET() {
   // GitHub Security Preflight: local next start with dummy Supabase URLs.
   if (process.env.SECURITY_PREFLIGHT_CI === "true") {
     const ok = authHealthy;
+    const commitSha =
+      process.env.NEXT_PUBLIC_BUILD_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_REF ||
+      "";
     return new Response(
       JSON.stringify({
         success: ok,
         status: ok ? "ok" : "degraded",
+        commitSha: commitSha ? String(commitSha).slice(0, 12) : null,
         mode: "security_preflight_ci",
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
       }),
       {
         status: ok ? 200 : 503,
-        headers: { "Content-Type": "application/json" },
+        headers: healthHeaders(commitSha),
       },
     );
   }
@@ -70,11 +90,18 @@ export async function GET() {
     const dbLabel = "supabase";
     const dbHealthy = dbStatus.ok;
 
+    const commitSha =
+      process.env.NEXT_PUBLIC_BUILD_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_REF ||
+      "";
+
     if (!authHealthy || !dbHealthy) {
       return new Response(
         JSON.stringify({
           success: false,
           status: "degraded",
+          commitSha: commitSha ? String(commitSha).slice(0, 12) : null,
           [dbLabel]: dbHealthy ? "ok" : "error",
           auth: authHealthy ? "ok" : "error",
           responseMs: Date.now() - startedAt,
@@ -82,15 +109,10 @@ export async function GET() {
         }),
         {
           status: 503,
-          headers: { "Content-Type": "application/json" },
+          headers: healthHeaders(commitSha),
         },
       );
     }
-
-    const commitSha =
-      process.env.VERCEL_GIT_COMMIT_SHA ||
-      process.env.VERCEL_GIT_COMMIT_REF ||
-      "";
 
     return new Response(
       JSON.stringify({
@@ -106,20 +128,26 @@ export async function GET() {
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: healthHeaders(commitSha),
       },
     );
   } catch {
+    const commitSha =
+      process.env.NEXT_PUBLIC_BUILD_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_REF ||
+      "";
     return new Response(
       JSON.stringify({
         success: false,
         status: "degraded",
+        commitSha: commitSha ? String(commitSha).slice(0, 12) : null,
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
       }),
       {
         status: 503,
-        headers: { "Content-Type": "application/json" },
+        headers: healthHeaders(commitSha),
       },
     );
   }
