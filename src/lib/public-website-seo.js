@@ -8,7 +8,7 @@ function getAppBaseUrl() {
 
 export function getPublicSiteUrl(slug) {
   const base = getAppBaseUrl();
-  return `${base}/site/${encodeURIComponent(String(slug || "").trim().toLowerCase())}`;
+  return `${base}/sites/${encodeURIComponent(String(slug || "").trim().toLowerCase())}`;
 }
 
 export function buildLocalBusinessJsonLd(site) {

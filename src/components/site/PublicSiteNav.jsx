@@ -13,12 +13,12 @@ export default function PublicSiteNav({
 }) {
   const copy = getPublicSiteCopy(locale);
   const navCopy = copy.nav;
-  const quoteHref = requestHref || `/site/${slug}/request`;
+  const quoteHref = requestHref || `/sites/${slug}/request`;
   const displayCta = ctaText || navCopy.getQuote;
 
   return (
     <nav className="s-nav">
-      <Link href={`/site/${slug}`} className="s-logo">
+      <Link href={`/sites/${slug}`} className="s-logo">
         <div className="s-logo-icon" style={{ background: themeColor }}>
           {logoUrl ? (
             <img src={logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />

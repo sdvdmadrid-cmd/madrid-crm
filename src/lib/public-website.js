@@ -6,8 +6,9 @@ import { normalizeSiteAnalytics } from "@/lib/site-analytics";
 import {
   getWebsiteBuilderPack,
   normalizeHeroPhotos,
-  resolveWebsiteIndustryFromProfile,
+  resolveWebsiteIndustryForWebsite,
 } from "@/lib/website-builder-industry";
+import { normalizeWebsiteSlug } from "@/lib/public-website-routing";
 
 const PUBLIC_WEBSITE_SELECT = [
   "slug",
@@ -54,7 +55,7 @@ function normalizeSocialLinks(raw) {
 }
 
 function normalizeSlug(value) {
-  return String(value || "").trim().toLowerCase();
+  return normalizeWebsiteSlug(value);
 }
 
 function sanitizeGalleryPhotos(rows) {
@@ -114,13 +115,15 @@ export async function getPublicWebsiteBySlug(slug) {
     .eq("tenant_id", website.tenant_id)
     .maybeSingle();
 
+  const meta = website.site_meta && typeof website.site_meta === "object" ? website.site_meta : {};
   const profileForIndustry = {
     businessType: companyProfile?.business_type || "",
     companyName: companyProfile?.company_name || "",
     publicDisplayName: companyProfile?.public_display_name || "",
   };
-  const pack = getWebsiteBuilderPack(resolveWebsiteIndustryFromProfile(profileForIndustry));
-  const meta = website.site_meta && typeof website.site_meta === "object" ? website.site_meta : {};
+  const pack = getWebsiteBuilderPack(
+    resolveWebsiteIndustryForWebsite(profileForIndustry, meta),
+  );
   const heroPhotos = normalizeHeroPhotos(meta.heroPhotos, pack).filter((p) => {
     const src = String(p?.src || "").trim();
     return src.startsWith("data:image/") || /^https?:\/\//i.test(src);

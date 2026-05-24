@@ -129,7 +129,19 @@
     "publicDisplayNameLabel": "Public display name",
     "publicDisplayNamePlaceholder": "FieldBase",
     "saveBranding": "Save branding",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "stripeConnect": {
+      "title": "Stripe Connect (platform)",
+      "featureFlagOn": "App flag STRIPE_CONNECT_ENABLED is ON — contractors can start Connect onboarding.",
+      "featureFlagOff": "App flag STRIPE_CONNECT_ENABLED is OFF — Connect onboarding is disabled in the app.",
+      "platformNotReady": "Stripe must approve Connect on the FieldBase platform Stripe account before contractors can connect.",
+      "step1": "Open Stripe Connect with the platform Stripe account (live keys in Vercel).",
+      "step2": "Complete platform registration. Use docs/STRIPE_CONNECT_APPLICATION_DRAFT.md in the repo for suggested English answers.",
+      "step3": "When Connect shows Enabled in Stripe, keep STRIPE_CONNECT_ENABLED=true in Vercel Production and redeploy fieldbaseapp.net.",
+      "openStripeConnect": "Open Stripe Connect dashboard",
+      "draftDocHint": "Questionnaire copy: docs/STRIPE_CONNECT_APPLICATION_DRAFT.md · Full steps: docs/STRIPE_CONNECT_APPROVAL.md",
+      "rolloutPaused": "Connect rollout is paused (STRIPE_CONNECT_ENABLED=false). Payment infrastructure stays deployment-ready. Enable only after Illinois EIN, business bank account, and Stripe platform Connect verification are complete — then contractors can onboard."
+    }
   },
   "actions": {
     "hideForm": "Hide form",
@@ -616,7 +628,11 @@
     "errors": {
       "loadStatus": "Could not load payment settings.",
       "onboard": "Could not start Stripe onboarding.",
-      "platformConnectRequired": "Stripe Connect is not enabled on the FieldBase platform Stripe account yet. The app owner must complete signup at dashboard.stripe.com/connect, then try again. Suggested copy: docs/STRIPE_CONNECT_APPLICATION_DRAFT.md",
+      "platformConnectRequired": "Online payments are not available yet. FieldBase is finishing Stripe Connect setup with our payments provider. Please try again in a few days or contact support@fieldbaseapp.net.",
+      "platformConnectRequiredOwner": "Stripe Connect is not enabled on the FieldBase platform Stripe account yet. As platform owner, open Stripe Connect, complete platform registration (use docs/STRIPE_CONNECT_APPLICATION_DRAFT.md in the repo for suggested copy), wait for Stripe approval, then redeploy production.",
+      "openStripeConnect": "Open Stripe Connect",
+      "ownerSetupGuide": "Owner setup guide",
+      "connectNotEnabledYet": "Stripe Connect onboarding is not enabled in this environment yet. Platform payments still work on the main Stripe account.",
       "dashboard": "Could not open Stripe dashboard.",
       "missingUrl": "Stripe did not return a link."
     }

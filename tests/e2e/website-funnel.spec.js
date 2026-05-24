@@ -43,7 +43,7 @@ test.describe("Website builder funnel", () => {
     await page.goto("/website");
     await expect(page.locator("body")).toBeVisible();
 
-    const publicRes = await page.request.get(`/site/${slug}`);
+    const publicRes = await page.request.get(`/sites/${slug}`);
     expect([200, 404]).toContain(publicRes.status());
   });
 });

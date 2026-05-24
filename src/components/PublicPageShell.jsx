@@ -10,7 +10,7 @@ export default function PublicPageShell({ children }) {
     pathname === "/reset-password" ||
     pathname?.startsWith("/quote/") ||
     pathname?.startsWith("/estimate/") ||
-    pathname?.startsWith("/site/");
+    pathname?.startsWith("/site/") || pathname?.startsWith("/sites/");
 
   if (hideChrome) {
     return children;

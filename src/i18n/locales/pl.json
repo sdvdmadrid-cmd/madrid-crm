@@ -129,7 +129,19 @@
     "publicDisplayNameLabel": "Publiczna nazwa",
     "publicDisplayNamePlaceholder": "FieldBase",
     "saveBranding": "Zapisz marke",
-    "saving": "Zapisywanie..."
+    "saving": "Zapisywanie...",
+    "stripeConnect": {
+      "title": "Stripe Connect (platforma)",
+      "featureFlagOn": "STRIPE_CONNECT_ENABLED jest WLACZONE — wykonawcy moga rozpoczac onboarding Connect.",
+      "featureFlagOff": "STRIPE_CONNECT_ENABLED jest WYLACZONE — onboarding Connect jest wylaczony w aplikacji.",
+      "platformNotReady": "Stripe musi zatwierdzic Connect na koncie platformy FieldBase, zanim wykonawcy beda mogli sie polaczyc.",
+      "step1": "Otworz Stripe Connect na koncie platformy (klucze live w Vercel).",
+      "step2": "Uzupelnij rejestracje platformy. Uzyj docs/STRIPE_CONNECT_APPLICATION_DRAFT.md w repozytorium.",
+      "step3": "Gdy Connect pokaze Enabled w Stripe, utrzymuj STRIPE_CONNECT_ENABLED=true w Vercel Production i ponownie wdroz fieldbaseapp.net.",
+      "openStripeConnect": "Otworz panel Stripe Connect",
+      "draftDocHint": "Tekst kwestionariusza: docs/STRIPE_CONNECT_APPLICATION_DRAFT.md · Kroki: docs/STRIPE_CONNECT_ROLLOUT.md",
+      "rolloutPaused": "Wdrozenie Connect jest wstrzymane (STRIPE_CONNECT_ENABLED=false). Infrastruktura platnosci pozostaje gotowa. Wlacz dopiero po EIN, koncie bankowym firmy i weryfikacji Connect w Stripe."
+    }
   },
   "actions": {
     "hideForm": "Ukryj formularz",

@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import ContractorTrustStrip from "@/components/workspace/ContractorTrustStrip";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { resolveConnectOnboardError } from "@/lib/stripe-connect-client";
+import { CONNECT_ERROR_CODE } from "@/lib/stripe-connect-codes";
 import styles from "./ContractorPaymentsSettings.module.css";
 
 function StatusBadge({ variant, children }) {
@@ -25,6 +27,8 @@ export default function ContractorPaymentsSettings() {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [errorIsPlatformSetup, setErrorIsPlatformSetup] = useState(false);
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false);
   const [notice, setNotice] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -51,6 +55,29 @@ export default function ContractorPaymentsSettings() {
   }, [loadStatus]);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/me", {
+          cache: "no-store",
+          suppressUnauthorizedEvent: true,
+        });
+        if (!res.ok || cancelled) return;
+        const payload = await res.json();
+        const role = String(payload?.data?.role || "").toLowerCase();
+        if (!cancelled) {
+          setIsPlatformOwner(role === "super_admin");
+        }
+      } catch {
+        if (!cancelled) setIsPlatformOwner(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (connectParam === "return") {
       setNotice(t("settingsPayments.notices.returnFromStripe"));
       loadStatus();
@@ -69,6 +96,7 @@ export default function ContractorPaymentsSettings() {
   const startOnboarding = useCallback(async () => {
     setActionLoading(true);
     setError("");
+    setErrorIsPlatformSetup(false);
     try {
       const res = await apiFetch("/api/payments/connect/onboard", {
         method: "POST",
@@ -85,16 +113,15 @@ export default function ContractorPaymentsSettings() {
       }
       window.location.href = url;
     } catch (err) {
-      const raw = String(err?.message || "");
-      if (raw.includes("STRIPE_CONNECT_PLATFORM_NOT_ENABLED")) {
-        setError(t("settingsPayments.errors.platformConnectRequired"));
-      } else {
-        setError(err?.message || t("settingsPayments.errors.onboard"));
-      }
+      const isPlatformSetup =
+        err?.code === CONNECT_ERROR_CODE.PLATFORM_NOT_ENABLED ||
+        String(err?.message || "").includes("STRIPE_CONNECT_PLATFORM_NOT_ENABLED");
+      setErrorIsPlatformSetup(isPlatformSetup);
+      setError(resolveConnectOnboardError(err, t, { isPlatformOwner }));
     } finally {
       setActionLoading(false);
     }
-  }, [t]);
+  }, [isPlatformOwner, t]);
 
   const openStripeDashboard = useCallback(async () => {
     setActionLoading(true);
@@ -150,7 +177,27 @@ export default function ContractorPaymentsSettings() {
       }
     >
       {notice ? <div className={styles.notice}>{notice}</div> : null}
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {error ? (
+        <div className={styles.error}>
+          <p>{error}</p>
+          {errorIsPlatformSetup && isPlatformOwner ? (
+            <p className={styles.errorActions}>
+              <a
+                href="https://dashboard.stripe.com/connect"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.errorLink}
+              >
+                {t("settingsPayments.errors.openStripeConnect")}
+              </a>
+              {" · "}
+              <Link href="/owner/settings" className={styles.errorLink}>
+                {t("settingsPayments.errors.ownerSetupGuide")}
+              </Link>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <section className={styles.heroCard}>
         <div className={styles.heroTop}>

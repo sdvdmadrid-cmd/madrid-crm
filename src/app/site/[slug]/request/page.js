@@ -82,7 +82,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
           </h1>
           <p style={{ color: "#475569", maxWidth: 620, lineHeight: 1.7 }}>{copy.request.subtitle}</p>
           <Link
-            href={`/site/${slug}`}
+            href={`/sites/${slug}`}
             style={{
               display: "inline-block",
               marginTop: 14,

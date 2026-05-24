@@ -39,6 +39,26 @@
   font-size: 14px;
 }
 
+.error p {
+  margin: 0;
+}
+
+.errorActions {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.errorLink {
+  color: #fecdd3;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.errorLink:hover {
+  color: #fff1f2;
+}
+
 .heroCard {
   padding: 28px 30px;
   margin-bottom: 20px;

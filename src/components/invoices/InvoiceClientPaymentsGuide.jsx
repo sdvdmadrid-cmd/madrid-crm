@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { resolveConnectOnboardError } from "@/lib/stripe-connect-client";
 import styles from "./InvoiceClientPaymentsGuide.module.css";
 
 const STORAGE_KEY = "fieldbase_invoices_guide_collapsed";
@@ -26,6 +27,7 @@ export default function InvoiceClientPaymentsGuide({
   const [copyNotice, setCopyNotice] = useState("");
   const [connectLoading, setConnectLoading] = useState(false);
   const [connectError, setConnectError] = useState("");
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -60,6 +62,30 @@ export default function InvoiceClientPaymentsGuide({
       cancelled = true;
     };
   }, [t]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/me", {
+          cache: "no-store",
+          suppressUnauthorizedEvent: true,
+        });
+        if (!res.ok || cancelled) return;
+        const payload = await res.json();
+        if (!cancelled) {
+          setIsPlatformOwner(
+            String(payload?.data?.role || "").toLowerCase() === "super_admin",
+          );
+        }
+      } catch {
+        if (!cancelled) setIsPlatformOwner(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const dismiss = useCallback(() => {
     setExpanded(false);
@@ -110,11 +136,11 @@ export default function InvoiceClientPaymentsGuide({
       }
       window.location.href = url;
     } catch (err) {
-      setConnectError(err?.message || "Connect onboarding failed");
+      setConnectError(resolveConnectOnboardError(err, t, { isPlatformOwner }));
     } finally {
       setConnectLoading(false);
     }
-  }, []);
+  }, [isPlatformOwner, t]);
 
   const steps = [
     {

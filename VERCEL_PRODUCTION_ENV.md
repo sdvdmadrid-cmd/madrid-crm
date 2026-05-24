@@ -20,9 +20,11 @@ Set these in the Vercel Production environment before deploy:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `BILL_AUTOPAY_CRON_SECRET`
-- `STRIPE_CONNECT_ENABLED` — keep `false` until Stripe Connect is approved in the Dashboard
+- `STRIPE_CONNECT_ENABLED` — **must stay `false`** until Illinois EIN, business banking, and Stripe platform Connect verification are complete (see `docs/STRIPE_CONNECT_ROLLOUT.md`)
 
 These are required because the codebase includes live invoice checkout and Bill Payments flows.
+
+**While Connect is paused:** invoice card payments use the **platform** Stripe account (`paymentsMode: platform`). No contractor Express onboarding is exposed. This is intentional and not a bug.
 
 ## Must Have If Transactional Email Is Live
 

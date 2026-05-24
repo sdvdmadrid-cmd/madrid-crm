@@ -23,10 +23,7 @@ export async function GET(request) {
     return new Response(
       JSON.stringify({
         success: true,
-        data: {
-          ...status,
-          docs: "/docs/payments-architecture.md",
-        },
+        data: status,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );

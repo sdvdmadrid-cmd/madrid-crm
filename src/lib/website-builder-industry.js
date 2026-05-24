@@ -581,6 +581,27 @@ export function resolveWebsiteIndustryFromProfile(companyProfile = {}) {
   return resolveWebsiteIndustryKey(companyProfile?.businessType, companyProfile);
 }
 
+/**
+ * Effective industry for a tenant website: manual override in site_meta, else company profile.
+ */
+export function resolveWebsiteIndustryForWebsite(companyProfile = {}, siteMeta = null) {
+  const meta =
+    siteMeta && typeof siteMeta === "object" ? siteMeta : {};
+  const override = String(meta.industryKeyOverride || "").trim();
+  if (override) {
+    return resolveWebsiteIndustryKey(override, companyProfile);
+  }
+  return resolveWebsiteIndustryFromProfile(companyProfile);
+}
+
+export function listWebsiteIndustryPackOptions() {
+  return Object.values(PACKS).map((pack) => ({
+    key: pack.key,
+    label: pack.label,
+    icon: pack.icon,
+  }));
+}
+
 function inferIndustryKeyFromCompanyName(companyName) {
   const name = String(companyName || "").trim();
   if (!name) return null;

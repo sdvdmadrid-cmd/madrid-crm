@@ -1,5 +1,10 @@
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
-import { createConnectOnboardingLink, isStripeConnectEnabled } from "@/lib/stripe-connect";
+import {
+  buildConnectRouteErrorPayload,
+  createConnectOnboardingLink,
+  isStripeConnectEnabled,
+} from "@/lib/stripe-connect";
+import { CONNECT_ERROR_CODE } from "@/lib/stripe-connect-codes";
 import { getRequestOrigin } from "@/lib/supabase-auth";
 import {
   canManageSensitive,
@@ -29,7 +34,7 @@ export async function POST(request) {
           success: false,
           error:
             "Stripe Connect onboarding is not enabled yet. See docs/payments-architecture.md.",
-          code: "connect_not_enabled",
+          code: CONNECT_ERROR_CODE.NOT_ENABLED,
         }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       );
@@ -68,9 +73,10 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error("[api/payments/connect/onboard] error", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    );
+    const { status, body } = buildConnectRouteErrorPayload(error);
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

@@ -11,8 +11,10 @@ import {
 } from "@/lib/company-profile-store";
 import {
   getWebsiteBuilderPack,
-  resolveWebsiteIndustryFromProfile,
+  resolveWebsiteIndustryForWebsite,
 } from "@/lib/website-builder-industry";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { uploadWebsiteImageFromDataUrl } from "@/lib/website-media-storage";
 import { getOpenAiClient } from "@/lib/openai-client";
 import { assertSafeText } from "@/lib/input-sanitizer";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
@@ -112,7 +114,18 @@ export async function POST(request) {
     }),
     access.tenantDbId,
   );
-  const pack = getWebsiteBuilderPack(resolveWebsiteIndustryFromProfile(profile));
+  const { data: websiteRow } = await supabaseAdmin
+    .from("contractor_websites")
+    .select("slug, site_meta")
+    .eq("tenant_id", access.tenantDbId)
+    .maybeSingle();
+
+  const pack = getWebsiteBuilderPack(
+    resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta),
+  );
+  const websiteSlug = String(websiteRow?.slug || "draft").trim();
+  const mediaKind =
+    String(body.mediaKind || "hero").trim() === "gallery" ? "gallery" : "hero";
   const styleHint = String(body.style || "realistic").trim().slice(0, 40);
   const companyName = String(
     profile?.publicDisplayName || profile?.companyName || "",
@@ -152,10 +165,25 @@ export async function POST(request) {
       throw new Error("AI did not return a valid image payload");
     }
 
+    let imageUrl = "";
+    if (websiteSlug) {
+      imageUrl = await uploadWebsiteImageFromDataUrl({
+        tenantId: access.tenantDbId,
+        slug: websiteSlug,
+        dataUrl: imageDataUrl,
+        kind: mediaKind,
+      });
+    }
+
+    const persistedSrc =
+      imageUrl && /^https?:\/\//i.test(imageUrl) ? imageUrl : imageDataUrl;
+
     return Response.json({
       success: true,
       data: {
-        imageDataUrl,
+        imageDataUrl: persistedSrc,
+        imageUrl: persistedSrc,
+        persisted: persistedSrc.startsWith("http"),
         alt: safePrompt.slice(0, 160),
       },
     });

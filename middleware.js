@@ -176,6 +176,7 @@ const PUBLIC_PATHS = [
   "/quote",
   "/estimate",
   "/site",
+  "/sites",
   "/api/site",
   "/legal",
   "/legal-required",
@@ -202,6 +203,7 @@ const LEGAL_BYPASS_PREFIXES = [
   "/_next",
   "/public",
   "/site",
+  "/sites",
   "/api/site",
   "/favicon.ico",
   "/robots.txt",
@@ -490,9 +492,9 @@ export async function middleware(request) {
     if (!isStaticAssetPath(pathname) && !pathname.startsWith("/_next")) {
       const rewriteUrl = request.nextUrl.clone();
       if (pathname === "/request" || pathname.startsWith("/request/")) {
-        rewriteUrl.pathname = `/site/${subdomainSlug}/request`;
+        rewriteUrl.pathname = `/sites/${subdomainSlug}/request`;
       } else if (pathname === "/" || pathname === "") {
-        rewriteUrl.pathname = `/site/${subdomainSlug}`;
+        rewriteUrl.pathname = `/sites/${subdomainSlug}`;
       } else {
         return notFoundResponse();
       }
