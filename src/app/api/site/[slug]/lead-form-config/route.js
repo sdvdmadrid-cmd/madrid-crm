@@ -24,6 +24,7 @@ export async function GET(_request, { params }) {
   }
 
   const data = resolved.website;
+  const turnstile = getTurnstileStatus();
 
   const services = resolveWebsiteRequestServices(data);
   const companyName =
