@@ -17,8 +17,18 @@ const CONTENT_SECURITY_POLICY = [
   "upgrade-insecure-requests",
 ].join('; ');
 
+const buildSha = String(
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.VERCEL_DEPLOYMENT_ID ||
+    process.env.GITHUB_SHA ||
+    "local",
+).slice(0, 12);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_BUILD_SHA: buildSha,
+  },
   reactCompiler: true,
   poweredByHeader: false,
   images: {
@@ -67,6 +77,10 @@ const nextConfig = {
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, must-revalidate",
           },
         ],
       },
