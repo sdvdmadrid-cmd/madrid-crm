@@ -115,7 +115,13 @@ export default async function PublicContractorSitePage({ params }) {
 
   if (!data) notFound();
 
-  const { reviews: publicReviews, stats: reviewStats } = await getPublicReviewsBySlug(slug);
+  let publicReviews = [];
+  let reviewStats = null;
+  try {
+    ({ reviews: publicReviews, stats: reviewStats } = await getPublicReviewsBySlug(slug));
+  } catch (error) {
+    console.error("[public-site] reviews load failed", error?.message || error);
+  }
 
   const locale = resolvePublicSiteLocale(data.companyProfile?.documentLanguage);
   const copy = getPublicSiteCopy(locale);
