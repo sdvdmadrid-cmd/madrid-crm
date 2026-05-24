@@ -7,6 +7,7 @@ export default function WebsiteBuilderFloatingBar({
   device,
   onDeviceChange,
   onRegenerate,
+  onCancelGenerate,
   generating,
   onToggleAdvanced,
   advancedOpen,
@@ -64,14 +65,24 @@ export default function WebsiteBuilderFloatingBar({
           </button>
         ) : null}
 
-        <button
-          type="button"
-          className={`${styles.floatingBtn} ${styles.floatingBtnAi}`}
-          disabled={generating}
-          onClick={onRegenerate}
-        >
-          {generating ? t.generatingFull : `✨ ${t.generateFull}`}
-        </button>
+        {generating && onCancelGenerate ? (
+          <button
+            type="button"
+            className={`${styles.floatingBtn} ${styles.floatingBtnGhost}`}
+            onClick={onCancelGenerate}
+          >
+            {t.genCancel}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={`${styles.floatingBtn} ${styles.floatingBtnAi}`}
+            disabled={generating}
+            onClick={onRegenerate}
+          >
+            {generating ? t.generatingFull : `✨ ${t.generateFull}`}
+          </button>
+        )}
 
         <button
           type="button"

@@ -307,13 +307,15 @@ export default function WebsiteBuilderPreview({
         {form.galleryPhotos.length > 0 ? (
           <div className="preview-gallery">
             <div className="preview-features-title">Recent Work</div>
-            <div className="preview-gallery-grid">
+            <div className="preview-gallery-masonry">
               {form.galleryPhotos.map((photo, index) => (
-                <div key={`gallery-${index}`} className="preview-gallery-card">
+                <div key={photo.id || `gallery-${index}`} className="preview-gallery-card">
                   <img
-                    src={photo.src}
+                    src={photo.thumbnail || photo.src}
                     alt={photo.alt || `Project ${index + 1}`}
                     className="preview-gallery-photo"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
               ))}

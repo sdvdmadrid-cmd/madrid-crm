@@ -1,11 +1,12 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { normalizeGalleryPhoto } from "@/lib/website-gallery";
 
 export const WEBSITE_MEDIA_BUCKET =
   process.env.SUPABASE_WEBSITE_MEDIA_BUCKET || "website-media";
 
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
 function parseDataUrl(dataUrl) {
   const raw = String(dataUrl || "").trim();
@@ -29,23 +30,28 @@ function buildObjectPath(tenantId, slug, kind, ext) {
   const safeSlug = String(slug || "site").replace(/[^a-zA-Z0-9-]/g, "");
   const stamp = Date.now();
   const rand = Math.random().toString(36).slice(2, 9);
-  return `${safeTenant}/${safeSlug}/${kind}/${stamp}-${rand}.${ext}`;
+  const safeKind = String(kind || "media").replace(/[^a-zA-Z0-9-_]/g, "").slice(0, 48);
+  return `${safeTenant}/${safeSlug}/${safeKind}/${stamp}-${rand}.${ext}`;
 }
 
-export async function uploadWebsiteImageFromDataUrl({
+export async function uploadWebsiteImageBuffer({
   tenantId,
   slug,
-  dataUrl,
-  kind = "hero",
+  buffer,
+  mime = "image/jpeg",
+  kind = "gallery",
 }) {
-  const parsed = parseDataUrl(dataUrl);
-  if (!parsed) return String(dataUrl || "").trim();
-
-  const path = buildObjectPath(tenantId, slug, kind, parsed.ext);
+  if (!buffer?.length || buffer.length > MAX_IMAGE_BYTES) return "";
+  const ext = mime.includes("png")
+    ? "png"
+    : mime.includes("webp")
+      ? "webp"
+      : "jpg";
+  const path = buildObjectPath(tenantId, slug, kind, ext);
   const { error: uploadError } = await supabaseAdmin.storage
     .from(WEBSITE_MEDIA_BUCKET)
-    .upload(path, parsed.buffer, {
-      contentType: parsed.mime,
+    .upload(path, buffer, {
+      contentType: mime,
       upsert: false,
       cacheControl: "31536000",
     });
@@ -60,6 +66,29 @@ export async function uploadWebsiteImageFromDataUrl({
     .getPublicUrl(path);
 
   return String(publicData?.publicUrl || "").trim();
+}
+
+export async function uploadWebsiteImageFromDataUrl({
+  tenantId,
+  slug,
+  dataUrl,
+  kind = "hero",
+}) {
+  const src = String(dataUrl || "").trim();
+  if (/^https?:\/\//i.test(src)) return src;
+
+  const parsed = parseDataUrl(src);
+  if (!parsed) return src.startsWith("data:image/") ? src : "";
+
+  const url = await uploadWebsiteImageBuffer({
+    tenantId,
+    slug,
+    buffer: parsed.buffer,
+    mime: parsed.mime,
+    kind,
+  });
+
+  return url || src;
 }
 
 export function isPersistableImageSrc(src) {
@@ -86,17 +115,26 @@ export async function persistHeroPhotosForStorage(tenantId, slug, heroPhotos = [
       src: nextSrc,
       alt: String(slot?.alt || "").slice(0, 160),
       prompt: String(slot?.prompt || "").slice(0, 320),
+      persisted: /^https?:\/\//i.test(nextSrc),
     });
   }
-  return out;
+  return out.filter((slot) => {
+    const s = String(slot?.src || "").trim();
+    return s.startsWith("data:image/") || /^https?:\/\//i.test(s);
+  });
 }
 
 export async function persistGalleryPhotosForStorage(tenantId, slug, galleryPhotos = []) {
   if (!Array.isArray(galleryPhotos)) return [];
   const out = [];
-  for (const photo of galleryPhotos) {
-    const src = String(photo?.src || "").trim();
+
+  for (let i = 0; i < galleryPhotos.length; i += 1) {
+    const raw = galleryPhotos[i];
+    const base = normalizeGalleryPhoto(raw, i);
+    const src = base.src;
     let nextSrc = src;
+    let persisted = /^https?:\/\//i.test(src);
+
     if (src.startsWith("data:image/")) {
       nextSrc = await uploadWebsiteImageFromDataUrl({
         tenantId,
@@ -104,11 +142,31 @@ export async function persistGalleryPhotosForStorage(tenantId, slug, galleryPhot
         dataUrl: src,
         kind: "gallery",
       });
+      persisted = /^https?:\/\//i.test(nextSrc);
     }
+
+    if (!nextSrc) continue;
+
+    const thumbSrc =
+      base.thumbnail && base.thumbnail.startsWith("data:image/")
+        ? await uploadWebsiteImageFromDataUrl({
+            tenantId,
+            slug,
+            dataUrl: base.thumbnail,
+            kind: "thumb",
+          })
+        : base.thumbnail;
+
     out.push({
+      id: base.id,
       src: nextSrc,
-      alt: String(photo?.alt || "Completed project photo").slice(0, 160),
+      thumbnail: /^https?:\/\//i.test(thumbSrc) ? thumbSrc : nextSrc,
+      alt: base.alt,
+      projectId: base.projectId,
+      kind: base.kind,
+      persisted,
     });
   }
-  return out.filter((p) => p.src && (p.src.startsWith("http") || p.src.startsWith("data:image/")));
+
+  return out.filter((p) => isPersistableImageSrc(p.src));
 }

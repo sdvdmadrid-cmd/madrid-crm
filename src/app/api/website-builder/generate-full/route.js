@@ -15,12 +15,15 @@ import {
   resolveWebsiteIndustryForWebsite,
 } from "@/lib/website-builder-industry";
 import {
-  buildFullSiteCopyPrompt,
+  buildCompactSiteCopyPrompt,
   buildFullSiteFromAi,
+  buildInstantSiteFromIndustry,
+  WEBSITE_AI_COPY_TIMEOUT_MS,
 } from "@/lib/website-builder-generation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
-import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
+import { runAiCompletion } from "@/lib/ai-service";
+
+export const maxDuration = 25;
 
 function parseAiJson(raw) {
   const text = String(raw || "{}");
@@ -31,6 +34,21 @@ function parseAiJson(raw) {
     if (match) return JSON.parse(match[0]);
     throw new Error("AI returned unexpected format");
   }
+}
+
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("AI copy timeout")), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 }
 
 export async function POST(request) {
@@ -45,17 +63,6 @@ export async function POST(request) {
     );
   }
 
-  const aiDescriptionEnabled = await isPlatformFeatureEnabled(
-    "feature_ai_description",
-    true,
-  );
-  if (!aiDescriptionEnabled) {
-    return Response.json(
-      { success: false, error: "AI generation is disabled by feature flag." },
-      { status: 403 },
-    );
-  }
-
   const access = await getAuthenticatedTenantContext(request);
   if (!access.authenticated) return unauthenticatedResponse();
   if (!canWrite(access.role)) return forbiddenResponse();
@@ -64,76 +71,82 @@ export async function POST(request) {
   const services = Array.isArray(body.services) ? body.services : [];
   const existingForm =
     body.currentForm && typeof body.currentForm === "object" ? body.currentForm : {};
+  const enhanceCopy = body.enhanceCopy !== false;
 
-  const profile = withDefaultCompanyProfile(
-    await getCompanyProfileByTenant({ tenantId: access.tenantDbId }),
-    access.tenantDbId,
-  );
+  const [profileRaw, websiteResult] = await Promise.all([
+    getCompanyProfileByTenant({ tenantId: access.tenantDbId }),
+    supabaseAdmin
+      .from("contractor_websites")
+      .select("site_meta")
+      .eq("tenant_id", access.tenantDbId)
+      .maybeSingle(),
+  ]);
 
-  const { data: websiteRow } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("site_meta")
-    .eq("tenant_id", access.tenantDbId)
-    .maybeSingle();
+  const profile = withDefaultCompanyProfile(profileRaw, access.tenantDbId);
+  const websiteRow = websiteResult?.data || null;
 
   const companyName =
     profile.publicDisplayName || profile.companyName || "Our Company";
   const industryKey = resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta);
   const pack = getWebsiteBuilderPack(industryKey);
 
-  const topServices = services
-    .slice(0, 12)
-    .map((s) => `- ${s.name}${s.description ? `: ${s.description.slice(0, 80)}` : ""}`)
-    .join("\n");
+  const instantSite = buildInstantSiteFromIndustry(pack, profile, existingForm);
+  let fullSite = instantSite;
+  let source = "instant";
 
-  const ctx = {
-    companyName,
-    city: profile.businessCity || profile.city || "",
-    phone: profile.phone || "",
-    topServices,
-    defaultServiceNames: pack.defaultServices.map((s) => s.name).join(", "),
-  };
+  const aiDescriptionEnabled = await isPlatformFeatureEnabled(
+    "feature_ai_description",
+    true,
+  );
 
-  let raw = "{}";
-  try {
-    const response = await runAiCompletion({
-      request,
-      tenantId: access.tenantDbId,
-      userId: access.userId,
-      feature: "website_builder_generate_full",
-      modelTier: "standard",
-      messages: [
-        { role: "system", content: buildIndustryAiSystemPrompt(pack) },
-        { role: "user", content: buildFullSiteCopyPrompt(pack, ctx) },
-      ],
-      maxTokens: 1400,
-      temperature: 0.4,
-    });
-    raw = response.text || "{}";
-  } catch (error) {
-    const code = normalizeAiErrorCode(error?.aiCode || error?.code, error?.status, error?.message);
-    return Response.json(
-      buildAiErrorPayload({
-        code,
-        language: getRequestLanguage(request, "en"),
-        status: Number(error?.status || 502),
-        technicalMessage: error?.message || "AI request failed",
-      }),
-      { status: Number(error?.status || 502) },
-    );
+  if (enhanceCopy && aiDescriptionEnabled) {
+    const topServices = services
+      .slice(0, 12)
+      .map(
+        (s) =>
+          `- ${s.name}${s.description ? `: ${String(s.description).slice(0, 80)}` : ""}`,
+      )
+      .join("\n");
+
+    const ctx = {
+      companyName,
+      city: profile.businessCity || profile.city || "",
+      phone: profile.phone || "",
+      topServices,
+      defaultServiceNames: pack.defaultServices.map((s) => s.name).join(", "),
+    };
+
+    try {
+      const response = await withTimeout(
+        runAiCompletion({
+          request,
+          tenantId: access.tenantDbId,
+          userId: access.userId,
+          feature: "website_builder_generate_full",
+          modelTier: "mini",
+          messages: [
+            { role: "system", content: buildIndustryAiSystemPrompt(pack) },
+            { role: "user", content: buildCompactSiteCopyPrompt(pack, ctx) },
+          ],
+          maxTokens: 750,
+          temperature: 0.35,
+        }),
+        WEBSITE_AI_COPY_TIMEOUT_MS,
+      );
+
+      const parsed = parseAiJson(response.text || "{}");
+      fullSite = buildFullSiteFromAi(parsed, pack, profile, existingForm);
+      if (fullSite.siteMeta && typeof fullSite.siteMeta === "object") {
+        fullSite.siteMeta.generationSource = "ai";
+      }
+      source = "ai";
+    } catch {
+      source = "ai_fallback";
+    }
   }
 
-  let parsed;
-  try {
-    parsed = parseAiJson(raw);
-  } catch {
-    return Response.json(
-      { success: false, error: "AI returned unexpected format. Try again." },
-      { status: 500 },
-    );
-  }
-
-  const fullSite = buildFullSiteFromAi(parsed, pack, profile, existingForm);
+  const heroPrompts = (fullSite.heroPhotos || []).map((p) => p.prompt).filter(Boolean);
+  const galleryPrompts = fullSite.galleryImagePrompts || [];
 
   return Response.json({
     success: true,
@@ -141,11 +154,13 @@ export async function POST(request) {
       ...fullSite,
       industry: industryKey,
       industryLabel: pack.label,
+      source,
       imagePlan: {
-        heroCount: fullSite.heroPhotos.length,
-        galleryCount: fullSite.galleryImagePrompts?.length || 2,
-        heroPrompts: fullSite.heroPhotos.map((p) => p.prompt),
-        galleryPrompts: fullSite.galleryImagePrompts || [],
+        optional: true,
+        heroCount: fullSite.heroPhotos?.length || 0,
+        galleryCount: galleryPrompts.length,
+        heroPrompts,
+        galleryPrompts,
       },
     },
   });

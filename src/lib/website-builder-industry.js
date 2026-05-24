@@ -696,9 +696,11 @@ export function normalizeHeroPhotos(rawSlots, pack) {
   return defaults.map((slot, index) => {
     const incoming = list[index] || list.find((p) => p?.id === slot.id) || {};
     const src = String(incoming?.src || "").trim();
+    const persistedSrc =
+      src.startsWith("data:image/") || /^https?:\/\//i.test(src) ? src : "";
     return {
       id: slot.id,
-      src: src.startsWith("data:image/") ? src : "",
+      src: persistedSrc,
       alt: String(incoming?.alt || slot.alt).slice(0, 160),
       prompt: String(incoming?.prompt || slot.prompt).slice(0, 320),
     };

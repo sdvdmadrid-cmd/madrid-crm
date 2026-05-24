@@ -13,6 +13,25 @@ import {
   buildPublicWebsiteRequestPath,
 } from "@/lib/public-website-routing";
 import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
+import {
+  findFirstEmptyHeroSlotIndex,
+  mergeFullSiteIntoDraft,
+  WEBSITE_FULL_GENERATE_TIMEOUT_MS,
+  WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+} from "@/lib/website-builder-client-generation";
+import {
+  createSaveQueue,
+  mergeFormAfterSave,
+} from "@/lib/website-builder-save-client";
+import {
+  MAX_FEATURED_GALLERY,
+  MAX_UPLOAD_BATCH,
+  buildFeaturedGallery,
+  normalizeGalleryPhotos,
+  normalizePortfolio,
+} from "@/lib/website-gallery";
+import { compressImageFile, fileToDataUrl } from "@/lib/website-image-compress";
+import WebsiteBuilderPortfolio from "./WebsiteBuilderPortfolio";
 import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
 import DeployBuildBadge from "@/components/workspace/DeployBuildBadge";
 import HeroImageEditor from "./HeroImageEditor";
@@ -22,8 +41,7 @@ import WebsiteBuilderPreview, { SECTION_REGEN_MAP } from "./WebsiteBuilderPrevie
 import { WEBSITE_BUILDER_UI } from "./website-builder-ui";
 import styles from "./website-builder.module.css";
 
-const MAX_GALLERY_IMAGES = 8;
-const MAX_GALLERY_IMAGE_SIZE = 3 * 1024 * 1024;
+const MAX_GALLERY_IMAGE_SIZE = 8 * 1024 * 1024;
 const IMAGE_STYLES = [
   { id: "realistic", label: "Realistic" },
   { id: "bright", label: "Bright & clean" },
@@ -51,15 +69,6 @@ const SECTION_FILTERS = {
 };
 
 const AUTOSAVE_MS = 2200;
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Failed to read image"));
-    reader.readAsDataURL(file);
-  });
-}
 
 function useUiLanguage() {
   const [lang, setLang] = useState("en");
@@ -103,6 +112,7 @@ export default function WebsiteBuilderClient() {
     seoDescription: "",
     footerTagline: "",
     serviceAreas: [],
+    portfolio: normalizePortfolio(null),
   });
   const [featureAiDescription, setFeatureAiDescription] = useState(true);
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -113,6 +123,12 @@ export default function WebsiteBuilderClient() {
   const autosaveTimer = useRef(null);
   const formRef = useRef(null);
   const skipAutosave = useRef(true);
+  const saveQueueRef = useRef(null);
+  if (!saveQueueRef.current) saveQueueRef.current = createSaveQueue();
+  const generationAbortRef = useRef(null);
+  const generatingLockRef = useRef(false);
+  const imageEnhanceAbortRef = useRef(null);
+  const [imageEnhancing, setImageEnhancing] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageStyle, setImageStyle] = useState("realistic");
   const [saving, setSaving] = useState(false);
@@ -208,7 +224,7 @@ export default function WebsiteBuilderClient() {
       aboutText: data.aboutText || "",
       ctaText: data.ctaText || "",
       themeColor: data.themeColor || "#16a34a",
-      galleryPhotos: Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [],
+      galleryPhotos: normalizeGalleryPhotos(data.galleryPhotos),
       heroPhotos: Array.isArray(data.heroPhotos) ? data.heroPhotos : [],
       services: Array.isArray(data.services) ? data.services : [],
       testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
@@ -235,6 +251,7 @@ export default function WebsiteBuilderClient() {
       seoDescription: sm.seoDescription || "",
       footerTagline: sm.footerTagline || "",
       serviceAreas: Array.isArray(sm.serviceAreas) ? sm.serviceAreas : [],
+      portfolio: normalizePortfolio(sm.portfolio),
     });
     const completeness = analyzeWebsiteCompleteness(
       {
@@ -244,7 +261,7 @@ export default function WebsiteBuilderClient() {
         ctaText: data.ctaText || "",
         services: Array.isArray(data.services) ? data.services : [],
         heroPhotos: Array.isArray(data.heroPhotos) ? data.heroPhotos : [],
-        galleryPhotos: Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [],
+        galleryPhotos: normalizeGalleryPhotos(data.galleryPhotos),
         testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
         trustBadges: Array.isArray(data.trustBadges) ? data.trustBadges : [],
       },
@@ -304,41 +321,91 @@ export default function WebsiteBuilderClient() {
 
   const handleSave = useCallback(
     async (data, options = {}) => {
-      const { silent = false } = options;
-      setSaving(true);
-      if (!silent) setError("");
-      try {
-        const pack = getWebsiteBuilderPack(industryKey);
-        const sanitized = sanitizeIndustryWebsiteContent(data, pack, companyProfile || {});
-        const res = await apiFetch("/api/website-builder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...data,
-            ...sanitized,
-            heroPhotos: data.heroPhotos,
-            galleryPhotos: data.galleryPhotos,
-            siteMeta: data.siteMeta ?? siteMeta,
-          }),
-        });
-        const payload = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(payload?.error || payload?.message || `HTTP ${res.status}`);
+      const { silent = false, mergeMedia = true } = options;
+      return saveQueueRef.current.run(async (saveId) => {
+        setSaving(true);
+        if (!silent) setError("");
+        const clientSnapshot = {
+          ...(formRef.current || form),
+          ...data,
+          galleryPhotos: normalizeGalleryPhotos(
+            data.galleryPhotos ?? formRef.current?.galleryPhotos,
+          ),
+        };
+        try {
+          const pack = getWebsiteBuilderPack(industryKey);
+          const meta = data.siteMeta ?? siteMeta;
+          const sanitized = sanitizeIndustryWebsiteContent(
+            clientSnapshot,
+            pack,
+            companyProfile || {},
+          );
+          const res = await apiFetch("/api/website-builder", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...clientSnapshot,
+              ...sanitized,
+              heroPhotos: clientSnapshot.heroPhotos,
+              galleryPhotos: clientSnapshot.galleryPhotos,
+              siteMeta: meta,
+            }),
+          });
+          const payload = await res.json().catch(() => null);
+          if (!res.ok) {
+            throw new Error(payload?.error || payload?.message || `HTTP ${res.status}`);
+          }
+
+          if (payload?.data && saveQueueRef.current.isLatest(saveId)) {
+            const serverGallery = normalizeGalleryPhotos(payload.data.galleryPhotos);
+            const clientGallery = normalizeGalleryPhotos(clientSnapshot.galleryPhotos);
+            if (
+              mergeMedia &&
+              clientGallery.length > serverGallery.length
+            ) {
+              showNotice(t.galleryPersistWarning, true);
+            }
+
+            if (mergeMedia) {
+              const mergedForm = mergeFormAfterSave({
+                serverData: payload.data,
+                clientForm: clientSnapshot,
+                mode: "save",
+              });
+              const mergedMeta = {
+                ...meta,
+                ...(payload.data.siteMeta || {}),
+                portfolio: normalizePortfolio(
+                  meta.portfolio ?? payload.data.siteMeta?.portfolio,
+                ),
+              };
+              skipAutosave.current = true;
+              formRef.current = { ...clientSnapshot, ...mergedForm };
+              setForm((prev) => ({ ...prev, ...mergedForm }));
+              setSiteMeta(mergedMeta);
+              setSlug(payload.data.slug || slug);
+              setSlugDraft(payload.data.slug || slug);
+              setPublished(payload.data.published === true);
+              setIndustryMismatch(payload.data.industryMismatch === true);
+            } else {
+              applyApiPayload(payload.data);
+            }
+          }
+
+          if (silent) {
+            setAutoSaved(true);
+            setTimeout(() => setAutoSaved(false), 2000);
+          } else {
+            showNotice(t.savedNotice);
+          }
+        } catch (err) {
+          if (!silent) showNotice(err.message || t.errorSave, true);
+        } finally {
+          setSaving(false);
         }
-        if (payload?.data) applyApiPayload(payload.data);
-        if (silent) {
-          setAutoSaved(true);
-          setTimeout(() => setAutoSaved(false), 2000);
-        } else {
-          showNotice(t.savedNotice);
-        }
-      } catch (err) {
-        if (!silent) showNotice(err.message || t.errorSave, true);
-      } finally {
-        setSaving(false);
-      }
+      });
     },
-    [t, showNotice, applyApiPayload, industryKey, companyProfile, siteMeta],
+    [t, showNotice, applyApiPayload, industryKey, companyProfile, siteMeta, slug],
   );
 
   const sectionVisible = useCallback(
@@ -352,6 +419,7 @@ export default function WebsiteBuilderClient() {
 
   useEffect(() => {
     if (loading) return;
+    if (generating || imageEnhancing || generatingLockRef.current) return;
     if (skipAutosave.current) {
       skipAutosave.current = false;
       return;
@@ -363,7 +431,7 @@ export default function WebsiteBuilderClient() {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-  }, [form, loading, handleSave]);
+  }, [form, loading, generating, imageEnhancing, handleSave]);
 
   const handleApplyIndustryPreset = useCallback(async () => {
     const pack = getWebsiteBuilderPack(industryKey);
@@ -515,148 +583,150 @@ export default function WebsiteBuilderClient() {
     }
   }, [form.services, t, showNotice]);
 
+  const handleCancelGeneration = useCallback(() => {
+    generationAbortRef.current?.abort();
+    imageEnhanceAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    imageEnhanceAbortRef.current = null;
+    generatingLockRef.current = false;
+    setGenerating(false);
+    setImageEnhancing(false);
+    setGenProgress("");
+    setGeneratingSlotId("");
+    showNotice(t.generateCancelled);
+  }, [t, showNotice]);
+
+  const runOptionalHeroImageEnhancement = useCallback(
+    async (heroIndex, prompt, signal) => {
+      if (!aiConfigOk || heroIndex < 0 || !prompt) return;
+      const slotId = formRef.current?.heroPhotos?.[heroIndex]?.id || "";
+      setImageEnhancing(true);
+      setGenProgress(t.genStepHero);
+      if (slotId) setGeneratingSlotId(slotId);
+      try {
+        const imgRes = await apiFetch("/api/website-builder/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
+          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+          signal,
+        });
+        const imgPayload = await getJsonOrThrow(imgRes, t.errorGenerateImage);
+        const imageSrc = String(
+          imgPayload?.data?.imageUrl || imgPayload?.data?.imageDataUrl || "",
+        );
+        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) return;
+
+        const current = formRef.current;
+        if (!current) return;
+        const updatedHero = [...(current.heroPhotos || [])];
+        updatedHero[heroIndex] = {
+          ...updatedHero[heroIndex],
+          src: imageSrc,
+          alt: String(imgPayload?.data?.alt || prompt).slice(0, 160),
+          prompt,
+        };
+        const withHero = { ...current, heroPhotos: updatedHero };
+        skipAutosave.current = true;
+        formRef.current = withHero;
+        setForm(withHero);
+        void handleSave({ ...withHero, siteMeta }, { silent: true });
+      } catch (err) {
+        if (err?.name !== "AbortError") {
+          /* optional — site already usable */
+        }
+      } finally {
+        setGeneratingSlotId("");
+        setImageEnhancing(false);
+        setGenProgress("");
+      }
+    },
+    [aiConfigOk, imageStyle, siteMeta, t, handleSave],
+  );
+
   const handleGenerateFullSite = useCallback(async () => {
-    if (!featureAiDescription) {
-      showNotice(t.errorGenerate, true);
-      return;
-    }
+    if (generatingLockRef.current) return;
+
+    imageEnhanceAbortRef.current?.abort();
+    const abort = new AbortController();
+    generationAbortRef.current = abort;
+    generatingLockRef.current = true;
+    skipAutosave.current = true;
+
     setGenerating(true);
     setGenProgress(t.genStepCopy);
     setError("");
+
     try {
       const catalogServices = (form.services || []).slice(0, 20).map((s) => ({
         name: s?.name || "",
         description: s?.description || "",
       }));
+      const currentForm = formRef.current || form;
+
       const res = await apiFetch("/api/website-builder/generate-full", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           services: catalogServices,
-          currentForm: formRef.current || form,
+          currentForm,
+          enhanceCopy: true,
         }),
+        timeoutMs: WEBSITE_FULL_GENERATE_TIMEOUT_MS,
+        signal: abort.signal,
       });
       const payload = await getJsonOrThrow(res, t.errorGenerate);
       const d = payload.data || {};
-      const nextSiteMeta = {
-        ...siteMeta,
-        ...(d.siteMeta || {}),
-      };
-      const nextForm = {
-        ...(formRef.current || form),
-        headline: d.headline || "",
-        subheadline: d.subheadline || "",
-        aboutText: d.aboutText || "",
-        ctaText: d.ctaText || "",
-        themeColor: d.themeColor || form.themeColor,
-        services: d.services?.length ? d.services : form.services,
-        testimonials: d.testimonials?.length ? d.testimonials : form.testimonials,
-        trustBadges: d.trustBadges?.length ? d.trustBadges : form.trustBadges,
-        heroPhotos: d.heroPhotos?.length ? d.heroPhotos : form.heroPhotos,
-        galleryPhotos: d.galleryPhotos?.length ? d.galleryPhotos : form.galleryPhotos,
-      };
-      skipAutosave.current = true;
+      const { nextForm, nextSiteMeta } = mergeFullSiteIntoDraft({
+        form: currentForm,
+        siteMeta,
+        data: d,
+      });
+
       formRef.current = nextForm;
       setForm(nextForm);
       setSiteMeta(nextSiteMeta);
-      setGenProgress(t.genStepSave);
-      await handleSave({ ...nextForm, siteMeta: nextSiteMeta }, { silent: true });
 
-      const heroSlots = nextForm.heroPhotos || [];
-      const heroTotal = heroSlots.length;
-      for (let i = 0; i < heroTotal; i += 1) {
-        const slot = heroSlots[i];
-        const src = String(slot?.src || "").trim();
-        if (src.startsWith("http") || src.startsWith("data:image/")) continue;
-        const prompt = String(slot?.prompt || imagePresets[i] || "").trim();
-        if (!prompt) continue;
-        setGenProgress(
-          t.genStepHero.replace("{n}", String(i + 1)).replace("{total}", String(heroTotal)),
-        );
-        setGeneratingSlotId(slot.id);
-        try {
-          const imgRes = await apiFetch("/api/website-builder/generate-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
-          });
-          const imgPayload = await getJsonOrThrow(imgRes, t.errorGenerateImage);
-          const imageSrc = String(
-            imgPayload?.data?.imageUrl || imgPayload?.data?.imageDataUrl || "",
-          );
-          if (imageSrc.startsWith("data:image/") || /^https?:\/\//i.test(imageSrc)) {
-            const current = formRef.current || nextForm;
-            const updatedHero = [...(current.heroPhotos || [])];
-            updatedHero[i] = {
-              ...updatedHero[i],
-              src: imageSrc,
-              alt: String(imgPayload?.data?.alt || prompt).slice(0, 160),
-              prompt,
-            };
-            const withHero = { ...current, heroPhotos: updatedHero };
-            formRef.current = withHero;
-            setForm(withHero);
-          }
-        } catch {
-          /* continue other slots */
-        } finally {
-          setGeneratingSlotId("");
-        }
-      }
-
-      const galleryPrompts = Array.isArray(d.galleryImagePrompts)
-        ? d.galleryImagePrompts
-        : [];
-      const galleryTotal = Math.min(2, galleryPrompts.length);
-      for (let g = 0; g < galleryTotal; g += 1) {
-        const prompt = String(galleryPrompts[g] || "").trim();
-        if (!prompt) continue;
-        setGenProgress(
-          t.genStepGallery.replace("{n}", String(g + 1)).replace("{total}", String(galleryTotal)),
-        );
-        try {
-          const imgRes = await apiFetch("/api/website-builder/generate-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "gallery" }),
-          });
-          const imgPayload = await getJsonOrThrow(imgRes, t.errorGenerateImage);
-          const imageSrc = String(
-            imgPayload?.data?.imageUrl || imgPayload?.data?.imageDataUrl || "",
-          );
-          if (imageSrc.startsWith("data:image/") || /^https?:\/\//i.test(imageSrc)) {
-            const current = formRef.current || nextForm;
-            const withGallery = {
-              ...current,
-              galleryPhotos: [
-                ...(current.galleryPhotos || []),
-                { src: imageSrc, alt: prompt.slice(0, 160) },
-              ].slice(0, MAX_GALLERY_IMAGES),
-            };
-            formRef.current = withGallery;
-            setForm(withGallery);
-          }
-        } catch {
-          /* continue */
-        }
-      }
-
-      await handleSave(
-        { ...(formRef.current || nextForm), siteMeta: nextSiteMeta },
-        { silent: true },
-      );
-      const finalForm = formRef.current || nextForm;
-      const finalMeta = nextSiteMeta;
-      const completeness = analyzeWebsiteCompleteness(finalForm, finalMeta);
+      const completeness = analyzeWebsiteCompleteness(nextForm, nextSiteMeta);
       setCompletenessScore(completeness.score);
       setEditorMode("edit");
       setShowAdvancedPanel(false);
       setSelectedPreviewSection(null);
       setMobileTab("preview");
-      showNotice(t.generateFullDone);
+
+      setGenProgress(t.genStepSave);
+      await handleSave({ ...nextForm, siteMeta: nextSiteMeta }, { silent: true });
+
+      const source = String(d.source || "instant");
+      showNotice(
+        source === "ai" ? t.generateFullDone : t.generateInstantDone,
+      );
+
+      setGenerating(false);
+      setGenProgress("");
+      generatingLockRef.current = false;
+      generationAbortRef.current = null;
+
+      const heroIndex = findFirstEmptyHeroSlotIndex(nextForm.heroPhotos);
+      if (heroIndex >= 0 && aiConfigOk) {
+        const prompt = String(
+          nextForm.heroPhotos[heroIndex]?.prompt || imagePresets[heroIndex] || "",
+        ).trim();
+        if (prompt) {
+          const imgAbort = new AbortController();
+          imageEnhanceAbortRef.current = imgAbort;
+          void runOptionalHeroImageEnhancement(heroIndex, prompt, imgAbort.signal);
+        }
+      }
     } catch (err) {
-      showNotice(err.message || t.errorGenerate, true);
+      if (err?.name === "AbortError") {
+        showNotice(t.generateCancelled);
+      } else {
+        showNotice(err.message || t.errorGenerate, true);
+      }
     } finally {
+      generatingLockRef.current = false;
+      generationAbortRef.current = null;
       setGenerating(false);
       setGenProgress("");
     }
@@ -664,11 +734,12 @@ export default function WebsiteBuilderClient() {
     featureAiDescription,
     form,
     imagePresets,
-    imageStyle,
     siteMeta,
+    aiConfigOk,
     t,
     showNotice,
     handleSave,
+    runOptionalHeroImageEnhancement,
   ]);
 
   useEffect(() => {
@@ -724,6 +795,7 @@ export default function WebsiteBuilderClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
+          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
         });
         const payload = await getJsonOrThrow(res, t.errorGenerateImage);
         const imageSrc = String(
@@ -824,31 +896,79 @@ export default function WebsiteBuilderClient() {
     }));
   }, []);
 
+  const handlePortfolioChange = useCallback(
+    (portfolio) => {
+      const normalized = normalizePortfolio(portfolio);
+      const featured = buildFeaturedGallery(normalized);
+      skipAutosave.current = true;
+      setSiteMeta((prev) => {
+        const nextMeta = { ...prev, portfolio: normalized };
+        const nextForm = { ...(formRef.current || form), galleryPhotos: featured };
+        formRef.current = nextForm;
+        setForm(nextForm);
+        void handleSave({ ...nextForm, siteMeta: nextMeta }, { silent: true });
+        return nextMeta;
+      });
+    },
+    [form, handleSave],
+  );
+
   const handleGalleryUpload = useCallback(
     async (event) => {
       const files = Array.from(event.target.files || []);
       if (event.target) event.target.value = "";
       if (!files.length) return;
+
+      const slots = Math.max(0, MAX_FEATURED_GALLERY - form.galleryPhotos.length);
+      const batch = files.slice(0, slots);
+      if (!batch.length) return;
+
       try {
-        const slots = Math.max(0, MAX_GALLERY_IMAGES - form.galleryPhotos.length);
-        const uploaded = [];
-        for (const file of files.slice(0, slots)) {
+        const items = [];
+        for (let i = 0; i < batch.length; i += 1) {
+          const file = batch[i];
           if (!file.type.startsWith("image/")) throw new Error("Images only.");
-          if (file.size > MAX_GALLERY_IMAGE_SIZE) throw new Error("Max 3MB per image.");
-          uploaded.push({
-            src: await fileToDataUrl(file),
+          if (file.size > MAX_GALLERY_IMAGE_SIZE) throw new Error("Image too large (max 8MB).");
+          const compressed = await compressImageFile(file).catch(() => file);
+          items.push({
+            id: `up-${Date.now()}-${i}`,
+            dataUrl: await fileToDataUrl(compressed),
             alt: file.name.replace(/\.[^.]+$/, "").slice(0, 160),
           });
         }
-        setForm((prev) => ({
-          ...prev,
-          galleryPhotos: [...prev.galleryPhotos, ...uploaded].slice(0, MAX_GALLERY_IMAGES),
-        }));
+
+        const uploaded = [];
+        for (let offset = 0; offset < items.length; offset += MAX_UPLOAD_BATCH) {
+          const chunk = items.slice(offset, offset + MAX_UPLOAD_BATCH);
+          const res = await apiFetch("/api/website-builder/gallery/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: chunk }),
+            timeoutMs: 120_000,
+          });
+          const payload = await getJsonOrThrow(res, t.portfolioUploadFailed);
+          if (payload?.data?.photos?.length) uploaded.push(...payload.data.photos);
+        }
+
+        if (!uploaded.length) throw new Error(t.portfolioUploadFailed);
+
+        const nextForm = {
+          ...(formRef.current || form),
+          galleryPhotos: normalizeGalleryPhotos([
+            ...(formRef.current?.galleryPhotos || form.galleryPhotos),
+            ...uploaded,
+          ]).slice(0, MAX_FEATURED_GALLERY),
+        };
+        skipAutosave.current = true;
+        formRef.current = nextForm;
+        setForm(nextForm);
+        await handleSave(nextForm, { silent: true });
+        showNotice(t.savedNotice);
       } catch (err) {
         showNotice(err.message || t.errorSave, true);
       }
     },
-    [form.galleryPhotos.length, showNotice, t.errorSave],
+    [form, showNotice, t, handleSave],
   );
 
   const handleGenerateImage = useCallback(
@@ -858,8 +978,8 @@ export default function WebsiteBuilderClient() {
         showNotice(t.errorGenerateImage, true);
         return;
       }
-      if (form.galleryPhotos.length >= MAX_GALLERY_IMAGES) {
-        showNotice(`Max ${MAX_GALLERY_IMAGES} photos.`, true);
+      if (form.galleryPhotos.length >= MAX_FEATURED_GALLERY) {
+        showNotice(`Max ${MAX_FEATURED_GALLERY} featured photos.`, true);
         return;
       }
       setGeneratingImage(true);
@@ -868,6 +988,7 @@ export default function WebsiteBuilderClient() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "gallery" }),
+          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
         });
         const payload = await getJsonOrThrow(res, t.errorGenerateImage);
         const imageSrc = String(
@@ -876,12 +997,19 @@ export default function WebsiteBuilderClient() {
         if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
           throw new Error(t.errorGenerateImage);
         }
+        const newPhoto = {
+          id: `ai-${Date.now()}`,
+          src: imageSrc,
+          thumbnail: imageSrc,
+          alt: String(payload?.data?.alt || prompt).slice(0, 160),
+          persisted: /^https?:\/\//i.test(imageSrc),
+        };
         const nextForm = {
           ...(formRef.current || form),
-          galleryPhotos: [
+          galleryPhotos: normalizeGalleryPhotos([
             ...(formRef.current?.galleryPhotos || form.galleryPhotos || []),
-            { src: imageSrc, alt: String(payload?.data?.alt || prompt).slice(0, 160) },
-          ].slice(0, MAX_GALLERY_IMAGES),
+            newPhoto,
+          ]).slice(0, MAX_FEATURED_GALLERY),
         };
         skipAutosave.current = true;
         formRef.current = nextForm;
@@ -1082,6 +1210,7 @@ export default function WebsiteBuilderClient() {
               device={device}
               onDeviceChange={setDevice}
               onRegenerate={handleGenerateFullSite}
+              onCancelGenerate={handleCancelGeneration}
               generating={generating}
               onToggleAdvanced={() => setShowAdvancedPanel((v) => !v)}
               advancedOpen={showAdvancedPanel}
@@ -1108,6 +1237,7 @@ export default function WebsiteBuilderClient() {
                 industryKeyOverride={industryKeyOverride}
                 onIndustryChange={handleIndustryOverrideChange}
                 onGenerate={handleGenerateFullSite}
+                onCancel={handleCancelGeneration}
                 generating={generating}
                 genProgress={genProgress}
                 completenessScore={completenessScore}
@@ -1484,6 +1614,19 @@ export default function WebsiteBuilderClient() {
                 </button>
               </>
             ) : null}
+            <WebsiteBuilderPortfolio
+              t={t}
+              portfolio={siteMeta.portfolio}
+              onPortfolioChange={handlePortfolioChange}
+              onSyncFeaturedGallery={(featured) => {
+                setForm((prev) => {
+                  const next = { ...prev, galleryPhotos: featured };
+                  formRef.current = next;
+                  return next;
+                });
+              }}
+              disabled={generating || saving}
+            />
             <p style={{ fontSize: "0.78rem", color: "#94a3b8", margin: "14px 0 8px" }}>
               {t.galleryHint}
             </p>
@@ -1502,8 +1645,14 @@ export default function WebsiteBuilderClient() {
             ) : (
               <div className={styles.galleryGrid}>
                 {form.galleryPhotos.map((photo, index) => (
-                  <div key={`g-${index}`} className={styles.galleryCard}>
-                    <img src={photo.src} alt="" className={styles.galleryPhoto} />
+                  <div key={photo.id || `g-${index}`} className={styles.galleryCard}>
+                    <img
+                      src={photo.thumbnail || photo.src}
+                      alt=""
+                      className={styles.galleryPhoto}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <div className={styles.galleryMeta}>
                       <input
                         className={styles.input}

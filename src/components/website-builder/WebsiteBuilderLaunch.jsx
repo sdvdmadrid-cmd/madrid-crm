@@ -11,6 +11,7 @@ export default function WebsiteBuilderLaunch({
   industryKeyOverride,
   onIndustryChange,
   onGenerate,
+  onCancel,
   generating,
   genProgress,
   completenessScore,
@@ -66,14 +67,25 @@ export default function WebsiteBuilderLaunch({
           </label>
         ) : null}
 
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnLaunch}`}
-          disabled={generating}
-          onClick={onGenerate}
-        >
-          {generating ? genProgress || t.generatingFull : t.generateFull}
-        </button>
+        <div className={styles.launchActions}>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnLaunch}`}
+            disabled={generating}
+            onClick={onGenerate}
+          >
+            {generating ? genProgress || t.generatingFull : t.generateFull}
+          </button>
+          {generating && onCancel ? (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              onClick={onCancel}
+            >
+              {t.genCancel}
+            </button>
+          ) : null}
+        </div>
 
         {generating && genProgress ? (
           <p className={styles.launchProgress}>{genProgress}</p>

@@ -18,6 +18,9 @@ export const WEBSITE_SECTIONS = [
   "brand",
 ];
 
+/** Server-side cap for optional AI copy enhancement during full-site generate. */
+export const WEBSITE_AI_COPY_TIMEOUT_MS = 12_000;
+
 export function analyzeWebsiteCompleteness(form = {}, meta = {}) {
   const heroPhotos = Array.isArray(form.heroPhotos) ? form.heroPhotos : [];
   const galleryPhotos = Array.isArray(form.galleryPhotos) ? form.galleryPhotos : [];
@@ -73,6 +76,108 @@ export function analyzeWebsiteCompleteness(form = {}, meta = {}) {
       heroImagesFilled === 0,
     isComplete: missing.length === 0,
   };
+}
+
+/** Industry pack defaults — no OpenAI; typically under 50ms. */
+export function buildInstantSiteFromIndustry(pack, profile, existingForm = {}) {
+  const defaults = buildIndustryWebsiteDefaults(pack, profile);
+  const personalized = personalizeGeneratedContent(
+    {
+      headline: defaults.headline,
+      subheadline: defaults.subheadline,
+      aboutText: defaults.aboutText,
+      ctaText: defaults.ctaText,
+      services: defaults.services,
+      testimonials: defaults.testimonials,
+      trustBadges: defaults.trustBadges,
+    },
+    pack,
+    profile,
+  );
+  const content = sanitizeIndustryWebsiteContent(personalized, pack, profile);
+  const presetSlots = createDefaultHeroPhotoSlots(pack);
+  const heroPhotos = presetSlots.map((slot, index) => {
+    const existing = Array.isArray(existingForm.heroPhotos)
+      ? existingForm.heroPhotos[index]
+      : null;
+    const existingSrc = String(existing?.src || "").trim();
+    const prompt = String(
+      existing?.prompt || slot.prompt || pack.imagePresets[index] || "",
+    ).slice(0, 320);
+    return {
+      id: slot.id,
+      src:
+        existingSrc.startsWith("http") || existingSrc.startsWith("data:image/")
+          ? existingSrc
+          : "",
+      alt: String(existing?.alt || `${pack.label} project ${index + 1}`).slice(0, 160),
+      prompt,
+    };
+  });
+
+  const existingGallery = Array.isArray(existingForm.galleryPhotos)
+    ? existingForm.galleryPhotos
+    : [];
+  const galleryPrompts = pack.imagePresets.slice(0, 2);
+  const galleryPhotos = existingGallery.length > 0 ? existingGallery : [];
+
+  const city = String(profile?.businessCity || profile?.city || "").trim();
+  const companyName =
+    profile?.publicDisplayName || profile?.companyName || "Our Company";
+  const serviceAreas = city ? [city, `${city} metro`] : [];
+
+  return {
+    headline: content.headline,
+    subheadline: content.subheadline,
+    aboutText: content.aboutText,
+    ctaText: content.ctaText,
+    themeColor: content.themeColor || pack.defaultThemeColor,
+    services: content.services,
+    testimonials: content.testimonials,
+    trustBadges: content.trustBadges,
+    heroPhotos: normalizeHeroPhotos(heroPhotos, pack),
+    galleryPhotos,
+    siteMeta: {
+      seoTitle: String(`${content.headline} | ${companyName}`).slice(0, 70),
+      seoDescription: String(content.subheadline || defaults.subheadline).slice(0, 160),
+      footerTagline: `Trusted ${pack.label.toLowerCase()} professionals.`,
+      serviceAreas,
+      aiGeneratedAt: new Date().toISOString(),
+      generationSource: "instant",
+    },
+    galleryImagePrompts: galleryPrompts,
+  };
+}
+
+/** Smaller prompt — copy/SEO only (images use industry presets). */
+export function buildCompactSiteCopyPrompt(pack, ctx) {
+  const forbiddenNote = `FORBIDDEN: content for trades outside ${pack.label}.`;
+
+  return `
+Company: ${ctx.companyName}
+Industry: ${pack.label} (${pack.key})
+City: ${ctx.city || "local area"}
+Tone: ${pack.tone}
+Services: ${ctx.topServices || ctx.defaultServiceNames}
+
+${forbiddenNote}
+
+JSON only:
+{
+  "headline": "max 10 words",
+  "subheadline": "max 28 words",
+  "aboutText": "max 80 words",
+  "ctaText": "max 5 words",
+  "footerTagline": "max 16 words",
+  "seoTitle": "max 60 chars",
+  "seoDescription": "max 155 chars",
+  "serviceAreas": ["up to 6"],
+  "services": [{ "name": "", "description": "", "price": "From $X" }],
+  "testimonials": [{ "quote": "", "name": "First L.", "role": "Homeowner" }],
+  "trustBadges": [""]
+}
+Rules: 4-6 services, 2 testimonials, 4 trust badges. ${pack.label} only.
+`.trim();
 }
 
 export function buildFullSiteCopyPrompt(pack, ctx) {
@@ -166,14 +271,7 @@ export function buildFullSiteFromAi(parsed, pack, profile, existingForm = {}) {
     ? existingForm.galleryPhotos
     : [];
 
-  const galleryPhotos =
-    existingGallery.length > 0
-      ? existingGallery
-      : aiGalleryPrompts.slice(0, 2).map((prompt, index) => ({
-          src: "",
-          alt: String(prompt || `${pack.label} gallery ${index + 1}`).slice(0, 160),
-          prompt: String(prompt || pack.imagePresets[index] || "").slice(0, 320),
-        }));
+  const galleryPhotos = existingGallery.length > 0 ? existingGallery : [];
 
   const city = String(profile?.businessCity || profile?.city || "").trim();
   let serviceAreas = Array.isArray(parsed.serviceAreas) ? parsed.serviceAreas : [];
