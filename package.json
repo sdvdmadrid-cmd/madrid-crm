@@ -14,6 +14,7 @@
     "db:apply-connect": "node -e \"console.log('Paste scripts/apply-connect-columns-only.sql in Supabase SQL Editor, or run: SUPABASE_DB_PASSWORD=*** npx supabase db query --linked -f scripts/apply-connect-columns-only.sql')\"",
     "stripe:check": "node scripts/check-stripe-key.mjs",
     "verify:prod": "node scripts/verify-production.mjs",
+    "deploy:audit": "node scripts/deployment-pipeline-audit.mjs",
     "setup:website-production": "node scripts/setup-website-production.mjs",
     "test:e2e": "playwright test",
     "test:e2e:website": "playwright test tests/e2e/website-funnel.spec.js",
