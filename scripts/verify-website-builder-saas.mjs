@@ -58,7 +58,7 @@ async function main() {
   }
 
   try {
-    const { res } = await fetch(`${base}/site/legacy-redirect-check`, {
+    const res = await fetch(`${base}/site/legacy-redirect-check`, {
       redirect: "manual",
       cache: "no-store",
     });
