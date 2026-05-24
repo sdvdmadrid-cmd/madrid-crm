@@ -1208,7 +1208,9 @@
     "support": "Wsparcie",
     "security": "Bezpieczenstwo",
     "settings": "Ustawienia",
-    "backToApp": "Aplikacja"
+    "backToApp": "Aplikacja",
+    "logout": "Wyloguj",
+    "signingOut": "Wylogowywanie..."
   },
   "ownerPaymentCards": {
     "title": "Karty i uzycie",

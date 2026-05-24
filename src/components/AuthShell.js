@@ -694,6 +694,23 @@ export default function AuthShell({ children }) {
       window.removeEventListener("auth:unauthorized", onUnauthorized);
   }, [isPublicPage, authUser, t]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onLogout = () => {
+      setAuthUser(null);
+      setSubmitting(false);
+      setError("");
+      setNotice("");
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("user-industry");
+      }
+    };
+
+    window.addEventListener("auth:logout", onLogout);
+    return () => window.removeEventListener("auth:logout", onLogout);
+  }, []);
+
   if (isPublicPage) {
     return <PublicPageShell>{children}</PublicPageShell>;
   }
