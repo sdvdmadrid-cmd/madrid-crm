@@ -65,14 +65,17 @@ export function buildPublicSiteMetadata(site, { page = "home" } = {}) {
     site?.companyProfile?.publicDisplayName ||
     site?.companyProfile?.companyName ||
     "Local Business";
+  const seoTitle = String(site?.seoTitle || "").trim();
+  const seoDescription = String(site?.seoDescription || "").trim();
   const title =
     page === "request"
       ? `Request a Quote | ${companyName}`
-      : site?.headline || companyName;
+      : seoTitle || site?.headline || companyName;
   const description =
     page === "request"
       ? `Request a free quote from ${companyName}. Fast response, no obligation.`
-      : site?.subheadline ||
+      : seoDescription ||
+        site?.subheadline ||
         site?.aboutText?.slice(0, 160) ||
         `${companyName} — professional home services in your area.`;
   const url =

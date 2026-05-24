@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
 import AiBubbleClient from "@/components/AiBubbleClient";
+import { WebsiteBuilderAiProvider } from "@/contexts/WebsiteBuilderAiContext";
 import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";
 import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
@@ -1332,8 +1333,11 @@ export default function AuthShell({ children }) {
     }
   };
 
+  const isWebsiteBuilderRoute = Boolean(pathname?.startsWith("/website"));
+
   return (
     <TenantWorkspaceProvider initialWorkspace={authUser?.workspace ?? null}>
+    <WebsiteBuilderAiProvider>
     <div
       className="auth-shell"
       style={{
@@ -1785,7 +1789,13 @@ export default function AuthShell({ children }) {
         <AppFooter />
       </div>
 
-      {authUser ? <AiBubbleClient authUser={authUser} pathname={pathname} /> : null}
+      {authUser ? (
+        <AiBubbleClient
+          authUser={authUser}
+          pathname={pathname}
+          websiteBuilderMode={isWebsiteBuilderRoute}
+        />
+      ) : null}
 
       <style jsx global>{`
         @media (max-width: 1200px) {
@@ -1811,6 +1821,7 @@ export default function AuthShell({ children }) {
       `}</style>
 
     </div>
+    </WebsiteBuilderAiProvider>
     </TenantWorkspaceProvider>
   );
 }

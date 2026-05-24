@@ -1,1 +1,1 @@
-﻿export { default } from "@/components/website-builder/WebsiteBuilderClient";
+﻿export { default } from "@/components/website-builder/WebsiteBuilderShell";
