@@ -12,6 +12,7 @@ import {
 import {
   computePlatformFeeCents,
   getConnectStatusForTenant,
+  CONNECT_PAYOUT_REQUIRED_CODE,
   isStripeConnectEnabled,
 } from "@/lib/stripe-connect";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -71,12 +72,16 @@ function isSuperAdmin(role) {
   );
 }
 
-function buildResourceError(message, status = 409) {
+function buildResourceError(message, status = 409, code) {
   const normalizedMessage =
     String(message || "") === "Missing STRIPE_SECRET_KEY"
       ? "Online payments are not configured"
       : message;
-  return jsonResponse({ success: false, error: normalizedMessage }, status);
+  const payload = { success: false, error: normalizedMessage };
+  if (code) {
+    payload.code = String(code);
+  }
+  return jsonResponse(payload, status);
 }
 
 function loadLocalEnvMap() {
@@ -630,6 +635,7 @@ export async function createStripeCheckoutSessionForAccess({
         response: buildResourceError(
           "Connect your Stripe payout account before accepting card payments online.",
           400,
+          CONNECT_PAYOUT_REQUIRED_CODE,
         ),
       };
     }

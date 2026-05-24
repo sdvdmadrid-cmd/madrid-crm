@@ -2,6 +2,8 @@
 
 FieldBase usa **Stripe Connect Express**. Hay **dos niveles** de aprobación distintos.
 
+**Prerrequisitos de negocio (antes de solicitar Connect en Stripe):** registro en Illinois, **EIN**, cuenta bancaria del negocio, y datos legales listos para el cuestionario de Stripe. Mientras tanto, mantén `STRIPE_CONNECT_ENABLED=false` en producción — ver `docs/STRIPE_CONNECT_ROLLOUT.md`.
+
 ---
 
 ## 1. Plataforma FieldBase (tú / la empresa)

@@ -15,8 +15,19 @@ import {
   detectWebsiteContentMismatch,
   getWebsiteBuilderPack,
   normalizeHeroPhotos,
+  resolveWebsiteIndustryForWebsite,
   resolveWebsiteIndustryFromProfile,
+  resolveWebsiteIndustryKey,
+  listWebsiteIndustryPackOptions,
 } from "@/lib/website-builder-industry";
+import {
+  buildPublicWebsitePath,
+  buildPublicWebsiteRequestPath,
+  buildPublicWebsiteUrl,
+  isReservedWebsiteSlug,
+  normalizeWebsiteSlug,
+  revalidatePublicWebsitePaths,
+} from "@/lib/public-website-routing";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeSiteAnalytics } from "@/lib/site-analytics";
@@ -47,8 +58,8 @@ function normalizeWebsiteCta(value, fallback = DEFAULT_CTA_TEXT) {
   return looksLikeMarketingTrialCta ? fallback : trimmed;
 }
 
-function buildDefaultWebsiteContent(companyProfile) {
-  const industryKey = resolveWebsiteIndustryFromProfile(companyProfile);
+function buildDefaultWebsiteContent(companyProfile, siteMeta = null) {
+  const industryKey = resolveWebsiteIndustryForWebsite(companyProfile, siteMeta);
   const pack = getWebsiteBuilderPack(industryKey);
   const defaults = buildIndustryWebsiteDefaults(pack, companyProfile);
   return {
@@ -89,10 +100,13 @@ function readSiteMeta(row, pack) {
 }
 
 function serializeWebsiteRow(row, profile, request) {
-  const industryKey = resolveWebsiteIndustryFromProfile(profile);
+  const siteMetaRow =
+    row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : {};
+  const industryKey = resolveWebsiteIndustryForWebsite(profile, siteMetaRow);
+  const profileIndustryKey = resolveWebsiteIndustryFromProfile(profile);
   const pack = getWebsiteBuilderPack(industryKey);
   const industryProfile = getIndustryProfile(profile.businessType || "");
-  const defaults = buildDefaultWebsiteContent(profile);
+  const defaults = buildDefaultWebsiteContent(profile, siteMetaRow);
   const meta = readSiteMeta(row, pack);
   const socialLinks =
     row?.site_meta?.socialLinks && typeof row.site_meta.socialLinks === "object"
@@ -129,8 +143,12 @@ function serializeWebsiteRow(row, profile, request) {
   return {
     id: row.id,
     slug: row.slug,
-    publicUrl: getPublicWebsiteUrl(row.slug, request),
-    websitePath: `/site/${row.slug}`,
+    publicUrl: buildPublicWebsiteUrl(row.slug, request),
+    websitePath: buildPublicWebsitePath(row.slug),
+    requestPath: buildPublicWebsiteRequestPath(row.slug),
+    industryKeyOverride: String(siteMetaRow.industryKeyOverride || "").trim() || null,
+    profileIndustry: profileIndustryKey,
+    industryPackOptions: listWebsiteIndustryPackOptions(),
     headline: row.headline || defaults.headline,
     subheadline: row.subheadline || defaults.subheadline,
     aboutText: row.about_text || defaults.aboutText,
@@ -157,27 +175,14 @@ function serializeWebsiteRow(row, profile, request) {
   };
 }
 
-function getPublicWebsiteUrl(slug, request) {
-  const domain = (process.env.NEXT_PUBLIC_SITE_DOMAIN || "")
-    .trim()
-    .replace(/^https?:\/\//i, "")
-    .replace(/\/$/, "");
-
-  if (!slug) return "";
-
-  if (domain) {
-    return `https://${slug}.${domain}`;
-  }
-
-  const origin = new URL(request.url).origin;
-  return `${origin}/site/${slug}`;
-}
-
 function generateSlug(companyName) {
-  return String(companyName || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "")
-    .slice(0, 40) || "mysite";
+  const base =
+    normalizeWebsiteSlug(
+      String(companyName || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-"),
+    ) || "my-company";
+  return base.slice(0, 40);
 }
 
 async function findOrCreateWebsite(tenantDbId, companyProfile) {
@@ -201,9 +206,9 @@ async function findOrCreateWebsite(tenantDbId, companyProfile) {
       .eq("slug", slug)
       .maybeSingle();
 
-    if (!conflict) break;
+    if (!conflict && !isReservedWebsiteSlug(slug)) break;
     attempt++;
-    slug = `${baseSlug}${attempt}`;
+    slug = `${baseSlug}-${attempt}`;
   }
 
   const { data, error } = await supabaseAdmin
@@ -228,7 +233,10 @@ export async function GET(request) {
   );
 
   let row = await findOrCreateWebsite(access.tenantDbId, profile);
-  const defaults = buildDefaultWebsiteContent(profile);
+  const defaults = buildDefaultWebsiteContent(
+    profile,
+    row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : null,
+  );
   const normalizedCtaText = normalizeWebsiteCta(row.cta_text, defaults.ctaText);
 
   if (typeof row.cta_text === "string" && normalizedCtaText !== row.cta_text) {
@@ -253,7 +261,6 @@ export async function GET(request) {
 export async function POST(request) {
   try {
   const access = await getAuthenticatedTenantContext(request);
-  console.log("[api/website-builder][POST] access", { authenticated: access.authenticated, role: access.role, tenantDbId: access.tenantDbId });
   if (!access.authenticated) return unauthenticatedResponse();
   if (!canWrite(access.role)) return forbiddenResponse();
 
@@ -265,11 +272,46 @@ export async function POST(request) {
     }),
     access.tenantDbId,
   );
-  const defaults = buildDefaultWebsiteContent(profile);
-
   const row = await findOrCreateWebsite(access.tenantDbId, profile);
+  const defaults = buildDefaultWebsiteContent(
+    profile,
+    row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : null,
+  );
 
   const patch = {};
+  let activeSlug = String(row.slug || "").trim();
+
+  if (typeof body.slug === "string") {
+    const nextSlug = normalizeWebsiteSlug(body.slug);
+    if (!nextSlug || nextSlug.length < 2) {
+      return Response.json(
+        { success: false, error: "Site slug must be at least 2 characters." },
+        { status: 400 },
+      );
+    }
+    if (isReservedWebsiteSlug(nextSlug)) {
+      return Response.json(
+        { success: false, error: "That site slug is reserved. Choose another." },
+        { status: 400 },
+      );
+    }
+    if (nextSlug !== normalizeWebsiteSlug(row.slug)) {
+      const { data: conflict } = await supabaseAdmin
+        .from(WEBSITE_TABLE)
+        .select("id, tenant_id")
+        .eq("slug", nextSlug)
+        .maybeSingle();
+      if (conflict && conflict.tenant_id !== access.tenantDbId) {
+        return Response.json(
+          { success: false, error: "That site URL is already taken." },
+          { status: 409 },
+        );
+      }
+      patch.slug = nextSlug;
+      activeSlug = nextSlug;
+    }
+  }
+
   if (typeof body.headline === "string") patch.headline = body.headline.slice(0, 200);
   if (typeof body.subheadline === "string") patch.subheadline = body.subheadline.slice(0, 300);
   if (typeof body.aboutText === "string") patch.about_text = body.aboutText.slice(0, 2000);
@@ -289,7 +331,7 @@ export async function POST(request) {
   if (Array.isArray(body.galleryPhotos)) {
     patch.gallery_photos = await persistGalleryPhotosForStorage(
       access.tenantDbId,
-      row.slug,
+      activeSlug,
       body.galleryPhotos.slice(0, 8).map((photo) => ({
         src: String(photo?.src || ""),
         alt: String(photo?.alt || "Completed project photo").slice(0, 160),
@@ -315,12 +357,28 @@ export async function POST(request) {
     nextMeta.trustBadges = body.trustBadges.slice(0, 6).map((b) => String(b).slice(0, 80));
     metaChanged = true;
   }
+  if (typeof body.industryKeyOverride === "string" || body.industryKeyOverride === null) {
+    const rawOverride = body.industryKeyOverride;
+    if (rawOverride === null || rawOverride === "") {
+      delete nextMeta.industryKeyOverride;
+      metaChanged = true;
+    } else {
+      nextMeta.industryKeyOverride = resolveWebsiteIndustryKey(
+        String(rawOverride).trim(),
+        profile,
+      );
+      metaChanged = true;
+    }
+  }
+
   if (Array.isArray(body.heroPhotos)) {
-    const pack = getWebsiteBuilderPack(resolveWebsiteIndustryFromProfile(profile));
+    const pack = getWebsiteBuilderPack(
+      resolveWebsiteIndustryForWebsite(profile, nextMeta),
+    );
     const normalized = normalizeHeroPhotos(body.heroPhotos, pack);
     nextMeta.heroPhotos = await persistHeroPhotosForStorage(
       access.tenantDbId,
-      row.slug,
+      activeSlug,
       normalized,
     );
     metaChanged = true;
@@ -377,9 +435,12 @@ export async function POST(request) {
   }
 
   const publishedSlug = data.slug || row.slug;
+  const previousSlug = row.slug;
   if (publishedSlug) {
-    revalidatePath(`/site/${publishedSlug}`);
-    revalidatePath(`/site/${publishedSlug}/request`);
+    revalidatePublicWebsitePaths(publishedSlug, revalidatePath);
+  }
+  if (previousSlug && previousSlug !== publishedSlug) {
+    revalidatePublicWebsitePaths(previousSlug, revalidatePath);
   }
 
     return Response.json({

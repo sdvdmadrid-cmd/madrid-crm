@@ -1,5 +1,9 @@
 import { getRequestOrigin } from "@/lib/supabase-auth";
-import { getConnectStatusForTenant } from "@/lib/stripe-connect";
+import {
+  CONNECT_PAYOUT_REQUIRED_CODE,
+  getConnectStatusForTenant,
+  getStripePaymentsMode,
+} from "@/lib/stripe-connect";
 import {
   getStripeSecretKey,
   getStripeWebhookSecret,
@@ -53,9 +57,14 @@ export async function GET(request) {
     console.error("[api/invoices/payment-setup-status] connect status", error);
   }
 
-  const connectRequired = Boolean(connect.enabled);
+  const paymentsMode = getStripePaymentsMode();
+  const connectRequired = Boolean(connect.checkoutRequiresConnect);
   const cardPaymentsReady =
     ready && (!connectRequired || connect.onboarded);
+  const cardPaymentsBlockReason =
+    ready && connectRequired && !connect.onboarded
+      ? CONNECT_PAYOUT_REQUIRED_CODE
+      : null;
 
   return new Response(
     JSON.stringify({
@@ -67,6 +76,9 @@ export async function GET(request) {
         appUrlConfigured,
         ready,
         cardPaymentsReady,
+        cardPaymentsBlockReason,
+        paymentsMode,
+        checkoutRequiresConnect: connectRequired,
         webhookEndpointUrl,
         connect,
       },

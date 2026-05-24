@@ -103,7 +103,7 @@ export async function generateMetadata({ params }) {
 
 export default async function PublicContractorSitePage({ params }) {
   const { slug } = await params;
-  const requestHref = `/site/${slug}/request`;
+  const requestHref = `/sites/${slug}/request`;
 
   const data = await getPublicWebsiteBySlug(slug);
 

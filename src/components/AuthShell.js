@@ -137,7 +137,8 @@ export default function AuthShell({ children }) {
   ];
   const isPublicQuotePage = pathname?.startsWith("/quote/");
   const isPublicEstimatePage = pathname?.startsWith("/estimate/");
-  const isPublicSitePage = pathname?.startsWith("/site/");
+  const isPublicSitePage =
+    pathname?.startsWith("/site/") || pathname?.startsWith("/sites/");
   const isPublicBillPaymentsPage = pathname?.startsWith("/public/bill-payments");
   const isPublicLegalPage = pathname === "/legal" || pathname?.startsWith("/legal#") || pathname === "/legal-required";
   const isMarketingHomePage = pathname === "/";

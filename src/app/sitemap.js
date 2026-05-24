@@ -17,7 +17,7 @@ export default async function sitemap() {
   const publishedSites = await listPublishedPublicWebsiteSlugs();
   const contractorEntries = publishedSites.flatMap((site) => {
     const lastModified = site.updatedAt ? new Date(site.updatedAt) : now;
-    const base = `${APP_BASE_URL}/site/${site.slug}`;
+    const base = `${APP_BASE_URL}/sites/${site.slug}`;
     return [
       {
         url: base,

@@ -45,6 +45,16 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/site/:slug",
+        destination: "/sites/:slug",
+        permanent: true,
+      },
+      {
+        source: "/site/:slug/request",
+        destination: "/sites/:slug/request",
+        permanent: true,
+      },
+      {
         source: "/admin",
         destination: "/owner/overview",
         permanent: false,

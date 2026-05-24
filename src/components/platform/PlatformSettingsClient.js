@@ -297,6 +297,68 @@ export default function PlatformSettingsClient() {
                   {settings.stripeApiKey ? "✓ Configured" : "⚠ Missing API Key"}
                 </div>
               </div>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "#334155",
+                    marginBottom: "6px",
+                  }}
+                >
+                  {t("platformSettings.stripeConnect.title")}
+                </label>
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "10px",
+                    fontSize: "14px",
+                    color: "#334155",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  <p style={{ margin: "0 0 10px" }}>
+                    {settings.stripeConnectEnabled
+                      ? t("platformSettings.stripeConnect.featureFlagOn")
+                      : t("platformSettings.stripeConnect.featureFlagOff")}
+                  </p>
+                  {settings.stripeConnectEnabled ? (
+                    <>
+                      <p style={{ margin: "0 0 10px" }}>
+                        {t("platformSettings.stripeConnect.platformNotReady")}
+                      </p>
+                      <ol style={{ margin: "0 0 12px", paddingLeft: "20px" }}>
+                        <li>{t("platformSettings.stripeConnect.step1")}</li>
+                        <li>{t("platformSettings.stripeConnect.step2")}</li>
+                        <li>{t("platformSettings.stripeConnect.step3")}</li>
+                      </ol>
+                      <a
+                        href="https://dashboard.stripe.com/connect"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "inline-block",
+                          marginBottom: "10px",
+                          color: "#2563eb",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {t("platformSettings.stripeConnect.openStripeConnect")}
+                      </a>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>
+                        {t("platformSettings.stripeConnect.draftDocHint")}
+                      </p>
+                    </>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: "14px", color: "#475569" }}>
+                      {t("platformSettings.stripeConnect.rolloutPaused")}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
 

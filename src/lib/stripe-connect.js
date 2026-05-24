@@ -1,16 +1,39 @@
 import "server-only";
 import { getStripeServerClient } from "@/lib/stripe-payments";
 import {
+  CONNECT_ERROR_CODE,
+  PAYMENTS_MODE,
+} from "@/lib/stripe-connect-codes";
+import {
   readConnectProfile,
   writeConnectProfile,
 } from "@/lib/stripe-connect-storage";
 
 /**
- * Stripe Connect (Express) — scaffold for Phase 1.
- * Enable with STRIPE_CONNECT_ENABLED=true after Connect is configured in Stripe Dashboard.
+ * Stripe Connect (Express) — deployment-ready scaffold.
+ * Keep STRIPE_CONNECT_ENABLED=false until Illinois EIN, business banking, and Stripe
+ * platform Connect verification are complete. No fake activation states in code.
  */
 export function isStripeConnectEnabled() {
   return String(process.env.STRIPE_CONNECT_ENABLED || "").trim() === "true";
+}
+
+/** @returns {'platform' | 'connect'} */
+export function getStripePaymentsMode() {
+  return isStripeConnectEnabled() ? PAYMENTS_MODE.CONNECT : PAYMENTS_MODE.PLATFORM;
+}
+
+export const STRIPE_CONNECT_PLATFORM_ERROR_CODE =
+  CONNECT_ERROR_CODE.PLATFORM_NOT_ENABLED;
+export const CONNECT_PAYOUT_REQUIRED_CODE = CONNECT_ERROR_CODE.PAYOUT_REQUIRED;
+
+export function isStripeConnectPlatformNotEnabledError(error) {
+  const message = String(error?.message || error || "");
+  return (
+    message.includes("STRIPE_CONNECT_PLATFORM_NOT_ENABLED") ||
+    message.includes("signed up for Connect") ||
+    message.includes("dashboard.stripe.com/connect")
+  );
 }
 
 /** Application fee in cents (destination charge). Default 0.75% + optional fixed. */
@@ -36,14 +59,46 @@ export async function getConnectStatusForTenant(tenantId) {
 
   const { connect } = await readConnectProfile(tenantKey);
 
+  const paymentsMode = getStripePaymentsMode();
+  const checkoutRequiresConnect = paymentsMode === PAYMENTS_MODE.CONNECT;
+
   return {
-    enabled: isStripeConnectEnabled(),
+    enabled: checkoutRequiresConnect,
+    paymentsMode,
+    checkoutRequiresConnect,
     configured: Boolean(connect.accountId),
     accountId: connect.accountId,
     chargesEnabled: connect.chargesEnabled,
     payoutsEnabled: connect.payoutsEnabled,
     onboardedAt: connect.onboardedAt,
     onboarded: connect.onboarded,
+    /** True only when Stripe webhooks report charges + payouts (never from env alone). */
+    activationSource: "stripe_account_capabilities",
+  };
+}
+
+/** JSON error body for Connect API routes. */
+export function buildConnectRouteErrorPayload(error, fallbackStatus = 500) {
+  if (isStripeConnectPlatformNotEnabledError(error)) {
+    return {
+      status: 503,
+      body: {
+        success: false,
+        code: CONNECT_ERROR_CODE.PLATFORM_NOT_ENABLED,
+        error:
+          "Stripe Connect is not enabled on the FieldBase platform Stripe account yet.",
+      },
+    };
+  }
+
+  const code = String(error?.code || "").trim();
+  return {
+    status: fallbackStatus,
+    body: {
+      success: false,
+      ...(code ? { code } : {}),
+      error: String(error?.message || "Connect request failed"),
+    },
   };
 }
 
@@ -85,14 +140,12 @@ export async function createConnectOnboardingLink({ tenantId, returnUrl, refresh
         },
       });
     } catch (error) {
-      const message = String(error?.message || "");
-      if (
-        message.includes("signed up for Connect") ||
-        message.includes("dashboard.stripe.com/connect")
-      ) {
-        throw new Error(
+      if (isStripeConnectPlatformNotEnabledError(error)) {
+        const platformError = new Error(
           "STRIPE_CONNECT_PLATFORM_NOT_ENABLED: FieldBase must enable Stripe Connect on the platform Stripe account first. Open https://dashboard.stripe.com/connect and complete platform signup, then try again.",
         );
+        platformError.code = STRIPE_CONNECT_PLATFORM_ERROR_CODE;
+        throw platformError;
       }
       throw error;
     }

@@ -14,9 +14,10 @@ import {
   buildIndustryWebsiteDefaults,
   getWebsiteBuilderPack,
   personalizeGeneratedContent,
-  resolveWebsiteIndustryFromProfile,
+  resolveWebsiteIndustryForWebsite,
   sanitizeIndustryWebsiteContent,
 } from "@/lib/website-builder-industry";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
 import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
 
@@ -125,8 +126,14 @@ export async function POST(request) {
     access.tenantDbId,
   );
 
+  const { data: websiteRow } = await supabaseAdmin
+    .from("contractor_websites")
+    .select("site_meta")
+    .eq("tenant_id", access.tenantDbId)
+    .maybeSingle();
+
   const companyName = profile.publicDisplayName || profile.companyName || "Our Company";
-  const industryKey = resolveWebsiteIndustryFromProfile(profile);
+  const industryKey = resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta);
   const pack = getWebsiteBuilderPack(industryKey);
   const defaults = buildIndustryWebsiteDefaults(pack, profile);
 

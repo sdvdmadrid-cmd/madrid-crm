@@ -43,6 +43,8 @@ export async function GET(request) {
       emailProvider: process.env.EMAIL_PROVIDER || "resend",
       emailFrom: process.env.EMAIL_FROM || "FieldBase <no-reply@fieldbaseapp.net>",
       stripeApiKey: process.env.STRIPE_SECRET_KEY ? "***configured***" : "⚠ missing",
+      stripeConnectEnabled:
+        String(process.env.STRIPE_CONNECT_ENABLED || "").trim() === "true",
       sessionSecretStatus: process.env.SESSION_SECRET ? "✓ Configured" : "⚠ Missing",
       lastHealthCheck: new Date().toISOString(),
     };
@@ -107,6 +109,8 @@ export async function POST(request) {
       emailProvider: process.env.EMAIL_PROVIDER || "resend",
       emailFrom: process.env.EMAIL_FROM || "FieldBase <no-reply@fieldbaseapp.net>",
       stripeApiKey: process.env.STRIPE_SECRET_KEY ? "***configured***" : "⚠ missing",
+      stripeConnectEnabled:
+        String(process.env.STRIPE_CONNECT_ENABLED || "").trim() === "true",
       sessionSecretStatus: process.env.SESSION_SECRET ? "✓ Configured" : "⚠ Missing",
       lastHealthCheck: new Date().toISOString(),
     };

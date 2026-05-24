@@ -8,6 +8,10 @@ import {
   getWebsiteBuilderPack,
   sanitizeIndustryWebsiteContent,
 } from "@/lib/website-builder-industry";
+import {
+  buildPublicWebsitePath,
+  buildPublicWebsiteRequestPath,
+} from "@/lib/public-website-routing";
 import DeployBuildBadge from "@/components/workspace/DeployBuildBadge";
 import HeroImageEditor from "./HeroImageEditor";
 import WebsiteBuilderPreview from "./WebsiteBuilderPreview";
@@ -91,10 +95,15 @@ export default function WebsiteBuilderClient() {
   const [device, setDevice] = useState("desktop");
   const [openSections, setOpenSections] = useState(DEFAULT_OPEN);
   const [slug, setSlug] = useState("");
+  const [slugDraft, setSlugDraft] = useState("");
+  const [websitePath, setWebsitePath] = useState("");
   const [publicUrl, setPublicUrl] = useState("");
   const [published, setPublished] = useState(false);
   const [companyProfile, setCompanyProfile] = useState(null);
-  const [industryKey, setIndustryKey] = useState("landscaping_hardscaping");
+  const [industryKey, setIndustryKey] = useState("general");
+  const [profileIndustry, setProfileIndustry] = useState("general");
+  const [industryKeyOverride, setIndustryKeyOverride] = useState(null);
+  const [industryPackOptions, setIndustryPackOptions] = useState([]);
   const [industryLabel, setIndustryLabel] = useState("");
   const [industryIcon, setIndustryIcon] = useState("🌿");
   const [themePresets, setThemePresets] = useState([]);
@@ -144,11 +153,19 @@ export default function WebsiteBuilderClient() {
   }, []);
 
   const applyApiPayload = useCallback((data) => {
-    setSlug(data.slug || "");
+    const nextSlug = data.slug || "";
+    setSlug(nextSlug);
+    setSlugDraft(nextSlug);
+    setWebsitePath(data.websitePath || buildPublicWebsitePath(nextSlug));
     setPublicUrl(data.publicUrl || "");
     setPublished(data.published === true);
     setCompanyProfile(data.companyProfile || null);
-    setIndustryKey(data.industry || "landscaping_hardscaping");
+    setIndustryKey(data.industry || "general");
+    setProfileIndustry(data.profileIndustry || data.industry || "general");
+    setIndustryKeyOverride(data.industryKeyOverride || null);
+    setIndustryPackOptions(
+      Array.isArray(data.industryPackOptions) ? data.industryPackOptions : [],
+    );
     setIndustryLabel(data.industryLabel || "");
     setIndustryIcon(data.industryIcon || "🏗️");
     setThemePresets(Array.isArray(data.themePresets) ? data.themePresets : []);
@@ -276,10 +293,11 @@ export default function WebsiteBuilderClient() {
     };
   }, [form, loading, handleSave]);
 
-  const handleApplyIndustryPreset = useCallback(() => {
+  const handleApplyIndustryPreset = useCallback(async () => {
     const pack = getWebsiteBuilderPack(industryKey);
     const defaults = buildIndustryWebsiteDefaults(pack, companyProfile || {});
     const nextForm = {
+      ...(formRef.current || form),
       headline: defaults.headline,
       subheadline: defaults.subheadline,
       aboutText: defaults.aboutText,
@@ -291,11 +309,67 @@ export default function WebsiteBuilderClient() {
       heroPhotos: defaults.heroPhotos.map((h) => ({ ...h })),
       galleryPhotos: formRef.current?.galleryPhotos || [],
     };
-    setForm((prev) => ({ ...prev, ...nextForm }));
+    skipAutosave.current = true;
+    formRef.current = nextForm;
+    setForm(nextForm);
     setIndustryMismatch(false);
+    await handleSave(nextForm);
     showNotice(t.presetApplied);
-    handleSave({ ...formRef.current, ...nextForm });
-  }, [industryKey, companyProfile, showNotice, t.presetApplied, handleSave]);
+  }, [form, industryKey, companyProfile, showNotice, t.presetApplied, handleSave]);
+
+  const handleSlugUpdate = useCallback(async () => {
+    const next = String(slugDraft || "").trim().toLowerCase();
+    if (!next || next === slug) return;
+    setSaving(true);
+    try {
+      const res = await apiFetch("/api/website-builder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: next }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.error || t.errorSave);
+      }
+      if (payload?.data) applyApiPayload(payload.data);
+      showNotice(t.savedNotice);
+    } catch (err) {
+      const msg = String(err?.message || "");
+      if (msg.toLowerCase().includes("taken")) {
+        showNotice(t.slugTaken, true);
+      } else if (msg.toLowerCase().includes("reserved")) {
+        showNotice(t.slugInvalid, true);
+      } else {
+        showNotice(msg || t.errorSave, true);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [slug, slugDraft, applyApiPayload, showNotice, t]);
+
+  const handleIndustryOverrideChange = useCallback(
+    async (event) => {
+      const value = String(event.target.value || "").trim();
+      const overrideKey = value === "" ? null : value;
+      setSaving(true);
+      try {
+        const res = await apiFetch("/api/website-builder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            industryKeyOverride: overrideKey,
+          }),
+        });
+        const payload = await getJsonOrThrow(res, t.errorSave);
+        if (payload?.data) applyApiPayload(payload.data);
+      } catch (err) {
+        showNotice(err.message || t.errorSave, true);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [applyApiPayload, showNotice, t.errorSave],
+  );
 
   const handleGenerateSection = useCallback(
     async (section) => {
@@ -384,21 +458,29 @@ export default function WebsiteBuilderClient() {
         const res = await apiFetch("/api/website-builder/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, style: imageStyle }),
+          body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
         });
         const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-        const imageDataUrl = String(payload?.data?.imageDataUrl || "");
-        if (!imageDataUrl.startsWith("data:image/")) throw new Error(t.errorGenerateImage);
-        setForm((prev) => {
-          const next = [...(prev.heroPhotos || [])];
-          next[index] = {
-            ...next[index],
-            src: imageDataUrl,
-            alt: String(payload?.data?.alt || prompt).slice(0, 160),
-            prompt,
-          };
-          return { ...prev, heroPhotos: next };
-        });
+        const imageSrc = String(
+          payload?.data?.imageUrl || payload?.data?.imageDataUrl || "",
+        );
+        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
+          throw new Error(t.errorGenerateImage);
+        }
+        const nextForm = {
+          ...(formRef.current || form),
+          heroPhotos: [...(formRef.current?.heroPhotos || form.heroPhotos || [])],
+        };
+        nextForm.heroPhotos[index] = {
+          ...nextForm.heroPhotos[index],
+          src: imageSrc,
+          alt: String(payload?.data?.alt || prompt).slice(0, 160),
+          prompt,
+        };
+        skipAutosave.current = true;
+        formRef.current = nextForm;
+        setForm(nextForm);
+        await handleSave(nextForm, { silent: true });
         showNotice(t.savedNotice);
       } catch (err) {
         showNotice(err.message || t.errorGenerateImage, true);
@@ -406,7 +488,7 @@ export default function WebsiteBuilderClient() {
         setGeneratingSlotId("");
       }
     },
-    [form.heroPhotos, imagePresets, imageStyle, showNotice, t],
+    [form, imagePresets, imageStyle, showNotice, t, handleSave],
   );
 
   const handlePublishToggle = useCallback(async () => {
@@ -497,19 +579,27 @@ export default function WebsiteBuilderClient() {
         const res = await apiFetch("/api/website-builder/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, style: imageStyle }),
+          body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "gallery" }),
         });
         const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-        const imageDataUrl = String(payload?.data?.imageDataUrl || "");
-        if (!imageDataUrl.startsWith("data:image/")) throw new Error(t.errorGenerateImage);
-        setForm((prev) => ({
-          ...prev,
+        const imageSrc = String(
+          payload?.data?.imageUrl || payload?.data?.imageDataUrl || "",
+        );
+        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
+          throw new Error(t.errorGenerateImage);
+        }
+        const nextForm = {
+          ...(formRef.current || form),
           galleryPhotos: [
-            ...prev.galleryPhotos,
-            { src: imageDataUrl, alt: String(payload?.data?.alt || prompt).slice(0, 160) },
+            ...(formRef.current?.galleryPhotos || form.galleryPhotos || []),
+            { src: imageSrc, alt: String(payload?.data?.alt || prompt).slice(0, 160) },
           ].slice(0, MAX_GALLERY_IMAGES),
-        }));
+        };
+        skipAutosave.current = true;
+        formRef.current = nextForm;
+        setForm(nextForm);
         setImagePrompt("");
+        await handleSave(nextForm, { silent: true });
         showNotice(t.savedNotice);
       } catch (err) {
         showNotice(err.message || t.errorGenerateImage, true);
@@ -517,7 +607,7 @@ export default function WebsiteBuilderClient() {
         setGeneratingImage(false);
       }
     },
-    [form.galleryPhotos.length, imagePrompt, imageStyle, showNotice, t],
+    [form, imagePrompt, imageStyle, showNotice, t, handleSave],
   );
 
   const setGalleryAlt = useCallback((index, value) => {
@@ -535,8 +625,15 @@ export default function WebsiteBuilderClient() {
     }));
   }, []);
 
-  const siteUrl = publicUrl || (slug ? `/site/${slug}` : null);
-  const requestUrl = slug ? `/site/${slug}/request` : "#preview-request-form";
+  const sitePath = websitePath || (slug ? buildPublicWebsitePath(slug) : "");
+  const siteUrl =
+    publicUrl ||
+    (typeof window !== "undefined" && sitePath
+      ? `${window.location.origin}${sitePath}`
+      : sitePath || null);
+  const requestUrl = slug
+    ? buildPublicWebsiteRequestPath(slug)
+    : "#preview-request-form";
   const theme = form.themeColor || "#3b82f6";
   const frameClass =
     device === "tablet"
@@ -618,18 +715,39 @@ export default function WebsiteBuilderClient() {
       </div>
 
       <div className={styles.industryBanner}>
-        <div>
+        <div style={{ flex: 1, minWidth: 200 }}>
           <div className={styles.industryLabel}>
             {industryIcon} {industryLabel || t.industryPack}
           </div>
           <div className={styles.industryMeta}>
-            Copy, colors, gallery prompts, and forms adapt to this trade automatically.
+            {t.industryMeta}
+            {industryKeyOverride ? ` (${t.industryOverrideOn})` : ` (${t.industryFromProfile})`}
           </div>
+          {industryPackOptions.length > 0 ? (
+            <label className={styles.industrySelectWrap}>
+              <span className={styles.industrySelectLabel}>{t.industryOverrideLabel}</span>
+              <select
+                className={styles.industrySelect}
+                value={industryKeyOverride || ""}
+                onChange={handleIndustryOverrideChange}
+                disabled={saving}
+              >
+                <option value="">{t.industryUseProfile}</option>
+                {industryPackOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.icon ? `${opt.icon} ` : ""}
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
         <button
           type="button"
           className={`${styles.btn} ${styles.btnGhost}`}
           onClick={handleApplyIndustryPreset}
+          disabled={saving}
         >
           {t.applyPreset}
         </button>
@@ -686,13 +804,44 @@ export default function WebsiteBuilderClient() {
 
           {slug ? (
             <div className={styles.slugRow}>
-              <span style={{ color: "#94a3b8", fontWeight: 600 }}>{t.slugLabel}</span>
-              <span className={styles.slugUrl}>
-                {published
-                  ? publicUrl ||
-                    `${typeof window !== "undefined" ? window.location.origin : ""}/site/${slug}`
-                  : `${typeof window !== "undefined" ? window.location.origin : ""}/website`}
-              </span>
+              <div>
+                <span style={{ color: "#94a3b8", fontWeight: 600 }}>{t.slugLabel}</span>
+                <span className={styles.slugUrl}>
+                  {typeof window !== "undefined"
+                    ? `${window.location.origin}${sitePath}`
+                    : sitePath}
+                </span>
+              </div>
+              <div className={styles.slugEditRow}>
+                <label className={styles.slugEditLabel} htmlFor="wb-slug-input">
+                  {t.slugEditLabel}
+                </label>
+                <div className={styles.slugEditControls}>
+                  <span className={styles.slugPrefix}>/sites/</span>
+                  <input
+                    id="wb-slug-input"
+                    className={styles.slugInput}
+                    value={slugDraft}
+                    onChange={(e) => setSlugDraft(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnGhost}`}
+                    disabled={saving || slugDraft === slug}
+                    onClick={handleSlugUpdate}
+                  >
+                    {t.slugSave}
+                  </button>
+                </div>
+                <p className={styles.slugEditHint}>{t.slugEditHint}</p>
+              </div>
+              <div style={{ marginTop: 6, fontSize: "0.8rem", color: "#64748b" }}>
+                {published ? t.publicSiteLive : t.publicSiteDraft}
+                {" · "}
+                {t.editorPathHint}
+              </div>
             </div>
           ) : null}
 

@@ -5,7 +5,7 @@
 | Level | Identity | Domain | Users |
 |-------|----------|--------|-------|
 | **Platform** | FieldBase | fieldbaseapp.net | `super_admin` (platform owner) |
-| **Tenant / company** | Contractor business name | `/site/{slug}` public site | `admin`, `contractor`, `viewer` |
+| **Tenant / company** | Contractor business name | `/sites/{slug}` public site | `admin`, `contractor`, `viewer` |
 
 FieldBase is always the SaaS product brand in the app shell (sidebar logo, login, marketing).
 

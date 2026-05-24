@@ -97,7 +97,7 @@ export default function PublicSiteFooter({
               )
             ) : null}
             <Link
-              href={`/site/${slug}/request`}
+              href={`/sites/${slug}/request`}
               style={{
                 display: "inline-flex",
                 marginTop: 12,
