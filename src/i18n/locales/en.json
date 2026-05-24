@@ -28,8 +28,8 @@
   "dashboardControl": {
     "operationsLabel": "Run · Get paid · Grow",
     "title": "Command Center",
-    "subtitle": "Your business in three moves — operations, collections, and growth.",
-    "subtitleWithName": "Welcome back, {{name}}. Here is your business at a glance.",
+    "subtitle": "Everything in one place — clear, secure, and built to get you paid.",
+    "subtitleWithName": "Hi {{name}}. Your jobs, clients, and payments — without the busywork.",
     "actions": {
       "collectPayment": "Collect payment",
       "newEstimate": "New Estimate",
@@ -494,6 +494,57 @@
     "logout": "Logout",
     "signingOut": "Signing out..."
   },
+  "trustStrip": {
+    "ariaLabel": "Security and trust",
+    "items": {
+      "stripe": "Powered by Stripe",
+      "secure": "Bank-level encryption",
+      "payouts": "Funds go to your account",
+      "support": "FieldBase support"
+    }
+  },
+  "paymentsBanner": {
+    "ready": {
+      "kicker": "Ready to collect",
+      "title": "Your payout account is active",
+      "body": "Send an invoice and your client pays online. Deposits hit your bank through Stripe.",
+      "cta": "Create or send invoice",
+      "manage": "Payment settings"
+    },
+    "setup": {
+      "kicker": "Recommended",
+      "kickerSoon": "Step 1",
+      "title": "Turn on card payments in 5 minutes",
+      "titleSoon": "Set up how clients pay you",
+      "body": "Easier than Jobber: one invoice link, secure checkout, money to your business.",
+      "bodySoon": "Connect Stripe once. Clients pay through FieldBase; you receive the deposit.",
+      "cta": "Connect Stripe now",
+      "ctaSoon": "Start setup",
+      "invoices": "View invoices"
+    }
+  },
+  "gettingStarted": {
+    "kicker": "Quick start",
+    "title": "Get your business running",
+    "subtitle": "Three steps to get paid like a pro — no menu maze.",
+    "progress": "{{completed}} of {{total}} done",
+    "go": "Go",
+    "done": "Done",
+    "steps": {
+      "payments": {
+        "label": "Connect payouts (Stripe)",
+        "desc": "So clients can pay by card from your invoice."
+      },
+      "client": {
+        "label": "Add your first client",
+        "desc": "Keep contact info and history in one place."
+      },
+      "invoice": {
+        "label": "Send your first invoice",
+        "desc": "One payment link — they pay, you stay on track."
+      }
+    }
+  },
   "settingsHub": {
     "title": "Settings",
     "subtitle": "Manage your FieldBase account, billing, and how you get paid by clients.",
@@ -516,7 +567,7 @@
     "heroTitle": "Stripe payout account",
     "heroBody": "Your clients pay from invoice links. FieldBase routes the payment to your Stripe balance with automatic payouts to your bank.",
     "loading": "Checking…",
-    "comingSoonHint": "Online client payments are rolling out. FieldBase will enable Stripe Connect for your account soon — you can finish setup here once it is active.",
+    "comingSoonHint": "Finish payout setup in a few minutes. Stripe verifies your business; then clients pay from your invoice link.",
     "features": {
       "sendInvoices": "Send invoices by email or share a payment link",
       "clientPaysOnline": "Clients pay by card — no chasing checks",

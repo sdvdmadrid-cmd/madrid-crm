@@ -28,8 +28,8 @@
   "dashboardControl": {
     "operationsLabel": "Operar · Cobrar · Crecer",
     "title": "Centro de mando",
-    "subtitle": "Tu negocio en tres movimientos: operaciones, cobros y crecimiento.",
-    "subtitleWithName": "Bienvenido de nuevo, {{name}}. Aqui tienes tu negocio de un vistazo.",
+    "subtitle": "Todo en un solo lugar — claro, seguro y listo para cobrar como los grandes.",
+    "subtitleWithName": "Hola {{name}}. Tu negocio, tus cobros y tu calendario — sin complicarte la vida.",
     "actions": {
       "collectPayment": "Cobrar pago",
       "newEstimate": "Nuevo estimado",
@@ -494,6 +494,57 @@
     "logout": "Cerrar sesion",
     "signingOut": "Cerrando sesion..."
   },
+  "trustStrip": {
+    "ariaLabel": "Seguridad y confianza",
+    "items": {
+      "stripe": "Pagos con Stripe",
+      "secure": "Cifrado de nivel bancario",
+      "payouts": "El dinero va a tu cuenta",
+      "support": "Soporte FieldBase"
+    }
+  },
+  "paymentsBanner": {
+    "ready": {
+      "kicker": "Listo para cobrar",
+      "title": "Tu cuenta de cobros esta activa",
+      "body": "Envia una factura y tu cliente paga en linea. Los depositos llegan a tu banco con Stripe.",
+      "cta": "Crear o enviar factura",
+      "manage": "Ajustes de cobros"
+    },
+    "setup": {
+      "kicker": "Recomendado",
+      "kickerSoon": "Paso 1",
+      "title": "Activa cobros con tarjeta en 5 minutos",
+      "titleSoon": "Configura como te pagan tus clientes",
+      "body": "Mas facil que Jobber: un enlace en la factura, pago seguro, y el dinero a tu negocio.",
+      "bodySoon": "Conecta Stripe una vez. Tus clientes pagan desde FieldBase; tu recibes el deposito.",
+      "cta": "Conectar Stripe ahora",
+      "ctaSoon": "Empezar configuracion",
+      "invoices": "Ver facturas"
+    }
+  },
+  "gettingStarted": {
+    "kicker": "Primeros pasos",
+    "title": "Pon tu negocio en marcha",
+    "subtitle": "Tres pasos y ya puedes cobrar como un pro — sin perderte en menus.",
+    "progress": "{{completed}} de {{total}} listos",
+    "go": "Ir",
+    "done": "Listo",
+    "steps": {
+      "payments": {
+        "label": "Conectar cobros (Stripe)",
+        "desc": "Para que tus clientes paguen con tarjeta desde la factura."
+      },
+      "client": {
+        "label": "Agregar tu primer cliente",
+        "desc": "Guarda contacto y historial en un solo lugar."
+      },
+      "invoice": {
+        "label": "Enviar tu primera factura",
+        "desc": "Un enlace de pago — el cliente paga y tu quedas al dia."
+      }
+    }
+  },
   "settingsHub": {
     "title": "Ajustes",
     "subtitle": "Administra tu cuenta de FieldBase, tu suscripcion y como cobras a tus clientes.",
@@ -516,7 +567,7 @@
     "heroTitle": "Cuenta de cobros Stripe",
     "heroBody": "Tus clientes pagan desde el enlace de la factura. FieldBase envia el pago a tu saldo de Stripe con depositos automaticos a tu banco.",
     "loading": "Comprobando…",
-    "comingSoonHint": "Los cobros en linea se estan activando. FieldBase habilitara Stripe Connect pronto — podras terminar la configuracion aqui cuando este listo.",
+    "comingSoonHint": "Activa tu cuenta de cobros en unos minutos. Stripe verifica tu negocio; despues tus clientes pagan desde el enlace de la factura.",
     "features": {
       "sendInvoices": "Envia facturas por correo o comparte un enlace de pago",
       "clientPaysOnline": "El cliente paga con tarjeta — sin perseguir cheques",
