@@ -87,10 +87,19 @@ export async function GET() {
       );
     }
 
+    const commitSha =
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_REF ||
+      "";
+
     return new Response(
       JSON.stringify({
         success: true,
         status: "ok",
+        commitSha: commitSha ? String(commitSha).slice(0, 12) : null,
+        stripeConnectEnabled:
+          String(process.env.STRIPE_CONNECT_ENABLED || "").toLowerCase() ===
+          "true",
         uptimeSeconds: Math.floor(process.uptime()),
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),

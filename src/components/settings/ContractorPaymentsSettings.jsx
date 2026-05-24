@@ -85,7 +85,12 @@ export default function ContractorPaymentsSettings() {
       }
       window.location.href = url;
     } catch (err) {
-      setError(err?.message || t("settingsPayments.errors.onboard"));
+      const raw = String(err?.message || "");
+      if (raw.includes("STRIPE_CONNECT_PLATFORM_NOT_ENABLED")) {
+        setError(t("settingsPayments.errors.platformConnectRequired"));
+      } else {
+        setError(err?.message || t("settingsPayments.errors.onboard"));
+      }
     } finally {
       setActionLoading(false);
     }

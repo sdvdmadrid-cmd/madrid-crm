@@ -69,19 +69,33 @@ export async function createConnectOnboardingLink({ tenantId, returnUrl, refresh
   let accountId = connect.accountId;
 
   if (!accountId) {
-    const account = await stripe.accounts.create({
-      type: "express",
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-      metadata: { tenant_id: tenantKey },
-      business_profile: {
-        name:
-          String(profile?.public_display_name || profile?.company_name || "").trim() ||
-          undefined,
-      },
-    });
+    let account;
+    try {
+      account = await stripe.accounts.create({
+        type: "express",
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        metadata: { tenant_id: tenantKey },
+        business_profile: {
+          name:
+            String(profile?.public_display_name || profile?.company_name || "").trim() ||
+            undefined,
+        },
+      });
+    } catch (error) {
+      const message = String(error?.message || "");
+      if (
+        message.includes("signed up for Connect") ||
+        message.includes("dashboard.stripe.com/connect")
+      ) {
+        throw new Error(
+          "STRIPE_CONNECT_PLATFORM_NOT_ENABLED: FieldBase must enable Stripe Connect on the platform Stripe account first. Open https://dashboard.stripe.com/connect and complete platform signup, then try again.",
+        );
+      }
+      throw error;
+    }
     accountId = account.id;
 
     await writeConnectProfile(tenantKey, { accountId });
