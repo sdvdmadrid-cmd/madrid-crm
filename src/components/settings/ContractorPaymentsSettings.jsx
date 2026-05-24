@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import ContractorTrustStrip from "@/components/workspace/ContractorTrustStrip";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import styles from "./ContractorPaymentsSettings.module.css";
@@ -163,6 +164,7 @@ export default function ContractorPaymentsSettings() {
           )}
         </div>
         <p className={styles.heroBody}>{t("settingsPayments.heroBody")}</p>
+        <ContractorTrustStrip />
 
         <ul className={styles.featureList}>
           <li>{t("settingsPayments.features.sendInvoices")}</li>

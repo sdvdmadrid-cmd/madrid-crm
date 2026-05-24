@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
+import ContractorTrustStrip from "@/components/workspace/ContractorTrustStrip";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import styles from "./settings.module.css";
 
@@ -30,6 +31,7 @@ export default function SettingsHubPage() {
       title={t("settingsHub.title")}
       subtitle={t("settingsHub.subtitle")}
     >
+      <ContractorTrustStrip />
       <div className={styles.grid}>
         {SETTINGS_LINKS.map((item) => (
           <Link

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
+import GettingStartedChecklist from "@/components/workspace/GettingStartedChecklist";
+import PaymentsReadinessBanner from "@/components/workspace/PaymentsReadinessBanner";
 import { FIELDBASE_PILLARS } from "@/lib/fieldbase-pillars";
 import styles from "./page.module.css";
 
@@ -83,6 +85,7 @@ export default function RevenueDashboardPage() {
     recentPayments: [],
   });
   const [revenueUnavailable, setRevenueUnavailable] = useState(false);
+  const [paymentsOnboarded, setPaymentsOnboarded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +102,10 @@ export default function RevenueDashboardPage() {
           apiFetch("/api/auth/me", { signal: controller.signal, suppressUnauthorizedEvent: true }),
           apiFetch("/api/dashboard-metrics", { signal: controller.signal, suppressUnauthorizedEvent: true }),
           apiFetch("/api/revenue-dashboard?limit=10", { signal: controller.signal, suppressUnauthorizedEvent: true }),
+          apiFetch("/api/payments/connect/status", {
+            signal: controller.signal,
+            suppressUnauthorizedEvent: true,
+          }),
         ]);
       } finally {
         clearTimeout(timeoutId);
@@ -106,7 +113,7 @@ export default function RevenueDashboardPage() {
 
       if (cancelled) return;
 
-      const [sessionResult, metricsResult, revenueResult] = requests;
+      const [sessionResult, metricsResult, revenueResult, connectResult] = requests;
 
       if (sessionResult.status === "fulfilled" && sessionResult.value.ok) {
         const sessionPayload = await sessionResult.value.json().catch(() => null);
@@ -123,6 +130,11 @@ export default function RevenueDashboardPage() {
         setMetrics(payload || null);
       } else {
         setMetrics(null);
+      }
+
+      if (connectResult?.status === "fulfilled" && connectResult.value.ok) {
+        const connectPayload = await connectResult.value.json().catch(() => null);
+        setPaymentsOnboarded(Boolean(connectPayload?.data?.onboarded));
       }
 
       if (revenueResult.status === "fulfilled" && revenueResult.value.ok) {
@@ -229,6 +241,33 @@ export default function RevenueDashboardPage() {
     );
   }
 
+  const clientCount = Number(metrics?.clients?.total || 0);
+  const invoiceCount = Number(metrics?.invoices?.total || 0);
+
+  const gettingStartedSteps = [
+    {
+      id: "payments",
+      done: paymentsOnboarded,
+      href: "/settings/payments",
+      labelKey: "gettingStarted.steps.payments.label",
+      descKey: "gettingStarted.steps.payments.desc",
+    },
+    {
+      id: "client",
+      done: clientCount > 0,
+      href: "/clients",
+      labelKey: "gettingStarted.steps.client.label",
+      descKey: "gettingStarted.steps.client.desc",
+    },
+    {
+      id: "invoice",
+      done: invoiceCount > 0,
+      href: "/invoices",
+      labelKey: "gettingStarted.steps.invoice.label",
+      descKey: "gettingStarted.steps.invoice.desc",
+    },
+  ];
+
   return (
     <main className={styles.page}>
       <header className={styles.topBar}>
@@ -253,6 +292,9 @@ export default function RevenueDashboardPage() {
           <Link href="/clients" className={styles.secondaryAction}>{t("dashboardControl.actions.addClient")}</Link>
         </div>
       </header>
+
+      <PaymentsReadinessBanner />
+      <GettingStartedChecklist steps={gettingStartedSteps} />
 
       <section className={styles.pillarsGrid} aria-label={t("dashboardControl.pillars.ariaLabel")}>
         {FIELDBASE_PILLARS.map((pillar) => (
