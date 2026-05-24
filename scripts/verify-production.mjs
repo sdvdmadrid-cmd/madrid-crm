@@ -33,6 +33,14 @@ async function checkRoute({ path, expect, json }) {
     const body = await res.json().catch(() => ({}));
     detail = `commitSha=${body.commitSha || "?"} stripeConnect=${body.stripeConnectEnabled}`;
   }
+  if (path === "/login" && res.ok) {
+    const html = await res.text().catch(() => "");
+    const m = html.match(/data-fieldbase-build="([a-f0-9]{7,12})"/i);
+    detail = `${detail} htmlBuild=${m?.[1] || "missing"}`;
+    if (!m?.[1]) {
+      return { path, status: res.status, pass: false, detail };
+    }
+  }
   return { path, status: res.status, pass, detail };
 }
 
