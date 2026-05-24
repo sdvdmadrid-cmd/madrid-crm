@@ -94,6 +94,8 @@ const COPY = {
       submitFailed: "Could not send your request. Please try again or call us.",
       previewSubmitBlocked:
         "Publish your website to start receiving customer requests from this form.",
+      turnstileRequired: "Please complete the security verification before submitting.",
+      turnstileLoading: "Loading security check…",
       saveSiteFirst: "Save and publish your website before customers can submit requests.",
       noServicesTitle: "Request form not ready",
       noServices: "Add services to your website in the builder so customers can choose what they need.",

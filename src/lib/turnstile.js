@@ -12,16 +12,33 @@ export function isTurnstileTestSiteKey(siteKey = getTurnstileSiteKey()) {
 }
 
 export function isTurnstileConfigured() {
+  return getTurnstileStatus().verificationRequired;
+}
+
+/**
+ * Ops-safe Turnstile status (no secrets). For health checks and lead-form-config.
+ */
+export function getTurnstileStatus() {
   const siteKey = getTurnstileSiteKey();
   const secret = String(process.env.TURNSTILE_SECRET_KEY || "").trim();
-  if (!siteKey || !secret) return false;
-  if (process.env.NODE_ENV === "production" && isTurnstileTestSiteKey(siteKey)) {
-    console.error(
-      "[turnstile] Test site key detected in production. Set production Turnstile keys in environment variables.",
-    );
-    return false;
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!siteKey && !secret) {
+    return { mode: "disabled", verificationRequired: false, widgetEnabled: false };
   }
-  return true;
+
+  if (!siteKey || !secret) {
+    return { mode: "misconfigured", verificationRequired: false, widgetEnabled: false };
+  }
+
+  if (isTurnstileTestSiteKey(siteKey)) {
+    if (isProd) {
+      return { mode: "test_rejected", verificationRequired: false, widgetEnabled: false };
+    }
+    return { mode: "test", verificationRequired: true, widgetEnabled: true };
+  }
+
+  return { mode: "production", verificationRequired: true, widgetEnabled: true };
 }
 
 export async function verifyTurnstileToken(token, remoteIp = "") {

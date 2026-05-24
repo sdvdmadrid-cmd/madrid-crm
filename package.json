@@ -18,6 +18,7 @@
     "stripe:check": "node scripts/check-stripe-key.mjs",
     "verify:prod": "node scripts/verify-production.mjs",
     "validate:public": "node scripts/validate-public-production.mjs",
+    "verify:turnstile": "node scripts/verify-turnstile-production.mjs",
     "deploy:audit": "node scripts/deployment-pipeline-audit.mjs",
     "verify:website-saas": "node scripts/verify-website-builder-saas.mjs",
     "setup:website-production": "node scripts/setup-website-production.mjs",

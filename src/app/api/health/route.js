@@ -1,4 +1,5 @@
 import { getSessionSecretHealth } from "@/lib/session-secret";
+import { getTurnstileStatus } from "@/lib/turnstile";
 
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -122,6 +123,7 @@ export async function GET() {
         stripeConnectEnabled:
           String(process.env.STRIPE_CONNECT_ENABLED || "").toLowerCase() ===
           "true",
+        turnstile: getTurnstileStatus(),
         uptimeSeconds: Math.floor(process.uptime()),
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),

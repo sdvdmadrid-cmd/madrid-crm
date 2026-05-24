@@ -91,6 +91,8 @@ export default function PremiumLeadForm({
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [turnstileRequired, setTurnstileRequired] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState("");
   const [leadId, setLeadId] = useState("");
 
   useEffect(() => {
@@ -135,6 +137,9 @@ export default function PremiumLeadForm({
         if (Array.isArray(data.contactPreferences) && data.contactPreferences.length) {
           setContactPrefs(data.contactPreferences);
         }
+        const ts = data.turnstile || {};
+        setTurnstileRequired(ts.required === true);
+        setTurnstileSiteKey(String(ts.siteKey || "").trim());
         setForm((prev) => ({
           ...prev,
           serviceNeeded: pickInitialService(
@@ -245,6 +250,10 @@ export default function PremiumLeadForm({
     }
     if (!serviceOptions.length) {
       setError(formCopy.noServices);
+      return;
+    }
+    if (turnstileRequired && !String(turnstileToken || "").trim()) {
+      setError(formCopy.turnstileRequired || "Please complete the security check below.");
       return;
     }
 
@@ -694,7 +703,13 @@ export default function PremiumLeadForm({
                   <img src={form.photoDataUrl} alt="" className="ps-photo-preview" />
                 ) : null}
               </div>
-              <TurnstileField onToken={setTurnstileToken} resetKey={turnstileResetKey} />
+              {turnstileRequired || turnstileSiteKey ? (
+                <TurnstileField
+                  siteKey={turnstileSiteKey}
+                  onToken={setTurnstileToken}
+                  resetKey={turnstileResetKey}
+                />
+              ) : null}
             </>
           ) : null}
 

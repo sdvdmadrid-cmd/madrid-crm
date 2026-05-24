@@ -1,5 +1,6 @@
 import { publicWebsiteJson } from "@/lib/api-zone-guard";
 import { resolveWebsiteForLeadSubmission } from "@/lib/public-website-lead";
+import { getTurnstileSiteKey, getTurnstileStatus } from "@/lib/turnstile";
 import {
   LEAD_BUDGET_OPTIONS,
   LEAD_CONTACT_PREFERENCES,
@@ -43,6 +44,11 @@ export async function GET(_request, { params }) {
       contactPreferences: LEAD_CONTACT_PREFERENCES,
       locale: data.companyProfile?.documentLanguage === "es" ? "es" : "en",
       phone: data.companyProfile?.phone || "",
+      turnstile: {
+        required: turnstile.verificationRequired,
+        mode: turnstile.mode,
+        siteKey: turnstile.widgetEnabled ? getTurnstileSiteKey() : "",
+      },
     },
   });
 }
