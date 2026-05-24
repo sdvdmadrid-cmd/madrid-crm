@@ -1,5 +1,6 @@
 import { buildEstimateBuilderInsertRow } from "@/lib/estimate-builder-records";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assertTenantClient } from "@/lib/tenant-fk-validation";
 import {
   canWrite,
   forbiddenResponse,
@@ -87,10 +88,23 @@ export async function POST(request) {
     const body = await request.json();
     const nowIso = new Date().toISOString();
 
-    if (!body.client_id) {
+    const clientId = String(body.client_id || body.clientId || "").trim();
+    if (!clientId) {
       return new Response(
         JSON.stringify({ success: false, error: "client_id is required" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const clientCheck = await assertTenantClient({
+      tenantDbId,
+      role,
+      clientId,
+    });
+    if (!clientCheck.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: clientCheck.error }),
+        { status: clientCheck.status, headers: { "Content-Type": "application/json" } },
       );
     }
 
