@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+const BUILD_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
-export default function TurnstileField({ onToken, resetKey = 0 }) {
+export default function TurnstileField({ onToken, resetKey = 0, siteKey: siteKeyProp = "" }) {
+  const SITE_KEY = String(siteKeyProp || BUILD_SITE_KEY || "").trim();
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
   const [ready, setReady] = useState(false);

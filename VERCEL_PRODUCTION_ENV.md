@@ -89,6 +89,24 @@ Set these explicitly in Vercel Production:
 - `NEXT_PUBLIC_DEV_LOGIN_ENABLED=false`
 - `ALLOW_INSECURE_DEV_WEBHOOKS=false`
 
+## Must Have For Public Lead Forms (Cloudflare Turnstile)
+
+Set in Vercel **Production** (then **redeploy** — the site key is baked into the client bundle):
+
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — production widget site key from [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile)
+- `TURNSTILE_SECRET_KEY` — matching secret key
+
+Do **not** use test keys (`1x00000000000000000000…`) in production; the app rejects them and submissions work without CAPTCHA.
+
+Verify after deploy:
+
+```bash
+npm run verify:turnstile
+npm run verify:turnstile https://fieldbaseapp.net your-site-slug
+```
+
+Healthy production: `/api/health` returns `turnstile.mode: "production"`.
+
 ## Non-Vercel Variable
 
 This is needed for remote Supabase migration pushes from local/CI, not for Vercel runtime:
