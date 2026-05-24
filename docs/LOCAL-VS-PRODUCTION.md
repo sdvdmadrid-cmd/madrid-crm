@@ -19,10 +19,13 @@
 ## Verify production is current
 
 ```bash
+npm run verify:prod
 git log origin/main -1 --oneline
-vercel ls madrid-app --prod
 curl https://fieldbaseapp.net/api/health
 ```
+
+In the app: open **Settings** or **Website builder** — footer shows **Build xxxxx** (must match `commitSha` from `/api/health`).
+Hard refresh: **Ctrl+Shift+R** if UI still looks cached.
 
 Latest deploy should be minutes after the last merge to `main`.
 

@@ -8,6 +8,7 @@ import {
   getWebsiteBuilderPack,
   sanitizeIndustryWebsiteContent,
 } from "@/lib/website-builder-industry";
+import DeployBuildBadge from "@/components/workspace/DeployBuildBadge";
 import HeroImageEditor from "./HeroImageEditor";
 import WebsiteBuilderPreview from "./WebsiteBuilderPreview";
 import { WEBSITE_BUILDER_UI } from "./website-builder-ui";
@@ -1219,6 +1220,7 @@ export default function WebsiteBuilderClient() {
           </div>
         </div>
       </div>
+      <DeployBuildBadge className={styles.buildBadge} />
     </div>
   );
 }
