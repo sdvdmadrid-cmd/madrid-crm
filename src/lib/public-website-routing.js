@@ -35,6 +35,17 @@ export function normalizeWebsiteSlug(raw) {
     .slice(0, 48);
 }
 
+/** Decode route param / link segment then normalize for DB lookup. */
+export function parsePublicWebsiteSlug(raw) {
+  let value = String(raw || "").trim();
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    /* keep raw */
+  }
+  return normalizeWebsiteSlug(value);
+}
+
 export function isReservedWebsiteSlug(slug) {
   const normalized = normalizeWebsiteSlug(slug);
   if (!normalized || normalized.length < 2) return true;

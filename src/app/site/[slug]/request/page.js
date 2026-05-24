@@ -3,10 +3,12 @@ import Link from "next/link";
 import PublicSiteFooter from "@/components/site/PublicSiteFooter";
 import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
+import PublicSiteEnhancements from "@/components/site/PublicSiteEnhancements";
+import PublicSiteLeadExperience from "@/components/site/PublicSiteLeadExperience";
+import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
 import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
-import { getWebsiteBuilderPack, resolveWebsiteIndustryKey } from "@/lib/website-builder-industry";
 
 export const revalidate = 120;
 
@@ -38,13 +40,10 @@ export default async function PublicContractorRequestPage({ params, searchParams
 
   const companyName =
     data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "Contractor";
-  const pack = getWebsiteBuilderPack(
-    resolveWebsiteIndustryKey(data.companyProfile?.businessType),
-  );
-  const serviceOptions =
-    Array.isArray(data.requestServices) && data.requestServices.length > 0
-      ? data.requestServices
-      : pack.requestServices;
+  const serviceOptions = resolveWebsiteRequestServices({
+    services: data.services,
+    requestServices: data.requestServices,
+  });
   const initialService = normalizeRequestedService(
     resolvedSearchParams?.service,
     serviceOptions,
@@ -52,10 +51,20 @@ export default async function PublicContractorRequestPage({ params, searchParams
   const theme = data.themeColor || "#1d4ed8";
   const phone = data.companyProfile?.phone || "";
 
+  const ctaText = data.ctaText || copy.nav.getQuote;
+
   return (
-    <main style={{ minHeight: "100vh", background: "#f8fafc" }}>
+    <PublicSiteLeadExperience
+      slug={data.slug}
+      serviceOptions={serviceOptions}
+      locale={locale}
+      themeColor={theme}
+      companyName={companyName}
+    >
+    <main style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)" }}>
+      <PublicSiteEnhancements stickyCtaHref={`/sites/${data.slug}#request-service`} stickyCtaLabel={ctaText} />
       <PublicSiteNav
-        slug={slug}
+        slug={data.slug}
         companyName={companyName}
         logoUrl={data.companyProfile?.logoDataUrl || ""}
         phone={phone}
@@ -82,7 +91,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
           </h1>
           <p style={{ color: "#475569", maxWidth: 620, lineHeight: 1.7 }}>{copy.request.subtitle}</p>
           <Link
-            href={`/sites/${slug}`}
+            href={`/sites/${data.slug}`}
             style={{
               display: "inline-block",
               marginTop: 14,
@@ -96,26 +105,30 @@ export default async function PublicContractorRequestPage({ params, searchParams
         </div>
 
         <section
+          id="request-service"
+          className="ps-visible"
           style={{
-            background: "#1e293b",
-            borderRadius: 20,
-            padding: "28px 20px",
-            boxShadow: "0 24px 60px rgba(15, 23, 42, 0.18)",
+            background: "linear-gradient(145deg, #1e293b 0%, #0f172a 100%)",
+            borderRadius: 24,
+            padding: "clamp(20px, 4vw, 36px)",
+            boxShadow: "0 32px 80px rgba(15, 23, 42, 0.22)",
             marginBottom: 0,
+            border: "1px solid rgba(255,255,255,0.08)",
           }}
         >
           <RequestServiceForm
-            slug={slug}
+            slug={data.slug}
             serviceOptions={serviceOptions}
             initialService={initialService}
             locale={locale}
             requireEmail
+            themeColor={theme}
           />
         </section>
       </div>
 
       <PublicSiteFooter
-        slug={slug}
+        slug={data.slug}
         companyName={companyName}
         phone={phone}
         businessAddress={data.companyProfile?.businessAddress || ""}
@@ -125,5 +138,6 @@ export default async function PublicContractorRequestPage({ params, searchParams
         locale={locale}
       />
     </main>
+    </PublicSiteLeadExperience>
   );
 }

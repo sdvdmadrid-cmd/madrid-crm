@@ -18,6 +18,7 @@
     "deploy:audit": "node scripts/deployment-pipeline-audit.mjs",
     "verify:website-saas": "node scripts/verify-website-builder-saas.mjs",
     "setup:website-production": "node scripts/setup-website-production.mjs",
+    "test:unit": "node --test tests/unit/**/*.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:website": "playwright test tests/e2e/website-funnel.spec.js",
     "test:e2e:ui": "playwright test --ui",

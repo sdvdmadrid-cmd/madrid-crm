@@ -90,7 +90,39 @@ export async function POST(request) {
   const industryKey = resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta);
   const pack = getWebsiteBuilderPack(industryKey);
 
-  const instantSite = buildInstantSiteFromIndustry(pack, profile, existingForm);
+  let catalogServices = [];
+  try {
+    const { data: catalogRows } = await supabaseAdmin
+      .from("services_catalog")
+      .select("name, description, price_min, price_max")
+      .eq("tenant_id", access.tenantDbId)
+      .order("updated_at", { ascending: false })
+      .limit(24);
+    catalogServices = (catalogRows || []).map((row) => ({
+      name: row.name || "",
+      description: row.description || "",
+      price:
+        row.price_min && row.price_max
+          ? `From $${row.price_min}`
+          : row.price_min
+            ? `From $${row.price_min}`
+            : "",
+    }));
+  } catch {
+    catalogServices = [];
+  }
+
+  const mergedForm = {
+    ...existingForm,
+    services:
+      services.length > 0
+        ? services
+        : Array.isArray(existingForm.services) && existingForm.services.length > 0
+          ? existingForm.services
+          : catalogServices,
+  };
+
+  const instantSite = buildInstantSiteFromIndustry(pack, profile, mergedForm);
   let fullSite = instantSite;
   let source = "instant";
 
@@ -135,7 +167,7 @@ export async function POST(request) {
       );
 
       const parsed = parseAiJson(response.text || "{}");
-      fullSite = buildFullSiteFromAi(parsed, pack, profile, existingForm);
+      fullSite = buildFullSiteFromAi(parsed, pack, profile, mergedForm);
       if (fullSite.siteMeta && typeof fullSite.siteMeta === "object") {
         fullSite.siteMeta.generationSource = "ai";
       }

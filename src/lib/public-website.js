@@ -14,6 +14,7 @@ import {
   normalizeGalleryPhotos,
   normalizePortfolio,
 } from "@/lib/website-gallery";
+import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 
 const PUBLIC_WEBSITE_SELECT = [
   "slug",
@@ -56,6 +57,7 @@ function normalizeSocialLinks(raw) {
     tiktok: pick("tiktok"),
     linkedin: pick("linkedin"),
     google: pick("google"),
+    youtube: pick("youtube"),
   };
 }
 
@@ -102,15 +104,8 @@ async function fetchPublishedWebsiteRow(slug) {
   return data;
 }
 
-export async function getPublicWebsiteBySlug(slug) {
-  const normalizedSlug = normalizeSlug(slug);
-  if (!normalizedSlug) return null;
-
-  const website = await fetchPublishedWebsiteRow(normalizedSlug);
-
-  if (!website?.tenant_id) {
-    return null;
-  }
+export async function assemblePublicWebsiteFromRow(website) {
+  if (!website?.tenant_id) return null;
 
   const { data: companyProfile } = await supabaseAdmin
     .from("company_profiles")
@@ -166,7 +161,10 @@ export async function getPublicWebsiteBySlug(slug) {
     analytics: normalizeSiteAnalytics(meta.analytics),
     industryLabel: pack.label,
     industryKey: pack.key,
-    requestServices: pack.requestServices,
+    requestServices: resolveWebsiteRequestServices({
+      services: Array.isArray(website.services) ? website.services : [],
+      requestServices: pack.requestServices,
+    }),
     companyProfile: {
       companyName: companyProfile?.company_name || "",
       publicDisplayName: companyProfile?.public_display_name || "",
@@ -180,6 +178,16 @@ export async function getPublicWebsiteBySlug(slug) {
       documentLanguage: companyProfile?.document_language || "en",
     },
   };
+}
+
+export async function getPublicWebsiteBySlug(slug) {
+  const normalizedSlug = normalizeSlug(slug);
+  if (!normalizedSlug) return null;
+
+  const website = await fetchPublishedWebsiteRow(normalizedSlug);
+  if (!website?.tenant_id) return null;
+
+  return assemblePublicWebsiteFromRow(website);
 }
 
 export async function listPublishedPublicWebsiteSlugs(limit = 5000) {

@@ -1,9 +1,17 @@
 "use client";
 
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./website-builder.module.css";
+import { useWebsiteBuilderEditingRef } from "./WebsiteBuilderEditContext";
+
+function autoResizeTextarea(el) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${Math.max(el.scrollHeight, 48)}px`;
+}
 
 /**
- * Inline field on the visual preview — looks like live site text, edits on click.
+ * Inline field on the visual preview — local draft while typing to avoid lag / one-char bugs.
  */
 export function InlineEditable({
   value,
@@ -14,28 +22,84 @@ export function InlineEditable({
   maxLength = 500,
   asHeading = false,
 }) {
+  const editingRef = useWebsiteBuilderEditingRef();
+  const [draft, setDraft] = useState(() => String(value || ""));
+  const inputRef = useRef(null);
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setDraft(String(value || ""));
+    }
+  }, [value]);
+
+  const commit = useCallback(
+    (next) => {
+      const trimmed = String(next || "").slice(0, maxLength);
+      onChange?.(trimmed);
+    },
+    [onChange, maxLength],
+  );
+
+  const handleFocus = () => {
+    focusedRef.current = true;
+    if (editingRef) editingRef.current = true;
+  };
+
+  const handleBlur = () => {
+    focusedRef.current = false;
+    if (editingRef) editingRef.current = false;
+    commit(draft);
+  };
+
+  useLayoutEffect(() => {
+    if (multiline && inputRef.current) {
+      autoResizeTextarea(inputRef.current);
+    }
+  }, [draft, multiline]);
+
   if (!onChange) {
-    const Tag = asHeading ? "span" : "span";
+    return <span className={className}>{value || placeholder}</span>;
+  }
+
+  const sharedClass = `${styles.inlineEdit} ${asHeading ? styles.inlineEditHeading : ""} ${multiline ? styles.inlineEditMultiline : styles.inlineEditSingle} ${className}`;
+
+  if (multiline) {
     return (
-      <Tag className={className}>{value || placeholder}</Tag>
+      <textarea
+        ref={inputRef}
+        className={sharedClass}
+        value={draft}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        rows={asHeading ? 2 : 3}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          autoResizeTextarea(e.target);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      />
     );
   }
 
-  const shared = {
-    className: `${styles.inlineEdit} ${asHeading ? styles.inlineEditHeading : ""} ${multiline ? styles.inlineEditMultiline : styles.inlineEditSingle} ${className}`,
-    value: value || "",
-    placeholder,
-    maxLength,
-    onChange: (e) => onChange(e.target.value),
-    onClick: (e) => e.stopPropagation(),
-    onKeyDown: (e) => e.stopPropagation(),
-  };
-
-  if (multiline) {
-    return <textarea {...shared} rows={asHeading ? 2 : 4} />;
-  }
-
-  return <input type="text" {...shared} />;
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      className={sharedClass}
+      value={draft}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onChange={(e) => setDraft(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    />
+  );
 }
 
 export function PreviewSection({

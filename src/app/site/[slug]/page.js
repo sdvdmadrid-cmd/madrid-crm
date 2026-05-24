@@ -1,9 +1,14 @@
 ﻿import { notFound } from "next/navigation";
-import Image from "next/image";
 import PublicSiteAnalytics from "@/components/site/PublicSiteAnalytics";
 import PublicSiteFooter from "@/components/site/PublicSiteFooter";
 import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
+import PremiumGallery from "@/components/site/PremiumGallery";
+import PublicReviewsSection from "@/components/site/PublicReviewsSection";
+import { getPublicReviewsBySlug } from "@/lib/reputation-store";
+import PublicSiteEnhancements from "@/components/site/PublicSiteEnhancements";
+import PublicSiteLeadExperience from "@/components/site/PublicSiteLeadExperience";
+import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { getIndustryProfile } from "@/lib/industry-profiles";
 import { buildLocalBusinessJsonLd, buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
@@ -104,10 +109,13 @@ export async function generateMetadata({ params }) {
 export default async function PublicContractorSitePage({ params }) {
   const { slug } = await params;
   const requestHref = `/sites/${slug}/request`;
+  const quoteFormHref = `#request-service`;
 
   const data = await getPublicWebsiteBySlug(slug);
 
   if (!data) notFound();
+
+  const { reviews: publicReviews, stats: reviewStats } = await getPublicReviewsBySlug(slug);
 
   const locale = resolvePublicSiteLocale(data.companyProfile?.documentLanguage);
   const copy = getPublicSiteCopy(locale);
@@ -129,10 +137,10 @@ export default async function PublicContractorSitePage({ params }) {
     Array.isArray(data.testimonials) && data.testimonials.length > 0
       ? data.testimonials
       : industryPack.testimonials;
-  const requestServiceOptions =
-    Array.isArray(data.requestServices) && data.requestServices.length > 0
-      ? data.requestServices
-      : industryPack.requestServices;
+  const requestServiceOptions = resolveWebsiteRequestServices({
+    services: data.services,
+    requestServices: data.requestServices,
+  });
   const jsonLd = buildLocalBusinessJsonLd(data);
   const services =
     Array.isArray(data.services) && data.services.length > 0
@@ -160,7 +168,13 @@ export default async function PublicContractorSitePage({ params }) {
   const displayServices = services.slice(0, 6);
 
   return (
-    <>
+    <PublicSiteLeadExperience
+      slug={data.slug}
+      serviceOptions={requestServiceOptions}
+      locale={locale}
+      themeColor={theme}
+      companyName={companyName}
+    >
       <PublicSiteAnalytics analytics={data.analytics} />
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -298,12 +312,14 @@ export default async function PublicContractorSitePage({ params }) {
           phone={phone}
           ctaText={ctaText}
           themeColor={theme}
-          requestHref={requestHref}
+          requestHref={quoteFormHref}
           locale={locale}
         />
 
         {/* ── Hero ── */}
-        <section className="s-hero" id="home">
+        <PublicSiteEnhancements stickyCtaHref={quoteFormHref} stickyCtaLabel={ctaText} />
+
+        <section className="s-hero ps-reveal" id="home">
           <div className="s-hero-inner">
             <div className="s-hero-left">
               <div className="s-hero-badge">
@@ -313,7 +329,9 @@ export default async function PublicContractorSitePage({ params }) {
               <p className="s-hero-sub">{subheadline || `Quality ${industryProfile.label.toLowerCase()} services you can count on. Licensed, insured, and trusted by local homeowners and businesses.`}</p>
               <p className="s-hero-pill">🎉 {copy.hero.freeEstimates}</p>
               <div className="s-hero-btns">
-                <a href={requestHref} className="s-btn-primary">{ctaText}</a>
+                <a href={quoteFormHref} className="s-btn-primary">
+                  {ctaText}
+                </a>
                 <a href="#services" className="s-btn-secondary">{copy.hero.ourServices}</a>
               </div>
               {trustBadges.length > 1 ? (
@@ -336,30 +354,30 @@ export default async function PublicContractorSitePage({ params }) {
                 </div>
               ) : null}
             </div>
-            <div className="s-hero-right">
-              {heroDisplayPhotos.length > 0
-                ? heroDisplayPhotos.map((photo, i) => (
-                    <div key={photo.id || `hero-${i}`} className="s-hero-photo">
-                      {String(photo.src || "").trim() ? (
-                        <img
-                          src={photo.src}
-                          alt={photo.alt || `${industryProfile.label} photo ${i + 1}`}
-                          loading={i === 0 ? "eager" : "lazy"}
-                          decoding="async"
-                          fetchPriority={i === 0 ? "high" : "low"}
-                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                      ) : null}
-                      <div className="s-hero-photo-caption">{photo.alt || industryProfile.label}</div>
-                    </div>
-                  ))
-                : null}
-            </div>
+            {heroDisplayPhotos.length > 0 ? (
+              <div className="s-hero-right">
+                {heroDisplayPhotos.map((photo, i) => (
+                  <div key={photo.id || `hero-${i}`} className="s-hero-photo">
+                    {String(photo.src || "").trim() ? (
+                      <img
+                        src={photo.src}
+                        alt={photo.alt || `${industryProfile.label} photo ${i + 1}`}
+                        loading={i === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={i === 0 ? "high" : "low"}
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : null}
+                    <div className="s-hero-photo-caption">{photo.alt || industryProfile.label}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         </section>
 
         {/* ── Stats bar ── */}
-        <section className="s-stats">
+        <section className="s-stats ps-reveal ps-reveal-delay-1">
           <div className="s-stats-grid">
             {statTiles.map((stat) => (
               <div key={stat.number} className="s-stat-tile">
@@ -374,7 +392,7 @@ export default async function PublicContractorSitePage({ params }) {
 
         {/* ── Services / Features grid (landing card style) ── */}
         {displayServices.length > 0 && (
-          <section className="s-features" id="services">
+          <section className="s-features ps-reveal" id="services">
             <div className="s-features-inner">
               <h2 className="s-section-eyebrow">{copy.services.title}</h2>
               <p className="s-section-sub">{copy.services.subtitle}</p>
@@ -393,7 +411,9 @@ export default async function PublicContractorSitePage({ params }) {
                     {service.description && (
                       <div className="s-feature-desc">{service.description}</div>
                     )}
-                    <a href={`${requestHref}?service=${encodeURIComponent(service.name || "")}`} className="s-feature-cta">{copy.services.getQuote}</a>
+                    <a href={quoteFormHref} className="s-feature-cta">
+                      {copy.services.getQuote}
+                    </a>
                   </div>
                 ))}
               </div>
@@ -405,7 +425,7 @@ export default async function PublicContractorSitePage({ params }) {
 
         {/* ── About ── */}
         {aboutText && (
-          <section className="s-about" id="about">
+          <section className="s-about ps-reveal" id="about">
             <div style={{ maxWidth: 1200, margin: "0 auto" }}>
               <div className="s-about-inner">
                 <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.5rem)", fontWeight: 900, color: "#1e293b", letterSpacing: "-1px", marginBottom: 20 }}>
@@ -418,7 +438,22 @@ export default async function PublicContractorSitePage({ params }) {
                       📞 {phone}
                     </a>
                   ) : null}
-                  <a href={requestHref} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: phone ? "#ffffff" : "#1e293b", color: phone ? "#1e293b" : "#fff", border: phone ? "1px solid #cbd5e1" : "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+                  <a
+                    href={quoteFormHref}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: phone ? "#ffffff" : "#1e293b",
+                      color: phone ? "#1e293b" : "#fff",
+                      border: phone ? "1px solid #cbd5e1" : "none",
+                      padding: "10px 20px",
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      fontSize: 15,
+                      textDecoration: "none",
+                    }}
+                  >
                     {copy.about.requestQuote}
                   </a>
                 </div>
@@ -427,39 +462,31 @@ export default async function PublicContractorSitePage({ params }) {
           </section>
         )}
 
-        {galleryPhotos.length > 0 && (
-          <section className="s-gallery">
-            <div className="s-gallery-inner">
-              <h2 className="s-section-eyebrow">{copy.gallery.title}</h2>
-              <p className="s-section-sub">
-                {fillPublicSiteTemplate(copy.gallery.subtitle, {
-                  company: companyName || (locale === "es" ? "nuestro equipo" : "our team"),
-                })}
-              </p>
-              <div className="s-gallery-grid">
-                {galleryPhotos.map((photo, index) => (
-                  <div key={photo.id || `${photo.alt || "work"}-${index}`} className="s-gallery-card">
-                    <div className="s-gallery-photo">
-                      <Image
-                        src={photo.thumbnail || photo.src}
-                        alt={photo.alt || `Completed project ${index + 1}`}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        style={{ objectFit: "cover" }}
-                        loading="lazy"
-                        unoptimized
-                      />
-                    </div>
-                    <div className="s-gallery-caption">{photo.alt || copy.gallery.caption}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        {galleryPhotos.length > 0 || data.portfolio?.projects?.length > 0 ? (
+          <PremiumGallery
+            photos={galleryPhotos}
+            portfolio={data.portfolio}
+            title={copy.gallery.title}
+            subtitle={fillPublicSiteTemplate(copy.gallery.subtitle, {
+              company: companyName || (locale === "es" ? "nuestro equipo" : "our team"),
+            })}
+            useNextImage
+          />
+        ) : null}
 
-        {testimonials.length > 0 ? (
-          <section className="s-testimonials">
+        {publicReviews.length > 0 ? (
+          <PublicReviewsSection
+            reviews={publicReviews}
+            stats={reviewStats}
+            title="Customer reviews"
+            subtitle={fillPublicSiteTemplate(copy.gallery.subtitle, {
+              company: companyName || "our team",
+            })}
+          />
+        ) : null}
+
+        {testimonials.length > 0 && publicReviews.length === 0 ? (
+          <section className="s-testimonials ps-reveal">
             <div className="s-test-grid">
               {testimonials.slice(0, 2).map((item, index) => (
                 <div key={`${item.name}-${index}`} className="s-test-card">
@@ -480,7 +507,7 @@ export default async function PublicContractorSitePage({ params }) {
         <WaveDivider fromColor="#eff6ff" toColor="#1e293b" />
 
         {/* ── CTA / Request Service (dark, like landing's pricing section) ── */}
-        <section className="s-cta" id="request-service">
+        <section className="s-cta ps-visible" id="request-service">
           <div className="s-cta-inner">
             <h2>
               {phone ? copy.cta.callToday : copy.cta.getQuote}
@@ -497,6 +524,7 @@ export default async function PublicContractorSitePage({ params }) {
               slug={data.slug}
               serviceOptions={requestServiceOptions}
               locale={locale}
+              themeColor={theme}
             />
           </div>
 
@@ -522,7 +550,7 @@ export default async function PublicContractorSitePage({ params }) {
         </section>
 
         <PublicSiteFooter
-          slug={slug}
+          slug={data.slug}
           companyName={companyName}
           phone={phone}
           businessAddress={data.companyProfile?.businessAddress || ""}
@@ -532,6 +560,6 @@ export default async function PublicContractorSitePage({ params }) {
           locale={locale}
         />
       </div>
-    </>
+    </PublicSiteLeadExperience>
   );
 }

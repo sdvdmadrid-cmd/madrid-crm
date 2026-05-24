@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
+import {
+  applyWebsiteRenderRepairs,
+  validateWebsiteRenderPayload,
+} from "@/lib/website-builder-render-validation";
+import BuilderWorkflowStepper from "@/components/website-builder/BuilderWorkflowStepper";
+import PlatformZoneBanner from "@/components/workspace/PlatformZoneBanner";
+import { WebsiteBuilderEditProvider } from "@/components/website-builder/WebsiteBuilderEditContext";
+import WebsiteBuilderSetupPanel from "@/components/website-builder/WebsiteBuilderSetupPanel";
 import Link from "next/link";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import {
@@ -10,7 +19,6 @@ import {
 } from "@/lib/website-builder-industry";
 import {
   buildPublicWebsitePath,
-  buildPublicWebsiteRequestPath,
 } from "@/lib/public-website-routing";
 import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
 import {
@@ -102,9 +110,11 @@ export default function WebsiteBuilderClient() {
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState("");
   const [editorMode, setEditorMode] = useState("launch");
+  const [builderStep, setBuilderStep] = useState(1);
+  const isEditingRef = useRef(false);
   const [activeSection, setActiveSection] = useState("all");
   const [completenessScore, setCompletenessScore] = useState(0);
-  const [showAdvancedPanel, setShowAdvancedPanel] = useState(false);
+  const [showAdvancedPanel, setShowAdvancedPanel] = useState(true);
   const [selectedPreviewSection, setSelectedPreviewSection] = useState(null);
   const [aiConfigOk, setAiConfigOk] = useState(true);
   const [siteMeta, setSiteMeta] = useState({
@@ -268,13 +278,28 @@ export default function WebsiteBuilderClient() {
       sm,
     );
     setCompletenessScore(completeness.score);
-    setEditorMode(completeness.score < 40 ? "launch" : "edit");
+    const hasContent =
+      completeness.score >= 40 ||
+      Boolean(String(data.headline || "").trim()) ||
+      (Array.isArray(data.services) && data.services.length > 0);
+    setEditorMode(hasContent ? "edit" : "launch");
+    setBuilderStep(hasContent ? 3 : 1);
     skipAutosave.current = true;
   }, []);
 
   useEffect(() => {
     formRef.current = form;
   }, [form]);
+
+  const liveRequestServices = useMemo(
+    () => resolveWebsiteRequestServices({ services: form.services, requestServices }),
+    [form.services, requestServices],
+  );
+
+  const previewForm = useMemo(() => {
+    const validation = validateWebsiteRenderPayload(form, siteMeta);
+    return applyWebsiteRenderRepairs(form, validation);
+  }, [form, siteMeta]);
 
   useEffect(() => {
     apiFetch("/api/website-builder/setup-status", { suppressUnauthorizedEvent: true })
@@ -420,6 +445,7 @@ export default function WebsiteBuilderClient() {
   useEffect(() => {
     if (loading) return;
     if (generating || imageEnhancing || generatingLockRef.current) return;
+    if (isEditingRef.current) return;
     if (skipAutosave.current) {
       skipAutosave.current = false;
       return;
@@ -436,6 +462,7 @@ export default function WebsiteBuilderClient() {
   const handleApplyIndustryPreset = useCallback(async () => {
     const pack = getWebsiteBuilderPack(industryKey);
     const defaults = buildIndustryWebsiteDefaults(pack, companyProfile || {});
+    const existingServices = (formRef.current || form).services || [];
     const nextForm = {
       ...(formRef.current || form),
       headline: defaults.headline,
@@ -443,7 +470,10 @@ export default function WebsiteBuilderClient() {
       aboutText: defaults.aboutText,
       ctaText: defaults.ctaText,
       themeColor: defaults.themeColor,
-      services: defaults.services.map((s) => ({ ...s })),
+      services:
+        existingServices.length > 0
+          ? existingServices.map((s) => ({ ...s }))
+          : defaults.services.map((s) => ({ ...s })),
       testimonials: defaults.testimonials.map((x) => ({ ...x })),
       trustBadges: [...defaults.trustBadges],
       heroPhotos: defaults.heroPhotos.map((h) => ({ ...h })),
@@ -690,7 +720,8 @@ export default function WebsiteBuilderClient() {
       const completeness = analyzeWebsiteCompleteness(nextForm, nextSiteMeta);
       setCompletenessScore(completeness.score);
       setEditorMode("edit");
-      setShowAdvancedPanel(false);
+      setBuilderStep(3);
+      setShowAdvancedPanel(true);
       setSelectedPreviewSection(null);
       setMobileTab("preview");
 
@@ -1047,10 +1078,59 @@ export default function WebsiteBuilderClient() {
     (typeof window !== "undefined" && sitePath
       ? `${window.location.origin}${sitePath}`
       : sitePath || null);
-  const requestUrl = slug
-    ? buildPublicWebsiteRequestPath(slug)
-    : "#preview-request-form";
   const theme = form.themeColor || "#3b82f6";
+  const siteLocale =
+    companyProfile?.documentLanguage === "es" ? "es" : "en";
+  const siteHasDraft =
+    editorMode === "edit" || completenessScore >= 40 || Boolean(String(form.headline || "").trim());
+
+  const handleWorkflowStep = useCallback((stepId) => {
+    setBuilderStep(stepId);
+    if (stepId <= 1) {
+      setEditorMode("launch");
+      setShowAdvancedPanel(true);
+      setActiveSection("all");
+      setMobileTab("edit");
+      return;
+    }
+    if (stepId === 2) {
+      setEditorMode("launch");
+      setShowAdvancedPanel(false);
+      setMobileTab("preview");
+      return;
+    }
+    if (stepId === 3) {
+      setEditorMode("edit");
+      setShowAdvancedPanel(true);
+      setMobileTab("preview");
+      return;
+    }
+    if (stepId === 4) {
+      setEditorMode("edit");
+      setShowAdvancedPanel(false);
+      setMobileTab("preview");
+      return;
+    }
+    if (stepId === 5) {
+      setEditorMode("edit");
+      setShowAdvancedPanel(true);
+      setActiveSection("advanced");
+      setMobileTab("edit");
+    }
+  }, []);
+
+  const handleOpenQuoteForm = useCallback(() => {
+    if (!slug) {
+      showNotice("Save your website once to enable the customer quote form.", true);
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("fieldbase:open-lead-form", { detail: {} }));
+  }, [slug, showNotice]);
+
+  const handleRegenerateWithConfirm = useCallback(() => {
+    if (!window.confirm(t.regenerateConfirm)) return;
+    handleGenerateFullSite();
+  }, [t.regenerateConfirm, handleGenerateFullSite]);
   const frameClass =
     device === "tablet"
       ? styles.previewFrameTablet
@@ -1064,8 +1144,25 @@ export default function WebsiteBuilderClient() {
     );
   }
 
+  const stepSubtitle =
+    builderStep === 1
+      ? t.stepSetupSub
+      : builderStep === 2
+        ? t.stepGenerateSub
+        : builderStep === 3
+          ? t.stepCustomizeSub
+          : builderStep === 4
+            ? t.stepPreviewSub
+            : t.stepPublishSub;
+
+  const logoUrl = companyProfile?.logoDataUrl || "";
+
   return (
+    <WebsiteBuilderEditProvider editingRef={isEditingRef}>
     <div className={styles.shell} style={{ "--wb-theme": theme }}>
+      <div style={{ padding: "0 16px 12px", maxWidth: 1200, margin: "0 auto" }}>
+        <PlatformZoneBanner zone="private" />
+      </div>
       <div className={`${styles.topBar} ${styles.topBarCompact}`}>
         <div className={styles.titleBlock}>
           <div className={styles.eyebrow}>
@@ -1077,7 +1174,7 @@ export default function WebsiteBuilderClient() {
           </div>
           <h1>{t.title}</h1>
           <p style={{ margin: "6px 0 0", fontSize: "0.82rem", color: "#94a3b8", maxWidth: 520 }}>
-            {editorMode === "launch" ? t.launchSubtitle : t.subtitle}
+            {stepSubtitle}
           </p>
         </div>
         <div className={styles.actions}>
@@ -1086,10 +1183,10 @@ export default function WebsiteBuilderClient() {
           >
             {published ? `🟢 ${t.publishedBadge}` : `⚪ ${t.draftBadge}`}
           </span>
-          {slug ? (
-            <Link href="/website?tab=preview" className={`${styles.btn} ${styles.btnGhost}`}>
-              {t.viewPrivatePreview}
-            </Link>
+          {autoSaved || saving ? (
+            <span className={styles.saveStatus}>
+              {saving ? t.savingAuto : t.savedAuto}
+            </span>
           ) : null}
           {siteUrl && published ? (
             <a
@@ -1101,43 +1198,32 @@ export default function WebsiteBuilderClient() {
               {t.viewSite} ↗
             </a>
           ) : null}
-          {editorMode === "edit" ? (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnGhost}`}
-              onClick={() => setEditorMode("launch")}
-            >
-              {t.backToLaunch}
-            </button>
-          ) : null}
-          {featureAiDescription ? (
+          {builderStep === 2 && featureAiDescription ? (
             <button
               type="button"
               className={`${styles.btn} ${styles.btnAi}`}
               disabled={generating}
               onClick={handleGenerateFullSite}
             >
-              {generating
-                ? genProgress || t.generatingFull
-                : editorMode === "launch"
-                  ? t.generateFull
-                  : t.generateFull}
+              {generating ? genProgress || t.generatingFull : t.generateFull}
             </button>
           ) : null}
-          {editorMode === "launch" ? (
+          {builderStep === 5 ? (
             <button
               type="button"
-              className={`${styles.btn} ${styles.btnSave}`}
-              disabled={saving}
-              onClick={() => handleSave({ ...form, siteMeta })}
+              className={`${styles.btn} ${published ? styles.btnDanger : styles.btnSave}`}
+              disabled={publishing || saving}
+              onClick={handlePublishToggle}
             >
-              {saving ? t.saving : t.save}
+              {publishing ? t.publishing : published ? t.unpublish : t.publishLive}
             </button>
           ) : null}
         </div>
       </div>
 
-      {editorMode === "edit" ? (
+      <BuilderWorkflowStepper activeStep={builderStep} onStepClick={handleWorkflowStep} />
+
+      {builderStep === 3 ? (
         <div className={styles.industryBannerCompact}>
           <span>
             {industryIcon} {industryLabel}
@@ -1169,7 +1255,7 @@ export default function WebsiteBuilderClient() {
               {t.aiConfigMissing}
             </div>
           ) : null}
-          {editorMode === "edit" ? (
+          {builderStep === 3 ? (
             <p
               style={{
                 margin: "8px 16px 0",
@@ -1185,16 +1271,14 @@ export default function WebsiteBuilderClient() {
             <div className={`${styles.previewFrame} ${frameClass}`}>
               <WebsiteBuilderPreview
                 theme={theme}
-                form={form}
+                form={previewForm}
                 companyProfile={companyProfile}
                 industryLabel={industryLabel}
-                requestServices={requestServices}
-                requestUrl={requestUrl}
-                canOpenRequestPage={Boolean(slug)}
-                onRequestBlocked={() =>
-                  showNotice("Save your website first to enable Send Request.", true)
-                }
-                editable={editorMode === "edit"}
+                requestServices={liveRequestServices}
+                slug={slug}
+                locale={siteLocale}
+                onQuoteClick={handleOpenQuoteForm}
+                editable={builderStep === 3}
                 selectedSection={selectedPreviewSection}
                 onSelectSection={setSelectedPreviewSection}
                 onFieldChange={handlePreviewFieldChange}
@@ -1204,30 +1288,22 @@ export default function WebsiteBuilderClient() {
               />
             </div>
           </div>
-          {editorMode === "edit" ? (
-            <WebsiteBuilderFloatingBar
-              t={t}
-              device={device}
-              onDeviceChange={setDevice}
-              onRegenerate={handleGenerateFullSite}
-              onCancelGenerate={handleCancelGeneration}
-              generating={generating}
-              onToggleAdvanced={() => setShowAdvancedPanel((v) => !v)}
-              advancedOpen={showAdvancedPanel}
-              onPublish={handlePublishToggle}
-              publishing={publishing}
-              published={published}
-              saving={saving}
-              themePresets={themePresets}
-              themeColor={form.themeColor}
-              onThemeChange={(c) => setField("themeColor", c)}
-              selectedSection={selectedPreviewSection}
-              onRegenerateSection={handleRegeneratePreviewSection}
-              regeneratingSection={regeneratingSection}
-            />
-          ) : null}
-          {editorMode === "launch" ? (
-            <div className={styles.launchOverlay}>
+          <WebsiteBuilderFloatingBar
+            t={t}
+            builderStep={builderStep}
+            device={device}
+            onDeviceChange={setDevice}
+            onOpenSettings={() => setShowAdvancedPanel(true)}
+            onPublish={handlePublishToggle}
+            publishing={publishing}
+            published={published}
+            saving={saving}
+            themePresets={themePresets}
+            themeColor={form.themeColor}
+            onThemeChange={(c) => setField("themeColor", c)}
+          />
+          {builderStep === 2 ? (
+            <div className={styles.generateDock}>
               <WebsiteBuilderLaunch
                 t={t}
                 companyProfile={companyProfile}
@@ -1246,8 +1322,20 @@ export default function WebsiteBuilderClient() {
           ) : null}
         </div>
 
-        {showAdvancedPanel && editorMode === "edit" ? (
+        {showAdvancedPanel && builderStep !== 4 ? (
           <aside className={styles.advancedDrawer}>
+              {builderStep === 1 ? (
+                <WebsiteBuilderSetupPanel
+                  t={t}
+                  companyProfile={companyProfile}
+                  serviceCount={(form.services || []).length}
+                  galleryCount={(form.galleryPhotos || []).length}
+                  logoUrl={logoUrl}
+                  onContinue={() => handleWorkflowStep(2)}
+                />
+              ) : null}
+              {builderStep !== 1 ? (
+              <>
               <div className={styles.sectionNav}>
                 {[
                   ["all", t.sectionNavAll],
@@ -1277,9 +1365,13 @@ export default function WebsiteBuilderClient() {
                   type="button"
                   className={`${styles.btn} ${styles.btnAi}`}
                   disabled={generating}
-                  onClick={handleGenerateFullSite}
+                  onClick={siteHasDraft ? handleRegenerateWithConfirm : handleGenerateFullSite}
                 >
-                  {generating ? t.generatingFull : t.generateFull}
+                  {generating
+                    ? t.generatingFull
+                    : siteHasDraft
+                      ? t.regenerateCopy
+                      : t.generateFull}
                 </button>
                 <button
                   type="button"
@@ -1348,9 +1440,13 @@ export default function WebsiteBuilderClient() {
                 type="button"
                 className={`${styles.btn} ${styles.btnAi}`}
                 disabled={generating}
-                onClick={handleGenerateFullSite}
+                onClick={siteHasDraft ? handleRegenerateWithConfirm : handleGenerateFullSite}
               >
-                {generating ? genProgress || t.generatingFull : t.generateFull}
+                {generating
+                  ? genProgress || t.generatingFull
+                  : siteHasDraft
+                    ? t.regenerateCopy
+                    : t.generateFull}
               </button>
             </div>
           ) : null}
@@ -1845,20 +1941,13 @@ export default function WebsiteBuilderClient() {
           </CollapsibleSection>
           ) : null}
 
-          <div className={styles.saveRow}>
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnSave}`}
-              disabled={saving}
-              onClick={() => handleSave({ ...form, siteMeta })}
-            >
-              {saving ? t.saving : t.save}
-            </button>
-          </div>
+              </>
+              ) : null}
           </aside>
         ) : null}
       </div>
       <DeployBuildBadge className={styles.buildBadge} />
     </div>
+    </WebsiteBuilderEditProvider>
   );
 }

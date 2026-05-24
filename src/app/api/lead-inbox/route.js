@@ -7,6 +7,11 @@ import { scopeByTenant } from "@/lib/tenant-scope";
 import { isSuperAdminRole } from "@/lib/access-control";
 
 function serializeLead(row) {
+  const photoUrl =
+    String(row.photo_url || "").trim() ||
+    (String(row.photo_data_url || "").startsWith("data:image/")
+      ? row.photo_data_url
+      : "");
   return {
     id: row.id,
     source: "website_lead",
@@ -17,17 +22,15 @@ function serializeLead(row) {
     email: row.email || "",
     phone: row.phone || "",
     serviceNeeded: row.service_needed || "",
+    budgetRange: row.budget_range || row.metadata?.budgetRange || "",
+    timeline: row.timeline || row.metadata?.timeline || "",
+    contactPreference: row.contact_preference || row.metadata?.contactPreference || "",
+    photoUrl,
     photoDataUrl: row.photo_data_url || "",
     address: [row.address_line_1, row.city, row.state, row.zip_code]
       .filter(Boolean)
       .join(", "),
-    description: [
-      row.service_needed ? `Service: ${row.service_needed}` : "",
-      row.description || "",
-      row.photo_data_url ? "Photo attached" : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    description: row.description || "",
     raw: row,
   };
 }

@@ -1,0 +1,134 @@
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tab,
+.tabActive {
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #f8fafc;
+}
+
+.muted {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.importCard {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.45);
+  margin-bottom: 24px;
+}
+
+.importCard h3 {
+  margin: 0 0 8px;
+  color: #f8fafc;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 10px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reviewCard {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.reviewHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+}
+
+.badgePin {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.badgeHide {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+}
+
+.quote {
+  color: #e2e8f0;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.socialGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.socialRow {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.socialLabel {
+  text-transform: capitalize;
+  font-weight: 700;
+  color: #cbd5e1;
+  font-size: 14px;
+}
