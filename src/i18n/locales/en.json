@@ -1336,7 +1336,9 @@
     "support": "Support",
     "security": "Security",
     "settings": "Settings",
-    "backToApp": "Tenant app"
+    "backToApp": "Tenant app",
+    "logout": "Sign out",
+    "signingOut": "Signing out..."
   },
   "ownerPaymentCards": {
     "title": "Payment cards & usage",

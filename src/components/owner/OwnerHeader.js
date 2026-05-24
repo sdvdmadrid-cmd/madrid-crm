@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { getOwnerPageTitleKey } from "@/components/owner/owner-nav";
+import OwnerLogoutButton from "@/components/owner/OwnerLogoutButton";
 import styles from "./OwnerShell.module.css";
 
 export default function OwnerHeader() {
@@ -18,9 +18,7 @@ export default function OwnerHeader() {
         <h1 className={styles.ownerHeaderTitle}>{t(titleKey)}</h1>
       </div>
       <div className={styles.ownerHeaderActions}>
-        <Link href="/dashboard" className={styles.ownerHeaderLink}>
-          {t("ownerNav.backToApp")}
-        </Link>
+        <OwnerLogoutButton variant="header" />
       </div>
     </header>
   );

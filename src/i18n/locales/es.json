@@ -1336,7 +1336,9 @@
     "support": "Soporte",
     "security": "Seguridad",
     "settings": "Ajustes",
-    "backToApp": "App tenant"
+    "backToApp": "App tenant",
+    "logout": "Cerrar sesion",
+    "signingOut": "Cerrando sesion..."
   },
   "ownerPaymentCards": {
     "title": "Tarjetas y uso",

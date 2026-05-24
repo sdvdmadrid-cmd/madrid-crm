@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { OWNER_NAV_GROUPS } from "@/components/owner/owner-nav";
+import OwnerLogoutButton from "@/components/owner/OwnerLogoutButton";
 import styles from "./OwnerShell.module.css";
 
 export default function OwnerSidebar() {
@@ -48,6 +49,10 @@ export default function OwnerSidebar() {
           </div>
         ))}
       </nav>
+
+      <div className={styles.ownerSidebarFooter}>
+        <OwnerLogoutButton variant="sidebar" />
+      </div>
     </aside>
   );
 }
