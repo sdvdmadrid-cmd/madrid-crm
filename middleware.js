@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyEdgeSessionToken } from "./src/lib/auth-edge";
+import { readContractorWorkspaceCookie } from "./src/lib/workspace-mode";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
@@ -435,8 +436,13 @@ export async function middleware(request) {
     if (edgeSession || hasConfirmedSupabaseUser) {
       const url = request.nextUrl.clone();
       const sessionRole = String(edgeSession?.role || "").toLowerCase();
+      const contractorPreview = readContractorWorkspaceCookie(
+        request.headers.get("cookie") || "",
+      );
       url.pathname =
-        sessionRole === "super_admin" ? "/owner/overview" : "/dashboard";
+        sessionRole === "super_admin" && !contractorPreview
+          ? "/owner/overview"
+          : "/dashboard";
       if (AUTH_LOG_VERBOSE) {
         console.info("[middleware] redirect public auth page -> dashboard", {
           pathname,
