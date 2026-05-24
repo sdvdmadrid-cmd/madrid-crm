@@ -143,11 +143,14 @@ export async function POST(request) {
 
   try {
     const client = getOpenAiClient();
-    const response = await client.images.generate({
-      model: IMAGE_MODEL,
-      prompt: finalPrompt,
-      size: IMAGE_SIZE,
-    });
+    const response = await client.images.generate(
+      {
+        model: IMAGE_MODEL,
+        prompt: finalPrompt,
+        size: IMAGE_SIZE,
+      },
+      { timeout: 60_000 },
+    );
 
     const first = response?.data?.[0] || null;
     if (!first) {

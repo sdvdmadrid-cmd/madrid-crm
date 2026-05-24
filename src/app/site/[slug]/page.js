@@ -438,14 +438,15 @@ export default async function PublicContractorSitePage({ params }) {
               </p>
               <div className="s-gallery-grid">
                 {galleryPhotos.map((photo, index) => (
-                  <div key={`${photo.alt || "work"}-${index}`} className="s-gallery-card">
+                  <div key={photo.id || `${photo.alt || "work"}-${index}`} className="s-gallery-card">
                     <div className="s-gallery-photo">
                       <Image
-                        src={photo.src}
+                        src={photo.thumbnail || photo.src}
                         alt={photo.alt || `Completed project ${index + 1}`}
                         fill
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         style={{ objectFit: "cover" }}
+                        loading="lazy"
                         unoptimized
                       />
                     </div>

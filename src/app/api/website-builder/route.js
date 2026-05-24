@@ -32,6 +32,12 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeSiteAnalytics } from "@/lib/site-analytics";
 import {
+  buildFeaturedGallery,
+  MAX_FEATURED_GALLERY,
+  normalizeGalleryPhotos,
+  normalizePortfolio,
+} from "@/lib/website-gallery";
+import {
   persistGalleryPhotosForStorage,
   persistHeroPhotosForStorage,
 } from "@/lib/website-media-storage";
@@ -154,7 +160,9 @@ function serializeWebsiteRow(row, profile, request) {
     aboutText: row.about_text || defaults.aboutText,
     ctaText: normalizedCtaText,
     themeColor: row.theme_color || defaults.themeColor,
-    galleryPhotos: Array.isArray(row.gallery_photos) ? row.gallery_photos : defaults.galleryPhotos,
+    galleryPhotos: normalizeGalleryPhotos(
+      Array.isArray(row.gallery_photos) ? row.gallery_photos : defaults.galleryPhotos,
+    ),
     services: effectiveServices,
     testimonials: meta.testimonials,
     trustBadges: meta.trustBadges,
@@ -180,6 +188,7 @@ function serializeWebsiteRow(row, profile, request) {
         ? siteMetaRow.serviceAreas.map((a) => String(a || "").trim()).filter(Boolean)
         : [],
       aiGeneratedAt: siteMetaRow.aiGeneratedAt || null,
+      portfolio: normalizePortfolio(siteMetaRow.portfolio),
     },
   };
 }
@@ -341,10 +350,7 @@ export async function POST(request) {
     patch.gallery_photos = await persistGalleryPhotosForStorage(
       access.tenantDbId,
       activeSlug,
-      body.galleryPhotos.slice(0, 8).map((photo) => ({
-        src: String(photo?.src || ""),
-        alt: String(photo?.alt || "Completed project photo").slice(0, 160),
-      })),
+      body.galleryPhotos.slice(0, MAX_FEATURED_GALLERY),
     );
   }
   if (typeof body.published === "boolean") patch.published = body.published;
@@ -432,6 +438,17 @@ export async function POST(request) {
         .filter(Boolean)
         .slice(0, 8);
       metaChanged = true;
+    }
+    if (sm.portfolio && typeof sm.portfolio === "object") {
+      nextMeta.portfolio = normalizePortfolio(sm.portfolio);
+      metaChanged = true;
+      if (!Array.isArray(body.galleryPhotos)) {
+        patch.gallery_photos = await persistGalleryPhotosForStorage(
+          access.tenantDbId,
+          activeSlug,
+          buildFeaturedGallery(nextMeta.portfolio),
+        );
+      }
     }
   }
   if (metaChanged) {

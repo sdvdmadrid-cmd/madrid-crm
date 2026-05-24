@@ -9,6 +9,11 @@ import {
   resolveWebsiteIndustryForWebsite,
 } from "@/lib/website-builder-industry";
 import { normalizeWebsiteSlug } from "@/lib/public-website-routing";
+import {
+  buildFeaturedGallery,
+  normalizeGalleryPhotos,
+  normalizePortfolio,
+} from "@/lib/website-gallery";
 
 const PUBLIC_WEBSITE_SELECT = [
   "slug",
@@ -58,12 +63,10 @@ function normalizeSlug(value) {
   return normalizeWebsiteSlug(value);
 }
 
-function sanitizeGalleryPhotos(rows) {
-  if (!Array.isArray(rows)) return [];
-  return rows.filter((photo) => {
-    const src = String(photo?.src || "").trim();
-    return src.startsWith("data:image/") || /^https?:\/\//i.test(src);
-  });
+function sanitizeGalleryPhotos(rows, portfolio) {
+  const fromColumn = normalizeGalleryPhotos(rows);
+  if (fromColumn.length) return fromColumn;
+  return buildFeaturedGallery(portfolio);
 }
 
 const PUBLIC_WEBSITE_SELECT_LEGACY = PUBLIC_WEBSITE_SELECT.replace(
@@ -154,7 +157,8 @@ export async function getPublicWebsiteBySlug(slug) {
     ctaText: website.cta_text || "",
     themeColor: website.theme_color || "",
     services: Array.isArray(website.services) ? website.services : [],
-    galleryPhotos: sanitizeGalleryPhotos(website.gallery_photos),
+    galleryPhotos: sanitizeGalleryPhotos(website.gallery_photos, meta.portfolio),
+    portfolio: normalizePortfolio(meta.portfolio),
     heroPhotos,
     testimonials,
     trustBadges,
