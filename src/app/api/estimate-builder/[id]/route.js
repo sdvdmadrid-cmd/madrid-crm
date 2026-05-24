@@ -1,4 +1,6 @@
+import { buildEstimateBuilderUpdateRow } from "@/lib/estimate-builder-records";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assertTenantClient, assertTenantQuote } from "@/lib/tenant-fk-validation";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canDelete,
@@ -141,10 +143,35 @@ export async function PATCH(request, { params }) {
       delete body.removeQuoteSignature;
     }
 
-    const updateRow = {
-      ...body,
-      updated_at: new Date().toISOString(),
-    };
+    const updateRow = buildEstimateBuilderUpdateRow(body);
+
+    if (updateRow.client_id) {
+      const clientCheck = await assertTenantClient({
+        tenantDbId,
+        role,
+        clientId: updateRow.client_id,
+      });
+      if (!clientCheck.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: clientCheck.error }),
+          { status: clientCheck.status, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    if (updateRow.quote_id) {
+      const quoteCheck = await assertTenantQuote({
+        tenantDbId,
+        role,
+        quoteId: updateRow.quote_id,
+      });
+      if (!quoteCheck.ok) {
+        return new Response(
+          JSON.stringify({ success: false, error: quoteCheck.error }),
+          { status: quoteCheck.status, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     let query = supabaseAdmin
       .from("estimate_builder")

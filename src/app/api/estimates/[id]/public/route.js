@@ -1,4 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  checkPublicQuoteRateLimit,
+  getRequestIp,
+  recordPublicQuoteAttempt,
+} from "@/lib/rate-limit";
+import {
+  isValidEstimatePublicToken,
+  verifyEstimatePublicAccess,
+} from "@/lib/estimate-public-access";
 
 const ESTIMATES_TABLE = "estimates";
 
@@ -38,17 +47,38 @@ function json(payload, status = 200) {
   });
 }
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const { id } = await params;
   if (!id) return json({ success: false, error: "Missing id" }, 400);
 
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get("token") || "").trim();
+  if (!isValidEstimatePublicToken(token)) {
+    return json({ success: false, error: "Invalid or missing access token" }, 403);
+  }
+
+  const ip = getRequestIp(request);
+  const rate = await checkPublicQuoteRateLimit({ token, ip, action: "view" });
+  if (!rate.allowed) {
+    return json({ success: false, error: "Too many requests. Please try again later." }, 429);
+  }
+
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
-    .select("id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at")
+    .select(
+      "id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at",
+    )
     .eq("id", id)
     .single();
 
   if (error || !data) return json({ success: false, error: "Not found" }, 404);
+
+  const access = verifyEstimatePublicAccess(data, token);
+  if (!access.ok) {
+    return json({ success: false, error: access.error }, access.status);
+  }
+
+  await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
   const parsedNotes = parseNotes(data.notes);
 

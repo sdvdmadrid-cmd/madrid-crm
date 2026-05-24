@@ -122,14 +122,23 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     expect(createdEstimate?.success).toBeTruthy();
 
     const estimateId = createdEstimate?.data?.id;
+    const publicLink = String(createdEstimate?.data?.publicLink || "");
+    const publicAccessToken = (() => {
+      try {
+        return new URL(publicLink, "http://localhost:3000").searchParams.get("token");
+      } catch {
+        return "";
+      }
+    })();
     expect(estimateId).toBeTruthy();
+    expect(publicAccessToken).toBeTruthy();
 
     // 1) Approve estimate (should auto-convert to quote).
     const { res: approveRes, body: approveJson } = await postWithTransientRetry(
       api,
       page,
       `/api/estimates/${estimateId}/respond`,
-      { action: "approved" },
+      { action: "approved", token: publicAccessToken },
     );
     if (!approveRes.ok()) {
       // eslint-disable-next-line no-console

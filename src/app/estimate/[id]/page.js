@@ -1,6 +1,6 @@
 ﻿"use client";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 function formatMoney(amount) {
   const num = Number(amount) || 0;
@@ -17,6 +17,8 @@ const STATUS_CONFIG = {
 
 export default function EstimateClientPage() {
   const { id } = useParams();
+  const searchParams = useSearchParams();
+  const accessToken = String(searchParams.get("token") || "").trim();
   const [estimate, setEstimate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,24 +36,30 @@ export default function EstimateClientPage() {
 
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/estimates/${id}/public`)
+    if (!accessToken) {
+      setError("This estimate link is invalid or incomplete.");
+      setLoading(false);
+      return;
+    }
+
+    const query = new URLSearchParams({ token: accessToken });
+    fetch(`/api/estimates/${id}/public?${query.toString()}`)
       .then((r) => r.json())
       .then((json) => {
         if (json.success) {
           setEstimate(json.data);
-          // init item edits: all kept by default
           const edits = {};
-          for (const s of (json.data?.services || [])) {
+          for (const s of json.data?.services || []) {
             edits[s.id || s.name] = { keep: true };
           }
           setItemEdits(edits);
         } else {
-          setError("Estimate not found.");
+          setError(json.error || "Estimate not found.");
         }
       })
       .catch(() => setError("Failed to load estimate."))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, accessToken]);
 
   function toggleItem(key) {
     setItemEdits((prev) => ({ ...prev, [key]: { keep: !prev[key]?.keep } }));
@@ -89,6 +97,7 @@ export default function EstimateClientPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action,
+          token: accessToken,
           note: changesNote.trim(),
           ...(requestedItems !== null ? { requestedItems } : {}),
         }),

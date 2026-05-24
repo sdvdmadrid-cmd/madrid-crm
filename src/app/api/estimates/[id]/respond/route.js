@@ -1,5 +1,16 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  checkPublicQuoteRateLimit,
+  getRequestIp,
+  recordPublicQuoteAttempt,
+} from "@/lib/rate-limit";
+import {
+  canRespondToEstimateStatus,
+  isValidEstimatePublicToken,
+  normalizeEstimateStatus,
+  verifyEstimatePublicAccess,
+} from "@/lib/estimate-public-access";
 
 const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
@@ -67,6 +78,17 @@ export async function POST(request, { params }) {
     return json({ success: false, error: "Invalid JSON" }, 400);
   }
 
+  const token = String(body.token || "").trim();
+  if (!isValidEstimatePublicToken(token)) {
+    return json({ success: false, error: "Invalid or missing access token" }, 403);
+  }
+
+  const ip = getRequestIp(request);
+  const rate = await checkPublicQuoteRateLimit({ token, ip, action: "approval" });
+  if (!rate.allowed) {
+    return json({ success: false, error: "Too many requests. Please try again later." }, 429);
+  }
+
   const action = String(body.action || "").trim().toLowerCase();
   if (!ALLOWED_ACTIONS.has(action)) {
     return json({ success: false, error: "Invalid action. Use 'approved', 'declined', or 'changes_requested'" }, 400);
@@ -80,8 +102,13 @@ export async function POST(request, { params }) {
 
   if (fetchErr || !existing) return json({ success: false, error: "Not found" }, 404);
 
-  const currentStatus = String(existing.status || "draft").toLowerCase();
-  if (currentStatus === "approved" || currentStatus === "declined") {
+  const access = verifyEstimatePublicAccess(existing, token);
+  if (!access.ok) {
+    return json({ success: false, error: access.error }, access.status);
+  }
+
+  const currentStatus = normalizeEstimateStatus(existing.status);
+  if (!canRespondToEstimateStatus(currentStatus)) {
     return json({ success: false, error: "This estimate is already finalized." }, 409);
   }
 
@@ -92,7 +119,6 @@ export async function POST(request, { params }) {
   if (action === "declined") audit.declinedAt = nowIso;
   if (action === "changes_requested") audit.changesRequestedAt = nowIso;
 
-  // Store client note and requested item changes (add/remove)
   const clientNote = String(body.note || "").trim();
   const requestedItems = Array.isArray(body.requestedItems) ? body.requestedItems : null;
   const updatedNoteText = clientNote
@@ -115,6 +141,8 @@ export async function POST(request, { params }) {
 
   if (updateErr) return json({ success: false, error: updateErr.message }, 500);
 
+  await recordPublicQuoteAttempt({ token, ip, action: "approval" });
+
   if (action === "approved") {
     const baseNumber = String(existing.estimate_number || "").trim();
     const parsed = parseNotes(existing.notes);
@@ -132,7 +160,6 @@ export async function POST(request, { params }) {
     }
 
     if (!existingQuote) {
-      const nowIso = new Date().toISOString();
       const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
 
       const { error: createQuoteError } = await supabaseAdmin

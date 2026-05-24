@@ -133,7 +133,7 @@ export default function NewEstimatePage() {
   useEffect(() => {
     if (!editId) return;
 
-    apiFetch(`/api/estimates/${editId}/public`)
+    apiFetch(`/api/estimates/${editId}`)
       .then((r) => r.json())
       .then((json) => {
         if (!json.success) return;

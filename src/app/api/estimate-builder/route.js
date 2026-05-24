@@ -1,4 +1,6 @@
+import { buildEstimateBuilderInsertRow } from "@/lib/estimate-builder-records";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { assertTenantClient } from "@/lib/tenant-fk-validation";
 import {
   canWrite,
   forbiddenResponse,
@@ -86,25 +88,34 @@ export async function POST(request) {
     const body = await request.json();
     const nowIso = new Date().toISOString();
 
-    if (!body.client_id) {
+    const clientId = String(body.client_id || body.clientId || "").trim();
+    if (!clientId) {
       return new Response(
         JSON.stringify({ success: false, error: "client_id is required" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
+    const clientCheck = await assertTenantClient({
+      tenantDbId,
+      role,
+      clientId,
+    });
+    if (!clientCheck.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: clientCheck.error }),
+        { status: clientCheck.status, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const estimateNumber = String(body.estimate_number || body.estimateNumber || "").trim() ||
       await nextEstimateBuilderNumber(tenantDbId);
 
-    const toInsert = {
-      ...body,
-      estimate_number: estimateNumber,
-      tenant_id: tenantDbId,
-      user_id: userId || null,
-      created_by: userId || null,
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
+    const toInsert = buildEstimateBuilderInsertRow(body, {
+      tenantDbId,
+      userId,
+      estimateNumber,
+    });
 
     const { data, error } = await supabaseAdmin
       .from("estimate_builder")

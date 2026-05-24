@@ -1,3 +1,7 @@
+import {
+  buildPublicEstimateLink,
+  isPublicEstimateStatus,
+} from "@/lib/estimate-public-access";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { sendEmail } from "@/lib/email";
 import { sendTextMessage } from "@/lib/sms";
@@ -118,10 +122,15 @@ function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientP
 function serializeEstimate(row) {
   const parsedNotes = parseNotes(row.notes);
   const services = Array.isArray(row.items) ? row.items : [];
+  const status = normalizeStatus(row.status);
+  const publicLink =
+    isPublicEstimateStatus(status) && row.id ? buildPublicEstimateLink(row.id) : null;
+
   return {
     id: row.id,
     _id: row.id,
     tenantId: row.tenant_id || null,
+    publicLink,
     userId: row.user_id || null,
     createdBy: row.created_by || null,
     clientName: row.client_name || "",
@@ -256,9 +265,15 @@ export async function POST(request) {
     const sendViaText = channels.text === true;
 
     // Send selected notifications when estimate is sent
-    if (serialized.status === "sent" && sendViaEmail && serialized.clientEmail) {
-      const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
-      const estimateLink = `${appUrl}/estimate/${serialized.id}`;
+    const estimateLink =
+      serialized.status === "sent" && serialized.id
+        ? buildPublicEstimateLink(
+            serialized.id,
+            (process.env.APP_URL || process.env.APP_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
+          )
+        : null;
+
+    if (serialized.status === "sent" && sendViaEmail && serialized.clientEmail && estimateLink) {
       const clientName = serialized.clientName || "Friend";
       const total = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(serialized.total || 0);
       await sendEmail({
@@ -284,9 +299,7 @@ export async function POST(request) {
       });
     }
 
-    if (serialized.status === "sent" && sendViaText && serialized.clientPhone) {
-      const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
-      const estimateLink = `${appUrl}/estimate/${serialized.id}`;
+    if (serialized.status === "sent" && sendViaText && serialized.clientPhone && estimateLink) {
       const total = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(serialized.total || 0);
       const text = `Your estimate for ${total} is ready: ${estimateLink}`;
       await sendTextMessage({
