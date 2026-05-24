@@ -6,8 +6,25 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { loadEnvLocal } from "./load-env-local.mjs";
 
-const migrationsDir = path.join(process.cwd(), "supabase", "migrations");
+const root = process.cwd();
+const envLoad = loadEnvLocal(root);
+if (!envLoad.ok) {
+  console.error(`[migrations] ${envLoad.error}`);
+  process.exit(1);
+}
+
+spawnSync("node", ["scripts/sync-supabase-cli-env.mjs"], {
+  shell: true,
+  stdio: "inherit",
+  cwd: root,
+});
+
+const password = String(process.env.SUPABASE_DB_PASSWORD || "").trim();
+const passwordFlag = password ? ["-p", password] : [];
+
+const migrationsDir = path.join(root, "supabase", "migrations");
 const files = fs
   .readdirSync(migrationsDir)
   .filter((name) => name.endsWith(".sql"))
@@ -25,10 +42,11 @@ if (which.status !== 0) {
   process.exit(1);
 }
 
-const push = spawnSync("npx", ["supabase", "db", "push"], {
+const push = spawnSync("npx", ["supabase", "db", "push", "--linked", ...passwordFlag, "--yes"], {
   shell: true,
   stdio: "inherit",
   env: process.env,
+  cwd: root,
 });
 
 if (push.status !== 0) {
