@@ -1,4 +1,5 @@
 import { computeBillStatus, createNotification, maybeCreateNextRecurringBill } from "@/lib/bill-payments";
+import { updateConnectProfileByAccountId } from "@/lib/stripe-connect-storage";
 import { requireWebhookPaymentResources, syncInvoicePaymentSummary } from "@/lib/stripe-payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
@@ -92,21 +93,13 @@ async function handleConnectAccountUpdated(account) {
   const onboardedAt =
     chargesEnabled && payoutsEnabled ? new Date().toISOString() : null;
 
-  let query = supabaseAdmin
-    .from(COMPANY_PROFILES)
-    .update({
-      stripe_connect_charges_enabled: chargesEnabled,
-      stripe_connect_payouts_enabled: payoutsEnabled,
-      stripe_connect_onboarded_at: onboardedAt,
-    })
-    .eq("stripe_connect_account_id", accountId);
-
-  if (tenantId) {
-    query = query.eq("tenant_id", tenantId);
-  }
-
-  const { error } = await query;
-  if (error) {
+  try {
+    await updateConnectProfileByAccountId(accountId, tenantId, {
+      chargesEnabled,
+      payoutsEnabled,
+      onboardedAt,
+    });
+  } catch (error) {
     logSupabaseError(
       "[stripe-webhook-processing][account.updated]",
       error,
