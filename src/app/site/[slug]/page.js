@@ -7,6 +7,7 @@ import RequestServiceForm from "@/components/site/RequestServiceForm";
 import { getIndustryProfile } from "@/lib/industry-profiles";
 import { buildLocalBusinessJsonLd, buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
 import {
   getWebsiteBuilderPack,
   resolveWebsiteIndustryKey,
@@ -49,16 +50,17 @@ function ServiceIcon({ index }) {
   );
 }
 
-// ─── Contractor social proof stats ────────────────────────────────────
-const CONTRACTOR_STATS = [
-  { number: "Free Quote", label: "No obligation estimate" },
-  { number: "Licensed", label: "Fully licensed & insured" },
-  { number: "5★", label: "Top-rated local contractor" },
-  { number: "Same Day", label: "Response within hours" },
-];
+// ─── Contractor social proof stats (localized defaults) ───────────────
+function getContractorStats(copy) {
+  return [
+    { number: copy.stats.freeQuote, label: copy.stats.noObligation },
+    { number: copy.stats.licensed, label: copy.stats.licensedInsured },
+    { number: copy.stats.topRated, label: copy.stats.topRatedLabel },
+    { number: copy.stats.sameDay, label: copy.stats.sameDayLabel },
+  ];
+}
 
-function normalizePublicCta(value) {
-  const fallback = "Request Estimate";
+function normalizePublicCta(value, fallback) {
   const trimmed = String(value || "").trim();
   if (!trimmed) return fallback;
 
@@ -107,11 +109,13 @@ export default async function PublicContractorSitePage({ params }) {
 
   if (!data) notFound();
 
+  const locale = resolvePublicSiteLocale(data.companyProfile?.documentLanguage);
+  const copy = getPublicSiteCopy(locale);
   const theme = data.themeColor || "#1d4ed8";
   const headline = data.headline || "";
   const subheadline = data.subheadline || "";
   const aboutText = data.aboutText || "";
-  const ctaText = normalizePublicCta(data.ctaText);
+  const ctaText = normalizePublicCta(data.ctaText, copy.hero.requestEstimate);
 
   const companyName =
     data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "";
@@ -150,7 +154,7 @@ export default async function PublicContractorSitePage({ params }) {
           number: badge,
           label: data.industryLabel || industryProfile.label,
         }))
-      : CONTRACTOR_STATS;
+      : getContractorStats(copy);
 
   // Pad services to at least 3, max 6
   const displayServices = services.slice(0, 6);
@@ -295,6 +299,7 @@ export default async function PublicContractorSitePage({ params }) {
           ctaText={ctaText}
           themeColor={theme}
           requestHref={requestHref}
+          locale={locale}
         />
 
         {/* ── Hero ── */}
@@ -302,14 +307,14 @@ export default async function PublicContractorSitePage({ params }) {
           <div className="s-hero-inner">
             <div className="s-hero-left">
               <div className="s-hero-badge">
-                ⭐ {industryProfile.label} · Licensed &amp; Insured
+                ⭐ {industryProfile.label} · {copy.hero.licensedInsured}
               </div>
               <h1>{headline || `Professional ${industryProfile.label}`}</h1>
               <p className="s-hero-sub">{subheadline || `Quality ${industryProfile.label.toLowerCase()} services you can count on. Licensed, insured, and trusted by local homeowners and businesses.`}</p>
-              <p className="s-hero-pill">🎉 Free estimates — no obligation, same-day response</p>
+              <p className="s-hero-pill">🎉 {copy.hero.freeEstimates}</p>
               <div className="s-hero-btns">
-                <a href={requestHref} className="s-btn-primary">{ctaText || "Request Estimate"}</a>
-                <a href="#services" className="s-btn-secondary">Our Services</a>
+                <a href={requestHref} className="s-btn-primary">{ctaText}</a>
+                <a href="#services" className="s-btn-secondary">{copy.hero.ourServices}</a>
               </div>
               {trustBadges.length > 1 ? (
                 <div className="s-hero-proof" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -371,10 +376,8 @@ export default async function PublicContractorSitePage({ params }) {
         {displayServices.length > 0 && (
           <section className="s-features" id="services">
             <div className="s-features-inner">
-              <h2 className="s-section-eyebrow">Our Services</h2>
-              <p className="s-section-sub">
-                Everything you need — from initial quote to completed project.
-              </p>
+              <h2 className="s-section-eyebrow">{copy.services.title}</h2>
+              <p className="s-section-sub">{copy.services.subtitle}</p>
               <div className="s-features-grid">
                 {displayServices.map((service, i) => (
                   <div key={i} className="s-feature-card">
@@ -390,7 +393,7 @@ export default async function PublicContractorSitePage({ params }) {
                     {service.description && (
                       <div className="s-feature-desc">{service.description}</div>
                     )}
-                    <a href={`${requestHref}?service=${encodeURIComponent(service.name || "")}`} className="s-feature-cta">Get a quote →</a>
+                    <a href={`${requestHref}?service=${encodeURIComponent(service.name || "")}`} className="s-feature-cta">{copy.services.getQuote}</a>
                   </div>
                 ))}
               </div>
@@ -406,7 +409,7 @@ export default async function PublicContractorSitePage({ params }) {
             <div style={{ maxWidth: 1200, margin: "0 auto" }}>
               <div className="s-about-inner">
                 <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.5rem)", fontWeight: 900, color: "#1e293b", letterSpacing: "-1px", marginBottom: 20 }}>
-                  About {companyName}
+                  {fillPublicSiteTemplate(copy.about.title, { company: companyName })}
                 </h2>
                 <p>{aboutText}</p>
                 <div style={{ marginTop: 28, display: "flex", gap: 14, flexWrap: "wrap" }}>
@@ -416,7 +419,7 @@ export default async function PublicContractorSitePage({ params }) {
                     </a>
                   ) : null}
                   <a href={requestHref} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: phone ? "#ffffff" : "#1e293b", color: phone ? "#1e293b" : "#fff", border: phone ? "1px solid #cbd5e1" : "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
-                    Request a quote
+                    {copy.about.requestQuote}
                   </a>
                 </div>
               </div>
@@ -427,9 +430,11 @@ export default async function PublicContractorSitePage({ params }) {
         {galleryPhotos.length > 0 && (
           <section className="s-gallery">
             <div className="s-gallery-inner">
-              <h2 className="s-section-eyebrow">Recent Work</h2>
+              <h2 className="s-section-eyebrow">{copy.gallery.title}</h2>
               <p className="s-section-sub">
-                See real projects completed by {companyName || "our team"}.
+                {fillPublicSiteTemplate(copy.gallery.subtitle, {
+                  company: companyName || (locale === "es" ? "nuestro equipo" : "our team"),
+                })}
               </p>
               <div className="s-gallery-grid">
                 {galleryPhotos.map((photo, index) => (
@@ -444,7 +449,7 @@ export default async function PublicContractorSitePage({ params }) {
                         unoptimized
                       />
                     </div>
-                    <div className="s-gallery-caption">{photo.alt || "Completed project"}</div>
+                    <div className="s-gallery-caption">{photo.alt || copy.gallery.caption}</div>
                   </div>
                 ))}
               </div>
@@ -477,11 +482,11 @@ export default async function PublicContractorSitePage({ params }) {
         <section className="s-cta" id="request-service">
           <div className="s-cta-inner">
             <h2>
-              {phone ? "Call us today." : "Get your free quote."}
+              {phone ? copy.cta.callToday : copy.cta.getQuote}
               <br />
-              We respond fast.
+              {copy.cta.respondFast}
             </h2>
-            <p className="s-cta-sub">No obligation. Free estimate. Same-day response.</p>
+            <p className="s-cta-sub">{copy.cta.noObligation}</p>
             {phone && (
               <a href={`tel:${phone}`} className="s-cta-phone">
                 {phone}
@@ -490,6 +495,7 @@ export default async function PublicContractorSitePage({ params }) {
             <RequestServiceForm
               slug={data.slug}
               serviceOptions={requestServiceOptions}
+              locale={locale}
             />
           </div>
 
@@ -508,7 +514,7 @@ export default async function PublicContractorSitePage({ params }) {
               </div>
               <div className="s-contact-chip">
                 <span>📝</span>
-                <span>Contact via secure request form</span>
+                <span>{copy.cta.contactForm}</span>
               </div>
             </div>
           </div>
@@ -522,6 +528,7 @@ export default async function PublicContractorSitePage({ params }) {
           socialLinks={data.socialLinks || {}}
           googleReviewsUrl={data.companyProfile?.googleReviewsUrl || ""}
           themeColor={theme}
+          locale={locale}
         />
       </div>
     </>

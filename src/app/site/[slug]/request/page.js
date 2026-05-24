@@ -5,6 +5,7 @@ import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
 import { buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
 import { getWebsiteBuilderPack, resolveWebsiteIndustryKey } from "@/lib/website-builder-industry";
 
 export const revalidate = 120;
@@ -32,6 +33,9 @@ export default async function PublicContractorRequestPage({ params, searchParams
 
   if (!data) notFound();
 
+  const locale = resolvePublicSiteLocale(data.companyProfile?.documentLanguage);
+  const copy = getPublicSiteCopy(locale);
+
   const companyName =
     data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "Contractor";
   const pack = getWebsiteBuilderPack(
@@ -55,14 +59,15 @@ export default async function PublicContractorRequestPage({ params, searchParams
         companyName={companyName}
         logoUrl={data.companyProfile?.logoDataUrl || ""}
         phone={phone}
-        ctaText={data.ctaText || "Get a Quote"}
+        ctaText={data.ctaText || copy.nav.getQuote}
         themeColor={theme}
+        locale={locale}
       />
 
       <div style={{ maxWidth: 920, margin: "0 auto", padding: "32px 16px 0" }}>
         <div style={{ marginBottom: 20 }}>
           <p style={{ color: "#64748b", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-            REQUEST A QUOTE
+            {copy.request.eyebrow}
           </p>
           <h1
             style={{
@@ -73,12 +78,9 @@ export default async function PublicContractorRequestPage({ params, searchParams
               marginBottom: 10,
             }}
           >
-            Tell {companyName} about your project
+            {fillPublicSiteTemplate(copy.request.title, { company: companyName })}
           </h1>
-          <p style={{ color: "#475569", maxWidth: 620, lineHeight: 1.7 }}>
-            Submit once — your request goes straight to the contractor CRM. Typical response:
-            same day.
-          </p>
+          <p style={{ color: "#475569", maxWidth: 620, lineHeight: 1.7 }}>{copy.request.subtitle}</p>
           <Link
             href={`/site/${slug}`}
             style={{
@@ -89,7 +91,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
               textDecoration: "none",
             }}
           >
-            ← Back to website
+            {copy.request.back}
           </Link>
         </div>
 
@@ -106,7 +108,8 @@ export default async function PublicContractorRequestPage({ params, searchParams
             slug={slug}
             serviceOptions={serviceOptions}
             initialService={initialService}
-            showEmailField
+            locale={locale}
+            requireEmail
           />
         </section>
       </div>
@@ -119,6 +122,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
         socialLinks={data.socialLinks || {}}
         googleReviewsUrl={data.companyProfile?.googleReviewsUrl || ""}
         themeColor={theme}
+        locale={locale}
       />
     </main>
   );
