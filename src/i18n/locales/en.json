@@ -490,8 +490,77 @@
     "adminSupport": "Support Queue",
     "adminSettings": "Admin Settings",
     "settings": "Settings",
+    "clientPayments": "Client payments",
     "logout": "Logout",
     "signingOut": "Signing out..."
+  },
+  "settingsHub": {
+    "title": "Settings",
+    "subtitle": "Manage your FieldBase account, billing, and how you get paid by clients.",
+    "clientPayments": {
+      "title": "Client payments",
+      "desc": "Connect Stripe so customers can pay invoices online. Money goes to your business.",
+      "cta": "Open payments"
+    },
+    "subscription": {
+      "title": "FieldBase subscription",
+      "desc": "Your plan, trial, and billing for using FieldBase.",
+      "cta": "Manage subscription"
+    }
+  },
+  "settingsPayments": {
+    "title": "Client payments",
+    "subtitle": "Connect Stripe to accept card payments on invoices. Payouts go to your bank.",
+    "backToSettings": "All settings",
+    "kicker": "Get paid through FieldBase",
+    "heroTitle": "Stripe payout account",
+    "heroBody": "Your clients pay from invoice links. FieldBase routes the payment to your Stripe balance with automatic payouts to your bank.",
+    "loading": "Checking…",
+    "comingSoonHint": "Online client payments are rolling out. FieldBase will enable Stripe Connect for your account soon — you can finish setup here once it is active.",
+    "features": {
+      "sendInvoices": "Send invoices by email or share a payment link",
+      "clientPaysOnline": "Clients pay by card — no chasing checks",
+      "payoutsToYou": "Funds deposit to your Stripe balance and pay out to your bank"
+    },
+    "status": {
+      "comingSoon": "Coming soon",
+      "notConnected": "Not connected",
+      "pending": "Setup in progress",
+      "active": "Connected"
+    },
+    "actions": {
+      "connectStripe": "Connect with Stripe",
+      "continueSetup": "Continue Stripe setup",
+      "openingStripe": "Opening Stripe…",
+      "openDashboard": "Open Stripe dashboard",
+      "goToInvoices": "Go to invoices"
+    },
+    "notices": {
+      "returnFromStripe": "Welcome back. We refreshed your payout status.",
+      "refreshFromStripe": "Your Stripe session expired. Continue setup when you are ready."
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "step1": "Connect your Stripe account (about 5 minutes).",
+      "step2": "Create an invoice and send it to your client.",
+      "step3": "Your client pays online from the invoice link.",
+      "step4": "Stripe pays out to your bank on your payout schedule."
+    },
+    "details": {
+      "title": "Account status",
+      "charges": "Accept payments",
+      "payouts": "Bank payouts",
+      "enabled": "Enabled",
+      "disabled": "Not yet",
+      "connectedAt": "Connected on",
+      "finePrint": "FieldBase uses Stripe Connect Express. You manage tax and banking details in Stripe."
+    },
+    "errors": {
+      "loadStatus": "Could not load payment settings.",
+      "onboard": "Could not start Stripe onboarding.",
+      "dashboard": "Could not open Stripe dashboard.",
+      "missingUrl": "Stripe did not return a link."
+    }
   },
   "auth": {
     "loading": "Loading...",

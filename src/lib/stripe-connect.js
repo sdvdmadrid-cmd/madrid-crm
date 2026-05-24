@@ -120,3 +120,26 @@ export async function createConnectOnboardingLink({ tenantId, returnUrl, refresh
 
   return { accountId, url: link.url };
 }
+
+/**
+ * Stripe Express dashboard login link for an onboarded connected account.
+ */
+export async function createConnectDashboardLink(tenantId) {
+  if (!isStripeConnectEnabled()) {
+    return null;
+  }
+
+  const stripe = getStripeServerClient();
+  if (!stripe) {
+    throw new Error("Missing STRIPE_SECRET_KEY");
+  }
+
+  const status = await getConnectStatusForTenant(tenantId);
+  const accountId = String(status.accountId || "").trim();
+  if (!accountId) {
+    return null;
+  }
+
+  const link = await stripe.accounts.createLoginLink(accountId);
+  return { url: link.url };
+}

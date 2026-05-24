@@ -18,6 +18,7 @@ const TENANT_SECTIONS = {
     href: "/subscriptions",
     labelKey: "sidebar.subscriptions",
   },
+  settings: { href: "/settings", labelKey: "sidebar.settings" },
   website: { href: "/website", labelKey: "sidebar.websiteBuilder" },
   "services-catalog": {
     href: "/services-catalog",
@@ -107,6 +108,22 @@ export function getCrmBreadcrumbs(pathname) {
       if (meta) {
         crumbs.push(meta);
       }
+    }
+    return crumbs;
+  }
+
+  if (segments[0] === "settings") {
+    crumbs.push(TENANT_SECTIONS.settings);
+    if (segments[1] === "payments") {
+      crumbs.push({
+        href: "/settings/payments",
+        labelKey: "sidebar.clientPayments",
+      });
+    } else if (segments.length > 1) {
+      crumbs.push({
+        href: path,
+        labelKey: "nav.currentPage",
+      });
     }
     return crumbs;
   }

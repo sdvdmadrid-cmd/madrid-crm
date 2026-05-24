@@ -1,6 +1,8 @@
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
-import { createConnectOnboardingLink, isStripeConnectEnabled } from "@/lib/stripe-connect";
-import { getRequestOrigin } from "@/lib/supabase-auth";
+import {
+  createConnectDashboardLink,
+  isStripeConnectEnabled,
+} from "@/lib/stripe-connect";
 import {
   canManageSensitive,
   forbiddenResponse,
@@ -27,47 +29,31 @@ export async function POST(request) {
       return new Response(
         JSON.stringify({
           success: false,
-          error:
-            "Stripe Connect onboarding is not enabled yet. See docs/payments-architecture.md.",
+          error: "Stripe Connect is not enabled yet.",
           code: "connect_not_enabled",
         }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       );
     }
 
-    const origin = String(getRequestOrigin(request) || "").replace(/\/$/, "");
-    if (!origin) {
+    const result = await createConnectDashboardLink(context.tenantDbId);
+    if (!result?.url) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "APP_BASE_URL or APP_URL must be configured",
+          error: "Connect a Stripe account before opening the dashboard.",
+          code: "connect_not_configured",
         }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    const result = await createConnectOnboardingLink({
-      tenantId: context.tenantDbId,
-      returnUrl: `${origin}/settings/payments?connect=return`,
-      refreshUrl: `${origin}/settings/payments?connect=refresh`,
-    });
-
-    if (!result?.url) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Unable to create onboarding link" }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        data: { url: result.url, accountId: result.accountId },
-      }),
+      JSON.stringify({ success: true, data: { url: result.url } }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error("[api/payments/connect/onboard] error", error);
+    console.error("[api/payments/connect/dashboard] error", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json" } },

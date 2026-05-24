@@ -490,8 +490,77 @@
     "adminSupport": "Cola de Soporte",
     "adminSettings": "Ajustes de Admin",
     "settings": "Ajustes",
+    "clientPayments": "Cobros a clientes",
     "logout": "Cerrar sesion",
     "signingOut": "Cerrando sesion..."
+  },
+  "settingsHub": {
+    "title": "Ajustes",
+    "subtitle": "Administra tu cuenta de FieldBase, tu suscripcion y como cobras a tus clientes.",
+    "clientPayments": {
+      "title": "Cobros a clientes",
+      "desc": "Conecta Stripe para que tus clientes paguen facturas en linea. El dinero va a tu negocio.",
+      "cta": "Abrir cobros"
+    },
+    "subscription": {
+      "title": "Suscripcion FieldBase",
+      "desc": "Tu plan, periodo de prueba y facturacion de FieldBase.",
+      "cta": "Gestionar suscripcion"
+    }
+  },
+  "settingsPayments": {
+    "title": "Cobros a clientes",
+    "subtitle": "Conecta Stripe para aceptar pagos con tarjeta en tus facturas. Los depositos van a tu banco.",
+    "backToSettings": "Todos los ajustes",
+    "kicker": "Cobra con FieldBase",
+    "heroTitle": "Cuenta de cobros Stripe",
+    "heroBody": "Tus clientes pagan desde el enlace de la factura. FieldBase envia el pago a tu saldo de Stripe con depositos automaticos a tu banco.",
+    "loading": "Comprobando…",
+    "comingSoonHint": "Los cobros en linea se estan activando. FieldBase habilitara Stripe Connect pronto — podras terminar la configuracion aqui cuando este listo.",
+    "features": {
+      "sendInvoices": "Envia facturas por correo o comparte un enlace de pago",
+      "clientPaysOnline": "El cliente paga con tarjeta — sin perseguir cheques",
+      "payoutsToYou": "El dinero llega a tu saldo de Stripe y se deposita en tu banco"
+    },
+    "status": {
+      "comingSoon": "Proximamente",
+      "notConnected": "Sin conectar",
+      "pending": "Configuracion en curso",
+      "active": "Conectado"
+    },
+    "actions": {
+      "connectStripe": "Conectar con Stripe",
+      "continueSetup": "Continuar configuracion",
+      "openingStripe": "Abriendo Stripe…",
+      "openDashboard": "Abrir panel de Stripe",
+      "goToInvoices": "Ir a facturas"
+    },
+    "notices": {
+      "returnFromStripe": "Bienvenido. Actualizamos el estado de tu cuenta de cobros.",
+      "refreshFromStripe": "Tu sesion de Stripe expiro. Continua la configuracion cuando quieras."
+    },
+    "howItWorks": {
+      "title": "Como funciona",
+      "step1": "Conecta tu cuenta de Stripe (unos 5 minutos).",
+      "step2": "Crea una factura y enviasela a tu cliente.",
+      "step3": "Tu cliente paga en linea desde el enlace.",
+      "step4": "Stripe deposita en tu banco segun tu calendario de pagos."
+    },
+    "details": {
+      "title": "Estado de la cuenta",
+      "charges": "Aceptar pagos",
+      "payouts": "Depositos al banco",
+      "enabled": "Activo",
+      "disabled": "Aun no",
+      "connectedAt": "Conectado el",
+      "finePrint": "FieldBase usa Stripe Connect Express. Impuestos y datos bancarios los gestionas en Stripe."
+    },
+    "errors": {
+      "loadStatus": "No se pudieron cargar los ajustes de cobro.",
+      "onboard": "No se pudo iniciar la configuracion de Stripe.",
+      "dashboard": "No se pudo abrir el panel de Stripe.",
+      "missingUrl": "Stripe no devolvio un enlace."
+    }
   },
   "auth": {
     "loading": "Cargando...",

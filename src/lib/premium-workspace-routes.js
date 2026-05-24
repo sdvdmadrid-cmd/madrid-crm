@@ -13,6 +13,7 @@ const PREMIUM_WORKSPACE_PREFIXES = [
   "/calendar",
   "/lead-inbox",
   "/subscriptions",
+  "/settings",
   "/website-builder",
   "/website",
   "/services-catalog",
