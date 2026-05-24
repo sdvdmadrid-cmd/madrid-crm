@@ -2,6 +2,8 @@
  * Industry-aware website builder packs — copy, visuals, image prompts, and defaults.
  */
 
+import { normalizeContractorServices, scrubHomeownerFacingCopy } from "@/lib/website-lead-form";
+
 const PACKS = {
   cleaning: {
     key: "cleaning",
@@ -664,15 +666,28 @@ export function sanitizeIndustryWebsiteContent(content, pack, companyProfile = {
 
   let trustBadges = Array.isArray(content?.trustBadges) ? content.trustBadges : [];
   trustBadges = trustBadges
-    .map((b) => String(b).slice(0, 80))
+    .map((b) => scrubHomeownerFacingCopy(String(b).slice(0, 80)))
     .filter((b) => b && !textViolatesIndustryPack(b, packKey));
   if (!trustBadges.length) trustBadges = [...defaults.trustBadges];
 
+  const headline = scrubHomeownerFacingCopy(
+    pick(content?.headline, defaults.headline, 200),
+  ) || pick(content?.headline, defaults.headline, 200);
+  const subheadline = scrubHomeownerFacingCopy(
+    pick(content?.subheadline, defaults.subheadline, 300),
+  ) || pick(content?.subheadline, defaults.subheadline, 300);
+  const aboutText = scrubHomeownerFacingCopy(
+    pick(content?.aboutText, defaults.aboutText, 2000),
+  ) || pick(content?.aboutText, defaults.aboutText, 2000);
+  const ctaText =
+    scrubHomeownerFacingCopy(pick(content?.ctaText, defaults.ctaText, 100)) ||
+    pick(content?.ctaText, defaults.ctaText, 100);
+
   return {
-    headline: pick(content?.headline, defaults.headline, 200),
-    subheadline: pick(content?.subheadline, defaults.subheadline, 300),
-    aboutText: pick(content?.aboutText, defaults.aboutText, 2000),
-    ctaText: pick(content?.ctaText, defaults.ctaText, 100),
+    headline,
+    subheadline,
+    aboutText,
+    ctaText,
     themeColor: content?.themeColor || defaults.themeColor,
     services,
     testimonials,

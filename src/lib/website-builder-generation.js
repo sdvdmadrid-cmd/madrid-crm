@@ -6,6 +6,10 @@ import {
   personalizeGeneratedContent,
   sanitizeIndustryWebsiteContent,
 } from "@/lib/website-builder-industry";
+import {
+  mergeAiServicesWithContractorCatalog,
+  normalizeContractorServices,
+} from "@/lib/website-lead-form";
 
 export const WEBSITE_SECTIONS = [
   "hero",
@@ -176,7 +180,12 @@ JSON only:
   "testimonials": [{ "quote": "", "name": "First L.", "role": "Homeowner" }],
   "trustBadges": [""]
 }
-Rules: 4-6 services, 2 testimonials, 4 trust badges. ${pack.label} only.
+Rules: 2 testimonials, 4 trust badges. ${pack.label} only.
+${
+  ctx.topServices
+    ? "Services: use ONLY the services catalog lines above — same names, do not add irrigation or other services not listed."
+    : `Services: 4-6 services aligned with ${pack.label} themes only.`
+}
 `.trim();
 }
 
@@ -238,6 +247,10 @@ export function buildFullSiteFromAi(parsed, pack, profile, existingForm = {}) {
   );
 
   const content = sanitizeIndustryWebsiteContent(personalized, pack, profile);
+  content.services = mergeAiServicesWithContractorCatalog(
+    content.services,
+    existingForm.services,
+  );
 
   const presetSlots = createDefaultHeroPhotoSlots(pack);
   const aiHeroPrompts = Array.isArray(parsed.heroImagePrompts)

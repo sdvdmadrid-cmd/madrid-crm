@@ -11,6 +11,14 @@ import {
   recordWebsiteLeadAttempt,
 } from "@/lib/rate-limit";
 import { isTurnstileConfigured, verifyTurnstileToken } from "@/lib/turnstile";
+import { uploadWebsiteImageFromDataUrl } from "@/lib/website-media-storage";
+import {
+  buildFullAddress,
+  isAllowedRequestService,
+  normalizeLeadPayload,
+  resolveWebsiteRequestServices,
+} from "@/lib/website-lead-form";
+import crypto from "crypto";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_FORM_FILL_MS = 1200;
@@ -53,6 +61,10 @@ async function notifyContractorOfWebsiteLead({
   serviceNeeded,
   description,
   slug,
+  budgetRange,
+  timeline,
+  contactPreference,
+  address,
 }) {
   const { emails, phone } = await resolveContractorNotificationTargets(tenantId);
   const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -64,6 +76,10 @@ async function notifyContractorOfWebsiteLead({
     `Email: ${leadEmail || "N/A"}`,
     `Phone: ${leadPhone || "N/A"}`,
     `Service: ${serviceNeeded || "N/A"}`,
+    `Budget: ${budgetRange || "N/A"}`,
+    `Timeline: ${timeline || "N/A"}`,
+    `Preferred contact: ${contactPreference || "N/A"}`,
+    `Address: ${address || "N/A"}`,
     `Message: ${description || "N/A"}`,
     `Open lead inbox: ${leadInboxUrl}`,
   ].join("\n\n");
@@ -76,6 +92,10 @@ async function notifyContractorOfWebsiteLead({
         <p><strong>Email:</strong> ${leadEmail || "N/A"}</p>
         <p><strong>Phone:</strong> ${leadPhone || "N/A"}</p>
         <p><strong>Service:</strong> ${serviceNeeded || "N/A"}</p>
+        <p><strong>Budget:</strong> ${budgetRange || "N/A"}</p>
+        <p><strong>Timeline:</strong> ${timeline || "N/A"}</p>
+        <p><strong>Contact via:</strong> ${contactPreference || "N/A"}</p>
+        <p><strong>Address:</strong> ${address || "N/A"}</p>
         <p><strong>Message:</strong><br/>${description || "N/A"}</p>
       </div>
       <a href="${leadInboxUrl}" style="display:inline-block;background:#0f172a;color:#fff;font-weight:700;padding:12px 18px;border-radius:10px;text-decoration:none">Open Lead Inbox</a>
@@ -181,72 +201,82 @@ export async function POST(request, { params }) {
 
     await recordWebsiteLeadAttempt({ slug, ip });
     const nowIso = new Date().toISOString();
-    const {
-      name,
-      email,
-      phone,
-      address,
-      addressLine1,
-      city,
-      state,
-      zipCode,
-      serviceNeeded,
-      description,
-      photoDataUrl,
-      website: honeypotWebsite,
-      formStartedAt,
-    } = body;
-
-    const honeypotValue = toText(honeypotWebsite, 200);
-    const startedAtMs = Number(formStartedAt || 0);
+    const payload = normalizeLeadPayload(body);
+    const honeypotValue = payload.website;
+    const startedAtMs = Number(payload.formStartedAt || 0);
     const elapsedMs = Date.now() - startedAtMs;
 
-    // Silent success for obvious bot payloads to avoid helping attackers tune their scripts.
     if (honeypotValue) {
       return Response.json({ success: true }, { status: 200 });
     }
 
     if (!Number.isFinite(startedAtMs) || elapsedMs < MIN_FORM_FILL_MS) {
-      return Response.json(
-        { error: "Invalid submission" },
-        { status: 400 },
-      );
+      return Response.json({ error: "Invalid submission" }, { status: 400 });
     }
 
-    const cleanName = toText(name, 200);
-    const cleanEmail = toText(email, 200);
-    const cleanPhone = toText(phone, 20);
-    const cleanAddressLine1 = toText(addressLine1 || address, 300);
-    const cleanCity = toText(city, 120);
-    const cleanState = toText(state, 40);
-    const cleanZipCode = toText(zipCode, 20);
-    const cleanServiceNeeded = toText(serviceNeeded, 160);
-    const cleanDescription = toText(description, 2000);
-    const cleanPhotoDataUrl = toText(photoDataUrl, MAX_PHOTO_DATA_URL_CHARS);
-    const fullAddress = [
-      cleanAddressLine1,
-      [cleanCity, cleanState, cleanZipCode].filter(Boolean).join(" "),
-    ]
-      .filter(Boolean)
-      .join(", ");
+    const cleanName = payload.name;
+    const cleanEmail = payload.email;
+    const cleanPhone = payload.phone;
+    const cleanAddressLine1 = payload.addressLine1;
+    const cleanCity = payload.city;
+    const cleanState = payload.state;
+    const cleanZipCode = payload.zipCode;
+    const cleanServiceNeeded = payload.serviceNeeded;
+    const cleanDescription = payload.description;
+    const cleanBudgetRange = payload.budgetRange;
+    const cleanTimeline = payload.timeline;
+    const cleanContactPreference = payload.contactPreference || "phone";
+    const cleanPhotoDataUrl = payload.photoDataUrl.slice(0, MAX_PHOTO_DATA_URL_CHARS);
+    const submissionId =
+      payload.submissionId || crypto.randomUUID().replace(/-/g, "").slice(0, 32);
+    const fullAddress = buildFullAddress({
+      addressLine1: cleanAddressLine1,
+      city: cleanCity,
+      state: cleanState,
+      zipCode: cleanZipCode,
+    });
 
-    // Validate — name, phone, service, and message are required; address is optional
+    const allowedServices = resolveWebsiteRequestServices(website);
+
     if (!cleanName || !cleanPhone || !cleanServiceNeeded || !cleanDescription) {
-      return Response.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return Response.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (allowedServices.length && !isAllowedRequestService(cleanServiceNeeded, allowedServices)) {
+      return Response.json({ error: "Invalid service selection" }, { status: 400 });
     }
 
     if (cleanEmail && !EMAIL_REGEX.test(cleanEmail)) {
+      return Response.json({ error: "Invalid email format" }, { status: 400 });
+    }
+
+    if (cleanContactPreference === "email" && !cleanEmail) {
+      return Response.json({ error: "Email is required for email contact preference" }, { status: 400 });
+    }
+
+    const { data: existingLead } = await supabaseAdmin
+      .from("contractor_website_leads")
+      .select("id")
+      .eq("submission_id", submissionId)
+      .maybeSingle();
+
+    if (existingLead?.id) {
       return Response.json(
-        { error: "Invalid email format" },
-        { status: 400 },
+        { success: true, leadId: existingLead.id, duplicate: true },
+        { status: 200 },
       );
     }
 
-    // Save as a quote lead (we'll store in existing quotes table or create a leads table)
-    // For now, we'll insert into a simple leads table structure
+    let photoUrl = "";
+    if (cleanPhotoDataUrl) {
+      photoUrl = await uploadWebsiteImageFromDataUrl({
+        tenantId: website.tenantId,
+        slug,
+        dataUrl: cleanPhotoDataUrl,
+        kind: "lead-photo",
+      });
+    }
+
     const leadInsertBase = {
       tenant_id: website.tenantId,
       slug,
@@ -258,34 +288,69 @@ export async function POST(request, { params }) {
       state: cleanState,
       zip_code: cleanZipCode,
       service_needed: cleanServiceNeeded,
-      photo_data_url: cleanPhotoDataUrl || null,
+      photo_data_url: photoUrl && !photoUrl.startsWith("data:") ? null : cleanPhotoDataUrl || null,
+      photo_url: photoUrl && !photoUrl.startsWith("data:") ? photoUrl : null,
       description: cleanDescription,
+      budget_range: cleanBudgetRange || null,
+      timeline: cleanTimeline || null,
+      contact_preference: cleanContactPreference,
+      submission_id: submissionId,
+      status: "new",
+      metadata: {
+        budgetRange: cleanBudgetRange,
+        timeline: cleanTimeline,
+        contactPreference: cleanContactPreference,
+        fullAddress,
+      },
       created_at: nowIso,
+      updated_at: nowIso,
     };
 
+    let insertedLead = null;
     let leadInsertError = null;
-    {
-      const { error } = await supabaseAdmin
-        .from("contractor_website_leads")
-        .insert(leadInsertBase);
-      leadInsertError = error;
-    }
+
+    const insertWithSelect = async (row) =>
+      supabaseAdmin.from("contractor_website_leads").insert(row).select("id").maybeSingle();
+
+    let insertResult = await insertWithSelect(leadInsertBase);
+    leadInsertError = insertResult.error;
+    insertedLead = insertResult.data;
 
     if (leadInsertError && String(leadInsertError.code || "") === "42703") {
-      // Backward compatibility for DBs that do not yet have service/photo columns.
-      const { service_needed, photo_data_url, ...fallbackPayload } = leadInsertBase;
-      const { error } = await supabaseAdmin
-        .from("contractor_website_leads")
-        .insert(fallbackPayload);
-      leadInsertError = error;
+      const {
+        budget_range,
+        timeline,
+        contact_preference,
+        submission_id,
+        photo_url,
+        metadata,
+        status,
+        updated_at,
+        ...fallbackPayload
+      } = leadInsertBase;
+      insertResult = await insertWithSelect(fallbackPayload);
+      leadInsertError = insertResult.error;
+      insertedLead = insertResult.data;
     }
 
     if (leadInsertError?.code === "42P01") {
-      // Table doesn't exist, insert without it (just return success)
-      // In production, create the migration first
-      console.warn("contractor_website_leads table missing — lead not saved to DB");
-    } else if (leadInsertError) {
+      console.error("contractor_website_leads table missing");
+      return Response.json(
+        { error: "Lead system unavailable. Please call the contractor directly." },
+        { status: 503 },
+      );
+    }
+
+    if (leadInsertError) {
       throw leadInsertError;
+    }
+
+    const leadId = insertedLead?.id || null;
+    if (!leadId) {
+      return Response.json(
+        { error: "Could not save your request. Please try again or call us." },
+        { status: 500 },
+      );
     }
 
     // Also sync into internal CRM flow: clients + estimate_requests
@@ -399,6 +464,10 @@ export async function POST(request, { params }) {
       serviceNeeded: cleanServiceNeeded,
       description: cleanDescription,
       slug,
+      budgetRange: cleanBudgetRange,
+      timeline: cleanTimeline,
+      contactPreference: cleanContactPreference,
+      address: fullAddress,
     }).catch((error) => {
       console.warn("contractor lead notification failed", error?.message || error);
     });
@@ -408,7 +477,7 @@ export async function POST(request, { params }) {
       await sendInngestEvent(INNGEST_EVENTS.WEBSITE_LEAD, {
         tenantId: website.tenantId,
         slug,
-        leadId: `${slug}-${nowIso}`,
+        leadId: leadId || `${slug}-${nowIso}`,
         contractorEmails: emails,
         leadData: {
           name: cleanName,
@@ -432,9 +501,10 @@ export async function POST(request, { params }) {
     return Response.json(
       {
         success: true,
+        leadId,
         message: "Quote request submitted. We'll contact you soon!",
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (err) {
     console.error("Contact form error:", err);

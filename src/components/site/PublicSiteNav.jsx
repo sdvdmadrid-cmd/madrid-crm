@@ -39,18 +39,19 @@ export default function PublicSiteNav({
       <div className="s-nav-links">
         <a href="#services">{navCopy.services}</a>
         <a href="#about">{navCopy.about}</a>
-        <a href="#contact">{navCopy.contact}</a>
+        <a href="#request-service">{navCopy.contact}</a>
       </div>
 
-      {phone ? (
-        <a href={`tel:${phone.replace(/\s/g, "")}`} className="s-nav-cta" style={{ background: themeColor }}>
-          {phone}
-        </a>
-      ) : (
+      <div className="s-nav-actions">
+        {phone ? (
+          <a href={`tel:${phone.replace(/\s/g, "")}`} className="s-nav-phone">
+            {phone}
+          </a>
+        ) : null}
         <Link href={quoteHref} className="s-nav-cta" style={{ background: themeColor }}>
           {displayCta}
         </Link>
-      )}
+      </div>
 
       <style>{`
         .s-nav { position: sticky; top: 0; z-index: 100; background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; gap: 12px; flex-wrap: wrap; }
@@ -59,6 +60,9 @@ export default function PublicSiteNav({
         .s-nav-links { display: flex; align-items: center; gap: 24px; font-size: 14px; }
         .s-nav-links a { color: #94a3b8; text-decoration: none; font-weight: 600; transition: color 0.15s; }
         .s-nav-links a:hover { color: #fff; }
+        .s-nav-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .s-nav-phone { color: #e2e8f0 !important; padding: 8px 14px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none; border: 1px solid rgba(255,255,255,0.2); white-space: nowrap; }
+        .s-nav-phone:hover { background: rgba(255,255,255,0.08); color: #fff !important; }
         .s-nav-cta { color: #fff !important; padding: 8px 20px; border-radius: 6px; font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; }
         .s-nav-cta:hover { filter: brightness(1.1); }
         @media (max-width: 600px) { .s-nav-links { display: none; } }

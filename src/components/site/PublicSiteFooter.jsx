@@ -29,6 +29,7 @@ export default function PublicSiteFooter({
     { key: "tiktok", label: "TikTok", href: socialLinks.tiktok },
     { key: "linkedin", label: "LinkedIn", href: socialLinks.linkedin },
     { key: "google", label: "Google", href: socialLinks.google || googleReviewsUrl },
+    { key: "youtube", label: "YouTube", href: socialLinks.youtube },
   ].filter((item) => String(item.href || "").startsWith("http"));
 
   return (

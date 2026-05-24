@@ -12,6 +12,7 @@ const PREMIUM_WORKSPACE_PREFIXES = [
   "/smart-estimator",
   "/calendar",
   "/lead-inbox",
+  "/reputation",
   "/subscriptions",
   "/settings",
   "/website-builder",

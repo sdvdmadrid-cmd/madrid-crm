@@ -14,6 +14,7 @@ import {
   normalizeGalleryPhotos,
   normalizePortfolio,
 } from "@/lib/website-gallery";
+import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 
 const PUBLIC_WEBSITE_SELECT = [
   "slug",
@@ -56,6 +57,7 @@ function normalizeSocialLinks(raw) {
     tiktok: pick("tiktok"),
     linkedin: pick("linkedin"),
     google: pick("google"),
+    youtube: pick("youtube"),
   };
 }
 
@@ -166,7 +168,10 @@ export async function getPublicWebsiteBySlug(slug) {
     analytics: normalizeSiteAnalytics(meta.analytics),
     industryLabel: pack.label,
     industryKey: pack.key,
-    requestServices: pack.requestServices,
+    requestServices: resolveWebsiteRequestServices({
+      services: Array.isArray(website.services) ? website.services : [],
+      requestServices: pack.requestServices,
+    }),
     companyProfile: {
       companyName: companyProfile?.company_name || "",
       publicDisplayName: companyProfile?.public_display_name || "",

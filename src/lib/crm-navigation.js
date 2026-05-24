@@ -13,6 +13,7 @@ const TENANT_SECTIONS = {
     labelKey: "sidebar.estimates",
   },
   "lead-inbox": { href: "/lead-inbox", labelKey: "sidebar.leadInbox" },
+  reputation: { href: "/reputation", labelKey: "sidebar.reputation" },
   calendar: { href: "/calendar", labelKey: "sidebar.calendar" },
   subscriptions: {
     href: "/subscriptions",

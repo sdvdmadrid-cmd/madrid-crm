@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
+import PlatformZoneBanner from "@/components/workspace/PlatformZoneBanner";
 import ws from "@/styles/workspace-dark.module.css";
 import li from "./lead-inbox.module.css";
 
@@ -29,6 +30,18 @@ const UI = {
     replySuggestion: "Suggested reply",
     replyFailed: "Unable to generate reply suggestion.",
     total: (n) => `${n} lead${n === 1 ? "" : "s"}`,
+    search: "Search leads",
+    filterStatus: "Status",
+    allStatuses: "All statuses",
+    markContacted: "Mark contacted",
+    markCompleted: "Mark completed",
+    updating: "Updating…",
+    budget: "Budget",
+    timeline: "Timeline",
+    service: "Service",
+    photo: "Project photo",
+    statusUpdated: "Lead status updated.",
+    statusFailed: "Could not update status.",
   },
   es: {
     title: "Bandeja de Leads",
@@ -51,6 +64,18 @@ const UI = {
     replySuggestion: "Respuesta sugerida",
     replyFailed: "No se pudo generar la respuesta sugerida.",
     total: (n) => `${n} lead${n === 1 ? "" : "s"}`,
+    search: "Search leads",
+    filterStatus: "Status",
+    allStatuses: "All statuses",
+    markContacted: "Mark contacted",
+    markCompleted: "Mark completed",
+    updating: "Updating…",
+    budget: "Budget",
+    timeline: "Timeline",
+    service: "Service",
+    photo: "Project photo",
+    statusUpdated: "Lead status updated.",
+    statusFailed: "Could not update status.",
   },
   pl: {
     title: "Skrzynka Leadów",
@@ -96,12 +121,16 @@ function statusBadgeClass(status) {
   return li.badgeStatus;
 }
 
+const WEBSITE_STATUSES = ["new", "contacted", "completed", "archived"];
+
 function LeadCard({
   item,
   t,
   isConverting,
+  isUpdatingStatus,
   onConvert,
   onSuggestReply,
+  onStatusChange,
   suggestingReply,
   replyDraft,
 }) {
@@ -147,9 +176,73 @@ function LeadCard({
         </div>
         <div>
           <p className={li.sectionLabel}>{t.details}</p>
+          {item.serviceNeeded ? (
+            <p className={li.contactLine}>
+              <strong>{t.service}:</strong> {item.serviceNeeded}
+            </p>
+          ) : null}
+          {item.budgetRange ? (
+            <p className={li.contactLine}>
+              <strong>{t.budget}:</strong> {item.budgetRange}
+            </p>
+          ) : null}
+          {item.timeline ? (
+            <p className={li.contactLine}>
+              <strong>{t.timeline}:</strong> {item.timeline}
+            </p>
+          ) : null}
           <p className={li.details}>{item.description || "—"}</p>
+          {item.photoUrl ? (
+            <div style={{ marginTop: 12 }}>
+              <p className={li.sectionLabel}>{t.photo}</p>
+              <a href={item.photoUrl} target="_blank" rel="noreferrer">
+                <img
+                  src={item.photoUrl}
+                  alt=""
+                  className={li.leadPhoto}
+                />
+              </a>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {item.source === "website_lead" ? (
+        <div className={li.statusRow}>
+          <label className={li.sectionLabel} htmlFor={`status-${item.id}`}>
+            {t.status}
+          </label>
+          <select
+            id={`status-${item.id}`}
+            className={li.statusSelect}
+            value={item.status || "new"}
+            disabled={isUpdatingStatus}
+            onChange={(e) => onStatusChange(item, e.target.value)}
+          >
+            {WEBSITE_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className={li.btnAi}
+            disabled={isUpdatingStatus}
+            onClick={() => onStatusChange(item, "contacted")}
+          >
+            {isUpdatingStatus ? t.updating : t.markContacted}
+          </button>
+          <button
+            type="button"
+            className={li.btnAi}
+            disabled={isUpdatingStatus}
+            onClick={() => onStatusChange(item, "completed")}
+          >
+            {t.markCompleted}
+          </button>
+        </div>
+      ) : null}
 
       <div className={li.cardFooter}>
         <button
@@ -189,6 +282,9 @@ export default function LeadInboxPage() {
   const [convertingId, setConvertingId] = useState("");
   const [replyLoadingId, setReplyLoadingId] = useState("");
   const [replyById, setReplyById] = useState({});
+  const [statusUpdatingId, setStatusUpdatingId] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const lang =
     typeof window !== "undefined"
@@ -231,6 +327,48 @@ export default function LeadInboxPage() {
     () => items.filter((item) => String(item.status || "").toLowerCase() !== "converted"),
     [items],
   );
+
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return activeItems.filter((item) => {
+      if (statusFilter && String(item.status || "").toLowerCase() !== statusFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const haystack = [
+        item.name,
+        item.email,
+        item.phone,
+        item.address,
+        item.description,
+        item.serviceNeeded,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [activeItems, search, statusFilter]);
+
+  const updateLeadStatus = async (item, status) => {
+    if (item.source !== "website_lead") return;
+    setStatusUpdatingId(item.id);
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch(`/api/lead-inbox/leads/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      await getJsonOrThrow(res, t.statusFailed);
+      setNotice(t.statusUpdated);
+      await fetchInbox();
+    } catch (err) {
+      setError(err.message || t.statusFailed);
+    } finally {
+      setStatusUpdatingId("");
+    }
+  };
 
   const convertToJob = async (item) => {
     setConvertingId(item.id);
@@ -298,6 +436,7 @@ export default function LeadInboxPage() {
 
   return (
     <PremiumPageShell title={t.title} subtitle={t.subtitle} actions={headerActions}>
+      <PlatformZoneBanner zone="private" />
       {notice ? <div className={ws.noticeSuccess}>{notice}</div> : null}
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
@@ -317,20 +456,46 @@ export default function LeadInboxPage() {
       ) : null}
 
       {!loading && activeItems.length > 0 ? (
-        <div className={li.grid}>
-          {activeItems.map((item) => (
-            <LeadCard
-              key={`${item.source}-${item.id}`}
-              item={item}
-              t={t}
-              isConverting={convertingId === item.id}
-              onConvert={convertToJob}
-              onSuggestReply={suggestReply}
-              suggestingReply={replyLoadingId === item.id}
-              replyDraft={replyById[item.id] || ""}
+        <>
+          <div className={li.toolbar}>
+            <input
+              type="search"
+              className={li.searchInput}
+              placeholder={t.search}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-          ))}
-        </div>
+            <select
+              className={li.statusSelect}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              aria-label={t.filterStatus}
+            >
+              <option value="">{t.allStatuses}</option>
+              {WEBSITE_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={li.grid}>
+            {filteredItems.map((item) => (
+              <LeadCard
+                key={`${item.source}-${item.id}`}
+                item={item}
+                t={t}
+                isConverting={convertingId === item.id}
+                isUpdatingStatus={statusUpdatingId === item.id}
+                onConvert={convertToJob}
+                onSuggestReply={suggestReply}
+                onStatusChange={updateLeadStatus}
+                suggestingReply={replyLoadingId === item.id}
+                replyDraft={replyById[item.id] || ""}
+              />
+            ))}
+          </div>
+        </>
       ) : null}
     </PremiumPageShell>
   );

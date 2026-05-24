@@ -1269,6 +1269,11 @@ export default function AuthShell({ children }) {
             label: t("sidebar.leadInbox"),
             iconKey: "insights",
           },
+          {
+            href: "/reputation",
+            label: t("sidebar.reputation"),
+            iconKey: "insights",
+          },
         ]
     : [
         {
@@ -1294,6 +1299,11 @@ export default function AuthShell({ children }) {
         {
           href: "/lead-inbox",
           label: t("sidebar.leadInbox"),
+          iconKey: "insights",
+        },
+        {
+          href: "/reputation",
+          label: t("sidebar.reputation"),
           iconKey: "insights",
         },
       ];

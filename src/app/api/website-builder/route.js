@@ -31,6 +31,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeSiteAnalytics } from "@/lib/site-analytics";
+import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import {
   buildFeaturedGallery,
   MAX_FEATURED_GALLERY,
@@ -178,7 +179,10 @@ function serializeWebsiteRow(row, profile, request) {
     themePresets: pack.themeColors,
     imagePresets: pack.imagePresets,
     ctaOptions: pack.ctaOptions,
-    requestServices: pack.requestServices,
+    requestServices: resolveWebsiteRequestServices({
+      services: effectiveServices,
+      requestServices: pack.requestServices,
+    }),
     companyProfile: profile,
     siteMeta: {
       seoTitle: String(siteMetaRow.seoTitle || "").trim(),
