@@ -19,6 +19,7 @@ import {
   normalizeLeadPayload,
   resolveWebsiteRequestServices,
 } from "@/lib/website-lead-form";
+import { insertWebsiteLeadRow } from "@/lib/website-lead-persist";
 import crypto from "crypto";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -315,43 +316,28 @@ export async function POST(request, { params }) {
       updated_at: nowIso,
     };
 
-    let insertedLead = null;
-    let leadInsertError = null;
-
-    const insertWithSelect = async (row) =>
-      supabaseAdmin.from("contractor_website_leads").insert(row).select("id").maybeSingle();
-
-    let insertResult = await insertWithSelect(leadInsertBase);
-    leadInsertError = insertResult.error;
-    insertedLead = insertResult.data;
-
-    if (leadInsertError && String(leadInsertError.code || "") === "42703") {
-      const {
-        budget_range,
-        timeline,
-        contact_preference,
-        submission_id,
-        photo_url,
-        metadata,
-        status,
-        updated_at,
-        ...fallbackPayload
-      } = leadInsertBase;
-      insertResult = await insertWithSelect(fallbackPayload);
-      leadInsertError = insertResult.error;
-      insertedLead = insertResult.data;
-    }
+    const { data: insertedLead, error: leadInsertError } = await insertWebsiteLeadRow(leadInsertBase);
 
     if (leadInsertError?.code === "42P01") {
       console.error("contractor_website_leads table missing");
-      return Response.json(
-        { error: "Lead system unavailable. Please call the contractor directly." },
+      return publicWebsiteJson(
+        {
+          success: false,
+          error: "Lead system unavailable. Please call the contractor directly.",
+        },
         { status: 503 },
       );
     }
 
     if (leadInsertError) {
-      throw leadInsertError;
+      console.error("contractor_website_leads insert failed", leadInsertError);
+      return publicWebsiteJson(
+        {
+          success: false,
+          error: "Could not save your request. Please try again or call us.",
+        },
+        { status: 500 },
+      );
     }
 
     const leadId = insertedLead?.id || null;

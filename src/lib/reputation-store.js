@@ -115,8 +115,8 @@ export async function getPublicReviewsBySlug(slug) {
     .limit(24);
 
   if (error) {
-    if (error.code === "42P01") return { reviews: [], stats: null };
-    throw error;
+    console.warn("[reputation] getPublicReviewsBySlug", error?.message || error);
+    return { reviews: [], stats: null };
   }
 
   const reviews = (data || []).map(serializeReview);
