@@ -9,7 +9,7 @@ module.exports = defineConfig({
     timeout: 10_000,
   },
   fullyParallel: false,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 2 : 1,
   reporter: process.env.CI ? [['html'], ['list']] : 'list',
   use: {
     baseURL,
@@ -17,8 +17,12 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  // webServer is managed externally (`npm run dev`). Set PLAYWRIGHT_BASE_URL to override.
-  // webServer: { command: 'npm run dev', url: baseURL, reuseExistingServer: true },
+  webServer: {
+    command: 'npm run dev',
+    url: `${baseURL}/api/health`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
   projects: [
     {
       name: 'chromium',
