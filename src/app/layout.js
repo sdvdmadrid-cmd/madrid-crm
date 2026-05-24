@@ -3,6 +3,7 @@ import "./globals.css";
 import AuthShell from "@/components/AuthShell";
 import InstantNavigation from "@/components/InstantNavigation";
 import I18nProvider from "@/components/I18nProvider";
+import BuildVersionBar from "@/components/BuildVersionBar";
 import MarketingScripts from "@/components/MarketingScripts";
 
 const APP_BASE_URL = String(
@@ -27,18 +28,18 @@ export const metadata = {
   alternates: {
     canonical: "/",
   },
-  manifest: "/site.webmanifest?v=4",
+  manifest: "/site.webmanifest?v=5",
   icons: {
     icon: [
-      { url: "/favicon.ico?v=4", sizes: "any" },
-      { url: "/favicon-32x32.png?v=4", type: "image/png", sizes: "32x32" },
-      { url: "/favicon-16x16.png?v=4", type: "image/png", sizes: "16x16" },
+      { url: "/favicon.ico?v=5", sizes: "any" },
+      { url: "/favicon-32x32.png?v=5", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png?v=5", type: "image/png", sizes: "16x16" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png?v=4", sizes: "180x180" },
-      { url: "/apple-touch-icon-precomposed-v3.png?v=4", sizes: "180x180" },
+      { url: "/apple-touch-icon.png?v=5", sizes: "180x180" },
+      { url: "/apple-touch-icon-precomposed-v3.png?v=5", sizes: "180x180" },
     ],
-    shortcut: ["/favicon.ico?v=4"],
+    shortcut: ["/favicon.ico?v=5"],
   },
   appleWebApp: {
     capable: true,
@@ -57,9 +58,15 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
+      data-fieldbase-build={String(
+        process.env.NEXT_PUBLIC_BUILD_SHA ||
+          process.env.VERCEL_GIT_COMMIT_SHA ||
+          "",
+      ).slice(0, 12)}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <BuildVersionBar />
         <MarketingScripts />
         <InstantNavigation />
         <I18nProvider>
