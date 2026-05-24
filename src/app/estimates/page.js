@@ -448,16 +448,23 @@ export default function EstimatesPage() {
                   </div>
                 )}
                 <div style={{ marginTop: 12, display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(148,163,184,0.12)" }}>
-                  <a href={`/estimate/${selectedEstimate.id}`} target="_blank" rel="noreferrer" className={ws.btnSecondary} style={{ flex: 1, textAlign: "center", textDecoration: "none" }}>
+                  <a
+                    href={selectedEstimate.publicLink || "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={ws.btnSecondary}
+                    style={{ flex: 1, textAlign: "center", textDecoration: "none", opacity: selectedEstimate.publicLink ? 1 : 0.5, pointerEvents: selectedEstimate.publicLink ? "auto" : "none" }}
+                  >
                     Client link
                   </a>
                   <a
-                    href={`/estimate/${selectedEstimate.id}`}
+                    href={selectedEstimate.publicLink || "#"}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => {
                       e.preventDefault();
-                      const w = window.open(`/estimate/${selectedEstimate.id}`, "_blank");
+                      if (!selectedEstimate.publicLink) return;
+                      const w = window.open(selectedEstimate.publicLink, "_blank");
                       w?.addEventListener("load", () => w.print());
                     }}
                     className={ws.btnSecondary}

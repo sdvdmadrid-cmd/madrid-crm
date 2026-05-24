@@ -1,3 +1,4 @@
+import { buildEstimateBuilderInsertRow } from "@/lib/estimate-builder-records";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   canWrite,
@@ -96,15 +97,11 @@ export async function POST(request) {
     const estimateNumber = String(body.estimate_number || body.estimateNumber || "").trim() ||
       await nextEstimateBuilderNumber(tenantDbId);
 
-    const toInsert = {
-      ...body,
-      estimate_number: estimateNumber,
-      tenant_id: tenantDbId,
-      user_id: userId || null,
-      created_by: userId || null,
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
+    const toInsert = buildEstimateBuilderInsertRow(body, {
+      tenantDbId,
+      userId,
+      estimateNumber,
+    });
 
     const { data, error } = await supabaseAdmin
       .from("estimate_builder")

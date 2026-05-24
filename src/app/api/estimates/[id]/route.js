@@ -1,3 +1,8 @@
+import {
+  buildPublicEstimateLink,
+  isPublicEstimateStatus,
+  normalizeEstimateStatus,
+} from "@/lib/estimate-public-access";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { sendEmail } from "@/lib/email";
 import { sendTextMessage } from "@/lib/sms";
@@ -136,12 +141,19 @@ function withStatusAudit(existingAudit, previousStatus, nextStatus, nowIso) {
   return audit;
 }
 
-function serializeEstimate(row) {
+function serializeEstimate(row, { includePublicLink = true } = {}) {
   const parsedNotes = parseNotes(row.notes);
+  const status = normalizeStatus(row.status);
+  const publicLink =
+    includePublicLink && isPublicEstimateStatus(status) && row.id
+      ? buildPublicEstimateLink(row.id)
+      : null;
+
   return {
     id: row.id,
     _id: row.id,
     tenantId: row.tenant_id || null,
+    publicLink,
     userId: row.user_id || null,
     createdBy: row.created_by || null,
     clientName: row.client_name || "",
@@ -224,6 +236,39 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
+export async function GET(request, { params }) {
+  try {
+    const { tenantDbId, role, authenticated } =
+      await getAuthenticatedTenantContext(request);
+    if (!authenticated) return unauthenticatedResponse();
+
+    const { id } = await params;
+    if (!id) {
+      return jsonResponse({ success: false, error: "Invalid estimate id" }, 400);
+    }
+
+    let query = supabaseAdmin
+      .from(ESTIMATES_TABLE)
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if ((role || "").toLowerCase() !== "super_admin") {
+      query = query.eq("tenant_id", tenantDbId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    if (!data) {
+      return jsonResponse({ success: false, error: "Estimate not found" }, 404);
+    }
+
+    return jsonResponse({ success: true, data: serializeEstimate(data) });
+  } catch (error) {
+    console.error("[api/estimates/:id][GET] error", error);
+    return jsonResponse({ success: false, error: error.message }, 500);
+  }
+}
+
 export async function PATCH(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
@@ -288,9 +333,15 @@ export async function PATCH(request, { params }) {
     const sendViaText = channels.text === true;
     const nextStatus = normalizeStatus(body?.status, serialized.status);
 
-    if (nextStatus === "sent" && sendViaEmail && serialized.clientEmail) {
-      const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
-      const estimateLink = `${appUrl}/estimate/${serialized.id}`;
+    const estimateLink =
+      nextStatus === "sent" && serialized.id
+        ? buildPublicEstimateLink(
+            serialized.id,
+            (process.env.APP_URL || process.env.APP_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
+          )
+        : null;
+
+    if (nextStatus === "sent" && sendViaEmail && serialized.clientEmail && estimateLink) {
       const clientName = serialized.clientName || "Friend";
       const total = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(serialized.total || 0);
       await sendEmail({
@@ -316,9 +367,7 @@ export async function PATCH(request, { params }) {
       });
     }
 
-    if (nextStatus === "sent" && sendViaText && serialized.clientPhone) {
-      const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
-      const estimateLink = `${appUrl}/estimate/${serialized.id}`;
+    if (nextStatus === "sent" && sendViaText && serialized.clientPhone && estimateLink) {
       const total = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(serialized.total || 0);
       const text = `Your estimate for ${total} is ready: ${estimateLink}`;
       await sendTextMessage({

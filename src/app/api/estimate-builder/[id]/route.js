@@ -1,3 +1,4 @@
+import { buildEstimateBuilderUpdateRow } from "@/lib/estimate-builder-records";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
@@ -141,10 +142,7 @@ export async function PATCH(request, { params }) {
       delete body.removeQuoteSignature;
     }
 
-    const updateRow = {
-      ...body,
-      updated_at: new Date().toISOString(),
-    };
+    const updateRow = buildEstimateBuilderUpdateRow(body);
 
     let query = supabaseAdmin
       .from("estimate_builder")
