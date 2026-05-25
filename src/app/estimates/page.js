@@ -53,6 +53,7 @@ export default function EstimatesPage() {
   const [pendingStatusAction, setPendingStatusAction] = useState(null);
   const [selectedEstimate, setSelectedEstimate] = useState(null);
   const [sendingEmailId, setSendingEmailId] = useState("");
+  const [duplicatingId, setDuplicatingId] = useState("");
 
   const kanbanColumns = useMemo(() => {
     const cols = { draft: [], sent: [], changes_requested: [], approved: [], declined: [] };
@@ -127,6 +128,36 @@ export default function EstimatesPage() {
     }
     await updateEstimateStatus(targetEstimate, pendingStatusAction.nextStatus);
     setPendingStatusAction(null);
+  }
+
+  async function duplicateEstimate(estimate) {
+    if (!estimate?.id) return;
+    setDuplicatingId(estimate.id);
+    setStatusMessage("");
+    try {
+      const response = await apiFetch(`/api/estimates/${estimate.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const payload = await getJsonOrThrow(response, "Unable to duplicate estimate.");
+      const newId = payload?.data?.id;
+      const newNumber = payload?.data?.estimateNumber || "";
+      setSelectedEstimate(null);
+      setStatusMessage(
+        newNumber
+          ? `Duplicated as ${newNumber}. Opening for editing…`
+          : "Duplicated. Opening for editing…",
+      );
+      if (newId) {
+        router.push(`/estimates/new?edit=${newId}`);
+      } else {
+        await loadEstimates();
+      }
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to duplicate estimate.");
+    } finally {
+      setDuplicatingId("");
+    }
   }
 
   async function sendEstimateEmail(estimate) {
@@ -444,6 +475,19 @@ export default function EstimatesPage() {
                       style={{ gridColumn: "1 / -1" }}
                     >
                       Edit estimate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicateEstimate(selectedEstimate)}
+                      disabled={duplicatingId === selectedEstimate.id}
+                      aria-label="Duplicate this estimate as a new draft"
+                      className={ws.btnSecondary}
+                      style={{
+                        gridColumn: "1 / -1",
+                        opacity: duplicatingId === selectedEstimate.id ? 0.6 : 1,
+                      }}
+                    >
+                      {duplicatingId === selectedEstimate.id ? "Duplicating…" : "⎘ Duplicate"}
                     </button>
                   </div>
                 )}
