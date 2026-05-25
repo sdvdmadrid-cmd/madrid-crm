@@ -1,5 +1,6 @@
 import AdminAiMonitoringClient from '@/components/admin/AdminAiMonitoringClient';
 import AdminBillPaymentsOpsClient from '@/components/admin/AdminBillPaymentsOpsClient';
+import OwnerSystemStatusCard from '@/components/owner/OwnerSystemStatusCard';
 
 export default function OwnerMonitoringPage() {
   return (
@@ -17,6 +18,7 @@ export default function OwnerMonitoringPage() {
           queue, processors, global KPIs). Tenant users do not see this panel.
         </p>
       </div>
+      <OwnerSystemStatusCard />
       <AdminAiMonitoringClient />
       <AdminBillPaymentsOpsClient mode="platform-owner" />
     </section>

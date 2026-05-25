@@ -33,9 +33,6 @@ export async function GET(request) {
       openai,
       storageReady,
       bucket: WEBSITE_MEDIA_BUCKET,
-      hint: ready
-        ? null
-        : "Run npm run env:ensure && npm run setup:website-production locally, or set OPENAI_API_KEY and create the website-media bucket in Supabase.",
     },
   });
 }

@@ -1341,11 +1341,6 @@ export default function WebsiteBuilderClient() {
               {autoSaved ? <div className={styles.savePulse}>{t.savedAuto}</div> : null}
             </div>
           )}
-          {!aiConfigOk ? (
-            <div className={styles.hintBox} style={{ margin: "8px 16px 0" }}>
-              {t.aiConfigMissing}
-            </div>
-          ) : null}
           {hasUnpublishedChanges ? (
             <div
               className={styles.hintBox}
