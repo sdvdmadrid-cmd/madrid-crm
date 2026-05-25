@@ -37,6 +37,15 @@ async function nextEstimateBuilderNumber(tenantId) {
   return `EST-${String(max + 1).padStart(4, "0")}`;
 }
 
+/**
+ * Serialize a raw estimate_builder row into the public API shape. The
+ * frontend (src/app/estimate-builder/page.js) reads camelCase keys like
+ * `clientId`, `quoteId`, and `lastSentAt`. Those used to be quoted columns
+ * on the table; they were dropped in
+ * 20260531100000_drop_estimate_builder_camelcase_columns.sql. We now
+ * synthesize the aliases from the canonical snake_case columns so the
+ * response contract stays the same.
+ */
 const serialize = (doc) => {
   const createdAt = doc.created_at || doc.createdAt || null;
   const updatedAt = doc.updated_at || doc.updatedAt || null;
@@ -48,6 +57,9 @@ const serialize = (doc) => {
     tenantId: doc.tenant_id || doc.tenantId || null,
     userId: doc.user_id || doc.userId || null,
     createdBy: doc.created_by || doc.createdBy || null,
+    clientId: doc.client_id || doc.clientId || null,
+    quoteId: doc.quote_id || doc.quoteId || null,
+    lastSentAt: doc.last_sent_at || doc.lastSentAt || null,
     createdAt,
     updatedAt,
   };

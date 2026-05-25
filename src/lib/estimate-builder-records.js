@@ -35,24 +35,26 @@ export function buildEstimateBuilderUpdateRow(body = {}) {
     row.total_final = toNumber(body.totalFinal ?? body.total_final);
   }
 
+  // We used to mirror writes into a quoted "clientId" column on the
+  // estimate_builder table. That column was dropped in
+  // 20260531100000_drop_estimate_builder_camelcase_columns.sql. The API
+  // layer is responsible for surfacing the snake_case column as a
+  // camelCase alias in JSON responses.
   const clientId = body.clientId ?? body.client_id;
   if ("clientId" in body || "client_id" in body) {
     const normalized = toText(clientId);
     row.client_id = normalized || null;
-    row.clientId = normalized || null;
   }
 
   const quoteId = body.quoteId ?? body.quote_id;
   if ("quoteId" in body || "quote_id" in body) {
     const normalized = toText(quoteId);
     row.quote_id = normalized || null;
-    row.quoteId = normalized || null;
   }
 
   if ("lastSentAt" in body || "last_sent_at" in body) {
     const raw = body.lastSentAt ?? body.last_sent_at;
     row.last_sent_at = raw ? new Date(raw).toISOString() : null;
-    row.lastSentAt = row.last_sent_at;
   }
 
   return row;
@@ -78,9 +80,7 @@ export function buildEstimateBuilderInsertRow(body = {}, { tenantDbId, userId, e
     total_mid: patch.total_mid ?? toNumber(body.totalMid ?? body.total_mid),
     total_final: patch.total_final ?? toNumber(body.totalFinal ?? body.total_final),
     client_id: clientRef || null,
-    clientId: clientRef || null,
     quote_id: quoteRef || null,
-    quoteId: quoteRef || null,
     estimate_number: estimateNumber,
     tenant_id: tenantDbId,
     user_id: userId || null,

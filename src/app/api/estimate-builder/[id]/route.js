@@ -12,6 +12,12 @@ import {
 
 // Tabla relacional: estimate_builder
 
+/**
+ * Same serialize contract as the list route. CamelCase aliases for
+ * client_id / quote_id / last_sent_at are synthesized here because the
+ * underlying columns were dropped in
+ * 20260531100000_drop_estimate_builder_camelcase_columns.sql.
+ */
 const serialize = (doc) => {
   const createdAt = doc.created_at || doc.createdAt || null;
   const updatedAt = doc.updated_at || doc.updatedAt || null;
@@ -23,6 +29,9 @@ const serialize = (doc) => {
     tenantId: doc.tenant_id || doc.tenantId || null,
     userId: doc.user_id || doc.userId || null,
     createdBy: doc.created_by || doc.createdBy || null,
+    clientId: doc.client_id || doc.clientId || null,
+    quoteId: doc.quote_id || doc.quoteId || null,
+    lastSentAt: doc.last_sent_at || doc.lastSentAt || null,
     createdAt,
     updatedAt,
   };
