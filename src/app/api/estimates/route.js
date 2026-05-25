@@ -3,6 +3,7 @@ import {
   isPublicEstimateStatus,
 } from "@/lib/estimate-public-access";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
+import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -310,6 +311,29 @@ export async function POST(request) {
     if (!data) throw new Error("Failed to allocate a unique estimate number");
 
     const serialized = serializeEstimate(data);
+
+    // Record the creation in the revisions log so the detail panel has a
+    // real "created" entry. Best-effort — never blocks the response.
+    await recordEstimateRevision({
+      estimateId: serialized.id,
+      tenantId: serialized.tenantId,
+      userId: serialized.userId || null,
+      actorLabel: serialized.clientName ? `created for ${serialized.clientName}` : "created",
+      kind: "created",
+      before: {},
+      after: {
+        clientName: serialized.clientName,
+        clientEmail: serialized.clientEmail,
+        clientPhone: serialized.clientPhone,
+        address: serialized.address,
+        status: serialized.status,
+        subtotal: serialized.subtotal,
+        tax: serialized.tax,
+        total: serialized.total,
+        notes: serialized.notes,
+        services: serialized.services,
+      },
+    });
 
     const delivery = await deliverEstimateNotifications({
       estimate: serialized,

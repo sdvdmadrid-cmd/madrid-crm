@@ -4,6 +4,7 @@ import {
   normalizeEstimateStatus,
 } from "@/lib/estimate-public-access";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
+import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -287,7 +288,7 @@ export async function PATCH(request, { params }) {
 
     let existingQuery = supabaseAdmin
       .from(ESTIMATES_TABLE)
-      .select("id, notes, status")
+      .select("*")
       .eq("id", id)
       .maybeSingle();
     if ((role || "").toLowerCase() !== "super_admin") {
@@ -299,6 +300,10 @@ export async function PATCH(request, { params }) {
     if (!existing) {
       return jsonResponse({ success: false, error: "Estimate not found" }, 404);
     }
+
+    // Snapshot the prior shape *before* the update so we can record an
+    // accurate revision diff even when the caller patches just one field.
+    const beforeSnapshot = serializeEstimate(existing, { includePublicLink: false });
 
     const toUpdate = buildUpdateRow({
       ...body,
@@ -324,6 +329,39 @@ export async function PATCH(request, { params }) {
     }
 
     const serialized = serializeEstimate(data);
+
+    // Append revision (best-effort, never blocks the response).
+    await recordEstimateRevision({
+      estimateId: serialized.id,
+      tenantId: serialized.tenantId,
+      userId: serialized.userId || null,
+      actorLabel: serialized.clientName ? `update: ${serialized.clientName}` : "update",
+      before: {
+        clientName: beforeSnapshot.clientName,
+        clientEmail: beforeSnapshot.clientEmail,
+        clientPhone: beforeSnapshot.clientPhone,
+        address: beforeSnapshot.address,
+        status: beforeSnapshot.status,
+        subtotal: beforeSnapshot.subtotal,
+        tax: beforeSnapshot.tax,
+        total: beforeSnapshot.total,
+        notes: beforeSnapshot.notes,
+        services: beforeSnapshot.services,
+      },
+      after: {
+        clientName: serialized.clientName,
+        clientEmail: serialized.clientEmail,
+        clientPhone: serialized.clientPhone,
+        address: serialized.address,
+        status: serialized.status,
+        subtotal: serialized.subtotal,
+        tax: serialized.tax,
+        total: serialized.total,
+        notes: serialized.notes,
+        services: serialized.services,
+      },
+    });
+
     const nextStatus = normalizeStatus(body?.status, serialized.status);
 
     const delivery = await deliverEstimateNotifications({

@@ -55,6 +55,46 @@ export default function EstimatesPage() {
   const [sendingEmailId, setSendingEmailId] = useState("");
   const [duplicatingId, setDuplicatingId] = useState("");
 
+  // History for the currently-selected estimate (paquete J). We fetch it
+  // on demand only when the detail panel is open, so the list view stays
+  // light.
+  const [revisions, setRevisions] = useState([]);
+  const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [revisionsError, setRevisionsError] = useState("");
+
+  useEffect(() => {
+    if (!selectedEstimate?.id) {
+      setRevisions([]);
+      setRevisionsError("");
+      return;
+    }
+    let cancelled = false;
+    setRevisionsLoading(true);
+    setRevisionsError("");
+    apiFetch(`/api/estimates/${selectedEstimate.id}/revisions`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (json?.success && Array.isArray(json.data)) {
+          setRevisions(json.data);
+        } else {
+          setRevisions([]);
+          setRevisionsError(String(json?.error || "Unable to load history"));
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setRevisions([]);
+        setRevisionsError(err?.message || "Unable to load history");
+      })
+      .finally(() => {
+        if (!cancelled) setRevisionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEstimate?.id]);
+
   const kanbanColumns = useMemo(() => {
     const cols = { draft: [], sent: [], changes_requested: [], approved: [], declined: [] };
     for (const estimate of estimates) {
@@ -399,6 +439,65 @@ export default function EstimatesPage() {
                       </div>
                     ) : null}
                   </div>
+                </div>
+
+                <div style={{ marginTop: 14 }}>
+                  <div className={est.detailLabel}>History</div>
+                  {revisionsLoading ? (
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>Loading history…</div>
+                  ) : revisionsError ? (
+                    <div style={{ fontSize: 11, color: "#fda4af" }}>{revisionsError}</div>
+                  ) : revisions.length === 0 ? (
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>No history yet.</div>
+                  ) : (
+                    <ul
+                      style={{
+                        listStyle: "none",
+                        padding: 0,
+                        margin: 0,
+                        display: "grid",
+                        gap: 6,
+                        maxHeight: 220,
+                        overflowY: "auto",
+                      }}
+                    >
+                      {revisions.map((rev) => (
+                        <li
+                          key={rev.id}
+                          style={{
+                            border: "1px solid rgba(148,163,184,0.18)",
+                            background: "rgba(15,23,42,0.4)",
+                            borderRadius: 8,
+                            padding: "6px 8px",
+                            fontSize: 11,
+                            color: "#cbd5e1",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ fontWeight: 600, color: "#e2e8f0", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                              {String(rev.kind || "updated").replace(/_/g, " ")}
+                            </span>
+                            <span style={{ color: "#94a3b8" }}>{formatDateTime(rev.createdAt)}</span>
+                          </div>
+                          {rev.statusBefore && rev.statusAfter && rev.statusBefore !== rev.statusAfter ? (
+                            <div style={{ marginTop: 2, color: "#94a3b8" }}>
+                              {rev.statusBefore} → {rev.statusAfter}
+                            </div>
+                          ) : null}
+                          {Number(rev.totalBefore) !== Number(rev.totalAfter) ? (
+                            <div style={{ marginTop: 2, color: "#94a3b8" }}>
+                              Total: {formatMoney(rev.totalBefore)} → {formatMoney(rev.totalAfter)}
+                            </div>
+                          ) : null}
+                          {Object.keys(rev.changes || {}).length > 0 ? (
+                            <div style={{ marginTop: 2, color: "#94a3b8" }}>
+                              Changed: {Object.keys(rev.changes).join(", ")}
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
 
