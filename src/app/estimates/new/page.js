@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { getUsStateTaxRate } from "@/lib/estimate-pricing";
 
 const CLIENT_PREFIXES = ["", "Mr.", "Mrs.", "Ms.", "Dr."];
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(value) {
+  return EMAIL_REGEX.test(String(value || "").trim());
+}
 
 function formatMoney(amount) {
   return new Intl.NumberFormat("en-US", {
@@ -77,6 +84,20 @@ function inferBaseAndDiscount(services = [], fallbackSubtotal = 0) {
 }
 
 export default function NewEstimatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <div className="text-sm text-slate-500">Loading…</div>
+        </div>
+      }
+    >
+      <NewEstimatePageInner />
+    </Suspense>
+  );
+}
+
+function NewEstimatePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit") || "";
@@ -110,6 +131,20 @@ export default function NewEstimatePage() {
   const [aiDescLoading, setAiDescLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingStatus, setEditingStatus] = useState("");
+  const [deliveryNotice, setDeliveryNotice] = useState("");
+
+  // Per-field validation. Empty string = no error.
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  // Track unsaved changes for the beforeunload guard. The initial mount
+  // and the editId backfill set this back to false so users only see the
+  // warning after they actually edit something.
+  const [isDirty, setIsDirty] = useState(false);
+  const hydratingRef = useRef(false);
+
+  // The user typed a tax rate manually — stop auto-filling from state.
+  const taxRateManualRef = useRef(false);
 
   const basePriceNumber = useMemo(() => Math.max(0, toNumber(basePrice, 0)), [basePrice]);
   const discountNumber = useMemo(() => Math.max(0, toNumber(discount, 0)), [discount]);
@@ -133,6 +168,7 @@ export default function NewEstimatePage() {
   useEffect(() => {
     if (!editId) return;
 
+    hydratingRef.current = true;
     apiFetch(`/api/estimates/${editId}`)
       .then((r) => r.json())
       .then((json) => {
@@ -159,23 +195,115 @@ export default function NewEstimatePage() {
         const safeTax = Math.max(0, toNumber(e.tax, 0));
         const inferredTaxRate = safeSubtotal > 0 ? Number(((safeTax / safeSubtotal) * 100).toFixed(2)) : 0;
         setTaxRate(String(inferredTaxRate || ""));
+        if (inferredTaxRate > 0) {
+          // The persisted rate counts as "manually set" so we don't clobber it
+          // when the state field is reapplied on autofill.
+          taxRateManualRef.current = true;
+        }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        // Reset dirty flag on the next tick once all state writes have flushed.
+        setTimeout(() => {
+          hydratingRef.current = false;
+          setIsDirty(false);
+        }, 0);
+      });
   }, [editId]);
 
-  async function save(nextStatus) {
-    if (!clientFirstName.trim() || !streetName.trim() || basePriceNumber <= 0) {
-      setStatusMessage("Fill in client name, service address, and a base price greater than 0.");
-      return;
+  // Auto-fill US state sales tax when the user picks a state and hasn't
+  // overridden the rate manually. Reuses the existing rate table from
+  // estimate-pricing instead of asking the contractor to memorize rates.
+  useEffect(() => {
+    if (taxRateManualRef.current) return;
+    if (!stateField) return;
+    const rate = getUsStateTaxRate(stateField);
+    if (rate > 0) {
+      setTaxRate(String(rate));
     }
+  }, [stateField]);
 
+  // Warn before unload when there are unsaved edits.
+  useEffect(() => {
+    if (!isDirty) return undefined;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // Mark form dirty whenever any user-editable field changes (skip during the
+  // initial editId backfill).
+  useEffect(() => {
+    if (hydratingRef.current) return;
+    setIsDirty(true);
+  }, [
+    clientPrefix,
+    clientFirstName,
+    clientLastName,
+    clientEmail,
+    clientPhone,
+    streetName,
+    city,
+    stateField,
+    zipCode,
+    billingStreetName,
+    billingCity,
+    billingState,
+    billingZip,
+    sameAsBilling,
+    jobDescription,
+    basePrice,
+    discountType,
+    discount,
+    taxRate,
+    sendViaEmail,
+    sendViaText,
+  ]);
+
+  // Compute live field errors. Surfaced visually only after the first submit
+  // attempt or when the field has been touched.
+  const liveErrors = useMemo(() => {
+    const errors = {};
+    if (!clientFirstName.trim()) errors.clientFirstName = "First name is required.";
+    if (clientEmail.trim() && !isValidEmail(clientEmail)) {
+      errors.clientEmail = "Enter a valid email address.";
+    }
+    if (!streetName.trim()) errors.streetName = "Service address is required.";
+    if (basePriceNumber <= 0) errors.basePrice = "Enter a base price greater than $0.";
     if (discountType === "percent" && discountNumber > 100) {
-      setStatusMessage("Discount percent cannot be greater than 100.");
-      return;
+      errors.discount = "Discount % cannot be greater than 100.";
     }
-
     if (discountType === "amount" && discountNumber > basePriceNumber) {
-      setStatusMessage("Discount cannot be greater than base price.");
+      errors.discount = "Discount cannot exceed base price.";
+    }
+    return errors;
+  }, [
+    clientFirstName,
+    clientEmail,
+    streetName,
+    basePriceNumber,
+    discountType,
+    discountNumber,
+  ]);
+
+  const showError = (key) =>
+    (submitAttempted || fieldErrors[key] === "touched") && liveErrors[key]
+      ? liveErrors[key]
+      : "";
+
+  const touchField = (key) =>
+    setFieldErrors((prev) => ({ ...prev, [key]: "touched" }));
+
+  async function save(nextStatus) {
+    setSubmitAttempted(true);
+    setDeliveryNotice("");
+
+    if (Object.keys(liveErrors).length > 0) {
+      setStatusMessage("Please fix the highlighted fields before saving.");
       return;
     }
 
@@ -256,21 +384,45 @@ export default function NewEstimatePage() {
 
     setSaving(true);
     try {
-      if (editId) {
-        const res = await apiFetch(`/api/estimates/${editId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        await getJsonOrThrow(res, "Unable to update estimate.");
-      } else {
-        const res = await apiFetch("/api/estimates", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        await getJsonOrThrow(res, "Unable to create estimate.");
+      const res = editId
+        ? await apiFetch(`/api/estimates/${editId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await apiFetch("/api/estimates", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      const json = await getJsonOrThrow(
+        res,
+        editId ? "Unable to update estimate." : "Unable to create estimate.",
+      );
+
+      // If the server tried to deliver the estimate but the email or SMS
+      // failed, surface a soft warning so the contractor can resend instead
+      // of silently believing the customer received it.
+      const delivery = json?.data?.delivery;
+      if (nextStatus === "sent" && delivery) {
+        const failures = [];
+        if (sendViaEmail && delivery.email && delivery.email.attempted && !delivery.email.sent) {
+          failures.push(`email${delivery.email.error ? `: ${delivery.email.error}` : ""}`);
+        }
+        if (sendViaText && delivery.sms && delivery.sms.attempted && !delivery.sms.sent) {
+          failures.push(`text${delivery.sms.error ? `: ${delivery.sms.error}` : ""}`);
+        }
+        if (failures.length > 0) {
+          setDeliveryNotice(
+            `Estimate saved, but delivery failed for: ${failures.join(", ")}. Please retry from the estimate list.`,
+          );
+          setIsDirty(false);
+          setSaving(false);
+          return;
+        }
       }
+
+      setIsDirty(false);
       router.push("/estimates");
     } catch (err) {
       setStatusMessage(err.message || "Unable to save.");
@@ -286,6 +438,7 @@ export default function NewEstimatePage() {
           <button
             type="button"
             onClick={() => router.push("/estimates")}
+            aria-label="Back to estimates list"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Back
@@ -304,6 +457,7 @@ export default function NewEstimatePage() {
             type="button"
             onClick={() => save("draft")}
             disabled={saving}
+            aria-label="Save as draft"
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
             Save Estimate
@@ -312,6 +466,7 @@ export default function NewEstimatePage() {
             type="button"
             onClick={() => save("sent")}
             disabled={saving}
+            aria-label={editId && editingStatus === "changes_requested" ? "Save and resend to client" : "Save and send to client"}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
           >
             {saving ? "Saving..." : editId && editingStatus === "changes_requested" ? "Save & Resend" : "Save & Send"}
@@ -320,8 +475,19 @@ export default function NewEstimatePage() {
       </div>
 
       <div className="mx-auto max-w-2xl px-4 py-8">
+        {deliveryNotice ? (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+          >
+            {deliveryNotice}
+          </div>
+        ) : null}
         {statusMessage ? (
-          <div className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          <div
+            role="alert"
+            className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700"
+          >
             {statusMessage}
           </div>
         ) : null}
@@ -332,6 +498,7 @@ export default function NewEstimatePage() {
             <select
               value={clientPrefix}
               onChange={(e) => setClientPrefix(e.target.value)}
+              aria-label="Client prefix"
               className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
             >
               {CLIENT_PREFIXES.map((p) => (
@@ -341,28 +508,42 @@ export default function NewEstimatePage() {
             <input
               value={clientFirstName}
               onChange={(e) => setClientFirstName(e.target.value)}
+              onBlur={() => touchField("clientFirstName")}
               placeholder="First name"
-              className="h-12 flex-1 min-w-[120px] rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+              aria-label="Client first name"
+              aria-invalid={showError("clientFirstName") ? "true" : "false"}
+              className={`h-12 flex-1 min-w-[120px] rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("clientFirstName") ? "border-rose-400" : "border-slate-300"}`}
             />
             <input
               value={clientLastName}
               onChange={(e) => setClientLastName(e.target.value)}
               placeholder="Last name"
+              aria-label="Client last name"
               className="h-12 flex-1 min-w-[120px] rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
             />
           </div>
+          {showError("clientFirstName") ? (
+            <p className="mt-1 text-xs font-medium text-rose-600">{showError("clientFirstName")}</p>
+          ) : null}
           <input
             type="email"
             value={clientEmail}
             onChange={(e) => setClientEmail(e.target.value)}
+            onBlur={() => touchField("clientEmail")}
             placeholder="Client email - to send the estimate link"
-            className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+            aria-label="Client email"
+            aria-invalid={showError("clientEmail") ? "true" : "false"}
+            className={`mt-2 h-12 w-full rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("clientEmail") ? "border-rose-400" : "border-slate-300"}`}
           />
+          {showError("clientEmail") ? (
+            <p className="mt-1 text-xs font-medium text-rose-600">{showError("clientEmail")}</p>
+          ) : null}
           <input
             type="tel"
             value={clientPhone}
             onChange={(e) => setClientPhone(e.target.value)}
             placeholder="Client phone number"
+            aria-label="Client phone"
             className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
           />
         </div>
@@ -380,12 +561,34 @@ export default function NewEstimatePage() {
               if (place.zip) setZipCode(place.zip);
             }}
             placeholder="Start typing address..."
-            inputClass="h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+            inputClass={`h-12 w-full rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("streetName") ? "border-rose-400" : "border-slate-300"}`}
           />
+          {showError("streetName") ? (
+            <p className="mt-1 text-xs font-medium text-rose-600">{showError("streetName")}</p>
+          ) : null}
           <div className="mt-2 grid grid-cols-[1fr_72px_90px] gap-2">
-            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500" />
-            <input value={stateField} onChange={(e) => setStateField(e.target.value)} placeholder="State" className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500" />
-            <input value={zipCode} onChange={(e) => setZipCode(e.target.value)} placeholder="ZIP" className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500" />
+            <input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="City"
+              aria-label="City"
+              className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+            />
+            <input
+              value={stateField}
+              onChange={(e) => setStateField(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="State"
+              maxLength={2}
+              aria-label="State (2-letter code, e.g. TX). Auto-fills sales tax."
+              className="h-12 rounded-xl border border-slate-300 px-3 text-base uppercase outline-none focus:border-slate-500"
+            />
+            <input
+              value={zipCode}
+              onChange={(e) => setZipCode(e.target.value)}
+              placeholder="ZIP"
+              aria-label="ZIP code"
+              className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+            />
           </div>
 
           <div className="mt-4">
@@ -417,9 +620,28 @@ export default function NewEstimatePage() {
                   inputClass="h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
                 />
                 <div className="mt-2 grid grid-cols-[1fr_72px_90px] gap-2">
-                  <input value={billingCity} onChange={(e) => setBillingCity(e.target.value)} placeholder="City" className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500" />
-                  <input value={billingState} onChange={(e) => setBillingState(e.target.value)} placeholder="State" className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500" />
-                  <input value={billingZip} onChange={(e) => setBillingZip(e.target.value)} placeholder="ZIP" className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500" />
+                  <input
+                    value={billingCity}
+                    onChange={(e) => setBillingCity(e.target.value)}
+                    placeholder="City"
+                    aria-label="Billing city"
+                    className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+                  />
+                  <input
+                    value={billingState}
+                    onChange={(e) => setBillingState(e.target.value.toUpperCase().slice(0, 2))}
+                    placeholder="State"
+                    maxLength={2}
+                    aria-label="Billing state"
+                    className="h-12 rounded-xl border border-slate-300 px-3 text-base uppercase outline-none focus:border-slate-500"
+                  />
+                  <input
+                    value={billingZip}
+                    onChange={(e) => setBillingZip(e.target.value)}
+                    placeholder="ZIP"
+                    aria-label="Billing ZIP"
+                    className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+                  />
                 </div>
               </>
             ) : (
@@ -508,9 +730,14 @@ export default function NewEstimatePage() {
                 step="0.01"
                 value={basePrice}
                 onChange={(e) => setBasePrice(e.target.value)}
+                onBlur={() => touchField("basePrice")}
                 placeholder="0"
-                className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500"
+                aria-invalid={showError("basePrice") ? "true" : "false"}
+                className={`mt-1 h-11 w-full rounded-lg border px-3 outline-none focus:border-slate-500 ${showError("basePrice") ? "border-rose-400" : "border-slate-300"}`}
               />
+              {showError("basePrice") ? (
+                <span className="mt-1 block text-xs font-medium text-rose-600">{showError("basePrice")}</span>
+              ) : null}
             </label>
 
             <label className="text-sm text-slate-700">
@@ -534,9 +761,14 @@ export default function NewEstimatePage() {
                 step="0.01"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
+                onBlur={() => touchField("discount")}
                 placeholder="0"
-                className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500"
+                aria-invalid={showError("discount") ? "true" : "false"}
+                className={`mt-1 h-11 w-full rounded-lg border px-3 outline-none focus:border-slate-500 ${showError("discount") ? "border-rose-400" : "border-slate-300"}`}
               />
+              {showError("discount") ? (
+                <span className="mt-1 block text-xs font-medium text-rose-600">{showError("discount")}</span>
+              ) : null}
             </label>
 
             <label className="text-sm text-slate-700">
@@ -547,10 +779,17 @@ export default function NewEstimatePage() {
                 max="100"
                 step="0.5"
                 value={taxRate}
-                onChange={(e) => setTaxRate(e.target.value)}
+                onChange={(e) => {
+                  taxRateManualRef.current = true;
+                  setTaxRate(e.target.value);
+                }}
                 placeholder="0"
+                aria-label={`Tax percent${stateField ? ` (${stateField} default ${getUsStateTaxRate(stateField)}%)` : ""}`}
                 className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500"
               />
+              {stateField && !taxRateManualRef.current ? (
+                <span className="mt-1 block text-[11px] text-slate-400">Auto-filled from {stateField}</span>
+              ) : null}
             </label>
           </div>
 

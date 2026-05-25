@@ -3,9 +3,8 @@ import {
   isPublicEstimateStatus,
   normalizeEstimateStatus,
 } from "@/lib/estimate-public-access";
+import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
-import { sendEmail } from "@/lib/email";
-import { sendTextMessage } from "@/lib/sms";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   canWrite,
@@ -325,60 +324,16 @@ export async function PATCH(request, { params }) {
     }
 
     const serialized = serializeEstimate(data);
-
-    const channels = body?.sendChannels && typeof body.sendChannels === "object"
-      ? body.sendChannels
-      : {};
-    const sendViaEmail = channels.email !== false;
-    const sendViaText = channels.text === true;
     const nextStatus = normalizeStatus(body?.status, serialized.status);
 
-    const estimateLink =
-      nextStatus === "sent" && serialized.id
-        ? buildPublicEstimateLink(
-            serialized.id,
-            (process.env.APP_URL || process.env.APP_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
-          )
-        : null;
+    const delivery = await deliverEstimateNotifications({
+      estimate: serialized,
+      sendChannels: body?.sendChannels,
+      requestedStatus: nextStatus,
+      contextLabel: "api/estimates/:id][PATCH",
+    });
 
-    if (nextStatus === "sent" && sendViaEmail && serialized.clientEmail && estimateLink) {
-      const clientName = serialized.clientName || "Friend";
-      const total = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(serialized.total || 0);
-      await sendEmail({
-        to: [serialized.clientEmail],
-        subject: `Your Estimate is Ready — ${serialized.estimateNumber || serialized.id}`,
-        text: `Hi ${clientName},\n\nYour estimate for ${total} is ready for review.\n\nView and respond here:\n${estimateLink}\n\nThank you!`,
-        html: `
-          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
-            <h2 style="color:#0f172a;margin-bottom:8px">Your Estimate is Ready</h2>
-            <p style="color:#475569;margin-bottom:16px">Hi ${clientName},</p>
-            <p style="color:#475569">Your estimate has been prepared. Please review the details and let us know how you'd like to proceed.</p>
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:20px 0">
-              <div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em">Total</div>
-              <div style="color:#0f172a;font-size:24px;font-weight:700">${total}</div>
-            </div>
-            <a href="${estimateLink}" style="display:inline-block;background:#059669;color:#fff;font-weight:600;padding:14px 28px;border-radius:10px;text-decoration:none;margin-bottom:16px">
-              View Estimate &amp; Respond
-            </a>
-            <p style="color:#94a3b8;font-size:12px;margin-top:24px">If the button doesn't work, copy this link:<br><a href="${estimateLink}" style="color:#3b82f6">${estimateLink}</a></p>
-          </div>`,
-      }).catch((emailErr) => {
-        console.warn("[api/estimates/:id][PATCH] email send failed:", emailErr?.message);
-      });
-    }
-
-    if (nextStatus === "sent" && sendViaText && serialized.clientPhone && estimateLink) {
-      const total = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(serialized.total || 0);
-      const text = `Your estimate for ${total} is ready: ${estimateLink}`;
-      await sendTextMessage({
-        to: serialized.clientPhone,
-        text,
-      }).catch((smsErr) => {
-        console.warn("[api/estimates/:id][PATCH] sms send failed:", smsErr?.message);
-      });
-    }
-
-    return jsonResponse({ success: true, data: serialized });
+    return jsonResponse({ success: true, data: { ...serialized, delivery } });
   } catch (error) {
     console.error("[api/estimates/:id][PATCH] error", error);
     return jsonResponse({ success: false, error: error.message }, 500);
