@@ -2,11 +2,25 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+export const LOGO_PLACEMENT_VALUES = Object.freeze([
+  "top-left",
+  "top-right",
+  "centered",
+  "hidden",
+]);
+
+export function normalizeLogoPlacement(value) {
+  const v = String(value || "").trim().toLowerCase();
+  return LOGO_PLACEMENT_VALUES.includes(v) ? v : "top-left";
+}
+
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: "",
   publicDisplayName: "",
   businessType: "",
   logoDataUrl: "",
+  logoUrl: "",
+  logoPlacement: "top-left",
   websiteUrl: "",
   googleReviewsUrl: "",
   phone: "",
@@ -27,6 +41,8 @@ function mapSupabaseRow(row = {}) {
     publicDisplayName: row?.public_display_name || "",
     businessType: row?.business_type || "",
     logoDataUrl: row?.logo_data_url || "",
+    logoUrl: row?.logo_url || "",
+    logoPlacement: normalizeLogoPlacement(row?.logo_placement),
     websiteUrl: row?.website_url || "",
     googleReviewsUrl: row?.google_reviews_url || "",
     phone: row?.phone || "",
@@ -75,6 +91,8 @@ function toSupabaseRow(tenantId, profile = {}, userId, { includeExtendedColumns 
     public_display_name:
       profile.publicDisplayName || profile.companyName || "",
     logo_data_url: profile.logoDataUrl || "",
+    logo_url: profile.logoUrl || "",
+    logo_placement: normalizeLogoPlacement(profile.logoPlacement),
     website_url: profile.websiteUrl || "",
     google_reviews_url: profile.googleReviewsUrl || "",
     phone: profile.phone || "",

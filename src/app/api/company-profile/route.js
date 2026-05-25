@@ -89,11 +89,26 @@ function normalizeUrl(value) {
 function sanitizeLogo(value) {
   const input = toStringValue(value);
   if (!input) return "";
-  if (!input.startsWith("data:image/")) return "";
+  if (input.startsWith("data:image/")) {
+    // Legacy path: base64 data URL. Cap around 2MB raw payload.
+    if (input.length > 2_800_000) return "";
+    return input;
+  }
+  return "";
+}
 
-  // Limit oversized payloads (about 2MB raw image data).
-  if (input.length > 2_800_000) return "";
-  return input;
+function sanitizeLogoUrl(value) {
+  const input = toStringValue(value);
+  if (!input) return "";
+  if (!/^https:\/\//i.test(input)) return "";
+  return input.slice(0, 1024);
+}
+
+function sanitizeLogoPlacement(value) {
+  const v = String(value || "").trim().toLowerCase();
+  return ["top-left", "top-right", "centered", "hidden"].includes(v)
+    ? v
+    : "top-left";
 }
 
 function normalizeLanguage(value) {
@@ -178,6 +193,8 @@ export async function PATCH(request) {
       ),
       businessType: toLimitedText(body.businessType || body.industry, 80),
       logoDataUrl: sanitizeLogo(body.logoDataUrl),
+      logoUrl: sanitizeLogoUrl(body.logoUrl),
+      logoPlacement: sanitizeLogoPlacement(body.logoPlacement),
       websiteUrl: normalizeUrl(body.websiteUrl),
       googleReviewsUrl: normalizeUrl(body.googleReviewsUrl),
       phone: toLimitedText(body.phone, 60),

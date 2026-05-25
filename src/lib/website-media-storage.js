@@ -91,6 +91,44 @@ export async function uploadWebsiteImageFromDataUrl({
   return url || src;
 }
 
+/**
+ * Issue #40 — upload a company logo (manual upload or AI-generated) into
+ * the website-media bucket under logos/{tenantId}/* and return the
+ * public HTTPS URL. Accepts a data URL or returns the input untouched
+ * if already an HTTPS URL.
+ */
+export async function uploadCompanyLogoFromDataUrl({ tenantId, dataUrl }) {
+  const src = String(dataUrl || "").trim();
+  if (/^https?:\/\//i.test(src)) return src;
+
+  const parsed = parseDataUrl(src);
+  if (!parsed) return "";
+
+  const safeTenant = String(tenantId || "tenant").replace(/[^a-zA-Z0-9-]/g, "");
+  const stamp = Date.now();
+  const rand = Math.random().toString(36).slice(2, 9);
+  const path = `logos/${safeTenant}/${stamp}-${rand}.${parsed.ext}`;
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from(WEBSITE_MEDIA_BUCKET)
+    .upload(path, parsed.buffer, {
+      contentType: parsed.mime,
+      upsert: false,
+      cacheControl: "31536000",
+    });
+
+  if (uploadError) {
+    console.error("[website-media-storage] logo upload failed", uploadError.message);
+    return "";
+  }
+
+  const { data: publicData } = supabaseAdmin.storage
+    .from(WEBSITE_MEDIA_BUCKET)
+    .getPublicUrl(path);
+
+  return String(publicData?.publicUrl || "").trim();
+}
+
 export function isPersistableImageSrc(src) {
   const value = String(src || "").trim();
   return value.startsWith("data:image/") || /^https?:\/\//i.test(value);

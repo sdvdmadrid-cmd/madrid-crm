@@ -742,47 +742,48 @@ export default function QuoteClientPage() {
       <div className="q-page">
         <div className="q-wrap">
           <div className="q-card">
-            {/* ── Header bar ─────────────────────────────────────────────── */}
-            <div
-              style={{
+            {/* ── Header bar (logo placement honors company_profiles.logo_placement) ── */}
+            {(() => {
+              const logoSrc = company.logoUrl || company.logoDataUrl || "";
+              const placement = String(company.logoPlacement || "top-left");
+              const logoVisible = Boolean(logoSrc) && placement !== "hidden";
+              const headerStyleBase = {
                 background: "#1F2937",
                 padding: "22px 32px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
                 gap: 16,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#6b7280",
-                    fontWeight: 600,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    marginBottom: 4,
-                  }}
-                >
-                  {t.projectQuote}
-                </div>
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: "white",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {companyName}
-                </div>
-                {company.phone && (
-                  <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                    {company.phone}
+              };
+              const brandBlock = (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#6b7280",
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {t.projectQuote}
                   </div>
-                )}
-              </div>
-              {company.logoDataUrl && (
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      color: "white",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {companyName}
+                  </div>
+                  {company.phone && (
+                    <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+                      {company.phone}
+                    </div>
+                  )}
+                </div>
+              );
+              const logoBlock = logoVisible ? (
                 <div
                   style={{
                     flexShrink: 0,
@@ -795,7 +796,7 @@ export default function QuoteClientPage() {
                   }}
                 >
                   <Image
-                    src={company.logoDataUrl}
+                    src={logoSrc}
                     alt={companyName}
                     width={120}
                     height={48}
@@ -808,8 +809,54 @@ export default function QuoteClientPage() {
                     }}
                   />
                 </div>
-              )}
-            </div>
+              ) : null;
+
+              if (placement === "centered" && logoVisible) {
+                return (
+                  <div
+                    style={{
+                      ...headerStyleBase,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      textAlign: "center",
+                    }}
+                  >
+                    {logoBlock}
+                    {brandBlock}
+                  </div>
+                );
+              }
+              if (placement === "top-left" && logoVisible) {
+                return (
+                  <div
+                    style={{
+                      ...headerStyleBase,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-start",
+                    }}
+                  >
+                    {logoBlock}
+                    {brandBlock}
+                  </div>
+                );
+              }
+              // top-right (default) or hidden
+              return (
+                <div
+                  style={{
+                    ...headerStyleBase,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  {brandBlock}
+                  {logoBlock}
+                </div>
+              );
+            })()}
 
             {/* ── Status banner (finalized / changes_requested) ────────── */}
             {statusInfo && (
