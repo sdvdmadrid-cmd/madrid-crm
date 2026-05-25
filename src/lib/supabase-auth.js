@@ -433,6 +433,7 @@ export async function generatePasswordRecoveryLink({ email, origin }) {
     return {
       tokenHash,
       resetUrl: `${redirectTo}?token=${tokenHash}`,
+      user: data?.user || null,
     };
   }
 

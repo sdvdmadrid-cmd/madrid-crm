@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import ContractorTrustStrip from "@/components/workspace/ContractorTrustStrip";
-import DeployBuildBadge from "@/components/workspace/DeployBuildBadge";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import styles from "./settings.module.css";
 
@@ -46,7 +45,6 @@ export default function SettingsHubPage() {
           </Link>
         ))}
       </div>
-      <DeployBuildBadge />
     </PremiumPageShell>
   );
 }

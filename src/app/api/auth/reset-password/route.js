@@ -11,7 +11,19 @@ function isStrongPassword(value) {
   return true;
 }
 
-export async function POST(request) {
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+const defaultDeps = {
+  createAuthClient: createSupabaseServerAuthClient,
+  supabaseAdmin,
+};
+
+export async function handleResetPassword(request, deps = defaultDeps) {
   try {
     const body = await request.json().catch(() => ({}));
     const token = String(body.token || "").trim();
@@ -19,67 +31,54 @@ export async function POST(request) {
     const newPassword = String(body.newPassword || "");
 
     if (!token && !accessToken) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Reset token is required" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { success: false, error: "Reset token is required" },
+        400,
       );
     }
 
     if (!isStrongPassword(newPassword)) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           success: false,
           error:
             "Password must be at least 12 chars and include uppercase, lowercase, number, and special character.",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
         },
+        400,
       );
     }
 
-    const authClient = createSupabaseServerAuthClient();
+    const authClient = deps.createAuthClient();
     if (token) {
-      const { error: verifyError } = await authClient.auth.verifyOtp({
+      const { data: verifyData, error: verifyError } = await authClient.auth.verifyOtp({
         token_hash: token,
         type: "recovery",
       });
 
-      if (verifyError) {
-        return new Response(
-          JSON.stringify({
+      const userId = verifyData?.user?.id || verifyData?.session?.user?.id || "";
+      if (verifyError || !userId) {
+        return jsonResponse(
+          {
             success: false,
             error: "Invalid or expired reset token",
-          }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
           },
+          400,
         );
       }
 
-      const { error: updateError } = await authClient.auth.updateUser({
-        password: newPassword,
-      });
+      const { error: updateError } =
+        await deps.supabaseAdmin.auth.admin.updateUserById(userId, {
+          password: newPassword,
+        });
 
       if (updateError) {
-        return new Response(
-          JSON.stringify({ success: false, error: updateError.message }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          },
+        return jsonResponse(
+          { success: false, error: updateError.message },
+          400,
         );
       }
 
-      return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: true });
     }
 
     const {
@@ -88,19 +87,16 @@ export async function POST(request) {
     } = await authClient.auth.getUser(accessToken);
 
     if (userError || !user?.id) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           success: false,
           error: "Invalid or expired reset session",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
         },
+        400,
       );
     }
 
-    const { error: adminUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+    const { error: adminUpdateError } = await deps.supabaseAdmin.auth.admin.updateUserById(
       user.id,
       {
         password: newPassword,
@@ -108,26 +104,18 @@ export async function POST(request) {
     );
 
     if (adminUpdateError) {
-      return new Response(
-        JSON.stringify({ success: false, error: adminUpdateError.message }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
+      return jsonResponse(
+        { success: false, error: adminUpdateError.message },
+        400,
       );
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: true });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    return jsonResponse({ success: false, error: error.message }, 500);
   }
+}
+
+export async function POST(request) {
+  return handleResetPassword(request);
 }

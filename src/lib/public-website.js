@@ -191,12 +191,20 @@ export async function getPublicWebsiteBySlug(slug) {
 }
 
 export async function listPublishedPublicWebsiteSlugs(limit = 5000) {
-  const { data, error } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("slug, updated_at")
-    .eq("published", true)
-    .order("updated_at", { ascending: false })
-    .limit(limit);
+  let data = [];
+  let error = null;
+
+  try {
+    ({ data, error } = await supabaseAdmin
+      .from("contractor_websites")
+      .select("slug, updated_at")
+      .eq("published", true)
+      .order("updated_at", { ascending: false })
+      .limit(limit));
+  } catch (queryError) {
+    console.error("[public-website] listPublishedPublicWebsiteSlugs", queryError);
+    return [];
+  }
 
   if (error) {
     console.error("[public-website] listPublishedPublicWebsiteSlugs", error);
