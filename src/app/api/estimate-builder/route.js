@@ -10,14 +10,31 @@ import {
 
 // Tabla relacional: estimate_builder
 
+/**
+ * See estimate-builder-records.js for the table layout. Numbering follows the
+ * same max-suffix-plus-one strategy used by /api/estimates so that concurrent
+ * creates don't collide.
+ */
 async function nextEstimateBuilderNumber(tenantId) {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("estimate_builder")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+    .select("estimate_number")
+    .eq("tenant_id", tenantId)
+    .ilike("estimate_number", "EST-%")
+    .order("estimate_number", { ascending: false })
+    .limit(50);
 
   if (error) throw new Error(error.message);
-  return `EST-${String(Number(count || 0) + 1).padStart(4, "0")}`;
+
+  let max = 0;
+  for (const row of data || []) {
+    const match = String(row.estimate_number || "").match(/^EST-(\d+)$/i);
+    if (match) {
+      const n = Number(match[1]);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return `EST-${String(max + 1).padStart(4, "0")}`;
 }
 
 const serialize = (doc) => {
@@ -108,28 +125,62 @@ export async function POST(request) {
       );
     }
 
-    const estimateNumber = String(body.estimate_number || body.estimateNumber || "").trim() ||
-      await nextEstimateBuilderNumber(tenantDbId);
+    const userProvidedNumber = String(
+      body.estimate_number || body.estimateNumber || "",
+    ).trim();
 
-    const toInsert = buildEstimateBuilderInsertRow(body, {
-      tenantDbId,
-      userId,
-      estimateNumber,
-    });
+    // Retry on unique-constraint violation so concurrent creates don't
+    // collide on the same EST-#### (paired with the partial unique index
+    // added in 20260528200000).
+    let data = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const estimateNumber =
+        attempt === 0 && userProvidedNumber
+          ? userProvidedNumber
+          : await nextEstimateBuilderNumber(tenantDbId);
 
-    const { data, error } = await supabaseAdmin
-      .from("estimate_builder")
-      .insert(toInsert)
-      .select("*")
-      .single();
+      const toInsert = buildEstimateBuilderInsertRow(body, {
+        tenantDbId,
+        userId,
+        estimateNumber,
+      });
 
-    if (error) {
+      const insertResult = await supabaseAdmin
+        .from("estimate_builder")
+        .insert(toInsert)
+        .select("*")
+        .single();
+
+      if (!insertResult.error) {
+        data = insertResult.data;
+        lastError = null;
+        break;
+      }
+      lastError = insertResult.error;
+      const code = String(insertResult.error.code || "");
+      const msg = String(insertResult.error.message || "");
+      const isUniqueViolation = code === "23505" || /duplicate key value/i.test(msg);
+      if (!isUniqueViolation) break;
+      if (userProvidedNumber && attempt === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Estimate number ${userProvidedNumber} is already in use.`,
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    if (lastError) {
       console.error(
         "[api/estimate-builder][POST] Supabase insert error",
-        error,
+        lastError,
       );
-      throw new Error(error.message);
+      throw new Error(lastError.message);
     }
+    if (!data) throw new Error("Failed to allocate a unique estimate number");
 
     return new Response(
       JSON.stringify({ success: true, data: serialize(data) }),
