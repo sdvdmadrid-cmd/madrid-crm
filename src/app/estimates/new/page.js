@@ -146,6 +146,12 @@ function NewEstimatePageInner() {
   // The user typed a tax rate manually — stop auto-filling from state.
   const taxRateManualRef = useRef(false);
 
+  // Existing-client picker. The picker is purely additive: contractors
+  // can still type a fresh client by hand and ignore the suggestions.
+  const [clients, setClients] = useState([]);
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+
   const basePriceNumber = useMemo(() => Math.max(0, toNumber(basePrice, 0)), [basePrice]);
   const discountNumber = useMemo(() => Math.max(0, toNumber(discount, 0)), [discount]);
   const discountAmount = useMemo(() => {
@@ -164,6 +170,66 @@ function NewEstimatePageInner() {
     return Number(((subtotal * rate) / 100).toFixed(2));
   }, [subtotal, taxRate]);
   const estimateTotal = useMemo(() => Number((subtotal + taxAmount).toFixed(2)), [subtotal, taxAmount]);
+
+  // Load the contractor's clients once for the picker. Failures here are
+  // non-fatal — the form still works without suggestions.
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch("/api/clients")
+      .then((r) => r.json())
+      .then((payload) => {
+        if (cancelled) return;
+        const list = Array.isArray(payload) ? payload : payload?.data || [];
+        setClients(list);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const clientSuggestions = useMemo(() => {
+    const q = clientQuery.trim().toLowerCase();
+    if (!q) return clients.slice(0, 6);
+    return clients
+      .filter((c) => {
+        const hay = `${c.name || ""} ${c.email || ""} ${c.phone || ""} ${c.address || ""}`
+          .toLowerCase();
+        return hay.includes(q);
+      })
+      .slice(0, 8);
+  }, [clientQuery, clients]);
+
+  function applyClient(client) {
+    if (!client) return;
+    const nameParts = String(client.name || "").trim().split(/\s+/);
+    setClientFirstName(nameParts[0] || "");
+    setClientLastName(nameParts.slice(1).join(" "));
+    setClientEmail(String(client.email || "").trim());
+    setClientPhone(String(client.phone || "").trim());
+
+    setStreetName(String(client.address || "").trim());
+    setCity(String(client.city || "").trim());
+    setStateField(String(client.state || "").trim().toUpperCase().slice(0, 2));
+    setZipCode(String(client.zip || client.zipCode || "").trim());
+
+    const billingSame =
+      client.billing_same_as_service === undefined
+        ? true
+        : Boolean(client.billing_same_as_service);
+    setSameAsBilling(billingSame);
+    if (!billingSame) {
+      setBillingStreetName(String(client.billing_address || "").trim());
+      setBillingCity(String(client.billing_city || "").trim());
+      setBillingState(
+        String(client.billing_state || "").trim().toUpperCase().slice(0, 2),
+      );
+      setBillingZip(String(client.billing_zip || "").trim());
+    }
+
+    setClientPickerOpen(false);
+    setClientQuery(`${client.name || ""}${client.email ? ` <${client.email}>` : ""}`);
+  }
 
   useEffect(() => {
     if (!editId) return;
@@ -493,7 +559,58 @@ function NewEstimatePageInner() {
         ) : null}
 
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-500">Client</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Client</h2>
+            {clients.length > 0 ? (
+              <span className="text-xs text-slate-400">
+                {clients.length} saved client{clients.length === 1 ? "" : "s"}
+              </span>
+            ) : null}
+          </div>
+
+          {clients.length > 0 ? (
+            <div className="relative mb-3">
+              <input
+                type="text"
+                value={clientQuery}
+                onChange={(e) => {
+                  setClientQuery(e.target.value);
+                  setClientPickerOpen(true);
+                }}
+                onFocus={() => setClientPickerOpen(true)}
+                onBlur={() => setTimeout(() => setClientPickerOpen(false), 150)}
+                placeholder="Search existing clients by name, email, or phone…"
+                aria-label="Search existing clients"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none focus:border-slate-400 focus:bg-white"
+              />
+              {clientPickerOpen && clientSuggestions.length > 0 ? (
+                <ul
+                  role="listbox"
+                  aria-label="Existing client suggestions"
+                  className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+                >
+                  {clientSuggestions.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          applyClient(c);
+                        }}
+                        className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
+                      >
+                        <div className="font-semibold text-slate-800">{c.name || "(no name)"}</div>
+                        <div className="text-xs text-slate-500">
+                          {[c.email, c.phone, c.address].filter(Boolean).join(" · ") || "—"}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
             <select
               value={clientPrefix}
