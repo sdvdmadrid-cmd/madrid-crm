@@ -399,8 +399,17 @@ export default function EstimateClientPage() {
           </div>
         ) : null}
 
-        {/* Print button */}
-        <div className="mt-6 text-center print:hidden">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-4 print:hidden">
+          {accessToken ? (
+            <a
+              href={`/api/estimates/${id}/public/pdf?token=${encodeURIComponent(accessToken)}`}
+              target="_blank"
+              rel="noopener"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Download PDF
+            </a>
+          ) : null}
           <button
             type="button"
             onClick={() => window.print()}

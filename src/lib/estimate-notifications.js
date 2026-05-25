@@ -1,4 +1,5 @@
 import { buildPublicEstimateLink } from "@/lib/estimate-public-access";
+import { buildEstimateEmailAttachments } from "@/lib/estimate-email-attachments";
 import { sendEmail } from "@/lib/email";
 import { sendTextMessage } from "@/lib/sms";
 
@@ -50,10 +51,15 @@ export async function deliverEstimateNotifications({
 
   if (sendViaEmail && estimate.clientEmail && estimateLink) {
     result.email.attempted = true;
+    // Build the PDF attachment fail-soft: a failed PDF render emits a
+    // console warning and resolves to an empty attachment list, so the
+    // email itself still goes out.
+    const attachments = await buildEstimateEmailAttachments(estimate);
     try {
       const emailResult = await sendEmail({
         to: [estimate.clientEmail],
         subject: `Your Estimate is Ready — ${estimate.estimateNumber || estimate.id}`,
+        attachments,
         text: `Hi ${clientName},\n\nYour estimate for ${total} is ready for review.\n\nView and respond here:\n${estimateLink}\n\nThank you!`,
         html: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
