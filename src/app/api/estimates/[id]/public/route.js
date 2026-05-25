@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -102,6 +103,10 @@ export async function GET(request, { params }) {
       total,
     });
 
+  // Paquete E: surface contractor branding so the public estimate view
+  // can render the company logo + name in the customer-facing page.
+  const branding = await getEstimateBrandingByTenant(data.tenant_id);
+
   return json({
     success: true,
     data: {
@@ -123,6 +128,11 @@ export async function GET(request, { params }) {
       signature: parsedNotes.audit?.signature || null,
       createdAt: data.created_at || null,
       updatedAt: data.updated_at || null,
+      branding: {
+        companyName: branding.companyName || "",
+        logoUrl: branding.logoUrl || "",
+        logoPlacement: branding.logoPlacement || "top_left",
+      },
     },
   });
 }

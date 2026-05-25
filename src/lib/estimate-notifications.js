@@ -1,3 +1,7 @@
+import {
+  getEstimateBrandingByTenant,
+  renderLogoEmailHeader,
+} from "@/lib/estimate-email-branding";
 import { buildPublicEstimateLink } from "@/lib/estimate-public-access";
 import { buildEstimateEmailAttachments } from "@/lib/estimate-email-attachments";
 import { sendEmail } from "@/lib/email";
@@ -49,6 +53,13 @@ export async function deliverEstimateNotifications({
   }).format(estimate.total || 0);
   const clientName = estimate.clientName || "Friend";
 
+  // Pull contractor branding (logo + placement) so the customer sees the
+  // company's identity in the email instead of an unbranded notice. Failures
+  // here fall back to no logo — the email still goes out.
+  const branding = await getEstimateBrandingByTenant(estimate.tenantId);
+  const logoHeader = renderLogoEmailHeader(branding);
+  const senderName = branding.companyName || "your contractor";
+
   if (sendViaEmail && estimate.clientEmail && estimateLink) {
     result.email.attempted = true;
     // Build the PDF attachment fail-soft: a failed PDF render emits a
@@ -60,12 +71,17 @@ export async function deliverEstimateNotifications({
         to: [estimate.clientEmail],
         subject: `Your Estimate is Ready — ${estimate.estimateNumber || estimate.id}`,
         attachments,
-        text: `Hi ${clientName},\n\nYour estimate for ${total} is ready for review.\n\nView and respond here:\n${estimateLink}\n\nThank you!`,
+        text: `Hi ${clientName},\n\nYour estimate from ${senderName} for ${total} is ready for review.\n\nView and respond here:\n${estimateLink}\n\nThank you!`,
         html: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
+            ${logoHeader}
             <h2 style="color:#0f172a;margin-bottom:8px">Your Estimate is Ready</h2>
             <p style="color:#475569;margin-bottom:16px">Hi ${clientName},</p>
-            <p style="color:#475569">Your estimate has been prepared. Please review the details and let us know how you'd like to proceed.</p>
+            <p style="color:#475569">${
+              branding.companyName
+                ? `Your estimate from <strong>${branding.companyName.replace(/</g, "&lt;")}</strong> has been prepared.`
+                : "Your estimate has been prepared."
+            } Please review the details and let us know how you'd like to proceed.</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:20px 0">
               <div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em">Total</div>
               <div style="color:#0f172a;font-size:24px;font-weight:700">${total}</div>
@@ -93,9 +109,12 @@ export async function deliverEstimateNotifications({
   if (sendViaText && estimate.clientPhone && estimateLink) {
     result.sms.attempted = true;
     try {
+      const smsText = branding.companyName
+        ? `${branding.companyName}: your estimate for ${total} is ready: ${estimateLink}`
+        : `Your estimate for ${total} is ready: ${estimateLink}`;
       const smsResult = await sendTextMessage({
         to: estimate.clientPhone,
-        text: `Your estimate for ${total} is ready: ${estimateLink}`,
+        text: smsText,
       });
       if (smsResult?.success === false) {
         result.sms.error = String(
