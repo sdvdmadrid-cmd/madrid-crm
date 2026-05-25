@@ -35,9 +35,10 @@ async function checkRoute({ path, expect, json }) {
   }
   if (path === "/login" && res.ok) {
     const html = await res.text().catch(() => "");
-    const m = html.match(/data-fieldbase-build="([a-f0-9]{7,12})"/i);
-    detail = `${detail} htmlBuild=${m?.[1] || "missing"}`;
-    if (!m?.[1]) {
+    const hasBuildBadge =
+      html.includes("data-fieldbase-build") || html.includes("prod ·");
+    detail = `${detail} buildBadge=${hasBuildBadge ? "present" : "absent"}`;
+    if (hasBuildBadge) {
       return { path, status: res.status, pass: false, detail };
     }
   }

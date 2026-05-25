@@ -304,7 +304,8 @@ export default function MarketingPage() {
     fetch("/api/auth/me", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.user || data?.userId || data?.id) {
+        const user = data?.data || data?.user || data || {};
+        if (user?.userId || user?.id || user?.email) {
           router.replace("/dashboard");
         }
       })

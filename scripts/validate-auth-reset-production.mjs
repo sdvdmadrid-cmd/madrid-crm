@@ -54,6 +54,16 @@ function checkEnvVar(name, { required = true, secret = false } = {}) {
   return value;
 }
 
+function getSupabasePublicKeyEnv() {
+  const publishable = String(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "").trim();
+  if (publishable) {
+    return { name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", value: publishable, legacy: false };
+  }
+
+  const anon = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim();
+  return { name: anon ? "NEXT_PUBLIC_SUPABASE_ANON_KEY" : "", value: anon, legacy: Boolean(anon) };
+}
+
 async function checkHealth() {
   const response = await fetch(`${BASE_URL}/api/health`, { cache: "no-store" });
   const body = await readJson(response);
@@ -61,7 +71,9 @@ async function checkHealth() {
     fail("/api/health healthy", `status=${response.status}`);
     return;
   }
-  ok("/api/health healthy", `commit=${body.commitSha || "unknown"}`);
+  const keyEnv = body.supabasePublicKeyEnv ? ` supabaseKey=${body.supabasePublicKeyEnv}` : "";
+  const legacy = body.usingLegacySupabaseAnonKey ? " legacyAnon=true" : "";
+  ok("/api/health healthy", `commit=${body.commitSha || "unknown"}${keyEnv}${legacy}`);
 }
 
 async function checkResetPage() {
@@ -243,6 +255,22 @@ console.log(`Auth reset validation target: ${BASE_URL}`);
 
 const appUrl = checkEnvVar("APP_URL", { required: false });
 const appBaseUrl = checkEnvVar("APP_BASE_URL", { required: false });
+checkEnvVar("NEXT_PUBLIC_SUPABASE_URL", { required: false });
+const supabasePublicKey = getSupabasePublicKeyEnv();
+if (supabasePublicKey.value) {
+  ok(`${supabasePublicKey.name} configured`, "present");
+  if (supabasePublicKey.legacy) {
+    warn(
+      "Supabase public key uses legacy env name",
+      "set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in Vercel production",
+    );
+  }
+} else {
+  warn(
+    "Supabase public key configured",
+    "missing NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY and legacy NEXT_PUBLIC_SUPABASE_ANON_KEY in this shell",
+  );
+}
 const emailProvider = checkEnvVar("EMAIL_PROVIDER", { required: false });
 const emailFrom = checkEnvVar("EMAIL_FROM", { required: false });
 checkEnvVar("RESEND_API_KEY", {

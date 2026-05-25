@@ -41,6 +41,18 @@ Production guardrails already enforced in code:
 - `EMAIL_FROM` cannot use `example.com`
 - `EMAIL_FROM` cannot use `resend.dev`
 
+## Supabase public key naming
+
+Use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Vercel Production. Supabase may
+label this value as the project "anon" or "publishable" key in the dashboard.
+The runtime accepts `NEXT_PUBLIC_SUPABASE_ANON_KEY` as a legacy fallback so older
+deployments do not break, but startup validation warns until the publishable-key
+name is set.
+
+Do not set `SUPABASE_URL` to a different project than
+`NEXT_PUBLIC_SUPABASE_URL`. Production startup validation checks that the URL
+project ref matches the Supabase JWT refs when the keys expose a `ref` claim.
+
 ## Must Have If Plaid Linking Is Live
 
 - `PLAID_CLIENT_ID`

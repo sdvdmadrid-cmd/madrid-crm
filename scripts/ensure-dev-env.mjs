@@ -8,7 +8,6 @@ const examplePath = resolve(root, ".env.example");
 
 const REQUIRED_KEYS = [
   "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "SESSION_SECRET",
   "APP_URL",
@@ -88,6 +87,21 @@ if (additions.length > 0) {
 
 const refreshed = parseEnv(readFileSync(envPath, "utf8"));
 const missing = REQUIRED_KEYS.filter((key) => !refreshed.get(key));
+if (
+  !refreshed.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") &&
+  !refreshed.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+) {
+  missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+}
+
+if (
+  refreshed.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") &&
+  !refreshed.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+) {
+  console.warn(
+    "[ensure-dev-env] NEXT_PUBLIC_SUPABASE_ANON_KEY is supported as a legacy fallback; prefer NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+  );
+}
 
 if (missing.length > 0) {
   console.error(

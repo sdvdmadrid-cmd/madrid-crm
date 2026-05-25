@@ -1,5 +1,11 @@
 import "server-only";
 
+import {
+  decodeSupabaseJwtRef,
+  getSupabaseProjectRefFromUrl,
+  getSupabasePublicKeyEnv,
+} from "@/lib/supabase-public-config";
+
 /**
  * Production environment validation
  * Ensures critical configurations are set for safe production deployment
@@ -37,6 +43,31 @@ export function validateProductionConfig() {
     errors.push("ENCRYPTION_KEY not configured (cannot encrypt Plaid tokens)");
   }
 
+  // === CRITICAL: Supabase runtime identity ===
+  const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const serverSupabaseUrl = String(process.env.SUPABASE_URL || "").trim();
+  const publicKey = getSupabasePublicKeyEnv();
+
+  if (!validateEnvVar("NEXT_PUBLIC_SUPABASE_URL", "Supabase project URL", true)) {
+    errors.push("NEXT_PUBLIC_SUPABASE_URL not configured");
+  }
+
+  if (!publicKey.key) {
+    errors.push(
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY not configured (legacy fallback NEXT_PUBLIC_SUPABASE_ANON_KEY also missing)",
+    );
+  } else if (publicKey.usingLegacyAnonKey) {
+    warnings.push(
+      "Using legacy NEXT_PUBLIC_SUPABASE_ANON_KEY fallback; set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in Vercel production",
+    );
+  }
+
+  if (serverSupabaseUrl && supabaseUrl && serverSupabaseUrl !== supabaseUrl) {
+    errors.push(
+      "SUPABASE_URL and NEXT_PUBLIC_SUPABASE_URL point to different projects/URLs",
+    );
+  }
+
   // === CRITICAL: Third-party Services ===
   if (!validateEnvVar("STRIPE_SECRET_KEY", "Stripe API key", true)) {
     errors.push("STRIPE_SECRET_KEY not configured");
@@ -50,6 +81,20 @@ export function validateProductionConfig() {
     true
   )) {
     errors.push("SUPABASE_SERVICE_ROLE_KEY not configured");
+  }
+
+  const urlProjectRef = getSupabaseProjectRefFromUrl(supabaseUrl || serverSupabaseUrl);
+  const serviceRoleRef = decodeSupabaseJwtRef(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const publicJwtRef = decodeSupabaseJwtRef(publicKey.key);
+  if (urlProjectRef && serviceRoleRef && urlProjectRef !== serviceRoleRef) {
+    errors.push(
+      `Supabase project mismatch: URL ref ${urlProjectRef} does not match service role ref ${serviceRoleRef}`,
+    );
+  }
+  if (urlProjectRef && publicJwtRef && urlProjectRef !== publicJwtRef) {
+    errors.push(
+      `Supabase project mismatch: URL ref ${urlProjectRef} does not match public key ref ${publicJwtRef}`,
+    );
   }
 
   // === HIGH: Email & Notifications ===
@@ -83,6 +128,12 @@ export function validateProductionConfig() {
   if (devLoginEnabled && process.env.NODE_ENV === "production") {
     errors.push(
       "DEV_LOGIN_ENABLED=true in production! Must be false for security"
+    );
+  }
+
+  if (process.env.NEXT_PUBLIC_AUTH_DEBUG === "1" && process.env.NODE_ENV === "production") {
+    errors.push(
+      "NEXT_PUBLIC_AUTH_DEBUG=1 in production! Must be unset or 0"
     );
   }
 

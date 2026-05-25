@@ -1,17 +1,7 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import { getSupabasePublicConfig } from "@/lib/supabase-public-config";
 
 const authDebugEnabled = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
-
-function getSupabasePublicConfig() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !supabasePublishableKey) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-    );
-  }
-  return { supabaseUrl, supabasePublishableKey };
-}
 
 let browserClientInstance = null;
 
@@ -55,7 +45,12 @@ function cookieNamesFromList(list) {
 export function createSupabaseBrowserAuthClient() {
   if (!browserClientInstance) {
     clearLegacyPersistedSupabaseSession();
-    const { supabaseUrl, supabasePublishableKey } = getSupabasePublicConfig();
+    const {
+      supabaseUrl,
+      supabasePublishableKey,
+      supabasePublicKeyEnv,
+      usingLegacySupabaseAnonKey,
+    } = getSupabasePublicConfig();
 
     browserClientInstance = createBrowserClient(
       supabaseUrl,
@@ -75,6 +70,8 @@ export function createSupabaseBrowserAuthClient() {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         supabaseUrl,
+        supabasePublicKeyEnv,
+        usingLegacySupabaseAnonKey,
         publishableKeyHint: maskToken(supabasePublishableKey),
       });
     }

@@ -36,6 +36,12 @@ const env = readEnv();
 const supabaseUrl = env.get("NEXT_PUBLIC_SUPABASE_URL") || "";
 const publishable = env.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") || "";
 const anon = env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") || "";
+const effectivePublicKey = publishable || anon;
+const effectivePublicKeyName = publishable
+  ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+  : anon
+    ? "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    : "(missing)";
 const serviceRole = env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const appUrl = env.get("APP_URL") || "";
 const appBaseUrl = env.get("APP_BASE_URL") || "";
@@ -43,6 +49,13 @@ const appBaseUrl = env.get("APP_BASE_URL") || "";
 console.log("NEXT_PUBLIC_SUPABASE_URL:", supabaseUrl || "(missing)");
 console.log("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:", mask(publishable));
 console.log("NEXT_PUBLIC_SUPABASE_ANON_KEY:", mask(anon));
+console.log("effective_supabase_public_key:", effectivePublicKeyName);
+if (anon && !publishable) {
+  console.log(
+    "warning:",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY is supported as a legacy fallback; prefer NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+  );
+}
 console.log("SUPABASE_SERVICE_ROLE_KEY:", mask(serviceRole));
 console.log("APP_URL:", appUrl || "(missing)");
 console.log("APP_BASE_URL:", appBaseUrl || "(missing)");
@@ -51,7 +64,7 @@ const refFromUrl = (supabaseUrl.match(/https:\/\/([^.]+)\./) || [])[1] || "(unkn
 console.log("project_ref_from_url:", refFromUrl);
 
 for (const [name, token] of [
-  ["publishable", publishable],
+  ["publishable", effectivePublicKey],
   ["anon", anon],
   ["service_role", serviceRole],
 ]) {

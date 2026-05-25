@@ -24,7 +24,7 @@ export const supabase = new Proxy(
 			const client = getSupabaseClient();
 			if (!client) {
 				throw new Error(
-					"Supabase client is unavailable. Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+					"Supabase client is unavailable. Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (legacy fallback: NEXT_PUBLIC_SUPABASE_ANON_KEY).",
 				);
 			}
 

@@ -117,20 +117,16 @@ async function main() {
   }
 
   const { res: loginRes, text: loginHtml } = await fetchJson("/login");
-  const htmlBuild = loginHtml.match(/data-fieldbase-build="([a-f0-9]{7,40})"/i)?.[1];
+  const hasBuildBadge =
+    loginHtml.includes("data-fieldbase-build") || loginHtml.includes("prod ·");
   const cacheControl = loginRes.headers.get("cache-control") || "";
   if (loginRes.ok) pass("GET /login", String(loginRes.status));
   else fail("GET /login", String(loginRes.status));
 
-  if (htmlBuild) {
-    pass("SSR build marker in HTML", htmlBuild);
-    if (prodSha && !htmlBuild.startsWith(prodSha.slice(0, 12))) {
-      fail("HTML build marker matches /api/health", `html=${htmlBuild} health=${prodSha}`);
-    } else if (prodSha) {
-      pass("HTML build marker matches /api/health");
-    }
+  if (hasBuildBadge) {
+    fail("Production build badge removed from HTML", "legacy build marker still present");
   } else {
-    fail("SSR build marker in HTML", "data-fieldbase-build missing");
+    pass("Production build badge removed from HTML");
   }
 
   if (/no-store|no-cache/i.test(cacheControl)) {

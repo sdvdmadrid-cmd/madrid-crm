@@ -1,16 +1,18 @@
 import { getSessionSecretHealth } from "@/lib/session-secret";
+import { getSupabasePublicKeyEnv } from "@/lib/supabase-public-config";
 import { getTurnstileStatus } from "@/lib/turnstile";
 
 const MIN_SECRET_LENGTH = Number(process.env.SESSION_SECRET_MIN_LENGTH || 32);
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SUPABASE_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
-
 async function checkSupabase() {
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  const publicKey = getSupabasePublicKeyEnv();
+  if (!SUPABASE_URL || !publicKey.key) {
     return {
       ok: false,
-      reason: "Missing Supabase URL or publishable key",
+      reason:
+        "Missing Supabase URL or public key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY or legacy NEXT_PUBLIC_SUPABASE_ANON_KEY)",
+      publicKeyEnv: publicKey.envName || null,
+      usingLegacyAnonKey: publicKey.usingLegacyAnonKey,
     };
   }
 
@@ -18,7 +20,7 @@ async function checkSupabase() {
     const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
       method: "GET",
       headers: {
-        apikey: SUPABASE_PUBLISHABLE_KEY,
+        apikey: publicKey.key,
       },
       cache: "no-store",
     });
@@ -28,11 +30,16 @@ async function checkSupabase() {
       reason: response.ok
         ? "ok"
         : `Supabase health returned ${response.status}`,
+      publicKeyEnv: publicKey.envName,
+      usingLegacyAnonKey: publicKey.usingLegacyAnonKey,
     };
   } catch (error) {
+    const publicKey = getSupabasePublicKeyEnv();
     return {
       ok: false,
       reason: error?.message || "Supabase request failed",
+      publicKeyEnv: publicKey.envName || null,
+      usingLegacyAnonKey: publicKey.usingLegacyAnonKey,
     };
   }
 }
@@ -104,6 +111,8 @@ export async function GET() {
           status: "degraded",
           commitSha: commitSha ? String(commitSha).slice(0, 12) : null,
           [dbLabel]: dbHealthy ? "ok" : "error",
+          supabasePublicKeyEnv: dbStatus.publicKeyEnv || null,
+          usingLegacySupabaseAnonKey: dbStatus.usingLegacyAnonKey === true,
           auth: authHealthy ? "ok" : "error",
           responseMs: Date.now() - startedAt,
           timestamp: new Date().toISOString(),
@@ -124,6 +133,8 @@ export async function GET() {
           String(process.env.STRIPE_CONNECT_ENABLED || "").toLowerCase() ===
           "true",
         turnstile: getTurnstileStatus(),
+        supabasePublicKeyEnv: dbStatus.publicKeyEnv || null,
+        usingLegacySupabaseAnonKey: dbStatus.usingLegacyAnonKey === true,
         uptimeSeconds: Math.floor(process.uptime()),
         responseMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),

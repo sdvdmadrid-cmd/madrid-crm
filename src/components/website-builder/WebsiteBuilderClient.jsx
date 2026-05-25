@@ -862,12 +862,37 @@ export default function WebsiteBuilderClient() {
     setPublishing(true);
     const newPublished = !published;
     try {
+      const snapshot = {
+        ...(formRef.current || form),
+        siteMeta,
+      };
+      await handleSave(snapshot, { silent: true });
+      const latestSnapshot = {
+        ...(formRef.current || snapshot),
+        siteMeta,
+      };
+      const pack = getWebsiteBuilderPack(industryKey);
+      const sanitized = sanitizeIndustryWebsiteContent(
+        latestSnapshot,
+        pack,
+        companyProfile || {},
+      );
       const res = await apiFetch("/api/website-builder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, siteMeta, published: newPublished }),
+        body: JSON.stringify({
+          ...latestSnapshot,
+          ...sanitized,
+          heroPhotos: latestSnapshot.heroPhotos,
+          galleryPhotos: latestSnapshot.galleryPhotos,
+          siteMeta,
+          published: newPublished,
+        }),
       });
-      await getJsonOrThrow(res, t.errorSave);
+      const payload = await getJsonOrThrow(res, t.errorSave);
+      if (payload?.data) {
+        applyApiPayload(payload.data);
+      }
       setPublished(newPublished);
       showNotice(newPublished ? t.publishedBadge : t.draftBadge);
     } catch (err) {
@@ -875,7 +900,17 @@ export default function WebsiteBuilderClient() {
     } finally {
       setPublishing(false);
     }
-  }, [published, form, t, showNotice]);
+  }, [
+    published,
+    form,
+    siteMeta,
+    handleSave,
+    industryKey,
+    companyProfile,
+    t,
+    showNotice,
+    applyApiPayload,
+  ]);
 
   const setField = useCallback((key, value) => {
     setForm((prev) => {
