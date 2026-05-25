@@ -502,19 +502,13 @@ export default function EstimatesPage() {
                     Client link
                   </a>
                   <a
-                    href={selectedEstimate.publicLink || "#"}
+                    href={`/api/estimates/${selectedEstimate.id}/pdf`}
                     target="_blank"
                     rel="noreferrer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (!selectedEstimate.publicLink) return;
-                      const w = window.open(selectedEstimate.publicLink, "_blank");
-                      w?.addEventListener("load", () => w.print());
-                    }}
                     className={ws.btnSecondary}
                     style={{ flex: 1, textAlign: "center", textDecoration: "none" }}
                   >
-                    Print / PDF
+                    Download PDF
                   </a>
                 </div>
               </div>

@@ -61,7 +61,39 @@ export function normalizeRecipients(recipients = []) {
   return valid;
 }
 
-async function sendWithResend({ to, subject, html, text, metadata }) {
+/**
+ * Normalize an attachment payload into the shape Resend expects:
+ *   { filename, content: base64string, contentType }
+ * Accepts Buffer or base64 string. Drops malformed entries silently so a
+ * bad attachment can never block the email itself.
+ */
+function normalizeAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  const out = [];
+  for (const att of attachments) {
+    if (!att || typeof att !== "object") continue;
+    const filename = String(att.filename || "").trim();
+    if (!filename) continue;
+    let base64 = "";
+    if (Buffer.isBuffer(att.content)) {
+      base64 = att.content.toString("base64");
+    } else if (typeof att.content === "string") {
+      // Assume already base64-encoded.
+      base64 = att.content;
+    } else if (att.content && typeof att.content.byteLength === "number") {
+      base64 = Buffer.from(att.content).toString("base64");
+    }
+    if (!base64) continue;
+    out.push({
+      filename,
+      content: base64,
+      content_type: String(att.contentType || "application/octet-stream"),
+    });
+  }
+  return out;
+}
+
+async function sendWithResend({ to, subject, html, text, metadata, attachments }) {
   const configError = validateResendConfig();
   if (configError) {
     return {
@@ -76,6 +108,8 @@ async function sendWithResend({ to, subject, html, text, metadata }) {
     : 4000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  const resendAttachments = normalizeAttachments(attachments);
 
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -97,6 +131,7 @@ async function sendWithResend({ to, subject, html, text, metadata }) {
             ? [{ name: "campaignId", value: String(metadata.campaignId) }]
             : []),
         ],
+        ...(resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
       }),
     });
 
@@ -137,9 +172,9 @@ function sendWithMock() {
   };
 }
 
-export async function sendEmail({ to, subject, html, text, metadata }) {
+export async function sendEmail({ to, subject, html, text, metadata, attachments }) {
   if (EMAIL_PROVIDER === "resend") {
-    return sendWithResend({ to, subject, html, text, metadata });
+    return sendWithResend({ to, subject, html, text, metadata, attachments });
   }
 
   if (EMAIL_PROVIDER === "mock") {
