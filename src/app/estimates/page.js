@@ -55,6 +55,49 @@ export default function EstimatesPage() {
   const [sendingEmailId, setSendingEmailId] = useState("");
   const [duplicatingId, setDuplicatingId] = useState("");
 
+  // Contract generation modal state. Surfaces a small inline form so the
+  // contractor can pick a category before we POST to the contract endpoint.
+  const [contractEstimate, setContractEstimate] = useState(null);
+  const [contractCategory, setContractCategory] = useState("Service");
+  const [contractOption, setContractOption] = useState("");
+  const [contractLanguage, setContractLanguage] = useState("en");
+  const [contractBusy, setContractBusy] = useState(false);
+  const [contractMessage, setContractMessage] = useState("");
+
+  async function generateContract() {
+    if (!contractEstimate?.id || contractBusy) return;
+    setContractBusy(true);
+    setContractMessage("");
+    try {
+      const res = await apiFetch(`/api/estimates/${contractEstimate.id}/contract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: contractCategory || "Service",
+          option: contractOption || "",
+          language: contractLanguage || "en",
+          persist: true,
+        }),
+      });
+      const payload = await getJsonOrThrow(res, "Unable to generate contract.");
+      const contractId = payload?.data?.contract?.id;
+      setContractMessage(
+        contractId
+          ? `Contract saved (#${String(contractId).slice(0, 8)}). Open it from the Contracts page.`
+          : "Contract draft saved.",
+      );
+      // Auto-dismiss after 6s so the panel doesn't stay stuck open.
+      setTimeout(() => {
+        setContractEstimate(null);
+        setContractMessage("");
+      }, 6000);
+    } catch (err) {
+      setContractMessage(err?.message || "Unable to generate contract.");
+    } finally {
+      setContractBusy(false);
+    }
+  }
+
   // History for the currently-selected estimate (paquete J). We fetch it
   // on demand only when the detail panel is open, so the list view stays
   // light.
@@ -601,13 +644,13 @@ export default function EstimatesPage() {
                     </button>
                   </div>
                 )}
-                <div style={{ marginTop: 12, display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(148,163,184,0.12)" }}>
+                <div style={{ marginTop: 12, display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(148,163,184,0.12)", flexWrap: "wrap" }}>
                   <a
                     href={selectedEstimate.publicLink || "#"}
                     target="_blank"
                     rel="noreferrer"
                     className={ws.btnSecondary}
-                    style={{ flex: 1, textAlign: "center", textDecoration: "none", opacity: selectedEstimate.publicLink ? 1 : 0.5, pointerEvents: selectedEstimate.publicLink ? "auto" : "none" }}
+                    style={{ flex: "1 1 110px", textAlign: "center", textDecoration: "none", opacity: selectedEstimate.publicLink ? 1 : 0.5, pointerEvents: selectedEstimate.publicLink ? "auto" : "none" }}
                   >
                     Client link
                   </a>
@@ -616,11 +659,132 @@ export default function EstimatesPage() {
                     target="_blank"
                     rel="noreferrer"
                     className={ws.btnSecondary}
-                    style={{ flex: 1, textAlign: "center", textDecoration: "none" }}
+                    style={{ flex: "1 1 110px", textAlign: "center", textDecoration: "none" }}
                   >
                     Download PDF
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContractEstimate(selectedEstimate);
+                      setContractCategory("Service");
+                      setContractOption("");
+                      setContractLanguage("en");
+                      setContractMessage("");
+                    }}
+                    className={ws.btnSecondary}
+                    style={{ flex: "1 1 110px", textAlign: "center" }}
+                  >
+                    Generate contract
+                  </button>
                 </div>
+
+                {contractEstimate?.id === selectedEstimate.id ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      padding: 12,
+                      background: "#0b1220",
+                      border: "1px solid rgba(96,165,250,0.4)",
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                      Contract from estimate {selectedEstimate.estimateNumber || ""}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <label style={{ fontSize: 12, color: "#94a3b8" }}>
+                        Category
+                        <input
+                          type="text"
+                          value={contractCategory}
+                          onChange={(e) => setContractCategory(e.target.value)}
+                          placeholder="Snowplowing, Roofing…"
+                          style={{
+                            width: "100%",
+                            marginTop: 4,
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            border: "1px solid rgba(148,163,184,0.3)",
+                            background: "#111827",
+                            color: "#e2e8f0",
+                          }}
+                        />
+                      </label>
+                      <label style={{ fontSize: 12, color: "#94a3b8" }}>
+                        Option (optional)
+                        <input
+                          type="text"
+                          value={contractOption}
+                          onChange={(e) => setContractOption(e.target.value)}
+                          placeholder="e.g. Seasonal contract"
+                          style={{
+                            width: "100%",
+                            marginTop: 4,
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            border: "1px solid rgba(148,163,184,0.3)",
+                            background: "#111827",
+                            color: "#e2e8f0",
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginTop: 8 }}>
+                      Language
+                      <select
+                        value={contractLanguage}
+                        onChange={(e) => setContractLanguage(e.target.value)}
+                        style={{
+                          width: 140,
+                          marginTop: 4,
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                          border: "1px solid rgba(148,163,184,0.3)",
+                          background: "#111827",
+                          color: "#e2e8f0",
+                        }}
+                      >
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="pl">Polski</option>
+                      </select>
+                    </label>
+                    <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={generateContract}
+                        disabled={contractBusy}
+                        className={ws.btnPrimary}
+                        style={{ opacity: contractBusy ? 0.7 : 1 }}
+                      >
+                        {contractBusy ? "Generating…" : "Save contract"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContractEstimate(null);
+                          setContractMessage("");
+                        }}
+                        disabled={contractBusy}
+                        className={ws.btnSecondary}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {contractMessage ? (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          fontSize: 12,
+                          color: contractMessage.toLowerCase().includes("unable") ? "#fca5a5" : "#86efac",
+                        }}
+                      >
+                        {contractMessage}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           </>

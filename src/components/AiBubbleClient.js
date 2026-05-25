@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
@@ -60,7 +61,8 @@ const TEXT = {
       proposal: "Proposal generator",
       crm: "CRM summary",
       reply: "Client reply",
-      schedule: "Scheduling",
+      schedule: "Schedule a job",
+      estimate: "Draft an estimate",
       flags: "Feature flag changes",
     },
     applied: "Suggested feature flags were applied.",
@@ -70,6 +72,17 @@ const TEXT = {
     applyPatches: "Apply suggested edits",
     patchesApplied: "Suggestions applied to your website draft.",
     runFullGenerate: "Generate full website",
+    schedulePlaceholder: "e.g. Schedule snowplowing for John on Maple St tomorrow 9am",
+    estimatePlaceholder: "e.g. Estimate snowplowing for 3 driveways on Maple St, two large",
+    scheduleConfirm: "Create appointment",
+    scheduleConfirming: "Creating…",
+    scheduleCreated: "Appointment created.",
+    scheduleSyncedGoogle: "Synced to Google Calendar.",
+    scheduleSyncFailed: "Google Calendar sync skipped.",
+    scheduleMissing: "Please fill in the missing fields before creating.",
+    estimateOpenForm: "Open in estimate form",
+    estimateDraftReady: "Draft ready — review and save in the estimate form.",
+    cancel: "Cancel",
   },
   es: {
     open: "IA",
@@ -89,7 +102,8 @@ const TEXT = {
       proposal: "Generador de propuesta",
       crm: "Resumen CRM",
       reply: "Respuesta a cliente",
-      schedule: "Agenda",
+      schedule: "Agendar un trabajo",
+      estimate: "Crear un estimado",
       flags: "Cambios de feature flags",
     },
     applied: "Se aplicaron los feature flags sugeridos.",
@@ -99,6 +113,17 @@ const TEXT = {
     applyPatches: "Aplicar sugerencias",
     patchesApplied: "Sugerencias aplicadas al borrador.",
     runFullGenerate: "Generar sitio completo",
+    schedulePlaceholder: "ej. Agendame snowplowing con Juan en Maple St mañana 9am",
+    estimatePlaceholder: "ej. Estimado de snowplowing para 3 driveways en Maple St, dos grandes",
+    scheduleConfirm: "Crear cita",
+    scheduleConfirming: "Creando…",
+    scheduleCreated: "Cita creada.",
+    scheduleSyncedGoogle: "Sincronizada con Google Calendar.",
+    scheduleSyncFailed: "No se sincronizo con Google Calendar.",
+    scheduleMissing: "Por favor completa los campos faltantes antes de crear.",
+    estimateOpenForm: "Abrir en formulario de estimado",
+    estimateDraftReady: "Borrador listo — revisa y guarda en el formulario.",
+    cancel: "Cancelar",
   },
   pl: {
     open: "AI",
@@ -118,7 +143,8 @@ const TEXT = {
       proposal: "Generator oferty",
       crm: "Podsumowanie CRM",
       reply: "Odpowiedz klientowi",
-      schedule: "Planowanie",
+      schedule: "Zaplanuj zlecenie",
+      estimate: "Wstepny kosztorys",
       flags: "Zmiany feature flag",
     },
     applied: "Zastosowano sugerowane feature flagi.",
@@ -128,6 +154,17 @@ const TEXT = {
     applyPatches: "Zastosuj sugestie",
     patchesApplied: "Sugestie zastosowane w szkicu strony.",
     runFullGenerate: "Wygeneruj cala strone",
+    schedulePlaceholder: "np. Zaplanuj odsniezanie z Janem na Maple St jutro 9:00",
+    estimatePlaceholder: "np. Kosztorys odsniezania 3 podjazdow na Maple St, dwa duze",
+    scheduleConfirm: "Utworz spotkanie",
+    scheduleConfirming: "Tworzenie…",
+    scheduleCreated: "Spotkanie utworzone.",
+    scheduleSyncedGoogle: "Zsynchronizowano z Google Calendar.",
+    scheduleSyncFailed: "Nie zsynchronizowano z Google Calendar.",
+    scheduleMissing: "Uzupelnij brakujace pola przed utworzeniem.",
+    estimateOpenForm: "Otworz w formularzu kosztorysu",
+    estimateDraftReady: "Szkic gotowy — przejrzyj i zapisz w formularzu.",
+    cancel: "Anuluj",
   },
 };
 
@@ -144,6 +181,8 @@ export default function AiBubbleClient({
   const role = String(authUser?.role || "").toLowerCase();
   const isSuperAdmin = role === "super_admin";
 
+  const router = useRouter();
+
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState(isSuperAdmin ? "owner" : "proposal");
   const [question, setQuestion] = useState("");
@@ -153,6 +192,12 @@ export default function AiBubbleClient({
   const [responseText, setResponseText] = useState("");
   const [flagRecommendations, setFlagRecommendations] = useState([]);
   const [websitePatches, setWebsitePatches] = useState(null);
+  // Action-capable mode state: each agent mode that produces a structured
+  // draft stores it here so the UI can render a confirmation card with
+  // explicit "Create" / "Open" buttons. Only one draft can be staged at
+  // a time — switching modes or asking again clears the previous draft.
+  const [scheduleDraft, setScheduleDraft] = useState(null);
+  const [estimateDraft, setEstimateDraft] = useState(null);
 
   const wbAi = useWebsiteBuilderAi();
   const onWebsiteBuilder =
@@ -182,6 +227,7 @@ export default function AiBubbleClient({
       { value: "crm", label: t.modes.crm },
       { value: "reply", label: t.modes.reply },
       { value: "schedule", label: t.modes.schedule },
+      { value: "estimate", label: t.modes.estimate },
     ];
     if (isSuperAdmin) {
       return [
@@ -206,6 +252,8 @@ export default function AiBubbleClient({
     setResponseText("");
     setFlagRecommendations([]);
     setWebsitePatches(null);
+    setScheduleDraft(null);
+    setEstimateDraft(null);
 
     try {
       if (mode === "website" || onWebsiteBuilder) {
@@ -274,33 +322,59 @@ export default function AiBubbleClient({
       }
 
       if (mode === "schedule") {
-        const res = await apiFetch("/api/ai/scheduling", {
+        // Parse the free-form prompt into a structured appointment draft.
+        // The contractor reviews/edits before we POST to /api/appointments
+        // (which auto-syncs to Google Calendar when connected).
+        const res = await apiFetch("/api/ai/scheduling/parse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jobSummary: prompt,
-            constraints: `Path context: ${pathname}`,
-            availability: [],
-            weatherSummary: "N/A",
-          }),
+          body: JSON.stringify({ prompt }),
         });
         const payload = await getJsonOrThrow(res, t.errorFallback);
-        const plan = String(payload?.data?.schedulePlan || "").trim();
-        const risks = Array.isArray(payload?.data?.riskNotes)
-          ? payload.data.riskNotes.join("; ")
-          : "";
-        const backups = Array.isArray(payload?.data?.backupSlots)
-          ? payload.data.backupSlots.join(", ")
-          : "";
-        setResponseText(
-          [
-            plan,
-            risks ? `Risks: ${risks}` : "",
-            backups ? `Backups: ${backups}` : "",
-          ]
-            .filter(Boolean)
-            .join("\n\n"),
-        );
+        const draft = payload?.data?.draft;
+        if (!draft || typeof draft !== "object") {
+          setError(t.errorFallback);
+          return;
+        }
+        setScheduleDraft({
+          title: draft.title || "",
+          clientName: draft.clientName || "",
+          date: draft.date || "",
+          time: draft.time || "",
+          endTime: draft.endTime || "",
+          location: draft.location || "",
+          notes: draft.notes || "",
+          missing: Array.isArray(draft.missing) ? draft.missing : [],
+        });
+        return;
+      }
+
+      if (mode === "estimate") {
+        // Parse the free-form prompt into a structured estimate draft and
+        // hand it off to the /estimates/new editor for review + save.
+        const res = await apiFetch("/api/ai/estimate/from-text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+        const payload = await getJsonOrThrow(res, t.errorFallback);
+        const draft = payload?.data?.draft;
+        if (!draft || typeof draft !== "object") {
+          setError(t.errorFallback);
+          return;
+        }
+        setEstimateDraft({
+          title: draft.title || "",
+          clientName: draft.clientName || "",
+          address: draft.address || "",
+          services: Array.isArray(draft.services) ? draft.services : [],
+          scopeNotes: draft.scopeNotes || "",
+          subtotal: Number(draft.subtotal) || 0,
+          assumptions: Array.isArray(draft.assumptions) ? draft.assumptions : [],
+          missing: Array.isArray(draft.missing) ? draft.missing : [],
+          heuristicReference: payload?.data?.heuristicReference || null,
+        });
+        setResponseText(t.estimateDraftReady);
         return;
       }
 
@@ -346,6 +420,73 @@ export default function AiBubbleClient({
       wbAi?.applyPatches?.(websitePatches);
       setResponseText((prev) => [prev, t.patchesApplied].filter(Boolean).join("\n\n"));
       setWebsitePatches(null);
+    } catch (err) {
+      setError(err?.message || t.errorFallback);
+    }
+  };
+
+  // Confirm the parsed appointment by POSTing to /api/appointments. The
+  // server-side handler is responsible for the Google Calendar sync, so a
+  // single "Create appointment" click can land both records.
+  const confirmScheduleDraft = async () => {
+    if (!scheduleDraft || applying) return;
+    if (!scheduleDraft.title?.trim() || !scheduleDraft.clientName?.trim() ||
+        !scheduleDraft.date?.trim() || !scheduleDraft.time?.trim()) {
+      setError(t.scheduleMissing || t.errorFallback);
+      return;
+    }
+
+    setApplying(true);
+    setError("");
+    try {
+      const res = await apiFetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: scheduleDraft.title,
+          clientName: scheduleDraft.clientName,
+          date: scheduleDraft.date,
+          time: scheduleDraft.time,
+          endTime: scheduleDraft.endTime || "",
+          location: scheduleDraft.location || "",
+          notes: scheduleDraft.notes || "",
+          status: "Scheduled",
+        }),
+      });
+      const payload = await getJsonOrThrow(res, t.errorFallback);
+      const synced = payload?.data?.google?.synced === true;
+      const link = String(payload?.data?.google?.htmlLink || "");
+      const lines = [t.scheduleCreated];
+      if (synced) {
+        lines.push(t.scheduleSyncedGoogle);
+        if (link) lines.push(link);
+      } else if (payload?.data?.google?.error) {
+        lines.push(t.scheduleSyncFailed);
+      }
+      setResponseText(lines.filter(Boolean).join("\n"));
+      setScheduleDraft(null);
+    } catch (err) {
+      setError(err?.message || t.errorFallback);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  // Hand the AI's estimate draft off to the editor. We URL-encode the
+  // payload so the editor's existing hydration path can pick it up via
+  // a query string parameter — no extra global state needed.
+  const openEstimateDraft = () => {
+    if (!estimateDraft) return;
+    try {
+      const encoded =
+        typeof window !== "undefined"
+          ? window.btoa(unescape(encodeURIComponent(JSON.stringify(estimateDraft))))
+          : "";
+      const target = encoded
+        ? `/estimates/new?aiDraft=${encodeURIComponent(encoded)}`
+        : "/estimates/new";
+      setIsOpen(false);
+      router.push(target);
     } catch (err) {
       setError(err?.message || t.errorFallback);
     }
@@ -447,7 +588,15 @@ export default function AiBubbleClient({
           <textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder={onWebsiteBuilder ? t.websitePlaceholder : t.placeholder}
+            placeholder={
+              onWebsiteBuilder
+                ? t.websitePlaceholder
+                : mode === "schedule"
+                  ? t.schedulePlaceholder || t.placeholder
+                  : mode === "estimate"
+                    ? t.estimatePlaceholder || t.placeholder
+                    : t.placeholder
+            }
             rows={4}
             style={{
               width: "100%",
@@ -535,6 +684,134 @@ export default function AiBubbleClient({
             ) : null}
           </div>
 
+          {scheduleDraft ? (
+            <div
+              style={{
+                marginTop: 12,
+                background: "#0b1220",
+                border: "1px solid rgba(94,234,212,0.35)",
+                borderRadius: 12,
+                padding: 12,
+                fontSize: 13,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                {t.modes.schedule}
+              </div>
+              <ScheduleDraftFields draft={scheduleDraft} onChange={setScheduleDraft} />
+              {scheduleDraft.missing && scheduleDraft.missing.length > 0 ? (
+                <div style={{ color: "#fbbf24", fontSize: 11, marginTop: 6 }}>
+                  Missing: {scheduleDraft.missing.join(", ")}
+                </div>
+              ) : null}
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={confirmScheduleDraft}
+                  disabled={applying}
+                  style={{
+                    border: "none",
+                    background: "#16a34a",
+                    color: "white",
+                    borderRadius: 10,
+                    padding: "9px 14px",
+                    fontWeight: 700,
+                    cursor: applying ? "wait" : "pointer",
+                    opacity: applying ? 0.7 : 1,
+                  }}
+                >
+                  {applying ? t.scheduleConfirming || t.applying : t.scheduleConfirm || t.apply}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleDraft(null)}
+                  disabled={applying}
+                  style={{
+                    border: "1px solid rgba(148,163,184,0.35)",
+                    background: "#111827",
+                    color: "#e2e8f0",
+                    borderRadius: 10,
+                    padding: "9px 14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.cancel || t.close}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {estimateDraft ? (
+            <div
+              style={{
+                marginTop: 12,
+                background: "#0b1220",
+                border: "1px solid rgba(96,165,250,0.35)",
+                borderRadius: 12,
+                padding: 12,
+                fontSize: 13,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                {t.modes.estimate}
+              </div>
+              <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+                {estimateDraft.title || "Draft"}
+                {estimateDraft.clientName ? ` · ${estimateDraft.clientName}` : ""}
+              </div>
+              {estimateDraft.services?.length ? (
+                <ul style={{ margin: "6px 0 6px 14px", padding: 0 }}>
+                  {estimateDraft.services.map((svc, idx) => (
+                    <li key={idx} style={{ marginBottom: 2 }}>
+                      {svc.name} · {svc.qty} × ${Number(svc.unitPrice).toFixed(2)} = ${Number(svc.price).toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <div style={{ fontWeight: 600, marginTop: 4 }}>
+                Subtotal: ${Number(estimateDraft.subtotal || 0).toFixed(2)}
+              </div>
+              {estimateDraft.missing && estimateDraft.missing.length > 0 ? (
+                <div style={{ color: "#fbbf24", fontSize: 11, marginTop: 6 }}>
+                  Missing: {estimateDraft.missing.join(", ")}
+                </div>
+              ) : null}
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={openEstimateDraft}
+                  style={{
+                    border: "none",
+                    background: "#2563eb",
+                    color: "white",
+                    borderRadius: 10,
+                    padding: "9px 14px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.estimateOpenForm}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEstimateDraft(null)}
+                  style={{
+                    border: "1px solid rgba(148,163,184,0.35)",
+                    background: "#111827",
+                    color: "#e2e8f0",
+                    borderRadius: 10,
+                    padding: "9px 14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.cancel || t.close}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {error ? (
             <div
               style={{
@@ -590,6 +867,64 @@ export default function AiBubbleClient({
       >
         {isOpen ? t.close : t.open}
       </button>
+    </div>
+  );
+}
+
+// Small editable form for the parsed appointment draft so the contractor
+// can fill in anything the AI couldn't infer (e.g. exact address) before
+// hitting "Create appointment". Kept inline since this is the only place
+// in the app that consumes this shape today.
+function ScheduleDraftFields({ draft, onChange }) {
+  const fieldStyle = {
+    width: "100%",
+    padding: "6px 8px",
+    borderRadius: 6,
+    border: "1px solid rgba(148,163,184,0.3)",
+    background: "#111827",
+    color: "#e2e8f0",
+    fontSize: 12,
+  };
+  const labelStyle = { fontSize: 11, color: "#94a3b8", marginBottom: 2, display: "block" };
+  const rowStyle = { marginTop: 6 };
+  const set = (key) => (event) => onChange({ ...draft, [key]: event.target.value });
+  return (
+    <div>
+      <div style={rowStyle}>
+        <label style={labelStyle}>Title</label>
+        <input type="text" value={draft.title || ""} onChange={set("title")} style={fieldStyle} />
+      </div>
+      <div style={rowStyle}>
+        <label style={labelStyle}>Client</label>
+        <input type="text" value={draft.clientName || ""} onChange={set("clientName")} style={fieldStyle} />
+      </div>
+      <div style={{ ...rowStyle, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+        <div>
+          <label style={labelStyle}>Date</label>
+          <input type="date" value={draft.date || ""} onChange={set("date")} style={fieldStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Start</label>
+          <input type="time" value={draft.time || ""} onChange={set("time")} style={fieldStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>End</label>
+          <input type="time" value={draft.endTime || ""} onChange={set("endTime")} style={fieldStyle} />
+        </div>
+      </div>
+      <div style={rowStyle}>
+        <label style={labelStyle}>Location</label>
+        <input type="text" value={draft.location || ""} onChange={set("location")} style={fieldStyle} />
+      </div>
+      <div style={rowStyle}>
+        <label style={labelStyle}>Notes</label>
+        <textarea
+          value={draft.notes || ""}
+          onChange={set("notes")}
+          rows={2}
+          style={{ ...fieldStyle, resize: "vertical" }}
+        />
+      </div>
     </div>
   );
 }
