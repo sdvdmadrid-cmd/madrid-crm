@@ -11,6 +11,10 @@ import {
   normalizeEstimateStatus,
   verifyEstimatePublicAccess,
 } from "@/lib/estimate-public-access";
+import {
+  isSignatureRequiredForEstimate,
+  sanitizeSignatureName,
+} from "@/lib/estimate-signature-policy";
 
 const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
@@ -21,10 +25,19 @@ function parseNotes(notes) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed?.kind === "estimate_pipeline") {
+      const signature =
+        parsed.audit?.signature && typeof parsed.audit.signature === "object"
+          ? {
+              name: String(parsed.audit.signature.name || ""),
+              signedAt: String(parsed.audit.signature.signedAt || ""),
+              ip: String(parsed.audit.signature.ip || ""),
+            }
+          : null;
       return {
         address: String(parsed.address || ""),
         noteText: String(parsed.noteText || ""),
         clientEmail: String(parsed.clientEmail || ""),
+        clientPhone: String(parsed.clientPhone || ""),
         audit: {
           sentAt: String(parsed.audit?.sentAt || ""),
           approvedAt: String(parsed.audit?.approvedAt || ""),
@@ -32,6 +45,7 @@ function parseNotes(notes) {
           changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
           resentAt: String(parsed.audit?.resentAt || ""),
           resendCount: Number(parsed.audit?.resendCount || 0),
+          signature,
         },
       };
     }
@@ -39,12 +53,20 @@ function parseNotes(notes) {
     // legacy
   }
   return {
-    address: "", noteText: raw, clientEmail: "",
-    audit: { sentAt: "", approvedAt: "", declinedAt: "", changesRequestedAt: "", resentAt: "", resendCount: 0 },
+    address: "", noteText: raw, clientEmail: "", clientPhone: "",
+    audit: { sentAt: "", approvedAt: "", declinedAt: "", changesRequestedAt: "", resentAt: "", resendCount: 0, signature: null },
   };
 }
 
 function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", requestedItems = null, audit = {} }) {
+  const signature =
+    audit.signature && typeof audit.signature === "object"
+      ? {
+          name: String(audit.signature.name || ""),
+          signedAt: String(audit.signature.signedAt || ""),
+          ip: String(audit.signature.ip || ""),
+        }
+      : null;
   return JSON.stringify({
     kind: "estimate_pipeline",
     address, noteText, clientEmail, clientPhone,
@@ -56,6 +78,7 @@ function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientP
       changesRequestedAt: String(audit.changesRequestedAt || ""),
       resentAt: String(audit.resentAt || ""),
       resendCount: Number(audit.resendCount || 0),
+      ...(signature ? { signature } : {}),
     },
   });
 }
@@ -118,6 +141,42 @@ export async function POST(request, { params }) {
   if (action === "approved") audit.approvedAt = nowIso;
   if (action === "declined") audit.declinedAt = nowIso;
   if (action === "changes_requested") audit.changesRequestedAt = nowIso;
+
+  // Paquete I: require a typed signature on approvals once the estimate
+  // exceeds the tenant's configured threshold. If the customer never sent
+  // a name (or sent an obviously malformed one), reject with a clear 400
+  // so the public page can prompt for it. Other actions (decline /
+  // changes_requested) are unaffected.
+  if (action === "approved") {
+    const { required: signatureRequired, threshold } =
+      await isSignatureRequiredForEstimate({
+        tenantId: existing.tenant_id,
+        total: existing.total,
+      });
+
+    if (signatureRequired) {
+      const signatureName = sanitizeSignatureName(body.signatureName);
+      const agreed = body.signatureAgreement === true;
+
+      if (!signatureName || !agreed) {
+        return json(
+          {
+            success: false,
+            error: "A typed signature is required to approve this estimate.",
+            signatureRequired: true,
+            signatureThreshold: threshold,
+          },
+          400,
+        );
+      }
+
+      audit.signature = {
+        name: signatureName,
+        signedAt: nowIso,
+        ip: String(ip || ""),
+      };
+    }
+  }
 
   const clientNote = String(body.note || "").trim();
   const requestedItems = Array.isArray(body.requestedItems) ? body.requestedItems : null;

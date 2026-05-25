@@ -433,6 +433,17 @@ export default function EstimatesPage() {
                         Approved: {formatDateTime(selectedEstimate.audit.approvedAt)}
                       </div>
                     ) : null}
+                    {selectedEstimate.audit?.signature?.name ? (
+                      <div style={{ color: "#e2e8f0" }}>
+                        Signed by{" "}
+                        <span style={{ fontStyle: "italic", fontFamily: "'Brush Script MT','Comic Sans MS',cursive", color: "#86efac" }}>
+                          {selectedEstimate.audit.signature.name}
+                        </span>
+                        {selectedEstimate.audit.signature.signedAt
+                          ? ` · ${formatDateTime(selectedEstimate.audit.signature.signedAt)}`
+                          : ""}
+                      </div>
+                    ) : null}
                     {selectedEstimate.audit?.declinedAt ? (
                       <div style={{ color: "#fda4af", fontWeight: 600 }}>
                         Declined: {formatDateTime(selectedEstimate.audit.declinedAt)}

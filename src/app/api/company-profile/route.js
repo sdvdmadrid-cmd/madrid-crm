@@ -75,6 +75,21 @@ function toLimitedText(value, limit) {
   return toStringValue(value).slice(0, limit);
 }
 
+/**
+ * Normalize the signature-required threshold. Accepts a positive number or
+ * a string that parses to one. Anything else (null, "", 0, negative,
+ * NaN) becomes null which is the canonical "signature never required"
+ * value used downstream.
+ */
+function normalizeSignatureThreshold(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed <= 0) return null;
+  // Cap at $10M to keep a malformed input from poisoning the column.
+  return Math.min(parsed, 10000000);
+}
+
 function normalizeUrl(value) {
   const input = toStringValue(value);
   if (!input) return "";
@@ -206,6 +221,9 @@ export async function PATCH(request) {
       defaultTaxState: normalizeTaxState(body.defaultTaxState),
       defaultInvoiceDueDays: normalizeInvoiceDueDays(
         body.defaultInvoiceDueDays,
+      ),
+      signatureRequiredAboveAmount: normalizeSignatureThreshold(
+        body.signatureRequiredAboveAmount,
       ),
       updatedAt: now,
       updatedBy: userId,

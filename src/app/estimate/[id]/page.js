@@ -34,6 +34,11 @@ export default function EstimateClientPage() {
   const [newItemLabel, setNewItemLabel] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
 
+  // Signature flow (paquete I). Driven by `estimate.signatureRequired`.
+  const [showSignaturePanel, setShowSignaturePanel] = useState(false);
+  const [signatureName, setSignatureName] = useState("");
+  const [signatureAgreement, setSignatureAgreement] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     if (!accessToken) {
@@ -78,7 +83,7 @@ export default function EstimateClientPage() {
     setNewItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  async function respond(action) {
+  async function respond(action, { signatureName: sigName, signatureAgreement: sigAgreement } = {}) {
     setActionLoading(true);
     setError("");
     try {
@@ -100,6 +105,8 @@ export default function EstimateClientPage() {
           token: accessToken,
           note: changesNote.trim(),
           ...(requestedItems !== null ? { requestedItems } : {}),
+          ...(sigName ? { signatureName: sigName } : {}),
+          ...(sigAgreement === true ? { signatureAgreement: true } : {}),
         }),
       });
       const json = await res.json();
@@ -107,7 +114,12 @@ export default function EstimateClientPage() {
         setEstimate((prev) => ({ ...prev, status: json.status }));
         setActionDone(action);
         setShowChangesPanel(false);
+        setShowSignaturePanel(false);
       } else {
+        // Server told us the customer must sign first — open the panel.
+        if (json.signatureRequired) {
+          setShowSignaturePanel(true);
+        }
         setError(json.error || "Action failed.");
       }
     } catch {
@@ -115,6 +127,27 @@ export default function EstimateClientPage() {
     } finally {
       setActionLoading(false);
     }
+  }
+
+  function handleApproveClick() {
+    if (estimate?.signatureRequired) {
+      setError("");
+      setShowSignaturePanel(true);
+      return;
+    }
+    respond("approved");
+  }
+
+  function handleConfirmSignature() {
+    const trimmed = signatureName.trim();
+    if (trimmed.length < 2 || !signatureAgreement) {
+      setError("Type your full name and confirm you agree before signing.");
+      return;
+    }
+    respond("approved", {
+      signatureName: trimmed,
+      signatureAgreement: true,
+    });
   }
 
   const status = estimate ? String(estimate.status || "draft").toLowerCase() : "";
@@ -339,15 +372,79 @@ export default function EstimateClientPage() {
                   </button>
                 </div>
               </div>
+            ) : showSignaturePanel ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="text-sm font-semibold text-emerald-800">
+                    Sign to approve
+                  </div>
+                  <div className="mt-1 text-xs text-emerald-700">
+                    {Number.isFinite(Number(estimate?.signatureThreshold)) && Number(estimate?.signatureThreshold) > 0
+                      ? `This estimate exceeds ${formatMoney(estimate.signatureThreshold)}. Please type your full legal name to confirm.`
+                      : "Please type your full legal name to confirm."}
+                  </div>
+                </div>
+                <label className="block text-xs font-semibold text-slate-600" htmlFor="signature-name">
+                  Full name
+                </label>
+                <input
+                  id="signature-name"
+                  type="text"
+                  value={signatureName}
+                  onChange={(e) => setSignatureName(e.target.value)}
+                  placeholder="Type your full name"
+                  autoComplete="name"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold tracking-wide text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+                  style={{ fontFamily: "'Brush Script MT','Comic Sans MS',cursive" }}
+                />
+                <label className="flex items-start gap-2 text-xs text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={signatureAgreement}
+                    onChange={(e) => setSignatureAgreement(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    I agree to the scope of work and total shown above, and my typed name acts as my electronic
+                    signature for this approval.
+                  </span>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleConfirmSignature}
+                    disabled={actionLoading || signatureName.trim().length < 2 || !signatureAgreement}
+                    className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                  >
+                    {actionLoading ? "Signing..." : "Sign & Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSignaturePanel(false);
+                      setError("");
+                    }}
+                    disabled={actionLoading}
+                    className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    Back
+                  </button>
+                </div>
+                {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
+              </div>
             ) : (
               <div className="space-y-2">
                 <button
                   type="button"
-                  onClick={() => respond("approved")}
+                  onClick={handleApproveClick}
                   disabled={actionLoading}
                   className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                 >
-                  {actionLoading ? "Processing..." : "Approve Estimate"}
+                  {actionLoading
+                    ? "Processing..."
+                    : estimate?.signatureRequired
+                      ? "Approve & Sign"
+                      : "Approve Estimate"}
                 </button>
                 <button
                   type="button"

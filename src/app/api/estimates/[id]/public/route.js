@@ -8,6 +8,7 @@ import {
   isValidEstimatePublicToken,
   verifyEstimatePublicAccess,
 } from "@/lib/estimate-public-access";
+import { isSignatureRequiredForEstimate } from "@/lib/estimate-signature-policy";
 
 const ESTIMATES_TABLE = "estimates";
 
@@ -21,6 +22,13 @@ function parseNotes(notes) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed?.kind === "estimate_pipeline") {
+      const signature =
+        parsed.audit?.signature && typeof parsed.audit.signature === "object"
+          ? {
+              name: String(parsed.audit.signature.name || ""),
+              signedAt: String(parsed.audit.signature.signedAt || ""),
+            }
+          : null;
       return {
         address: String(parsed.address || ""),
         noteText: String(parsed.noteText || ""),
@@ -31,6 +39,7 @@ function parseNotes(notes) {
           approvedAt: String(parsed.audit?.approvedAt || ""),
           declinedAt: String(parsed.audit?.declinedAt || ""),
           changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
+          signature,
         },
       };
     }
@@ -66,7 +75,7 @@ export async function GET(request, { params }) {
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
     .select(
-      "id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at",
+      "id, tenant_id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at",
     )
     .eq("id", id)
     .single();
@@ -81,6 +90,17 @@ export async function GET(request, { params }) {
   await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
   const parsedNotes = parseNotes(data.notes);
+  const total = toNumber(data.total);
+
+  // Paquete I: surface whether this estimate needs a typed signature
+  // before the customer can approve it. Falls back to no-policy (open
+  // approve) on any error so the customer never sees a blocked flow
+  // because of an infrastructure issue.
+  const { required: signatureRequired, threshold: signatureThreshold } =
+    await isSignatureRequiredForEstimate({
+      tenantId: data.tenant_id,
+      total,
+    });
 
   return json({
     success: true,
@@ -95,9 +115,12 @@ export async function GET(request, { params }) {
       services: Array.isArray(data.items) ? data.items : [],
       subtotal: toNumber(data.subtotal),
       tax: toNumber(data.tax),
-      total: toNumber(data.total),
+      total,
       notes: parsedNotes.noteText,
       audit: parsedNotes.audit,
+      signatureRequired,
+      signatureThreshold,
+      signature: parsedNotes.audit?.signature || null,
       createdAt: data.created_at || null,
       updatedAt: data.updated_at || null,
     },
