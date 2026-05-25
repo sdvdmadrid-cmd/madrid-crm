@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -66,7 +67,7 @@ export async function GET(request, { params }) {
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
     .select(
-      "id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at",
+      "id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at, tenant_id",
     )
     .eq("id", id)
     .single();
@@ -81,6 +82,7 @@ export async function GET(request, { params }) {
   await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
   const parsedNotes = parseNotes(data.notes);
+  const branding = await getEstimateBrandingByTenant(data.tenant_id);
 
   return json({
     success: true,
@@ -100,6 +102,11 @@ export async function GET(request, { params }) {
       audit: parsedNotes.audit,
       createdAt: data.created_at || null,
       updatedAt: data.updated_at || null,
+      branding: {
+        companyName: branding.companyName || "",
+        logoUrl: branding.logoUrl || "",
+        logoPlacement: branding.logoPlacement || "top_left",
+      },
     },
   });
 }

@@ -142,13 +142,37 @@ export default function EstimateClientPage() {
   const statusConf = STATUS_CONFIG[status] || STATUS_CONFIG.sent;
   const services = estimate?.services || [];
 
+  const branding = estimate?.branding || {};
+  const logoPlacement = branding.logoPlacement || "top_left";
+  const logoAlignmentClass =
+    logoPlacement === "top_right"
+      ? "justify-end"
+      : logoPlacement === "top_center"
+        ? "justify-center"
+        : "justify-start";
+
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 print:bg-white print:py-0">
       <div className="mx-auto max-w-2xl">
+        {branding.logoUrl ? (
+          <div className={`mb-4 flex ${logoAlignmentClass}`}>
+            {/* Public-page branding header. Plain <img> avoids next/image
+                config for arbitrary tenant CDN hosts and keeps the print
+                view consistent. */}
+            <img
+              src={branding.logoUrl}
+              alt={branding.companyName ? `${branding.companyName} logo` : "Company logo"}
+              className="max-h-16 max-w-[240px] object-contain"
+            />
+          </div>
+        ) : null}
+
         {/* Header */}
         <div className="mb-6 flex items-start justify-between print:mb-4">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">Estimate</div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              {branding.companyName ? branding.companyName : "Estimate"}
+            </div>
             <h1 className="mt-1 text-2xl font-bold text-slate-900">
               {estimate.estimateNumber || `#${id.slice(-6).toUpperCase()}`}
             </h1>
