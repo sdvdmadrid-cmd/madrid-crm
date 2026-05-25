@@ -2,7 +2,7 @@
 import LegalAcceptanceWidget from "./LegalAcceptanceWidget";
 
 export const metadata = {
-  title: "Legal & Compliance — FieldBase",
+  title: { absolute: "Legal & Compliance — FieldBase" },
   description:
     "FieldBase Terms of Service, Privacy Policy, Payment Authorization, SMS Consent, and Estimate/Invoice Terms.",
 };
