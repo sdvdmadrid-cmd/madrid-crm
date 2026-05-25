@@ -147,7 +147,11 @@ export default async function PublicContractorSitePage({ params }) {
     services: data.services,
     requestServices: data.requestServices,
   });
-  const jsonLd = buildLocalBusinessJsonLd(data);
+  const jsonLd = buildLocalBusinessJsonLd({
+    ...data,
+    reviewStats,
+    publicReviews,
+  });
   const services =
     Array.isArray(data.services) && data.services.length > 0
       ? data.services

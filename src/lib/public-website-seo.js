@@ -89,6 +89,48 @@ export function buildLocalBusinessJsonLd(site) {
     jsonLd.sameAs = [...(jsonLd.sameAs || []), ...socialUrls];
   }
 
+  // Paquete D: surface aggregate review counts in schema.org so search
+  // engines can render star ratings in SERPs. Only emit when we have at
+  // least one verified rating to avoid AggregateRating with 0 reviews.
+  const stats = site.reviewStats;
+  if (
+    stats &&
+    Number.isFinite(Number(stats.count)) &&
+    Number(stats.count) > 0 &&
+    Number.isFinite(Number(stats.averageRating)) &&
+    Number(stats.averageRating) > 0
+  ) {
+    jsonLd.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: Number(stats.averageRating).toFixed(1),
+      reviewCount: Number(stats.count),
+      bestRating: "5",
+      worstRating: "1",
+    };
+  }
+
+  // Paquete D: emit up to 5 individual reviews so the schema.org listing
+  // has real Review entries. Each review must have a rating + body. We
+  // intentionally cap at 5 to keep the rendered JSON-LD lean.
+  const reviewItems = Array.isArray(site.publicReviews) ? site.publicReviews.slice(0, 5) : [];
+  if (reviewItems.length > 0) {
+    jsonLd.review = reviewItems
+      .filter((rv) => rv && Number.isFinite(Number(rv.rating)) && rv.reviewText)
+      .map((rv) => ({
+        "@type": "Review",
+        author: { "@type": "Person", name: rv.authorName || "Customer" },
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: Number(rv.rating).toFixed(1),
+          bestRating: "5",
+          worstRating: "1",
+        },
+        reviewBody: String(rv.reviewText).slice(0, 800),
+        datePublished: rv.reviewDate || undefined,
+      }));
+    if (jsonLd.review.length === 0) delete jsonLd.review;
+  }
+
   return jsonLd;
 }
 
