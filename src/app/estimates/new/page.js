@@ -101,6 +101,7 @@ function NewEstimatePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit") || "";
+  const aiDraftParam = searchParams.get("aiDraft") || "";
 
   const [clientPrefix, setClientPrefix] = useState("");
   const [clientFirstName, setClientFirstName] = useState("");
@@ -281,6 +282,55 @@ function NewEstimatePageInner() {
         }, 0);
       });
   }, [editId]);
+
+  // Hydrate the form from an AI-drafted estimate when the bubble hands one
+  // off via ?aiDraft=<base64>. Skipped when ?edit=<id> is also present so
+  // the editor flow keeps its precedence over the assistant. Best-effort —
+  // a malformed payload simply leaves the form empty.
+  useEffect(() => {
+    if (editId) return;
+    if (!aiDraftParam) return;
+
+    let draft;
+    try {
+      const decoded =
+        typeof window !== "undefined"
+          ? decodeURIComponent(escape(window.atob(aiDraftParam)))
+          : "";
+      draft = decoded ? JSON.parse(decoded) : null;
+    } catch {
+      draft = null;
+    }
+    if (!draft || typeof draft !== "object") return;
+
+    hydratingRef.current = true;
+    try {
+      const nameParts = String(draft.clientName || "").trim().split(/\s+/);
+      if (nameParts[0]) setClientFirstName(nameParts[0]);
+      if (nameParts.length > 1) setClientLastName(nameParts.slice(1).join(" "));
+      if (draft.address) setStreetName(String(draft.address));
+
+      const scopeLines = [
+        String(draft.scopeNotes || "").trim(),
+        Array.isArray(draft.assumptions) && draft.assumptions.length
+          ? `Assumptions:\n- ${draft.assumptions.join("\n- ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      if (scopeLines) setJobDescription(scopeLines);
+
+      const subtotal = Number(draft.subtotal) || 0;
+      if (subtotal > 0) setBasePrice(String(subtotal.toFixed(2)));
+    } finally {
+      setTimeout(() => {
+        hydratingRef.current = false;
+        // Mark dirty so the unload guard fires if the contractor closes
+        // the tab without saving an AI-drafted estimate.
+        setIsDirty(true);
+      }, 0);
+    }
+  }, [editId, aiDraftParam]);
 
   // Auto-fill US state sales tax when the user picks a state and hasn't
   // overridden the rate manually. Reuses the existing rate table from
