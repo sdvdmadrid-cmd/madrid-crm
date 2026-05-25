@@ -103,7 +103,19 @@
 }
 
 .s-feature-card {
-  backdrop-filter: blur(8px);
+  background: #ffffff;
+  color: #0f172a;
+  min-height: 220px;
+  box-shadow: 0 14px 44px rgba(15, 23, 42, 0.07);
+  backdrop-filter: none;
+}
+
+.s-feature-title {
+  color: #0f172a;
+}
+
+.s-feature-desc {
+  color: #475569;
 }
 
 .s-stat-tile {

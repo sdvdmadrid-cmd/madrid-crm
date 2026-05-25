@@ -102,6 +102,11 @@ export default function InstantNavigation() {
       pathname === "/register" ||
       pathname === "/reset-password" ||
       pathname === "/verify-email" ||
+      pathname === "/" ||
+      pathname === "/website" ||
+      pathname === "/website-builder" ||
+      pathname?.startsWith("/site/") ||
+      pathname?.startsWith("/sites/") ||
       pathname?.startsWith("/quote/") ||
       pathname?.startsWith("/estimate/")
     ) {

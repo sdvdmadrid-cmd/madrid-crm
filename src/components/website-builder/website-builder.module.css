@@ -1306,16 +1306,19 @@
 }
 
 .previewRoot :global(.preview-features) {
-  background: #fff;
-  padding: 48px 24px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--theme, #1d4ed8) 10%, transparent), transparent 34%),
+    #ffffff;
+  padding: 54px 24px;
 }
 
 .previewRoot :global(.preview-features-title) {
-  font-size: 1.6rem;
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
   font-weight: 900;
-  color: #1e293b;
+  color: #0f172a;
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 24px;
+  letter-spacing: -0.04em;
 }
 
 .previewRoot :global(.preview-features-sub) {
@@ -1327,14 +1330,22 @@
 
 .previewRoot :global(.preview-features-grid) {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
 }
 
+.previewRoot :global(.preview-feature-card),
 .previewRoot :global(.preview-feat-card) {
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  min-height: 176px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 18px;
   padding: 20px 18px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.07);
 }
 
 .previewRoot :global(.preview-feat-icon) {
@@ -1347,25 +1358,34 @@
   justify-content: center;
 }
 
+.previewRoot :global(.preview-feature-title),
 .previewRoot :global(.preview-feat-title) {
   font-size: 14px;
   font-weight: 800;
-  color: #1e293b;
-  margin-bottom: 6px;
+  color: #0f172a;
+  line-height: 1.25;
 }
 
+.previewRoot :global(.preview-feature-desc),
 .previewRoot :global(.preview-feat-desc) {
   font-size: 12px;
-  color: #6b7280;
+  color: #475569;
   line-height: 1.6;
+  margin: 0;
+  flex: 1;
 }
 
 .previewRoot :global(.preview-feat-link) {
+  border: none;
+  background: transparent;
+  padding: 0;
   font-size: 12px;
   font-weight: 700;
   color: var(--theme, #1d4ed8);
-  margin-top: 12px;
+  margin-top: auto;
   text-decoration: none;
+  cursor: pointer;
+  text-align: left;
 }
 
 .previewRoot :global(.preview-about) {
