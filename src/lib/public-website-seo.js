@@ -137,7 +137,7 @@ export function buildPublicSiteMetadata(site, { page = "home" } = {}) {
   }
 
   return {
-    title,
+    title: { absolute: title },
     description,
     metadataBase: new URL(getAppBaseUrl()),
     alternates: { canonical: url },
