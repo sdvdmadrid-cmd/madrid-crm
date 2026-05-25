@@ -241,7 +241,7 @@ export default function AuthShell({ children }) {
   ]);
 
   useEffect(() => {
-    if (isPublicPage) return;
+    if (isPublicPage || isResetPasswordPage) return;
 
     let cancelled = false;
 
@@ -262,7 +262,7 @@ export default function AuthShell({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [isPublicPage]);
+  }, [isPublicPage, isResetPasswordPage]);
 
   useEffect(() => {
     if (isPublicPage || isResetPasswordPage) {
