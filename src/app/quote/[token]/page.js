@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import UniversalShareButton from "@/components/UniversalShareButton";
 import SignaturePad from "@/components/SignaturePad";
@@ -36,7 +36,7 @@ const UI_I18N = {
     declineDesc:
       "If this quote does not work for you, you can decline it now.",
     yourName: "Your full name",
-    yourEmail: "Your email (optional)",
+    yourEmail: "Your email",
     yourSignature: "Type your signature (optional)",
     changeType: "Type of change",
     specificItem: "Specific item (optional)",
@@ -106,6 +106,7 @@ const UI_I18N = {
     shareHint: "Quick share via SMS, WhatsApp, email, or other apps.",
     linkCopied: "Link copied",
     copyFailed: "Could not copy link",
+    visitWebsite: "Visit Website",
   },
   es: {
     loading: "Cargando tu cotización…",
@@ -129,7 +130,7 @@ const UI_I18N = {
     declineDesc:
       "Si esta cotización no te funciona, puedes rechazarla ahora.",
     yourName: "Tu nombre completo",
-    yourEmail: "Tu email (opcional)",
+    yourEmail: "Tu email",
     yourSignature: "Escribe tu firma (opcional)",
     changeType: "Tipo de cambio",
     specificItem: "Ítem específico (opcional)",
@@ -146,13 +147,13 @@ const UI_I18N = {
     signedDocumentDesc:
       "Este registro firmado incluye evidencia de firma y puede imprimirse o guardarse como PDF.",
     printSignedPdf: "Imprimir / Guardar PDF firmado",
-    signatureEvidence: "Dowód podpisu",
-    signatureMethod: "Metodo podpisu",
-    documentHash: "Hash dokumentu",
-    signerIp: "IP podpisującego",
-    typedSignature: "Podpis wpisany",
-    drawnSignature: "Podpis odręczny",
-    drawnAndTypedSignature: "Podpis odręczny + wpisany",
+    signatureEvidence: "Evidencia de firma",
+    signatureMethod: "Método de firma",
+    documentHash: "Hash del documento",
+    signerIp: "IP del firmante",
+    typedSignature: "Firma escrita",
+    drawnSignature: "Firma dibujada",
+    drawnAndTypedSignature: "Firma dibujada + escrita",
     sending: "Enviando…",
     processing: "Procesando…",
     confirmApprove: "Confirmar aceptación",
@@ -173,7 +174,7 @@ const UI_I18N = {
     alreadyDeclined: "Esta cotización fue rechazada",
     changesRequested: "Se solicitaron cambios",
     approvedBy: "Aceptado por",
-    signedBy: "Podpisał",
+    signedBy: "Firmado por",
     on: "el",
     dueDate: "Fecha límite",
     service: "Servicio",
@@ -189,7 +190,7 @@ const UI_I18N = {
       load: "No se pudo cargar la cotización. El enlace puede haber expirado.",
       nameRequired: "Por favor ingresa tu nombre.",
       signatureRequired: "Por favor escribe tu firma.",
-      consentRequired: "Wymagana jest zgoda na podpis elektroniczny.",
+      consentRequired: "Se requiere consentimiento para firma electrónica.",
       describeChanges: "Por favor describe los cambios que deseas.",
       submit: "Algo salió mal. Intenta de nuevo.",
     },
@@ -199,6 +200,7 @@ const UI_I18N = {
       "Comparte rápido por SMS, WhatsApp, email u otras apps.",
     linkCopied: "Enlace copiado",
     copyFailed: "No se pudo copiar el enlace",
+    visitWebsite: "Visitar sitio web",
   },
   pl: {
     loading: "Ładowanie wyceny…",
@@ -222,7 +224,7 @@ const UI_I18N = {
     declineDesc:
       "Jeśli ta wycena Ci nie odpowiada, możesz ją teraz odrzucić.",
     yourName: "Twoje imię i nazwisko",
-    yourEmail: "Twój email (opcjonalnie)",
+    yourEmail: "Twój email",
     yourSignature: "Wpisz podpis (opcjonalnie)",
     changeType: "Rodzaj zmiany",
     specificItem: "Konkretna pozycja (opcjonalnie)",
@@ -293,6 +295,7 @@ const UI_I18N = {
       "Szybkie udostępnianie przez SMS, WhatsApp, email i inne aplikacje.",
     linkCopied: "Link skopiowany",
     copyFailed: "Nie udało się skopiować linku",
+    visitWebsite: "Odwiedź stronę",
   },
 };
 
@@ -334,6 +337,7 @@ function blurReset(e) {
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function QuoteClientPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const token = String(params?.token || "");
   const [uiLanguage] = useStoredUiLanguage();
   const t = UI_I18N[uiLanguage] || UI_I18N.en;
@@ -353,6 +357,14 @@ export default function QuoteClientPage() {
     signatureText: "",
     signatureDrawDataUrl: "",
     acceptElectronicConsent: false,
+  });
+  const [changesForm, setChangesForm] = useState({
+    requestType: "change",
+    item: "",
+    message: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
   });
   const [printSignedMode, setPrintSignedMode] = useState(false);
 
@@ -416,8 +428,20 @@ export default function QuoteClientPage() {
   const job = payload?.job || {};
   const signatureEvidence = payload?.signatureEvidence || null;
   const signedPdfUrl = payload?.signedPdfUrl || "";
+  const visitWebsiteUrl =
+    String(company.websiteUrl || "").trim() ||
+    String(company.publicWebsiteUrl || "").trim();
 
   const quoteStatus = String(job.quoteStatus || "sent").toLowerCase();
+  const financials = useMemo(
+    () =>
+      computeEstimateFinancials({
+        baseAmount: job.price,
+        taxState: job.taxState,
+        downPaymentPercent: job.downPaymentPercent,
+      }),
+    [job.price, job.taxState, job.downPaymentPercent],
+  );
   const isFinalized = quoteStatus === "approved" || quoteStatus === "signed" || quoteStatus === "declined";
   const isSigned = quoteStatus === "signed";
   const changesWereRequested = quoteStatus === "changes_requested";
@@ -435,6 +459,12 @@ export default function QuoteClientPage() {
     const timer = window.setTimeout(() => window.print(), 320);
     return () => window.clearTimeout(timer);
   }, [printSignedMode, isSigned, loading]);
+
+  useEffect(() => {
+    if (searchParams.get("print") === "signed") {
+      setPrintSignedMode(true);
+    }
+  }, [searchParams]);
 
   const submitApproval = async (action) => {
     setFormError("");
@@ -782,6 +812,26 @@ export default function QuoteClientPage() {
                   </div>
                 )}
               </div>
+              {visitWebsiteUrl && (
+                <a
+                  href={visitWebsiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    flexShrink: 0,
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.28)",
+                    color: "white",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: "9px 12px",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {t.visitWebsite}
+                </a>
+              )}
               {company.logoDataUrl && (
                 <div
                   style={{
@@ -1480,16 +1530,16 @@ export default function QuoteClientPage() {
               }}
             >
               {t.footer}
-              {company.websiteUrl && (
+              {visitWebsiteUrl && (
                 <>
                   {" · "}
                   <a
-                    href={company.websiteUrl}
+                    href={visitWebsiteUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: "#94a3b8", textDecoration: "underline" }}
                   >
-                    {company.websiteUrl.replace(/^https?:\/\//, "")}
+                    {t.visitWebsite}
                   </a>
                 </>
               )}

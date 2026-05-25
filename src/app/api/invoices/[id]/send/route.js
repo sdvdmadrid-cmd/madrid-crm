@@ -8,6 +8,7 @@ import {
 } from "@/lib/stripe-payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
+import { buildPublicWebsiteUrl } from "@/lib/public-website-routing";
 import {
   canManageSensitive,
   forbiddenResponse,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/tenant";
 
 const INVOICES = "invoices";
+const CONTRACTOR_WEBSITES = "contractor_websites";
 
 export const runtime = "nodejs";
 
@@ -27,6 +29,7 @@ function buildInvoiceEmailTemplate({
   amount,
   dueDate,
   checkoutUrl,
+  websiteUrl,
 }) {
   const safeCompany = companyName || "FieldBase";
   const safeClient = clientName || "Client";
@@ -35,6 +38,7 @@ function buildInvoiceEmailTemplate({
   const safeAmount = Number(amount || 0).toFixed(2);
   const safeDueDate = dueDate || "Not specified";
   const safeCheckoutUrl = String(checkoutUrl || "").trim();
+  const safeWebsiteUrl = String(websiteUrl || "").trim();
 
   const subject = `${safeCompany} - ${safeInvoice}`;
   const text = [
@@ -48,6 +52,7 @@ function buildInvoiceEmailTemplate({
     safeCheckoutUrl
       ? `Pay securely online: ${safeCheckoutUrl}`
       : "If you already received a payment link, you can complete payment securely online.",
+    safeWebsiteUrl ? `Visit our website: ${safeWebsiteUrl}` : "",
     "For questions, reply to this email.",
     "",
     `Thank you,`,
@@ -67,6 +72,11 @@ function buildInvoiceEmailTemplate({
         safeCheckoutUrl
           ? `<p><a href="${safeCheckoutUrl}" style="display:inline-block;padding:10px 14px;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Pay invoice securely</a></p><p>Or open this link: <br /><a href="${safeCheckoutUrl}">${safeCheckoutUrl}</a></p>`
           : "<p>If you already received a payment link, you can complete payment securely online.</p>"
+      }
+      ${
+        safeWebsiteUrl
+          ? `<p><a href="${safeWebsiteUrl}" style="display:inline-block;padding:8px 12px;border:1px solid #d1d5db;color:#111;text-decoration:none;border-radius:8px;">Visit Website</a></p>`
+          : ""
       }
       <p>For questions, reply to this email.</p>
       <p>Thank you,<br />${safeCompany}</p>
@@ -123,9 +133,29 @@ export async function POST(request, { params }) {
       );
     }
 
-    const companyProfile = await getCompanyProfileByTenant({
-      tenantId: tenantDbId,
-    });
+    const [companyProfile, publicWebsite] = await Promise.all([
+      getCompanyProfileByTenant({
+        tenantId: tenantDbId,
+      }),
+      supabaseAdmin
+        .from(CONTRACTOR_WEBSITES)
+        .select("slug, updated_at")
+        .eq("tenant_id", tenantDbId)
+        .eq("published", true)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error(
+              "[api/invoices/:id/send] Supabase public website query error",
+              error,
+            );
+            return null;
+          }
+          return data;
+        }),
+    ]);
 
     const stripe = getStripeServerClient();
     let checkoutUrl = "";
@@ -149,6 +179,16 @@ export async function POST(request, { params }) {
       console.error("Failed to create invoice checkout URL", checkoutError);
     }
 
+    if (!checkoutUrl) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Unable to create a secure invoice payment link right now.",
+        }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const paymentState = computeInvoicePaymentState({
       amount: invoice.amount,
       payments: invoice.payments,
@@ -163,6 +203,9 @@ export async function POST(request, { params }) {
       amount: paymentState.balanceDue || invoice.amount || 0,
       dueDate: invoice.due_date || "",
       checkoutUrl,
+      websiteUrl:
+        String(companyProfile?.websiteUrl || "").trim() ||
+        (publicWebsite?.slug ? buildPublicWebsiteUrl(publicWebsite.slug, request) : ""),
     });
 
     const sendResult = await sendEmail({

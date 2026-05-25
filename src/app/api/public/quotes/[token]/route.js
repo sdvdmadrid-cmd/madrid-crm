@@ -1,4 +1,5 @@
 ﻿import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+import { buildPublicWebsiteUrl } from "@/lib/public-website-routing";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -10,6 +11,7 @@ import { readLatestQuoteSignatureAudit } from "@/lib/quote-signatures";
 const JOBS = "jobs";
 const QUOTES = "quotes";
 const CLIENTS = "clients";
+const CONTRACTOR_WEBSITES = "contractor_websites";
 
 function isValidQuoteToken(value) {
   const token = String(value || "").trim();
@@ -157,7 +159,7 @@ export async function GET(_request, { params }) {
 
     const clientId = String(job.client_id || "").trim();
 
-    const [clientDoc, companyProfile, signatureEvidence] = await Promise.all([
+    const [clientDoc, companyProfile, publicWebsite, signatureEvidence] = await Promise.all([
       clientId
         ? supabaseAdmin
             .from(CLIENTS)
@@ -177,6 +179,24 @@ export async function GET(_request, { params }) {
             })
         : Promise.resolve(null),
       getCompanyProfileByTenant({ tenantId }),
+      supabaseAdmin
+        .from(CONTRACTOR_WEBSITES)
+        .select("slug, updated_at")
+        .eq("tenant_id", tenantId)
+        .eq("published", true)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error(
+              "[api/public/quotes/:token][GET] Supabase public website query error",
+              error,
+            );
+            return null;
+          }
+          return data;
+        }),
       readLatestQuoteSignatureAudit({
         quoteId: quoteRow?.id || job.id,
         quoteToken,
@@ -227,6 +247,9 @@ export async function GET(_request, { params }) {
             publicDisplayName: companyProfile?.publicDisplayName || "",
             logoDataUrl: companyProfile?.logoDataUrl || "",
             websiteUrl: companyProfile?.websiteUrl || "",
+            publicWebsiteUrl: publicWebsite?.slug
+              ? buildPublicWebsiteUrl(publicWebsite.slug, _request)
+              : "",
             googleReviewsUrl: companyProfile?.googleReviewsUrl || "",
             phone: companyProfile?.phone || "",
             businessAddress: companyProfile?.businessAddress || "",

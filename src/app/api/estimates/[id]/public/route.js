@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
+import { buildPublicWebsiteUrl } from "@/lib/public-website-routing";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -10,6 +12,7 @@ import {
 } from "@/lib/estimate-public-access";
 
 const ESTIMATES_TABLE = "estimates";
+const CONTRACTOR_WEBSITES = "contractor_websites";
 
 function toNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -66,7 +69,7 @@ export async function GET(request, { params }) {
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
     .select(
-      "id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at",
+      "id, tenant_id, client_name, status, items, subtotal, tax, total, notes, estimate_number, created_at, updated_at",
     )
     .eq("id", id)
     .single();
@@ -81,6 +84,30 @@ export async function GET(request, { params }) {
   await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
   const parsedNotes = parseNotes(data.notes);
+  const tenantId = String(data.tenant_id || "").trim();
+  const [companyProfile, publicWebsite] = await Promise.all([
+    tenantId ? getCompanyProfileByTenant({ tenantId }) : Promise.resolve(null),
+    tenantId
+      ? supabaseAdmin
+          .from(CONTRACTOR_WEBSITES)
+          .select("slug, updated_at")
+          .eq("tenant_id", tenantId)
+          .eq("published", true)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data: website, error: websiteError }) => {
+            if (websiteError) {
+              console.error(
+                "[api/estimates/:id/public] Supabase public website query error",
+                websiteError,
+              );
+              return null;
+            }
+            return website;
+          })
+      : Promise.resolve(null),
+  ]);
 
   return json({
     success: true,
@@ -98,6 +125,19 @@ export async function GET(request, { params }) {
       total: toNumber(data.total),
       notes: parsedNotes.noteText,
       audit: parsedNotes.audit,
+      companyProfile: {
+        companyName:
+          companyProfile?.publicDisplayName ||
+          companyProfile?.companyName ||
+          "FieldBase",
+        publicDisplayName: companyProfile?.publicDisplayName || "",
+        logoDataUrl: companyProfile?.logoDataUrl || "",
+        websiteUrl: companyProfile?.websiteUrl || "",
+        publicWebsiteUrl: publicWebsite?.slug
+          ? buildPublicWebsiteUrl(publicWebsite.slug, request)
+          : "",
+        phone: companyProfile?.phone || "",
+      },
       createdAt: data.created_at || null,
       updatedAt: data.updated_at || null,
     },

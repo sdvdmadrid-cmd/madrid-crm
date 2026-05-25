@@ -159,14 +159,30 @@ export async function POST(request, { params }) {
 
     if (quoteRow) {
       const currentStatus = String(quoteRow.status || "").toLowerCase();
-      if (currentStatus === "signed") {
+      if (["approved", "signed", "declined"].includes(currentStatus)) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "This quote is already signed and cannot be edited.",
+            error: "This quote has already received a final response.",
           }),
           {
             status: 409,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const expectedRecipient = String(quoteRow.client_email || "")
+        .trim()
+        .toLowerCase();
+      if (expectedRecipient && contactEmail !== expectedRecipient) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Approval email must match the original quote recipient",
+          }),
+          {
+            status: 403,
             headers: { "Content-Type": "application/json" },
           },
         );
@@ -284,6 +300,20 @@ export async function POST(request, { params }) {
         JSON.stringify({ success: false, error: "Quote not found" }),
         {
           status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const currentJobQuoteStatus = String(job.quote_status || "").toLowerCase();
+    if (["approved", "signed", "declined"].includes(currentJobQuoteStatus)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "This quote has already received a final response.",
+        }),
+        {
+          status: 409,
           headers: { "Content-Type": "application/json" },
         },
       );

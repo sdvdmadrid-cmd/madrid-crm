@@ -101,7 +101,9 @@ export default function InstantNavigation() {
       pathname === "/login" ||
       pathname === "/register" ||
       pathname === "/reset-password" ||
-      pathname === "/verify-email"
+      pathname === "/verify-email" ||
+      pathname?.startsWith("/quote/") ||
+      pathname?.startsWith("/estimate/")
     ) {
       return;
     }

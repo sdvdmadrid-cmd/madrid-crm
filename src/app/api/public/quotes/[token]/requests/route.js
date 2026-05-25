@@ -107,6 +107,38 @@ export async function POST(request, { params }) {
     if (quoteRow) {
       const now = new Date();
       const tenantId = quoteRow.tenant_id || "default";
+      const currentStatus = String(quoteRow.status || "").toLowerCase();
+      if (["approved", "signed", "declined"].includes(currentStatus)) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "This quote has already received a final response.",
+          }),
+          {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const expectedRecipient = String(quoteRow.client_email || "")
+        .trim()
+        .toLowerCase();
+      if (
+        expectedRecipient &&
+        contactEmail.trim().toLowerCase() !== expectedRecipient
+      ) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Request email must match the original quote recipient",
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
 
       const toInsert = {
         tenant_id: tenantId,
@@ -153,6 +185,39 @@ export async function POST(request, { params }) {
           updateQuoteError,
         );
         throw new Error(updateQuoteError.message);
+      }
+
+      const contactDisplay = contactName || quoteRow.client_name || "Client";
+      const notifMessage = item
+        ? `${contactDisplay} wants to ${type} "${item}": ${message.slice(0, 120)}${message.length > 120 ? "…" : ""}`
+        : `${contactDisplay} requested changes: ${message.slice(0, 140)}${message.length > 140 ? "…" : ""}`;
+
+      const { error: notificationError } = await supabaseAdmin
+        .from(NOTIFICATIONS)
+        .insert({
+          tenant_id: tenantId,
+          user_id: null,
+          type: "changes_requested",
+          title: `Changes requested — ${quoteRow.title || "Quote"}`,
+          message: notifMessage,
+          job_title: quoteRow.title || "",
+          client_name: contactDisplay,
+          quote_token: quoteToken,
+          client_message: message,
+          metadata: {
+            quoteId: quoteRow.id,
+            source: "public_quote",
+          },
+          read: false,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        });
+      if (notificationError) {
+        console.error(
+          "[api/public/quotes/:token/requests][POST] Supabase notification insert error",
+          notificationError,
+        );
+        throw new Error(notificationError.message);
       }
 
       return new Response(
@@ -220,6 +285,20 @@ export async function POST(request, { params }) {
         }),
         {
           status: 403,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const currentJobQuoteStatus = String(job.quote_status || "").toLowerCase();
+    if (["approved", "signed", "declined"].includes(currentJobQuoteStatus)) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "This quote has already received a final response.",
+        }),
+        {
+          status: 409,
           headers: { "Content-Type": "application/json" },
         },
       );
