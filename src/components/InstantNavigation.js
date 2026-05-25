@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useEffect } from "react";
 
 const PREFETCH_TTL_MS = 5 * 60 * 1000;
@@ -94,8 +94,18 @@ function collectInternalRoutesFromAnchors() {
 
 export default function InstantNavigation() {
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
+    if (
+      pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/reset-password" ||
+      pathname === "/verify-email"
+    ) {
+      return;
+    }
+
     const prefetchedInSession = new Set();
 
     const prefetchRoute = (route) => {
@@ -228,7 +238,7 @@ export default function InstantNavigation() {
       document.removeEventListener("mousedown", onMouseDown, true);
       document.removeEventListener("click", onClick, true);
     };
-  }, [router]);
+  }, [pathname, router]);
 
   return null;
 }

@@ -241,7 +241,7 @@ export default function AuthShell({ children }) {
   ]);
 
   useEffect(() => {
-    if (isPublicPage) return;
+    if (isPublicPage || isResetPasswordPage) return;
 
     let cancelled = false;
 
@@ -262,10 +262,10 @@ export default function AuthShell({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [isPublicPage]);
+  }, [isPublicPage, isResetPasswordPage]);
 
   useEffect(() => {
-    if (isPublicPage) {
+    if (isPublicPage || isResetPasswordPage) {
       setAuthHydrating(false);
       return;
     }
@@ -335,7 +335,7 @@ export default function AuthShell({ children }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [isPublicPage]);
+  }, [isPublicPage, isResetPasswordPage, pathname]);
 
   useEffect(() => {
     if (!AUTH_DEBUG) return;
@@ -624,7 +624,7 @@ export default function AuthShell({ children }) {
   useEffect(() => {
     if (!hasMounted) return;
 
-    if (isPublicPage) {
+    if (isPublicPage || isResetPasswordPage) {
       setAuthChecked(true);
       return;
     }
@@ -657,7 +657,7 @@ export default function AuthShell({ children }) {
     return () => {
       active = false;
     };
-  }, [hasMounted, isPublicPage, fetchMe, pathname]);
+  }, [hasMounted, isPublicPage, isResetPasswordPage, fetchMe, pathname]);
 
   useEffect(() => {
     if (isPublicPage) {
