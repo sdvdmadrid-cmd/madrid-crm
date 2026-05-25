@@ -152,6 +152,11 @@ function NewEstimatePageInner() {
   const [clientQuery, setClientQuery] = useState("");
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
 
+  // Preview-before-send: pause the "Save & Send" flow on a modal that
+  // mirrors the customer-facing email. The contractor confirms before the
+  // email actually leaves. Setting this to true never bypasses validation.
+  const [previewOpen, setPreviewOpen] = useState(false);
+
   const basePriceNumber = useMemo(() => Math.max(0, toNumber(basePrice, 0)), [basePrice]);
   const discountNumber = useMemo(() => Math.max(0, toNumber(discount, 0)), [discount]);
   const discountAmount = useMemo(() => {
@@ -364,27 +369,54 @@ function NewEstimatePageInner() {
   const touchField = (key) =>
     setFieldErrors((prev) => ({ ...prev, [key]: "touched" }));
 
-  async function save(nextStatus) {
+  /**
+   * Validate the form for the requested next status. Combines the granular
+   * liveErrors (from Package A's quick-wins audit) with the send-channel
+   * checks that only apply when the contractor is actually sending. Returns
+   * true when the form is ready to be persisted.
+   */
+  function validateForSave(nextStatus) {
     setSubmitAttempted(true);
-    setDeliveryNotice("");
-
     if (Object.keys(liveErrors).length > 0) {
       setStatusMessage("Please fix the highlighted fields before saving.");
-      return;
+      return false;
     }
-
     if (nextStatus === "sent" && !sendViaEmail && !sendViaText) {
       setStatusMessage("Select at least one send channel: email or text.");
-      return;
+      return false;
     }
     if (nextStatus === "sent" && sendViaEmail && !clientEmail.trim()) {
       setStatusMessage("Client email is required to send by email.");
-      return;
+      return false;
     }
     if (nextStatus === "sent" && sendViaText && !clientPhone.trim()) {
       setStatusMessage("Client phone is required to send by text.");
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Entry point bound to UI buttons. For drafts we save immediately; for
+   * "sent" we first show the preview modal so the contractor sees what the
+   * customer will actually receive before the email leaves.
+   */
+  function handleSaveClick(nextStatus) {
+    setStatusMessage("");
+    setDeliveryNotice("");
+    if (!validateForSave(nextStatus)) return;
+    if (nextStatus === "sent") {
+      setPreviewOpen(true);
       return;
     }
+    save("draft");
+  }
+
+  async function save(nextStatus) {
+    // Defense-in-depth: the modal already validated, but if save() is
+    // called directly we keep guarding here.
+    if (!validateForSave(nextStatus)) return;
+    setDeliveryNotice("");
 
     const fullClientName = [clientPrefix, clientFirstName.trim(), clientLastName.trim()]
       .filter(Boolean)
@@ -521,7 +553,7 @@ function NewEstimatePageInner() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => save("draft")}
+            onClick={() => handleSaveClick("draft")}
             disabled={saving}
             aria-label="Save as draft"
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
@@ -530,7 +562,7 @@ function NewEstimatePageInner() {
           </button>
           <button
             type="button"
-            onClick={() => save("sent")}
+            onClick={() => handleSaveClick("sent")}
             disabled={saving}
             aria-label={editId && editingStatus === "changes_requested" ? "Save and resend to client" : "Save and send to client"}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
@@ -932,7 +964,7 @@ function NewEstimatePageInner() {
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => save("draft")}
+              onClick={() => handleSaveClick("draft")}
               disabled={saving}
               className="h-12 rounded-xl border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
@@ -940,7 +972,7 @@ function NewEstimatePageInner() {
             </button>
             <button
               type="button"
-              onClick={() => save("sent")}
+              onClick={() => handleSaveClick("sent")}
               disabled={saving}
               className="h-12 rounded-xl bg-emerald-600 px-6 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
             >
@@ -954,6 +986,185 @@ function NewEstimatePageInner() {
               Cancel
             </button>
           </div>
+        </div>
+      </div>
+
+      {previewOpen ? (
+        <EstimatePreviewModal
+          clientName={[clientPrefix, clientFirstName.trim(), clientLastName.trim()].filter(Boolean).join(" ") || "Customer"}
+          clientEmail={clientEmail.trim()}
+          clientPhone={clientPhone.trim()}
+          sendViaEmail={sendViaEmail}
+          sendViaText={sendViaText}
+          total={estimateTotal}
+          subtotal={subtotal}
+          taxAmount={taxAmount}
+          discountAmount={discountAmount}
+          basePrice={basePriceNumber}
+          jobDescription={jobDescription.trim()}
+          serviceAddress={[streetName.trim(), city.trim(), [stateField.trim(), zipCode.trim()].filter(Boolean).join(" ")].filter(Boolean).join(", ")}
+          saving={saving}
+          onCancel={() => setPreviewOpen(false)}
+          onConfirm={() => {
+            setPreviewOpen(false);
+            save("sent");
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Visual preview of the customer-facing email shown before the contractor
+ * presses Send. The styling intentionally tracks the server template in
+ * src/lib/estimate-notifications.js. Updating one without the other will
+ * cause drift the contractor will notice immediately, which is the point.
+ */
+function EstimatePreviewModal({
+  clientName,
+  clientEmail,
+  clientPhone,
+  sendViaEmail,
+  sendViaText,
+  total,
+  subtotal,
+  taxAmount,
+  discountAmount,
+  basePrice,
+  jobDescription,
+  serviceAddress,
+  saving,
+  onCancel,
+  onConfirm,
+}) {
+  const formattedTotal = formatMoney(total);
+  const channelsLine = [
+    sendViaEmail && clientEmail ? `Email · ${clientEmail}` : null,
+    sendViaText && clientPhone ? `Text · ${clientPhone}` : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 px-4 py-6 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Preview estimate before sending"
+    >
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Preview before sending</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              This is exactly what {clientName} will receive. Review the amounts and copy below.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close preview"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto bg-slate-50 px-5 py-5">
+          {channelsLine ? (
+            <div className="mb-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+              <span className="font-semibold text-slate-700">Sending via:</span> {channelsLine}
+            </div>
+          ) : null}
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="text-xs uppercase tracking-wide text-slate-400">Subject</div>
+            <div className="mt-1 text-sm font-semibold text-slate-800">
+              Your Estimate is Ready
+            </div>
+
+            <hr className="my-4 border-slate-200" />
+
+            <p className="text-sm text-slate-600">Hi {clientName || "Friend"},</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Your estimate has been prepared. Please review the details and let us know how you&apos;d
+              like to proceed.
+            </p>
+
+            <div className="my-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[11px] uppercase tracking-wider text-slate-500">Total</div>
+              <div className="text-2xl font-bold text-slate-900">{formattedTotal}</div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="text-xs font-semibold text-slate-500">Breakdown</div>
+              <div className="mt-2 space-y-1 text-sm text-slate-700">
+                <div className="flex justify-between">
+                  <span>Base price</span>
+                  <span>{formatMoney(basePrice)}</span>
+                </div>
+                {discountAmount > 0 ? (
+                  <div className="flex justify-between text-rose-600">
+                    <span>Discount</span>
+                    <span>-{formatMoney(discountAmount)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between border-t border-slate-200 pt-1 font-medium">
+                  <span>Subtotal</span>
+                  <span>{formatMoney(subtotal)}</span>
+                </div>
+                {taxAmount > 0 ? (
+                  <div className="flex justify-between">
+                    <span>Tax</span>
+                    <span>{formatMoney(taxAmount)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between border-t border-slate-200 pt-1 text-base font-semibold text-slate-900">
+                  <span>Total</span>
+                  <span>{formattedTotal}</span>
+                </div>
+              </div>
+            </div>
+
+            {serviceAddress ? (
+              <div className="mt-4 text-xs text-slate-500">
+                <span className="font-semibold text-slate-600">Service address:</span> {serviceAddress}
+              </div>
+            ) : null}
+
+            {jobDescription ? (
+              <div className="mt-3 whitespace-pre-wrap text-xs text-slate-500">
+                <span className="font-semibold text-slate-600">Scope of work:</span>{" "}
+                {jobDescription.length > 240 ? `${jobDescription.slice(0, 240)}…` : jobDescription}
+              </div>
+            ) : null}
+
+            <div className="mt-5">
+              <div className="inline-block rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white">
+                View Estimate &amp; Respond
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Edit estimate
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+          >
+            {saving ? "Sending..." : "Send to customer"}
+          </button>
         </div>
       </div>
     </div>
