@@ -41,7 +41,6 @@ import {
 import { compressImageFile, fileToDataUrl } from "@/lib/website-image-compress";
 import WebsiteBuilderPortfolio from "./WebsiteBuilderPortfolio";
 import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
-import DeployBuildBadge from "@/components/workspace/DeployBuildBadge";
 import HeroImageEditor from "./HeroImageEditor";
 import WebsiteBuilderLaunch from "./WebsiteBuilderLaunch";
 import WebsiteBuilderFloatingBar from "./WebsiteBuilderFloatingBar";
@@ -1946,7 +1945,6 @@ export default function WebsiteBuilderClient() {
           </aside>
         ) : null}
       </div>
-      <DeployBuildBadge className={styles.buildBadge} />
     </div>
     </WebsiteBuilderEditProvider>
   );
