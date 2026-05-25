@@ -32,6 +32,9 @@ export const DEFAULT_COMPANY_PROFILE = {
   defaultTaxState: "TX",
   defaultInvoiceDueDays: 14,
   serviceCatalogPreferences: {},
+  // Paquete I: when set, estimates with total > this amount require a
+  // typed customer signature on approval. null = no signature required.
+  signatureRequiredAboveAmount: null,
 };
 
 function mapSupabaseRow(row = {}) {
@@ -58,6 +61,12 @@ function mapSupabaseRow(row = {}) {
       typeof row.service_catalog_preferences === "object"
         ? row.service_catalog_preferences
         : {},
+    signatureRequiredAboveAmount:
+      row?.signature_required_above_amount === null ||
+      row?.signature_required_above_amount === undefined ||
+      row?.signature_required_above_amount === ""
+        ? null
+        : Number(row.signature_required_above_amount),
     updatedAt: row?.updated_at || null,
   };
 }
@@ -108,6 +117,12 @@ function toSupabaseRow(tenantId, profile = {}, userId, { includeExtendedColumns 
       typeof profile.serviceCatalogPreferences === "object"
         ? profile.serviceCatalogPreferences
         : {},
+    signature_required_above_amount:
+      profile.signatureRequiredAboveAmount === null ||
+      profile.signatureRequiredAboveAmount === undefined ||
+      profile.signatureRequiredAboveAmount === ""
+        ? null
+        : Math.max(0, Number(profile.signatureRequiredAboveAmount) || 0),
   };
 }
 
@@ -155,6 +170,25 @@ export async function upsertCompanyProfileForTenant({
     .upsert(payload, { onConflict: "tenant_id" })
     .select("*")
     .single();
+
+  // Two graceful-degrade retries:
+  //   1. Newer column (signature_required_above_amount) not yet applied →
+  //      strip just that field and retry, so the rest of the profile saves.
+  //   2. Whole extended-columns set missing → fall back to the minimal row
+  //      (existing behavior).
+  if (error && isMissingColumnError(error, "signature_required_above_amount")) {
+    console.warn(
+      "[company-profile-store] Retrying upsert without signature_required_above_amount",
+      error.message,
+    );
+    const { signature_required_above_amount: _omit, ...withoutSignatureCol } = payload;
+    void _omit;
+    ({ data, error } = await supabaseAdmin
+      .from("company_profiles")
+      .upsert(withoutSignatureCol, { onConflict: "tenant_id" })
+      .select("*")
+      .single());
+  }
 
   if (error && isMissingColumnError(error, "public_display_name")) {
     console.warn(

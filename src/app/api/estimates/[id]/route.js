@@ -56,6 +56,14 @@ function parseNotes(notes) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && parsed.kind === "estimate_pipeline") {
+      const signature =
+        parsed.audit?.signature && typeof parsed.audit.signature === "object"
+          ? {
+              name: String(parsed.audit.signature.name || ""),
+              signedAt: String(parsed.audit.signature.signedAt || ""),
+              ip: String(parsed.audit.signature.ip || ""),
+            }
+          : null;
       return {
         address: String(parsed.address || ""),
         noteText: String(parsed.noteText || ""),
@@ -68,6 +76,7 @@ function parseNotes(notes) {
           changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
           resentAt: String(parsed.audit?.resentAt || ""),
           resendCount: Number(parsed.audit?.resendCount || 0),
+          signature,
         },
       };
     }
@@ -86,11 +95,22 @@ function parseNotes(notes) {
       changesRequestedAt: "",
       resentAt: "",
       resendCount: 0,
+      signature: null,
     },
   };
 }
 
 function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", audit = {} }) {
+  // Carry the signature through if the customer signed previously, so a
+  // subsequent contractor PATCH doesn't accidentally wipe the audit trail.
+  const signature =
+    audit.signature && typeof audit.signature === "object"
+      ? {
+          name: String(audit.signature.name || ""),
+          signedAt: String(audit.signature.signedAt || ""),
+          ip: String(audit.signature.ip || ""),
+        }
+      : null;
   return JSON.stringify({
     kind: "estimate_pipeline",
     address: String(address || ""),
@@ -104,6 +124,7 @@ function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientP
       changesRequestedAt: String(audit.changesRequestedAt || ""),
       resentAt: String(audit.resentAt || ""),
       resendCount: Number(audit.resendCount || 0),
+      ...(signature ? { signature } : {}),
     },
   });
 }
@@ -116,6 +137,10 @@ function withStatusAudit(existingAudit, previousStatus, nextStatus, nowIso) {
     changesRequestedAt: String(existingAudit?.changesRequestedAt || ""),
     resentAt: String(existingAudit?.resentAt || ""),
     resendCount: Number(existingAudit?.resendCount || 0),
+    signature:
+      existingAudit?.signature && typeof existingAudit.signature === "object"
+        ? existingAudit.signature
+        : null,
   };
 
   if (!nextStatus || nextStatus === previousStatus) return audit;
