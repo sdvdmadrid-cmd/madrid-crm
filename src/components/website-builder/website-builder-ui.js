@@ -125,6 +125,19 @@ export const WEBSITE_BUILDER_UI = {
     servicePriceLabel: "Price (optional)",
     publishedBadge: "Published",
     draftBadge: "Draft",
+    publishStateLive: "Live and in sync",
+    publishStateDirty: "Unpublished changes pending",
+    publishStateNever: "Not published yet",
+    publishDirtyHint:
+      "Every change you make stays in this draft. Customers will only see them after you click Publish.",
+    publishChangesCta: "Publish changes",
+    discardDraft: "Discard changes",
+    discardDraftConfirm:
+      "Discard all unpublished changes? Your draft will be reset to the version that is currently live.",
+    discardedDraft: "Draft reset to live version.",
+    leaveUnpublishedWarning:
+      "You have unpublished changes. Leave without publishing?",
+    errorLoad: "Couldn't reload website draft.",
     generateHint: "Uses your company profile, industry pack, and services catalog.",
     savedNotice: "Changes saved.",
     errorGenerate: "AI generation failed.",
@@ -279,6 +292,19 @@ export const WEBSITE_BUILDER_UI = {
     servicePriceLabel: "Precio",
     publishedBadge: "Publicado",
     draftBadge: "Borrador",
+    publishStateLive: "En vivo y sincronizado",
+    publishStateDirty: "Cambios sin publicar",
+    publishStateNever: "Aun no publicado",
+    publishDirtyHint:
+      "Cada cambio queda en este borrador. Los clientes solo lo veran cuando aprietes Publicar.",
+    publishChangesCta: "Publicar cambios",
+    discardDraft: "Descartar cambios",
+    discardDraftConfirm:
+      "Descartar todos los cambios sin publicar? El borrador volvera a la version que esta en vivo.",
+    discardedDraft: "Borrador restaurado a la version en vivo.",
+    leaveUnpublishedWarning:
+      "Tienes cambios sin publicar. Salir sin publicar?",
+    errorLoad: "No se pudo recargar el borrador.",
     generateHint: "Usa perfil, industria y catálogo de servicios.",
     savedNotice: "Guardado.",
     errorGenerate: "Error al generar.",
@@ -370,6 +396,19 @@ export const WEBSITE_BUILDER_UI = {
     servicePriceLabel: "Cena",
     publishedBadge: "Opublikowano",
     draftBadge: "Szkic",
+    publishStateLive: "Online i zsynchronizowane",
+    publishStateDirty: "Niezopublikowane zmiany",
+    publishStateNever: "Jeszcze nie opublikowano",
+    publishDirtyHint:
+      "Kazda zmiana zostaje w szkicu. Klienci zobacza ja dopiero po klikniecu Publikuj.",
+    publishChangesCta: "Opublikuj zmiany",
+    discardDraft: "Odrzuc zmiany",
+    discardDraftConfirm:
+      "Odrzucic wszystkie niezopublikowane zmiany? Szkic wroci do wersji na zywo.",
+    discardedDraft: "Szkic przywrocony do wersji online.",
+    leaveUnpublishedWarning:
+      "Masz niezopublikowane zmiany. Wyjsc bez publikacji?",
+    errorLoad: "Nie udalo sie ponownie zaladowac szkicu.",
     generateHint: "Profil firmy, branża i usługi.",
     savedNotice: "Zapisano.",
     errorGenerate: "Błąd generowania.",

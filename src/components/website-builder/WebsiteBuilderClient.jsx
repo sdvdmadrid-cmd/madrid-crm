@@ -152,6 +152,8 @@ export default function WebsiteBuilderClient() {
   const [websitePath, setWebsitePath] = useState("");
   const [publicUrl, setPublicUrl] = useState("");
   const [published, setPublished] = useState(false);
+  const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
+  const [lastPublishedAt, setLastPublishedAt] = useState(null);
   const [companyProfile, setCompanyProfile] = useState(null);
   const [industryKey, setIndustryKey] = useState("general");
   const [profileIndustry, setProfileIndustry] = useState("general");
@@ -205,13 +207,17 @@ export default function WebsiteBuilderClient() {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  const applyApiPayload = useCallback((data) => {
+  const applyApiPayload = useCallback((data, meta = null) => {
     const nextSlug = data.slug || "";
     setSlug(nextSlug);
     setSlugDraft(nextSlug);
     setWebsitePath(data.websitePath || buildPublicWebsitePath(nextSlug));
     setPublicUrl(data.publicUrl || "");
     setPublished(data.published === true);
+    if (meta) {
+      setHasUnpublishedChanges(Boolean(meta.hasUnpublishedChanges));
+      setLastPublishedAt(meta.lastPublishedAt || null);
+    }
     setCompanyProfile(data.companyProfile || null);
     setIndustryKey(data.industry || "general");
     setProfileIndustry(data.profileIndustry || data.industry || "general");
@@ -301,6 +307,17 @@ export default function WebsiteBuilderClient() {
   }, [form, siteMeta]);
 
   useEffect(() => {
+    if (!hasUnpublishedChanges) return undefined;
+    const handler = (event) => {
+      event.preventDefault();
+      event.returnValue = t.leaveUnpublishedWarning;
+      return t.leaveUnpublishedWarning;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnpublishedChanges, t.leaveUnpublishedWarning]);
+
+  useEffect(() => {
     apiFetch("/api/website-builder/setup-status", { suppressUnauthorizedEvent: true })
       .then((res) => (res.ok ? res.json() : null))
       .then((payload) => {
@@ -314,7 +331,7 @@ export default function WebsiteBuilderClient() {
   useEffect(() => {
     apiFetch("/api/website-builder")
       .then((res) => getJsonOrThrow(res, "Load failed"))
-      .then(({ data }) => applyApiPayload(data))
+      .then(({ data, meta }) => applyApiPayload(data, meta))
       .catch((err) => setError(err.message || "Load failed"))
       .finally(() => setLoading(false));
 
@@ -410,9 +427,15 @@ export default function WebsiteBuilderClient() {
               setSlug(payload.data.slug || slug);
               setSlugDraft(payload.data.slug || slug);
               setPublished(payload.data.published === true);
+              if (payload.meta) {
+                setHasUnpublishedChanges(
+                  Boolean(payload.meta.hasUnpublishedChanges),
+                );
+                setLastPublishedAt(payload.meta.lastPublishedAt || null);
+              }
               setIndustryMismatch(payload.data.industryMismatch === true);
             } else {
-              applyApiPayload(payload.data);
+              applyApiPayload(payload.data, payload.meta);
             }
           }
 
@@ -500,7 +523,7 @@ export default function WebsiteBuilderClient() {
       if (!res.ok) {
         throw new Error(payload?.error || t.errorSave);
       }
-      if (payload?.data) applyApiPayload(payload.data);
+      if (payload?.data) applyApiPayload(payload.data, payload.meta);
       showNotice(t.savedNotice);
     } catch (err) {
       const msg = String(err?.message || "");
@@ -530,7 +553,7 @@ export default function WebsiteBuilderClient() {
           }),
         });
         const payload = await getJsonOrThrow(res, t.errorSave);
-        if (payload?.data) applyApiPayload(payload.data);
+        if (payload?.data) applyApiPayload(payload.data, payload.meta);
       } catch (err) {
         showNotice(err.message || t.errorSave, true);
       } finally {
@@ -860,22 +883,44 @@ export default function WebsiteBuilderClient() {
 
   const handlePublishToggle = useCallback(async () => {
     setPublishing(true);
-    const newPublished = !published;
+    const goPublish = !published || hasUnpublishedChanges;
     try {
-      const res = await apiFetch("/api/website-builder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, siteMeta, published: newPublished }),
-      });
-      await getJsonOrThrow(res, t.errorSave);
-      setPublished(newPublished);
-      showNotice(newPublished ? t.publishedBadge : t.draftBadge);
+      const endpoint = goPublish
+        ? "/api/website-builder/publish"
+        : "/api/website-builder/unpublish";
+      const res = await apiFetch(endpoint, { method: "POST" });
+      const payload = await getJsonOrThrow(res, t.errorSave);
+      setPublished(payload?.data?.published === true);
+      setHasUnpublishedChanges(false);
+      setLastPublishedAt(payload?.data?.lastPublishedAt || null);
+      showNotice(goPublish ? t.publishedBadge : t.draftBadge);
     } catch (err) {
       showNotice(err.message || t.errorSave, true);
     } finally {
       setPublishing(false);
     }
-  }, [published, form, t, showNotice]);
+  }, [published, hasUnpublishedChanges, t, showNotice]);
+
+  const handleDiscardDraft = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(t.discardDraftConfirm);
+      if (!ok) return;
+    }
+    try {
+      const res = await apiFetch("/api/website-builder/discard-draft", {
+        method: "POST",
+      });
+      await getJsonOrThrow(res, t.errorSave);
+      // Reload the draft view from the server (now restored to live).
+      const reload = await apiFetch("/api/website-builder", { cache: "no-store" });
+      const payload = await getJsonOrThrow(reload, t.errorLoad);
+      applyApiPayload(payload.data, payload.meta);
+      setHasUnpublishedChanges(false);
+      showNotice(t.discardedDraft);
+    } catch (err) {
+      showNotice(err.message || t.errorSave, true);
+    }
+  }, [applyApiPayload, t, showNotice]);
 
   const setField = useCallback((key, value) => {
     setForm((prev) => {
@@ -1177,11 +1222,48 @@ export default function WebsiteBuilderClient() {
           </p>
         </div>
         <div className={styles.actions}>
-          <span
-            className={`${styles.badge} ${published ? styles.badgePub : styles.badgeDraft}`}
-          >
-            {published ? `🟢 ${t.publishedBadge}` : `⚪ ${t.draftBadge}`}
-          </span>
+          {(() => {
+            const dirty = hasUnpublishedChanges;
+            const liveAndSynced = published && !dirty;
+            const badgeLabel = liveAndSynced
+              ? `🟢 ${t.publishStateLive}`
+              : dirty
+                ? `🟡 ${t.publishStateDirty}`
+                : `⚪ ${t.publishStateNever}`;
+            const badgeClass = liveAndSynced
+              ? styles.badgePub
+              : dirty
+                ? `${styles.badgeDraft} ${styles.badgeDirty || ""}`
+                : styles.badgeDraft;
+            return (
+              <span
+                className={`${styles.badge} ${badgeClass}`}
+                title={dirty ? t.publishDirtyHint : undefined}
+              >
+                {badgeLabel}
+              </span>
+            );
+          })()}
+          {hasUnpublishedChanges ? (
+            <>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnSave}`}
+                disabled={publishing || saving}
+                onClick={handlePublishToggle}
+              >
+                {publishing ? t.publishing : t.publishChangesCta}
+              </button>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnGhost}`}
+                disabled={publishing || saving}
+                onClick={handleDiscardDraft}
+              >
+                {t.discardDraft}
+              </button>
+            </>
+          ) : null}
           {autoSaved || saving ? (
             <span className={styles.saveStatus}>
               {saving ? t.savingAuto : t.savedAuto}
@@ -1210,11 +1292,21 @@ export default function WebsiteBuilderClient() {
           {builderStep === 5 ? (
             <button
               type="button"
-              className={`${styles.btn} ${published ? styles.btnDanger : styles.btnSave}`}
+              className={`${styles.btn} ${
+                published && !hasUnpublishedChanges
+                  ? styles.btnDanger
+                  : styles.btnSave
+              }`}
               disabled={publishing || saving}
               onClick={handlePublishToggle}
             >
-              {publishing ? t.publishing : published ? t.unpublish : t.publishLive}
+              {publishing
+                ? t.publishing
+                : published && !hasUnpublishedChanges
+                  ? t.unpublish
+                  : !published
+                    ? t.publishLive
+                    : t.publishChangesCta}
             </button>
           ) : null}
         </div>
@@ -1252,6 +1344,20 @@ export default function WebsiteBuilderClient() {
           {!aiConfigOk ? (
             <div className={styles.hintBox} style={{ margin: "8px 16px 0" }}>
               {t.aiConfigMissing}
+            </div>
+          ) : null}
+          {hasUnpublishedChanges ? (
+            <div
+              className={styles.hintBox}
+              style={{
+                margin: "8px 16px 0",
+                borderColor: "rgba(245,158,11,0.55)",
+                background: "rgba(245,158,11,0.12)",
+                color: "#fbbf24",
+              }}
+              role="status"
+            >
+              {t.publishDirtyHint}
             </div>
           ) : null}
           {builderStep === 3 ? (
