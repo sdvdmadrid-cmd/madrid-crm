@@ -4,6 +4,7 @@ import { getAuthenticatedTenantContext } from "@/lib/tenant";
 const VERIFICATION_EVENT_TYPES = [
   "signup_verification",
   "signup_verification_resend",
+  "password_reset",
 ];
 
 function normalizeLimit(value) {

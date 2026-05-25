@@ -93,6 +93,9 @@ async function sendWithResend({ to, subject, html, text, metadata }) {
         text,
         tags: [
           { name: "tenantId", value: metadata?.tenantId || "default" },
+          ...(metadata?.eventType
+            ? [{ name: "eventType", value: String(metadata.eventType) }]
+            : []),
           ...(metadata?.campaignId
             ? [{ name: "campaignId", value: String(metadata.campaignId) }]
             : []),

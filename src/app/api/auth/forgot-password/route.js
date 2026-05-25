@@ -16,8 +16,6 @@ import { isTestEmailDomain as isTestEmailDomainDefault } from "@/lib/production-
 
 const PASSWORD_RESET_EVENT_TYPE = "password_reset";
 
-// Resend is only usable when: provider=resend, has API key, and EMAIL_FROM is a
-// verified domain (not a test domain like onboarding@resend.dev in production).
 export function isResendUsable(env = process.env, isTestEmailDomain = isTestEmailDomainDefault) {
   const emailProvider = String(env.EMAIL_PROVIDER || "mock").trim().toLowerCase();
   const emailFrom = String(env.EMAIL_FROM || "").trim();
@@ -37,17 +35,11 @@ function createJsonResponse(payload, status = 200, headers = {}) {
 }
 
 export function createGenericResponse() {
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message:
-        "If an account exists for this email, a password reset link has been sent.",
-    }),
-    {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    },
-  );
+  return createJsonResponse({
+    success: true,
+    message:
+      "If an account exists for this email, a password reset link has been sent.",
+  });
 }
 
 function createDeliveryFailureResponse() {
@@ -141,7 +133,7 @@ export function buildResetEmailHtml(resetUrl) {
               </a>
             </div>
             <p style="margin:0 0 8px;font-size:13px;color:#9ca3af;">
-              If you didn't request a password reset, you can safely ignore this email — your password won't change.
+              If you didn't request a password reset, you can safely ignore this email - your password won't change.
             </p>
             <p style="margin:0;font-size:12px;color:#d1d5db;word-break:break-all;">
               Or copy this link: ${resetUrl}
@@ -150,7 +142,7 @@ export function buildResetEmailHtml(resetUrl) {
         </tr>
         <tr>
           <td style="padding:20px 40px;border-top:1px solid #f3f4f6;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;">© ${new Date().getFullYear()} FieldBase. All rights reserved.</p>
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; ${new Date().getFullYear()} FieldBase. All rights reserved.</p>
           </td>
         </tr>
       </table>
@@ -177,13 +169,10 @@ const defaultDeps = {
 export async function handleForgotPassword(request, deps = defaultDeps) {
   try {
     const body = await request.json().catch(() => ({}));
-    const email = String(body.email || "")
-      .trim()
-      .toLowerCase();
+    const email = String(body.email || "").trim().toLowerCase();
     const env = deps.env || process.env;
     const superAdminEmail = getSuperAdminEmail(env);
-    const isSuperAdminRequest =
-      Boolean(superAdminEmail) && email === superAdminEmail;
+    const isSuperAdminRequest = Boolean(superAdminEmail) && email === superAdminEmail;
     const ip = deps.getRequestIp(request);
 
     if (!isValidEmail(email)) {
@@ -208,13 +197,9 @@ export async function handleForgotPassword(request, deps = defaultDeps) {
 
     const origin = deps.getRequestOrigin(request) || getAppUrl(env);
 
-    // ── Admin: always return a direct reset link (no email needed) ────────────
     if (isSuperAdminRequest) {
       try {
-        const debugLink = await deps.generatePasswordRecoveryLink({
-          email,
-          origin,
-        });
+        const debugLink = await deps.generatePasswordRecoveryLink({ email, origin });
         return createJsonResponse({
           success: true,
           message: "Admin direct reset link generated.",
@@ -229,8 +214,6 @@ export async function handleForgotPassword(request, deps = defaultDeps) {
       }
     }
 
-    // ── Regular users ────────────────────────────────────────────────────────
-    // Path A: Resend with a verified sending domain → FieldBase-branded email.
     if (isResendUsable(env, deps.isTestEmailDomain)) {
       try {
         const result = await deps.generatePasswordRecoveryLink({ email, origin });
@@ -240,8 +223,16 @@ export async function handleForgotPassword(request, deps = defaultDeps) {
           to: email,
           subject: "Reset your FieldBase password",
           html: buildResetEmailHtml(resetUrl),
-          text: `Reset your FieldBase password\n\nClick this link to reset your password (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
-          metadata: { tenantId: normalizeResetTenantId(result.user) },
+          text: `Reset your FieldBase password
+
+Click this link to reset your password (expires in 1 hour):
+${resetUrl}
+
+If you didn't request this, ignore this email.`,
+          metadata: {
+            tenantId: normalizeResetTenantId(result.user),
+            eventType: PASSWORD_RESET_EVENT_TYPE,
+          },
         });
 
         await logPasswordResetEmailAttempt({
@@ -261,21 +252,15 @@ export async function handleForgotPassword(request, deps = defaultDeps) {
           provider: emailResult?.provider,
           error: emailResult?.error,
         });
-        // Fall through to Supabase path below.
       } catch (resendErr) {
         console.error("[api/auth/forgot-password] Resend flow error", {
           error: resendErr?.message || "unknown",
         });
-        // Fall through to Supabase path below.
       }
     }
 
-    // Path B: Supabase native email (works without a verified custom domain).
     try {
-      await deps.sendPasswordRecoveryEmailViaSupabase({
-        email,
-        origin,
-      });
+      await deps.sendPasswordRecoveryEmailViaSupabase({ email, origin });
       await logPasswordResetEmailAttempt({
         deps,
         email,

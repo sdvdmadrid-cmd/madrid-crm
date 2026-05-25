@@ -6,6 +6,19 @@ const LOGS = "email_logs";
 
 function parseEvent(item = {}) {
   const meta = item.metadata || item.meta || {};
+  const tagList = Array.isArray(item.tags)
+    ? item.tags
+    : Array.isArray(item.data?.tags)
+      ? item.data.tags
+      : [];
+  const tags = Object.fromEntries(
+    tagList
+      .map((tag) => [
+        String(tag?.name || tag?.key || "").trim(),
+        String(tag?.value || "").trim(),
+      ])
+      .filter(([key]) => key),
+  );
   const statusRaw = item.event || item.type || item.status || item.eventType;
   const status = normalizeEventStatus(statusRaw);
 
@@ -17,8 +30,8 @@ function parseEvent(item = {}) {
       item.email_id ||
       item.data?.email_id ||
       null,
-    campaignId: item.campaignId || meta.campaignId || null,
-    tenantId: item.tenantId || meta.tenantId || "",
+    campaignId: item.campaignId || meta.campaignId || tags.campaignId || null,
+    tenantId: item.tenantId || meta.tenantId || tags.tenantId || "",
     recipient: String(item.recipient || item.email || item.to || "")
       .toLowerCase()
       .trim(),
@@ -89,7 +102,6 @@ export async function POST(request) {
         .from(LOGS)
         .update({
           status: event.status,
-          event_type: event.eventType,
           error: event.error,
           updated_at: new Date().toISOString(),
           last_event_at: eventDateIso,

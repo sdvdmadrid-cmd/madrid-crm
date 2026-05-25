@@ -5,7 +5,6 @@ import { normalizeAppRole } from "@/lib/access-control";
 import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { getSessionFromRequest } from "@/lib/auth";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
-import { getSupabasePublicConfig } from "@/lib/supabase-public-config";
 
 let supabaseAdminClientPromise = null;
 
@@ -16,6 +15,17 @@ async function getSupabaseAdminClient() {
     );
   }
   return supabaseAdminClientPromise;
+}
+
+function getSupabasePublicConfig() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !supabasePublishableKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    );
+  }
+  return { supabaseUrl, supabasePublishableKey };
 }
 
 export function createSupabaseServerAuthClient() {
@@ -367,10 +377,9 @@ function buildOriginCandidates(origin) {
 }
 
 export function getAuthCallbackUrl(origin) {
+  const productionCallback = "https://fieldbaseapp.net/auth/callback";
   if (process.env.NODE_ENV === "production") {
-    const candidates = buildOriginCandidates(origin);
-    const baseOrigin = candidates[0] || "https://fieldbaseapp.net";
-    return `${baseOrigin}/auth/callback`;
+    return productionCallback;
   }
 
   const candidates = buildOriginCandidates(origin);
