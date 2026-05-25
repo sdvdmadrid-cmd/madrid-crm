@@ -42,6 +42,13 @@ import {
   persistGalleryPhotosForStorage,
   persistHeroPhotosForStorage,
 } from "@/lib/website-media-storage";
+import {
+  draftSnapshotToColumnPatch,
+  hashDraftSnapshot,
+  mergeWebsiteDraftPatch,
+  readWebsiteDraftSnapshot,
+  readWebsiteLiveSnapshot,
+} from "@/lib/website-draft-snapshot";
 
 const WEBSITE_TABLE = "contractor_websites";
 
@@ -197,6 +204,41 @@ function serializeWebsiteRow(row, profile, request) {
   };
 }
 
+/**
+ * Project a database row into the "what the builder sees" shape by
+ * overlaying the draft snapshot on top of the live columns. The public
+ * site keeps reading the raw row, so this projection is builder-only.
+ */
+function projectRowForBuilder(row) {
+  const draft = readWebsiteDraftSnapshot(row);
+  return {
+    ...row,
+    headline: draft.headline,
+    subheadline: draft.subheadline,
+    about_text: draft.aboutText,
+    cta_text: draft.ctaText,
+    theme_color: draft.themeColor,
+    services: draft.services,
+    gallery_photos: draft.galleryPhotos,
+    site_meta: draft.siteMeta,
+  };
+}
+
+function buildPublishMeta(row, draftSnapshot) {
+  const liveSnapshot = readWebsiteLiveSnapshot(row);
+  const draftHash = hashDraftSnapshot(draftSnapshot);
+  const liveHash = hashDraftSnapshot(liveSnapshot);
+  return {
+    published: row?.published === true,
+    hasUnpublishedChanges:
+      row?.has_unpublished_changes === true || draftHash !== liveHash,
+    lastPublishedAt: row?.last_published_at || null,
+    draftUpdatedAt: row?.draft_updated_at || row?.updated_at || null,
+    draftHash,
+    liveHash,
+  };
+}
+
 function generateSlug(companyName) {
   const base =
     normalizeWebsiteSlug(
@@ -274,9 +316,12 @@ export async function GET(request) {
     }
   }
 
+  const draftSnapshot = readWebsiteDraftSnapshot(row);
+  const projected = projectRowForBuilder(row);
   return Response.json({
     success: true,
-    data: serializeWebsiteRow(row, profile, request),
+    data: serializeWebsiteRow(projected, profile, request),
+    meta: buildPublishMeta(row, draftSnapshot),
   });
 }
 
@@ -459,26 +504,65 @@ export async function POST(request) {
     patch.site_meta = nextMeta;
   }
 
-  patch.updated_at = new Date().toISOString();
+  // Issue #43: content patches go to draft_content. Only slug + published
+  // remain live mutations on this endpoint. Publishing the draft into the
+  // top-level columns happens via POST /api/website-builder/publish.
+  const livePatch = {};
+  if (patch.slug) livePatch.slug = patch.slug;
+  if (typeof body.published === "boolean") livePatch.published = body.published;
+
+  const currentDraft = readWebsiteDraftSnapshot(row);
+  const draftPatch = {};
+  if (patch.headline !== undefined) draftPatch.headline = patch.headline;
+  if (patch.subheadline !== undefined) draftPatch.subheadline = patch.subheadline;
+  if (patch.about_text !== undefined) draftPatch.aboutText = patch.about_text;
+  if (patch.cta_text !== undefined) draftPatch.ctaText = patch.cta_text;
+  if (patch.theme_color !== undefined) draftPatch.themeColor = patch.theme_color;
+  if (Array.isArray(patch.services)) draftPatch.services = patch.services;
+  if (Array.isArray(patch.gallery_photos)) {
+    draftPatch.galleryPhotos = patch.gallery_photos;
+  }
+  if (patch.site_meta) draftPatch.siteMeta = patch.site_meta;
+
+  const nextDraft = mergeWebsiteDraftPatch(currentDraft, draftPatch);
+  const draftChanged = Object.keys(draftPatch).length > 0;
+  const now = new Date().toISOString();
+
+  const dbPatch = {
+    ...livePatch,
+    updated_at: now,
+  };
+  if (draftChanged) {
+    dbPatch.draft_content = nextDraft;
+    dbPatch.has_unpublished_changes = true;
+    dbPatch.draft_updated_at = now;
+  }
+  // If the user is publishing in the same request (legacy flow), promote
+  // the current draft into the live columns atomically.
+  if (livePatch.published === true) {
+    const promoted = draftSnapshotToColumnPatch(nextDraft);
+    Object.assign(dbPatch, promoted);
+    dbPatch.has_unpublished_changes = false;
+    dbPatch.last_published_at = now;
+  }
 
   let { data, error } = await supabaseAdmin
     .from(WEBSITE_TABLE)
-    .update(patch)
+    .update(dbPatch)
     .eq("id", row.id)
     .select("*")
     .single();
 
-  if (error && patch.site_meta && isMissingColumnError(error, "site_meta")) {
-    const { site_meta: _ignored, ...patchWithoutMeta } = patch;
+  if (error && isMissingColumnError(error, "draft_content")) {
+    // Migration hasn't landed yet — degrade to the old behavior where
+    // edits go straight to the live columns and there is no draft.
+    const legacyPatch = { ...patch, ...livePatch, updated_at: now };
     ({ data, error } = await supabaseAdmin
       .from(WEBSITE_TABLE)
-      .update(patchWithoutMeta)
+      .update(legacyPatch)
       .eq("id", row.id)
       .select("*")
       .single());
-    if (data && !data.site_meta) {
-      data.site_meta = nextMeta;
-    }
   }
 
   if (error) {
@@ -488,16 +572,24 @@ export async function POST(request) {
 
   const publishedSlug = data.slug || row.slug;
   const previousSlug = row.slug;
-  if (publishedSlug) {
+  // Public revalidation is only meaningful when the live snapshot
+  // actually changes (slug change, publish/unpublish, or legacy fallback).
+  const liveChanged =
+    livePatch.slug ||
+    livePatch.published !== undefined ||
+    dbPatch.headline !== undefined; // legacy fallback path
+  if (liveChanged && publishedSlug) {
     revalidatePublicWebsitePaths(publishedSlug, revalidatePath);
   }
-  if (previousSlug && previousSlug !== publishedSlug) {
+  if (liveChanged && previousSlug && previousSlug !== publishedSlug) {
     revalidatePublicWebsitePaths(previousSlug, revalidatePath);
   }
 
+    const projected = projectRowForBuilder(data);
     return Response.json({
       success: true,
-      data: serializeWebsiteRow(data, profile, request),
+      data: serializeWebsiteRow(projected, profile, request),
+      meta: buildPublishMeta(data, readWebsiteDraftSnapshot(data)),
     });
   } catch (err) {
     console.error("[api/website-builder][POST] unhandled error", err);
