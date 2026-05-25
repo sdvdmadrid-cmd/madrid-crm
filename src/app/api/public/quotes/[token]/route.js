@@ -226,6 +226,8 @@ export async function GET(_request, { params }) {
               "FieldBase",
             publicDisplayName: companyProfile?.publicDisplayName || "",
             logoDataUrl: companyProfile?.logoDataUrl || "",
+            logoUrl: companyProfile?.logoUrl || "",
+            logoPlacement: companyProfile?.logoPlacement || "top-left",
             websiteUrl: companyProfile?.websiteUrl || "",
             googleReviewsUrl: companyProfile?.googleReviewsUrl || "",
             phone: companyProfile?.phone || "",

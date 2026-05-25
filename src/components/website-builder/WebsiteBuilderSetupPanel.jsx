@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import styles from "./website-builder.module.css";
+import CompanyLogoPanel from "./CompanyLogoPanel";
 
 export default function WebsiteBuilderSetupPanel({
   t,
@@ -10,7 +11,13 @@ export default function WebsiteBuilderSetupPanel({
   galleryCount = 0,
   logoUrl = "",
   onContinue,
+  onCompanyProfileChange,
 }) {
+  const effectiveLogoUrl =
+    String(logoUrl || "").trim() ||
+    String(companyProfile?.logoUrl || "").trim() ||
+    String(companyProfile?.logoDataUrl || "").trim();
+  const logoPlacement = String(companyProfile?.logoPlacement || "top-left");
   const companyName =
     companyProfile?.publicDisplayName || companyProfile?.companyName || t.launchCompanyFallback;
   const phone = companyProfile?.phone || "—";
@@ -22,8 +29,8 @@ export default function WebsiteBuilderSetupPanel({
       <p className={styles.setupSub}>{t.stepSetupSub}</p>
 
       <div className={styles.setupCard}>
-        {logoUrl ? (
-          <img src={logoUrl} alt="" className={styles.setupLogo} />
+        {effectiveLogoUrl ? (
+          <img src={effectiveLogoUrl} alt="" className={styles.setupLogo} />
         ) : (
           <div className={styles.setupLogoPlaceholder}>{companyName.charAt(0) || "?"}</div>
         )}
@@ -38,6 +45,23 @@ export default function WebsiteBuilderSetupPanel({
           </p>
         </div>
       </div>
+
+      <CompanyLogoPanel
+        t={t}
+        logoUrl={effectiveLogoUrl}
+        logoPlacement={logoPlacement}
+        companyProfile={companyProfile || {}}
+        onChange={(next) => {
+          if (typeof onCompanyProfileChange === "function") {
+            onCompanyProfileChange({
+              ...(companyProfile || {}),
+              logoUrl: next.logoUrl,
+              logoPlacement: next.logoPlacement,
+            });
+          }
+        }}
+      />
+
 
       <ul className={styles.setupList}>
         <li>{t.stepSetupBullet1}</li>

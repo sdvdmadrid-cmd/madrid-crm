@@ -1199,7 +1199,8 @@ export default function WebsiteBuilderClient() {
             ? t.stepPreviewSub
             : t.stepPublishSub;
 
-  const logoUrl = companyProfile?.logoDataUrl || "";
+  const logoUrl =
+    companyProfile?.logoUrl || companyProfile?.logoDataUrl || "";
 
   return (
     <WebsiteBuilderEditProvider editingRef={isEditingRef}>
@@ -1432,6 +1433,9 @@ export default function WebsiteBuilderClient() {
                   galleryCount={(form.galleryPhotos || []).length}
                   logoUrl={logoUrl}
                   onContinue={() => handleWorkflowStep(2)}
+                  onCompanyProfileChange={(nextProfile) =>
+                    setCompanyProfile(nextProfile)
+                  }
                 />
               ) : null}
               {builderStep !== 1 ? (
