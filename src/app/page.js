@@ -340,8 +340,43 @@ export default function MarketingPage() {
     },
   ];
 
+  const organizationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "FieldBase",
+    url: "https://fieldbaseapp.net",
+    logo: "https://fieldbaseapp.net/apple-touch-icon.png",
+    sameAs: [],
+    description:
+      "FieldBase is the all-in-one platform contractors use to win leads, send estimates, run jobs, and get paid — with a free public website and lead inbox built in.",
+  };
+
+  const softwareAppJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "FieldBase",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web, iOS, Android",
+    offers: {
+      "@type": "Offer",
+      price: "35.00",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+    },
+    description:
+      "Free 15-day trial. Run estimates, jobs, invoices, payments, and a public website for your contracting business.",
+  };
+
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "Inter, sans-serif" }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppJsonLd) }}
+      />
       <Navbar />
 
       {/* ── Hero ── */}

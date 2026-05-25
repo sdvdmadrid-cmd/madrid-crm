@@ -20,12 +20,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "FieldBase",
+  title: {
+    default: "FieldBase — All-in-one platform for home service contractors",
+    template: "%s | FieldBase",
+  },
   description:
-    "Complete contractor management system for clients jobs invoices and contracts.",
+    "FieldBase is the all-in-one platform contractors use to win leads, send estimates, run jobs, and get paid — with a free public website and lead inbox built in.",
   metadataBase: new URL(APP_BASE_URL),
   alternates: {
     canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: APP_BASE_URL,
+    siteName: "FieldBase",
+    title: "FieldBase — All-in-one platform for home service contractors",
+    description:
+      "Win leads, send estimates, run jobs, and get paid. FieldBase gives contractors a public website, lead inbox, and full operations in one place.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "FieldBase — All-in-one platform for home service contractors",
+    description:
+      "Win leads, send estimates, run jobs, and get paid. FieldBase gives contractors a public website, lead inbox, and full operations in one place.",
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
   manifest: "/site.webmanifest?v=5",
   icons: {
