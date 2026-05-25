@@ -195,28 +195,11 @@ export default function AuthShell({ children }) {
         for (const reg of regs) reg.unregister();
       });
     }
-
-    const pageBuild = String(
-      document.documentElement.getAttribute("data-fieldbase-build") || "",
-    ).slice(0, 12);
-    if (!pageBuild) return;
-
-    fetch("/api/health", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((health) => {
-        const liveBuild = String(health?.commitSha || "").slice(0, 12);
-        if (liveBuild && pageBuild && liveBuild !== pageBuild) {
-          console.warn(
-            `[FieldBase] Cached UI (${pageBuild}) does not match server (${liveBuild}). Hard refresh (Ctrl+Shift+R).`,
-          );
-        }
-      })
-      .catch(() => {});
   }, [hasMounted]);
 
   useEffect(() => {
     if (!hasMounted || !authChecked || !authUser) return;
-    if (!isDedicatedLoginPage && !isResetPasswordPage && !isRegisterPage) return;
+    if (!isDedicatedLoginPage && !isRegisterPage) return;
     router.replace(resolveAuthRedirect(authUser));
   }, [
     hasMounted,
@@ -224,7 +207,6 @@ export default function AuthShell({ children }) {
     authUser,
     isDedicatedLoginPage,
     isRegisterPage,
-    isResetPasswordPage,
     resolveAuthRedirect,
     router,
   ]);
