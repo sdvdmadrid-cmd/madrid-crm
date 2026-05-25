@@ -11,6 +11,38 @@ export function getPublicSiteUrl(slug) {
   return `${base}/sites/${encodeURIComponent(String(slug || "").trim().toLowerCase())}`;
 }
 
+function isHostedHttpUrl(value) {
+  const s = String(value || "").trim();
+  return /^https?:\/\//i.test(s);
+}
+
+function pickPhotoSrc(photo) {
+  if (!photo) return "";
+  if (typeof photo === "string") return photo;
+  return photo.src || photo.url || "";
+}
+
+/**
+ * Returns the first hosted (https/http) photo URL we can find on the
+ * public site, suitable for use as an Open Graph / Twitter card image.
+ * Skips `data:` URLs since those can't be fetched by external crawlers.
+ */
+export function resolvePublicSiteSocialImage(site) {
+  if (!site) return null;
+  const candidates = [
+    ...(Array.isArray(site.galleryPhotos) ? site.galleryPhotos : []),
+    ...(Array.isArray(site.heroPhotos) ? site.heroPhotos : []),
+    ...(Array.isArray(site.portfolio?.featured) ? site.portfolio.featured : []),
+  ];
+  for (const photo of candidates) {
+    const src = pickPhotoSrc(photo);
+    if (isHostedHttpUrl(src)) return src;
+  }
+  const logo = site.companyProfile?.logoDataUrl || "";
+  if (isHostedHttpUrl(logo)) return logo;
+  return null;
+}
+
 export function buildLocalBusinessJsonLd(site) {
   if (!site?.slug) return null;
 
@@ -84,23 +116,33 @@ export function buildPublicSiteMetadata(site, { page = "home" } = {}) {
       : getPublicSiteUrl(site.slug);
   const themeColor = site?.themeColor || "#1d4ed8";
 
+  const socialImage = resolvePublicSiteSocialImage(site);
+  const openGraph = {
+    type: "website",
+    url,
+    title,
+    description,
+    siteName: companyName,
+  };
+  const twitter = {
+    card: "summary_large_image",
+    title,
+    description,
+  };
+  if (socialImage) {
+    openGraph.images = [
+      { url: socialImage, alt: `${companyName} — featured project` },
+    ];
+    twitter.images = [socialImage];
+  }
+
   return {
     title,
     description,
     metadataBase: new URL(getAppBaseUrl()),
     alternates: { canonical: url },
-    openGraph: {
-      type: "website",
-      url,
-      title,
-      description,
-      siteName: companyName,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-    },
+    openGraph,
+    twitter,
     robots: {
       index: true,
       follow: true,

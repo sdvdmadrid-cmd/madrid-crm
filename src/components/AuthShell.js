@@ -174,6 +174,10 @@ export default function AuthShell({ children }) {
     featureAiInvoiceAssistant: true,
     featureAdminAiAssistant: true,
   });
+  const [websiteStatus, setWebsiteStatus] = useState({
+    loaded: false,
+    published: false,
+  });
 
   const resolveAuthRedirect = useCallback((user) => {
     if (typeof window === "undefined") return "/dashboard";
@@ -620,6 +624,44 @@ export default function AuthShell({ children }) {
       window.localStorage.setItem("user-industry", authUser.industry || "");
     }
   }, [authUser]);
+
+  // Once authenticated, learn whether the tenant has already published its
+  // contractor website so the nav can relabel "Build Website" -> "Website".
+  useEffect(() => {
+    if (!authUser) {
+      setWebsiteStatus({ loaded: false, published: false });
+      return;
+    }
+    const role = String(authUser?.role || "").toLowerCase();
+    if (role === "super_admin") {
+      setWebsiteStatus({ loaded: true, published: false });
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/website-builder/publish-status", {
+          cache: "no-store",
+          suppressUnauthorizedEvent: true,
+        });
+        if (!res.ok) {
+          if (!cancelled) setWebsiteStatus({ loaded: true, published: false });
+          return;
+        }
+        const payload = await res.json().catch(() => null);
+        if (cancelled) return;
+        setWebsiteStatus({
+          loaded: true,
+          published: Boolean(payload?.data?.published),
+        });
+      } catch {
+        if (!cancelled) setWebsiteStatus({ loaded: true, published: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser, pathname]);
 
   useEffect(() => {
     if (!hasMounted) return;
@@ -1238,7 +1280,9 @@ export default function AuthShell({ children }) {
           },
           {
             href: "/website",
-            label: t("sidebar.websiteBuilder"),
+            label: websiteStatus.published
+              ? t("sidebar.websiteLive")
+              : t("sidebar.websiteBuilder"),
             iconKey: "websiteBuilder",
           },
           {
@@ -1265,7 +1309,9 @@ export default function AuthShell({ children }) {
         },
         {
           href: "/website",
-          label: t("sidebar.websiteBuilder"),
+          label: websiteStatus.published
+            ? t("sidebar.websiteLive")
+            : t("sidebar.websiteBuilder"),
           iconKey: "websiteBuilder",
         },
         {
