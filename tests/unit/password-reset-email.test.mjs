@@ -9,6 +9,13 @@ const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier === "server-only") {
+      return {
+        url: "data:text/javascript,export default {};",
+        shortCircuit: true,
+      };
+    }
+
     if (specifier.startsWith("@/")) {
       const target = resolve(workspaceRoot, "src", specifier.slice(2));
       const candidates = [target, `${target}.js`, `${target}.jsx`];
