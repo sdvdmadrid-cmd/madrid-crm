@@ -40,6 +40,7 @@ import {
 } from "@/lib/website-gallery";
 import { compressImageFile, fileToDataUrl } from "@/lib/website-image-compress";
 import WebsiteBuilderPortfolio from "./WebsiteBuilderPortfolio";
+import WebsiteMobileUploads from "./WebsiteMobileUploads";
 import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
 import HeroImageEditor from "./HeroImageEditor";
 import WebsiteBuilderLaunch from "./WebsiteBuilderLaunch";
@@ -1871,6 +1872,8 @@ export default function WebsiteBuilderClient() {
                 ))}
               </div>
             )}
+
+            <WebsiteMobileUploads />
           </CollapsibleSection>
           ) : null}
 
