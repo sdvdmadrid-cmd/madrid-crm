@@ -31,6 +31,7 @@ function getMissingColumnName(errorMessage) {
 
 async function updateQuoteWithSchemaFallback({ quoteId, tenantId, update }) {
   const candidateUpdate = { ...update };
+  const droppedColumns = [];
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const { error } = await supabaseAdmin
@@ -40,20 +41,38 @@ async function updateQuoteWithSchemaFallback({ quoteId, tenantId, update }) {
       .eq("tenant_id", tenantId || null);
 
     if (!error) {
-      return { error: null, appliedUpdate: candidateUpdate };
+      // Surface a loud warning when we degraded the write because the schema
+      // is missing columns. This signals that the pending migration is not
+      // yet applied in production, which can cause subtle data loss (e.g.
+      // signature evidence not being persisted). The previous silent retry
+      // hid this from operators.
+      if (droppedColumns.length > 0) {
+        console.warn(
+          "[updateQuoteWithSchemaFallback] schema drift: dropped columns from update",
+          { quoteId, tenantId, droppedColumns },
+        );
+      }
+      return { error: null, appliedUpdate: candidateUpdate, droppedColumns };
     }
 
     const missingColumn = getMissingColumnName(error.message);
     if (!missingColumn || !(missingColumn in candidateUpdate)) {
-      return { error, appliedUpdate: candidateUpdate };
+      return { error, appliedUpdate: candidateUpdate, droppedColumns };
     }
 
+    droppedColumns.push(missingColumn);
     delete candidateUpdate[missingColumn];
   }
+
+  console.error(
+    "[updateQuoteWithSchemaFallback] gave up after 8 retries — schema mismatch unresolved",
+    { quoteId, tenantId, droppedColumns },
+  );
 
   return {
     error: new Error("Failed to update quote due to repeated schema mismatches"),
     appliedUpdate: candidateUpdate,
+    droppedColumns,
   };
 }
 

@@ -180,14 +180,35 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
+/**
+ * Generate the next EST-#### identifier for a tenant.
+ *
+ * The previous implementation used `COUNT(*) + 1`, which is vulnerable to a
+ * race where two concurrent creations produce the same number. We now pick
+ * the highest existing EST-#### suffix and add one. The same-origin guard +
+ * unique index on (tenant_id, estimate_number) added in the companion
+ * migration are what make this safe under contention.
+ */
 async function nextEstimateNumber(tenantId) {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+    .select("estimate_number")
+    .eq("tenant_id", tenantId)
+    .ilike("estimate_number", "EST-%")
+    .order("estimate_number", { ascending: false })
+    .limit(50);
 
   if (error) throw new Error(error.message);
-  return `EST-${String(Number(count || 0) + 1).padStart(4, "0")}`;
+
+  let max = 0;
+  for (const row of data || []) {
+    const match = String(row.estimate_number || "").match(/^EST-(\d+)$/i);
+    if (match) {
+      const n = Number(match[1]);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return `EST-${String(max + 1).padStart(4, "0")}`;
 }
 
 export async function GET(request) {
@@ -236,25 +257,58 @@ export async function POST(request) {
       return jsonResponse({ success: false, error: "Client name is required" }, 400);
     }
 
-    const estimateNumber = String(body.estimateNumber || "").trim() ||
-      await nextEstimateNumber(tenantDbId);
+    const userProvidedNumber = String(body.estimateNumber || "").trim();
 
-    const { data, error } = await supabaseAdmin
-      .from(ESTIMATES_TABLE)
-      .insert({
-        ...mapped,
-        estimate_number: estimateNumber,
-        currency: "USD",
-        tenant_id: tenantDbId,
-        user_id: userId || null,
-        created_by: userId || null,
-        created_at: nowIso,
-        updated_at: nowIso,
-      })
-      .select("*")
-      .single();
+    // Insert with retry on unique-constraint violation. Under concurrent
+    // creates two callers can compute the same EST-####, and the partial
+    // unique index added in 20260528200000 will reject the second insert.
+    // We retry with a freshly-computed number a few times before giving up.
+    let data = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const estimateNumber =
+        attempt === 0 && userProvidedNumber
+          ? userProvidedNumber
+          : await nextEstimateNumber(tenantDbId);
 
-    if (error) throw new Error(error.message);
+      const insertResult = await supabaseAdmin
+        .from(ESTIMATES_TABLE)
+        .insert({
+          ...mapped,
+          estimate_number: estimateNumber,
+          currency: "USD",
+          tenant_id: tenantDbId,
+          user_id: userId || null,
+          created_by: userId || null,
+          created_at: nowIso,
+          updated_at: nowIso,
+        })
+        .select("*")
+        .single();
+
+      if (!insertResult.error) {
+        data = insertResult.data;
+        lastError = null;
+        break;
+      }
+      lastError = insertResult.error;
+      const code = String(insertResult.error.code || "");
+      const msg = String(insertResult.error.message || "");
+      const isUniqueViolation = code === "23505" || /duplicate key value/i.test(msg);
+      if (!isUniqueViolation) break;
+      if (userProvidedNumber && attempt === 0) {
+        // The user explicitly chose a number that collides. Surface a
+        // friendly 409 instead of looping.
+        return jsonResponse(
+          { success: false, error: `Estimate number ${userProvidedNumber} is already in use.` },
+          409,
+        );
+      }
+      // Otherwise loop and pick the next available number.
+    }
+
+    if (lastError) throw new Error(lastError.message);
+    if (!data) throw new Error("Failed to allocate a unique estimate number");
 
     const serialized = serializeEstimate(data);
 
