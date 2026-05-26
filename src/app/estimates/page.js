@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import ws from "@/styles/workspace-dark.module.css";
@@ -63,11 +63,28 @@ export default function EstimatesPage() {
   const [contractLanguage, setContractLanguage] = useState("en");
   const [contractBusy, setContractBusy] = useState(false);
   const [contractMessage, setContractMessage] = useState("");
+  // Ref-tracked auto-dismiss timer so we can clear it on unmount and on
+  // re-open. Previously a bare `setTimeout` would fire after the panel
+  // closed manually and write state on an unmounted component.
+  const contractDismissTimer = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (contractDismissTimer.current) {
+        clearTimeout(contractDismissTimer.current);
+        contractDismissTimer.current = null;
+      }
+    };
+  }, []);
 
   async function generateContract() {
     if (!contractEstimate?.id || contractBusy) return;
     setContractBusy(true);
     setContractMessage("");
+    if (contractDismissTimer.current) {
+      clearTimeout(contractDismissTimer.current);
+      contractDismissTimer.current = null;
+    }
     try {
       const res = await apiFetch(`/api/estimates/${contractEstimate.id}/contract`, {
         method: "POST",
@@ -86,10 +103,12 @@ export default function EstimatesPage() {
           ? `Contract saved (#${String(contractId).slice(0, 8)}). Open it from the Contracts page.`
           : "Contract draft saved.",
       );
-      // Auto-dismiss after 6s so the panel doesn't stay stuck open.
-      setTimeout(() => {
+      // Auto-dismiss after 6s so the panel doesn't stay stuck open. Stored
+      // in a ref so cleanup on unmount can cancel it.
+      contractDismissTimer.current = setTimeout(() => {
         setContractEstimate(null);
         setContractMessage("");
+        contractDismissTimer.current = null;
       }, 6000);
     } catch (err) {
       setContractMessage(err?.message || "Unable to generate contract.");
@@ -161,7 +180,16 @@ export default function EstimatesPage() {
         suppressUnauthorizedEvent: true,
       });
       const payload = await getJsonOrThrow(response, "Unable to load estimates.");
-      setEstimates(Array.isArray(payload?.data) ? payload.data : []);
+      const next = Array.isArray(payload?.data) ? payload.data : [];
+      setEstimates(next);
+      // Re-sync the side panel against the freshly-loaded list so a status
+      // change or send-email action refreshes the visible totals, audit,
+      // and signature immediately instead of showing stale snapshot data.
+      setSelectedEstimate((prev) => {
+        if (!prev?.id) return prev;
+        const fresh = next.find((row) => row.id === prev.id);
+        return fresh || null;
+      });
     } catch (error) {
       setStatusMessage(error.message || "Unable to load estimates.");
     } finally {

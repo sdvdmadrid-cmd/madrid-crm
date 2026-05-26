@@ -154,19 +154,40 @@ export default function EstimateClientPage() {
   const canRespond = status === "sent";
 
   if (loading) {
+    // Skeleton mirrors the loaded layout so the page doesn't jump on hydrate.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-sm text-slate-500">Loading estimate...</div>
+      <div className="min-h-screen bg-slate-50 py-10 px-4">
+        <div className="mx-auto max-w-2xl animate-pulse">
+          <div className="mb-6 flex items-start justify-between">
+            <div className="space-y-2">
+              <div className="h-3 w-24 rounded bg-slate-200" />
+              <div className="h-6 w-40 rounded bg-slate-200" />
+            </div>
+            <div className="h-6 w-24 rounded-full bg-slate-200" />
+          </div>
+          <div className="mb-4 h-24 rounded-2xl border border-slate-200 bg-white" />
+          <div className="mb-4 h-40 rounded-2xl border border-slate-200 bg-white" />
+          <div className="h-32 rounded-2xl border border-slate-200 bg-white" />
+        </div>
       </div>
     );
   }
 
   if (error && !estimate) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="rounded-2xl bg-white p-8 shadow text-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow text-center">
           <div className="text-lg font-bold text-slate-800">Estimate not found</div>
           <div className="mt-2 text-sm text-slate-500">{error}</div>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") window.location.reload();
+            }}
+            className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -301,13 +322,13 @@ export default function EstimateClientPage() {
                         return (
                           <label
                             key={key}
-                            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition ${kept ? "border-slate-200 bg-white" : "border-rose-200 bg-rose-50 opacity-60"}`}
+                            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 text-sm transition min-h-[52px] ${kept ? "border-slate-200 bg-white" : "border-rose-200 bg-rose-50 opacity-60"}`}
                           >
                             <input
                               type="checkbox"
                               checked={kept}
                               onChange={() => toggleItem(key)}
-                              className="h-4 w-4 rounded accent-emerald-600"
+                              className="h-5 w-5 rounded accent-emerald-600"
                             />
                             <span className={`flex-1 font-medium ${kept ? "text-slate-800" : "text-rose-700 line-through"}`}>
                               {s.name}
@@ -326,15 +347,16 @@ export default function EstimateClientPage() {
                     Add Items / Requests
                   </div>
                   {newItems.map((item, idx) => (
-                    <div key={item.id} className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm">
+                    <div key={item.id} className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
                       <span className="flex-1 font-medium text-blue-800">{item.name}</span>
                       {item.price > 0 ? <span className="text-blue-600">{formatMoney(item.price)}</span> : null}
                       <button
                         type="button"
                         onClick={() => removeNewItem(idx)}
-                        className="ml-2 text-rose-500 hover:text-rose-700 font-bold text-lg leading-none"
+                        aria-label="Remove item"
+                        className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-rose-500 hover:bg-rose-100 hover:text-rose-700 font-bold text-base leading-none"
                       >
-                        x
+                        ×
                       </button>
                     </div>
                   ))}
