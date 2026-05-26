@@ -2,6 +2,11 @@ import {
   buildPublicEstimateLink,
   isPublicEstimateStatus,
 } from "@/lib/estimate-public-access";
+import {
+  buildAuditForCreate,
+  parseEstimateNotes,
+  stringifyEstimateNotes,
+} from "@/lib/estimate-notes";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
@@ -34,117 +39,8 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function parseNotes(notes) {
-  const raw = String(notes || "").trim();
-  if (!raw) {
-    return {
-      address: "",
-      noteText: "",
-      clientEmail: "",
-      clientPhone: "",
-      audit: {
-        sentAt: "",
-        approvedAt: "",
-        declinedAt: "",
-        changesRequestedAt: "",
-        resentAt: "",
-        resendCount: 0,
-        signature: null,
-      },
-    };
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && parsed.kind === "estimate_pipeline") {
-      // The kanban detail panel reads `audit.signature.name` to show who
-      // signed the estimate. The list serializer used to omit the
-      // signature object, so the panel never rendered the row even on
-      // signed estimates. Mirrors the single-GET parser in [id]/route.js.
-      const signature =
-        parsed.audit?.signature && typeof parsed.audit.signature === "object"
-          ? {
-              name: String(parsed.audit.signature.name || ""),
-              signedAt: String(parsed.audit.signature.signedAt || ""),
-              ip: String(parsed.audit.signature.ip || ""),
-            }
-          : null;
-      return {
-        address: String(parsed.address || ""),
-        noteText: String(parsed.noteText || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-        audit: {
-          sentAt: String(parsed.audit?.sentAt || ""),
-          approvedAt: String(parsed.audit?.approvedAt || ""),
-          declinedAt: String(parsed.audit?.declinedAt || ""),
-          changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
-          resentAt: String(parsed.audit?.resentAt || ""),
-          resendCount: Number(parsed.audit?.resendCount || 0),
-          signature,
-        },
-      };
-    }
-  } catch {
-    // Legacy notes are plain text.
-  }
-  return {
-    address: "",
-    noteText: raw,
-    clientEmail: "",
-    clientPhone: "",
-    audit: {
-      sentAt: "",
-      approvedAt: "",
-      declinedAt: "",
-      changesRequestedAt: "",
-      resentAt: "",
-      resendCount: 0,
-      signature: null,
-    },
-  };
-}
-
-function buildAuditForCreate(status, nowIso) {
-  const normalizedStatus = normalizeStatus(status);
-  return {
-    sentAt: normalizedStatus === "sent" ? nowIso : "",
-    approvedAt: normalizedStatus === "approved" ? nowIso : "",
-    declinedAt: normalizedStatus === "declined" ? nowIso : "",
-    changesRequestedAt: normalizedStatus === "changes_requested" ? nowIso : "",
-    resentAt: "",
-    resendCount: 0,
-  };
-}
-
-function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", audit = {} }) {
-  const signature =
-    audit.signature && typeof audit.signature === "object"
-      ? {
-          name: String(audit.signature.name || ""),
-          signedAt: String(audit.signature.signedAt || ""),
-          ip: String(audit.signature.ip || ""),
-        }
-      : null;
-  return JSON.stringify({
-    kind: "estimate_pipeline",
-    address: String(address || ""),
-    noteText: String(noteText || ""),
-    clientEmail: String(clientEmail || ""),
-    clientPhone: String(clientPhone || ""),
-    audit: {
-      sentAt: String(audit.sentAt || ""),
-      approvedAt: String(audit.approvedAt || ""),
-      declinedAt: String(audit.declinedAt || ""),
-      changesRequestedAt: String(audit.changesRequestedAt || ""),
-      resentAt: String(audit.resentAt || ""),
-      resendCount: Number(audit.resendCount || 0),
-      ...(signature ? { signature } : {}),
-    },
-  });
-}
-
 function serializeEstimate(row) {
-  const parsedNotes = parseNotes(row.notes);
+  const parsedNotes = parseEstimateNotes(row.notes);
   const services = Array.isArray(row.items) ? row.items : [];
   const status = normalizeStatus(row.status);
   const publicLink =
@@ -220,7 +116,7 @@ function buildEstimateRow(body = {}, nowIso) {
     subtotal,
     tax,
     total,
-    notes: stringifyNotes({
+    notes: stringifyEstimateNotes({
       address: String(body.address || "").trim(),
       noteText: String(body.notes || ""),
       clientEmail: String(body.clientEmail || "").trim().toLowerCase(),

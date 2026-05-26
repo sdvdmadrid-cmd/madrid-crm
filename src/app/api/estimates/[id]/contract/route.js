@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { generateContractAssistant } from "@/lib/document-ai";
+import { parseEstimateNotes } from "@/lib/estimate-notes";
 import {
   canWrite,
   forbiddenResponse,
@@ -17,30 +18,6 @@ function jsonResponse(payload, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-function parseEstimateNotes(notes) {
-  const raw = String(notes || "").trim();
-  if (!raw) return { noteText: "", address: "", clientEmail: "", clientPhone: "" };
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && parsed.kind === "estimate_pipeline") {
-      // The estimate pipeline JSON stores the free-form scope under
-      // `noteText`. Older code read `parsed.note`, which never existed and
-      // silently produced empty contract bodies. Fall back to `parsed.note`
-      // only if `noteText` is genuinely missing so legacy rows (if any)
-      // still surface their text.
-      return {
-        noteText: String(parsed.noteText ?? parsed.note ?? ""),
-        address: String(parsed.address || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-      };
-    }
-  } catch {
-    // fall through
-  }
-  return { noteText: raw, address: "", clientEmail: "", clientPhone: "" };
 }
 
 function buildScopeFromItems(items, fallbackNote) {

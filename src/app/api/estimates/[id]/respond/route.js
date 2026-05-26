@@ -15,74 +15,15 @@ import {
   isSignatureRequiredForEstimate,
   sanitizeSignatureName,
 } from "@/lib/estimate-signature-policy";
+import {
+  parseEstimateNotes,
+  stringifyEstimateNotes,
+} from "@/lib/estimate-notes";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 
 const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
 const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
-
-function parseNotes(notes) {
-  const raw = String(notes || "").trim();
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed?.kind === "estimate_pipeline") {
-      const signature =
-        parsed.audit?.signature && typeof parsed.audit.signature === "object"
-          ? {
-              name: String(parsed.audit.signature.name || ""),
-              signedAt: String(parsed.audit.signature.signedAt || ""),
-              ip: String(parsed.audit.signature.ip || ""),
-            }
-          : null;
-      return {
-        address: String(parsed.address || ""),
-        noteText: String(parsed.noteText || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-        audit: {
-          sentAt: String(parsed.audit?.sentAt || ""),
-          approvedAt: String(parsed.audit?.approvedAt || ""),
-          declinedAt: String(parsed.audit?.declinedAt || ""),
-          changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
-          resentAt: String(parsed.audit?.resentAt || ""),
-          resendCount: Number(parsed.audit?.resendCount || 0),
-          signature,
-        },
-      };
-    }
-  } catch {
-    // legacy
-  }
-  return {
-    address: "", noteText: raw, clientEmail: "", clientPhone: "",
-    audit: { sentAt: "", approvedAt: "", declinedAt: "", changesRequestedAt: "", resentAt: "", resendCount: 0, signature: null },
-  };
-}
-
-function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", requestedItems = null, audit = {} }) {
-  const signature =
-    audit.signature && typeof audit.signature === "object"
-      ? {
-          name: String(audit.signature.name || ""),
-          signedAt: String(audit.signature.signedAt || ""),
-          ip: String(audit.signature.ip || ""),
-        }
-      : null;
-  return JSON.stringify({
-    kind: "estimate_pipeline",
-    address, noteText, clientEmail, clientPhone,
-    ...(requestedItems !== null ? { requestedItems } : {}),
-    audit: {
-      sentAt: String(audit.sentAt || ""),
-      approvedAt: String(audit.approvedAt || ""),
-      declinedAt: String(audit.declinedAt || ""),
-      changesRequestedAt: String(audit.changesRequestedAt || ""),
-      resentAt: String(audit.resentAt || ""),
-      resendCount: Number(audit.resendCount || 0),
-      ...(signature ? { signature } : {}),
-    },
-  });
-}
 
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -137,7 +78,7 @@ export async function POST(request, { params }) {
   }
 
   const nowIso = new Date().toISOString();
-  const parsedNotes = parseNotes(existing.notes);
+  const parsedNotes = parseEstimateNotes(existing.notes);
   const audit = { ...parsedNotes.audit };
   if (action === "approved") audit.approvedAt = nowIso;
   if (action === "declined") audit.declinedAt = nowIso;
@@ -189,7 +130,7 @@ export async function POST(request, { params }) {
     .from(ESTIMATES_TABLE)
     .update({
       status: action,
-      notes: stringifyNotes({
+      notes: stringifyEstimateNotes({
         ...parsedNotes,
         noteText: updatedNoteText,
         requestedItems,
@@ -277,7 +218,7 @@ async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
   }
 
   const baseNumber = String(existing.estimate_number || "").trim();
-  const parsed = parseNotes(existing.notes);
+  const parsed = parseEstimateNotes(existing.notes);
   const lineItems = Array.isArray(existing.items) ? existing.items : [];
 
   const { data: existingQuote, error: existingQuoteError } = await supabaseAdmin

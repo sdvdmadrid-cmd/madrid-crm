@@ -1,3 +1,5 @@
+import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
+import { parseEstimateNotes } from "@/lib/estimate-notes";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -14,62 +16,8 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
-function parseNotes(notes) {
-  const raw = String(notes || "").trim();
-  if (!raw) return { address: "", noteText: "", clientEmail: "", clientPhone: "" };
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && parsed.kind === "estimate_pipeline") {
-      return {
-        address: String(parsed.address || ""),
-        noteText: String(parsed.noteText || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-      };
-    }
-  } catch {
-    // legacy plain-text notes
-  }
-  return { address: "", noteText: raw, clientEmail: "", clientPhone: "" };
-}
-
-function sanitizeLogoUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (raw.startsWith("https://") || raw.startsWith("data:image/")) return raw;
-  return "";
-}
-
-const ALLOWED_PLACEMENTS = new Set(["top_left", "top_center", "top_right"]);
-
-async function loadBranding(tenantId) {
-  const fallback = { companyName: "", logoUrl: "", logoPlacement: "top_left" };
-  const id = String(tenantId || "").trim();
-  if (!id) return fallback;
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("company_profiles")
-      .select("company_name, logo_url, logo_data_url, logo_placement")
-      .eq("tenant_id", id)
-      .maybeSingle();
-    if (error || !data) return fallback;
-    const placement = ALLOWED_PLACEMENTS.has(String(data.logo_placement || "").toLowerCase())
-      ? String(data.logo_placement).toLowerCase()
-      : "top_left";
-    return {
-      companyName: String(data.company_name || "").trim(),
-      logoUrl:
-        sanitizeLogoUrl(data.logo_url) || sanitizeLogoUrl(data.logo_data_url),
-      logoPlacement: placement,
-    };
-  } catch {
-    return fallback;
-  }
-}
-
 function buildEstimatePayload(row) {
-  const parsed = parseNotes(row.notes);
+  const parsed = parseEstimateNotes(row.notes);
   return {
     id: row.id,
     tenantId: row.tenant_id || null,
@@ -123,7 +71,7 @@ export async function GET(request, { params }) {
     if (!data) return jsonResponse({ success: false, error: "Estimate not found" }, 404);
 
     const estimate = buildEstimatePayload(data);
-    const branding = await loadBranding(estimate.tenantId);
+    const branding = await getEstimateBrandingByTenant(estimate.tenantId);
 
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });
     const filename = pdfFilenameForEstimate(estimate);
