@@ -17,40 +17,65 @@ function isValidEmail(value) {
   );
 }
 
+/**
+ * HTML-escape a string before interpolating into an email template. This
+ * email is built by hand (no template engine), so any tenant-controlled
+ * field — name, description, line item names, notes — needs explicit
+ * escaping or a client typing `<script>` into a service name would inject
+ * markup into the recipient's mailbox.
+ */
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function buildEstimateEmail(estimate) {
   const name = estimate.name || "Estimate";
-  const lines = estimate.lines || [];
-  const total = Number(estimate.totalFinal || estimate.totalMid || 0).toFixed(
-    2,
+  const lines = Array.isArray(estimate.lines) ? estimate.lines : [];
+  // The DB row stores totals as snake_case (`total_final` / `total_mid`).
+  // The previous implementation read `estimate.totalFinal || estimate.totalMid`
+  // which always fell through to 0 and produced an undercount in the email.
+  const totalNumber = Number(
+    estimate.total_final ??
+      estimate.totalFinal ??
+      estimate.total_mid ??
+      estimate.totalMid ??
+      0,
   );
+  const total = (Number.isFinite(totalNumber) ? totalNumber : 0).toFixed(2);
 
   const lineRows = lines
     .map((l) => {
-      const lineTotal = (
-        Number(l.finalPrice || 0) * Number(l.qty || 0)
-      ).toFixed(2);
+      const qty = Number(l.qty) || 1;
+      const unit = Number(l.finalPrice || 0);
+      const lineTotal = (qty * unit).toFixed(2);
       return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;">${l.name}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${l.qty}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">$${Number(l.finalPrice || 0).toFixed(2)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;">${escapeHtml(l.name)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">${qty}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;">$${unit.toFixed(2)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">$${lineTotal}</td>
       </tr>`;
     })
     .join("");
 
   const lineText = lines
-    .map(
-      (l) =>
-        `  ${l.name} x${l.qty} @ $${Number(l.finalPrice || 0).toFixed(2)} = $${(Number(l.finalPrice || 0) * Number(l.qty || 0)).toFixed(2)}`,
-    )
+    .map((l) => {
+      const qty = Number(l.qty) || 1;
+      const unit = Number(l.finalPrice || 0);
+      return `  ${l.name} x${qty} @ $${unit.toFixed(2)} = $${(qty * unit).toFixed(2)}`;
+    })
     .join("\n");
 
   const subject = `Estimate: ${name}`;
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a;line-height:1.6;">
-      <h2 style="margin:0 0 8px 0;font-size:22px;">${name}</h2>
-      ${estimate.description ? `<p style="color:#555;margin:0 0 20px 0;">${estimate.description}</p>` : ""}
+      <h2 style="margin:0 0 8px 0;font-size:22px;">${escapeHtml(name)}</h2>
+      ${estimate.description ? `<p style="color:#555;margin:0 0 20px 0;">${escapeHtml(estimate.description)}</p>` : ""}
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
         <thead>
           <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
@@ -66,14 +91,14 @@ function buildEstimateEmail(estimate) {
         <span style="font-size:13px;opacity:0.85;">Total</span>
         <div style="font-size:24px;font-weight:700;">$${total}</div>
       </div>
-      ${estimate.notes ? `<p style="margin-top:20px;color:#555;font-size:14px;"><em>Notes: ${estimate.notes}</em></p>` : ""}
+      ${estimate.notes ? `<p style="margin-top:20px;color:#555;font-size:14px;"><em>Notes: ${escapeHtml(estimate.notes)}</em></p>` : ""}
     </div>
   `;
 
   const text = [
     name,
     "",
-    ...lines.map((l) => `  ${l.name} x${l.qty}`),
+    ...lines.map((l) => `  ${l.name} x${Number(l.qty) || 1}`),
     lineText,
     "",
     `Total: $${total}`,

@@ -13,11 +13,21 @@ const CLIENTS_COL = "clients";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Compute the next sequential quote number for a tenant. Uses MAX(numeric
+ * suffix) + 1 instead of `COUNT(*) + 1` so soft-deleted/migrated rows
+ * don't reset the sequence. Wrapped in a retry loop at the call-site to
+ * survive concurrent promotes — two contractors clicking "promote" at the
+ * same time will hit a unique-violation on insert and we re-derive the
+ * next number.
+ */
 async function nextQuoteNumber(tenantId) {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from(QUOTES_COL)
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+    .select("quote_number")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if (error) {
     console.error(
@@ -27,8 +37,27 @@ async function nextQuoteNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  const total = Number(count || 0);
-  return String(total + 1);
+  let max = 0;
+  for (const row of data || []) {
+    const match = String(row.quote_number || "").match(/(\d+)/);
+    if (match) {
+      const n = Number(match[1]);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return String(max + 1);
+}
+
+/**
+ * Round a dollar amount to integer cents using safe arithmetic. JS
+ * floating point makes `12.34 * 100` = 1234.0000000000002, which a
+ * `bigint`-typed cents column will reject. Always pipe payment math
+ * through this helper.
+ */
+function toCents(amount) {
+  const num = Number(amount || 0);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num * 100);
 }
 
 function normalizeBaseNumber(value) {
@@ -172,69 +201,108 @@ export async function POST(request, { params }) {
     }
 
     // ── 3. Map estimate lines → quote lineItems ─────────────────────────────
-    const lineItems = (estimate.lines || []).map((l, idx) => ({
-      id: l.serviceId || `li-${idx}`,
-      name: l.name || "",
-      description: l.name || "",
-      qty: Number(l.qty) || 1,
-      unitPrice: Number(l.finalPrice) || 0,
-      total: (Number(l.qty) || 1) * (Number(l.finalPrice) || 0),
-    }));
+    // Line totals are rounded to cents to avoid float-precision drift
+    // (12.34 * 3 yields 37.019999999999996 in JS) which then propagates
+    // into invoice cent columns below.
+    const lineItems = (estimate.lines || []).map((l, idx) => {
+      const qty = Number(l.qty) || 1;
+      const unit = Number(l.finalPrice) || 0;
+      const total = Math.round(qty * unit * 100) / 100;
+      return {
+        id: l.serviceId || `li-${idx}`,
+        name: l.name || "",
+        description: l.name || "",
+        qty,
+        unitPrice: unit,
+        total,
+      };
+    });
+    const invoiceAmount =
+      Math.round(
+        lineItems.reduce((sum, li) => sum + Number(li.total || 0), 0) * 100,
+      ) / 100;
+    const invoiceAmountCents = toCents(invoiceAmount);
 
     const nowIso = new Date().toISOString();
-    const baseNumber =
-      normalizeBaseNumber(estimate.quote_number || estimate.quoteNumber) ||
-      (await nextQuoteNumber(tenantDbId));
+    const reusedBaseNumber = normalizeBaseNumber(
+      estimate.quote_number || estimate.quoteNumber,
+    );
     const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
     const baseUrl = (process.env.APP_BASE_URL || new URL(request.url).origin)
       .replace(/\/$/, "");
     const quoteUrl = `${baseUrl}/quote/${quoteToken}`;
 
     // ── 4. Create the Quote ─────────────────────────────────────────────────
-    const quoteDoc = {
-      tenant_id: tenantDbId,
-      user_id: userId || null,
-      created_by: userId || null,
-      quote_number: baseNumber,
-      title: estimate.name || "Estimate",
-      client_id: estimateClientId,
-      client_name: clientDoc.name || "",
-      client_email: clientDoc.email || "",
-      client_phone: clientDoc.phone || "",
-      // Clients store a single address field; quotes keep the expanded structure.
-      address_line1: clientDoc.address || "",
-      address_line2: "",
-      city: "",
-      state: "",
-      zip: "",
-      property_address: clientDoc.address || "",
-      line_items: lineItems,
-      scope_of_work: estimate.notes || estimate.description || "",
-      status: "sent",
-      sent_at: nowIso,
-      viewed_at: null,
-      email_opened_at: null,
-      approved_at: null,
-      quote_token: quoteToken,
-      quote_shared_at: nowIso,
-      // Back-reference to the source estimate
-      estimate_id: id,
-      created_at: nowIso,
-      updated_at: nowIso,
-    };
+    // Retry on unique violation so two simultaneous promotes don't both
+    // grab `quote_number = 17`. When `reusedBaseNumber` is present (the
+    // estimate already has a quote number assigned), use it for the first
+    // attempt only; subsequent retries fall through to a freshly computed
+    // sequential number.
+    let insertedQuote = null;
+    let insertError = null;
+    let baseNumber = reusedBaseNumber || (await nextQuoteNumber(tenantDbId));
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if (attempt > 0) {
+        baseNumber = await nextQuoteNumber(tenantDbId);
+      }
+      const quoteDoc = {
+        tenant_id: tenantDbId,
+        user_id: userId || null,
+        created_by: userId || null,
+        quote_number: baseNumber,
+        title: estimate.name || "Estimate",
+        client_id: estimateClientId,
+        client_name: clientDoc.name || "",
+        client_email: clientDoc.email || "",
+        client_phone: clientDoc.phone || "",
+        // Clients store a single address field; quotes keep the expanded structure.
+        address_line1: clientDoc.address || "",
+        address_line2: "",
+        city: "",
+        state: "",
+        zip: "",
+        property_address: clientDoc.address || "",
+        line_items: lineItems,
+        scope_of_work: estimate.notes || estimate.description || "",
+        status: "sent",
+        sent_at: nowIso,
+        viewed_at: null,
+        email_opened_at: null,
+        approved_at: null,
+        quote_token: quoteToken,
+        quote_shared_at: nowIso,
+        // Back-reference to the source estimate
+        estimate_id: id,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
 
-    const { data: insertedQuote, error: insertError } = await supabaseAdmin
-      .from(QUOTES_COL)
-      .insert(quoteDoc)
-      .select("*")
-      .single();
+      const insertResult = await supabaseAdmin
+        .from(QUOTES_COL)
+        .insert(quoteDoc)
+        .select("*")
+        .single();
 
-    if (insertError) {
+      if (!insertResult.error) {
+        insertedQuote = insertResult.data;
+        insertError = null;
+        break;
+      }
+      insertError = insertResult.error;
+      const code = String(insertResult.error.code || "");
+      const msg = String(insertResult.error.message || "");
+      const isUniqueViolation = code === "23505" || /duplicate key value/i.test(msg);
+      if (!isUniqueViolation) break;
+    }
+
+    if (!insertedQuote) {
       console.error(
         "[api/estimate-builder/:id/promote] Supabase quote insert error",
         insertError,
       );
-      throw new Error(insertError.message);
+      throw new Error(
+        insertError?.message || "Failed to allocate a unique quote number",
+      );
     }
 
     await supabaseAdmin
@@ -277,22 +345,22 @@ export async function POST(request, { params }) {
       user_id: userId || null,
       created_by: userId || null,
       invoice_number: invoiceNumber,
-      invoice_title: `Invoice for ${quoteDoc.title}`,
+      invoice_title: `Invoice for ${insertedQuote.title || "Estimate"}`,
       job_id: null, // No job linked yet
-      client_id: quoteDoc.client_id,
-      client_name: quoteDoc.client_name,
-      client_email: quoteDoc.client_email,
-      amount: lineItems.reduce((sum, li) => sum + li.total, 0),
+      client_id: insertedQuote.client_id,
+      client_name: insertedQuote.client_name,
+      client_email: insertedQuote.client_email,
+      amount: invoiceAmount,
       due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
       items: lineItems,
-      subtotal_cents: lineItems.reduce((sum, li) => sum + li.total, 0) * 100,
+      subtotal_cents: invoiceAmountCents,
       tax_cents: 0,
-      total_cents: lineItems.reduce((sum, li) => sum + li.total, 0) * 100,
-      notes: quoteDoc.scope_of_work,
+      total_cents: invoiceAmountCents,
+      notes: insertedQuote.scope_of_work || "",
       preferred_payment_method: null,
       payments: [],
       paid_amount: 0,
-      balance_due: lineItems.reduce((sum, li) => sum + li.total, 0),
+      balance_due: invoiceAmount,
       status: "Unpaid",
       created_at: nowIso,
       updated_at: nowIso,

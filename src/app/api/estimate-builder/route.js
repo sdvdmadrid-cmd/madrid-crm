@@ -13,16 +13,19 @@ import {
 /**
  * See estimate-builder-records.js for the table layout. Numbering follows the
  * same max-suffix-plus-one strategy used by /api/estimates so that concurrent
- * creates don't collide.
+ * creates don't collide. Orders by `created_at desc` instead of by the
+ * estimate_number column to avoid the lexicographic-vs-numeric pitfall at
+ * the EST-9999 -> EST-10000 boundary (where "EST-10000" sorts below
+ * "EST-9999" alphabetically and a small LIMIT misses it).
  */
 async function nextEstimateBuilderNumber(tenantId) {
   const { data, error } = await supabaseAdmin
     .from("estimate_builder")
-    .select("estimate_number")
+    .select("estimate_number, created_at")
     .eq("tenant_id", tenantId)
     .ilike("estimate_number", "EST-%")
-    .order("estimate_number", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
 
