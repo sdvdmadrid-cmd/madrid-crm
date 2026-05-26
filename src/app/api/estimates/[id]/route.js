@@ -198,6 +198,27 @@ function serializeEstimate(row, { includePublicLink = true } = {}) {
   };
 }
 
+/**
+ * Recompute subtotal from a services array — mirrors the create route. Keeps
+ * server-side numbers consistent with line items regardless of what the
+ * client sent in the body.
+ */
+function recomputeSubtotal(services) {
+  if (!Array.isArray(services)) return 0;
+  let cents = 0;
+  for (const service of services) {
+    const qty = Number.isFinite(Number(service?.qty)) ? Number(service.qty) : 1;
+    const unit = Number.isFinite(Number(service?.unitPrice ?? service?.price))
+      ? Number(service?.unitPrice ?? service?.price)
+      : 0;
+    const explicit = service?.price !== undefined ? Number(service.price) : NaN;
+    const lineTotal = Number.isFinite(explicit) ? explicit : unit * qty;
+    if (!Number.isFinite(lineTotal)) continue;
+    cents += Math.round(lineTotal * 100);
+  }
+  return cents / 100;
+}
+
 function buildUpdateRow(body = {}) {
   const nowIso = new Date().toISOString();
   const existingNotes = parseNotes(body.currentNotes || "");
@@ -214,17 +235,30 @@ function buildUpdateRow(body = {}) {
   if ("status" in body) {
     next.status = requestedStatus;
   }
-  if ("services" in body) {
-    next.items = Array.isArray(body.services) ? body.services : [];
-  }
-  if ("subtotal" in body) {
-    next.subtotal = toNumber(body.subtotal);
-  }
-  if ("tax" in body) {
-    next.tax = toNumber(body.tax);
-  }
-  if ("total" in body) {
-    next.total = toNumber(body.total);
+
+  // When services are touched, recompute subtotal/tax/total from the items
+  // and the supplied tax so totals stay consistent even if the client sent
+  // a stale or tampered value. When only totals are patched (e.g. a tax
+  // adjustment without items), we accept the provided numbers verbatim.
+  const servicesProvided = "services" in body;
+  if (servicesProvided) {
+    const services = Array.isArray(body.services) ? body.services : [];
+    next.items = services;
+    const computedSubtotal = Math.round(recomputeSubtotal(services) * 100) / 100;
+    next.subtotal = computedSubtotal;
+    const providedTax = "tax" in body ? Math.max(0, toNumber(body.tax)) : 0;
+    next.tax = Math.round(providedTax * 100) / 100;
+    next.total = Math.round((next.subtotal + next.tax) * 100) / 100;
+  } else {
+    if ("subtotal" in body) {
+      next.subtotal = Math.round(toNumber(body.subtotal) * 100) / 100;
+    }
+    if ("tax" in body) {
+      next.tax = Math.max(0, Math.round(toNumber(body.tax) * 100) / 100);
+    }
+    if ("total" in body) {
+      next.total = Math.round(toNumber(body.total) * 100) / 100;
+    }
   }
 
   if ("address" in body || "notes" in body || "status" in body) {

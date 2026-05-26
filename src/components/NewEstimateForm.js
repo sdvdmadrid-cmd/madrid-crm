@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { getUsStateLabel, getUsStateTaxRate } from "@/lib/estimate-pricing";
 import { getIndustryProfile } from "@/lib/industry-profiles";
-import { supabase } from "@/lib/supabase";
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -319,77 +318,76 @@ export default function NewEstimateForm({ onCreated }) {
     try {
       setSaving(true);
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) {
-        console.error("[NewEstimateForm] Failed to load current Supabase user", userError);
-        throw new Error(userError.message);
-      }
-
-      if (!user?.id) {
-        throw new Error("Unable to resolve the current user.");
-      }
-
       const selectedClient =
         clients.find((client) => (client._id || client.id) === form.clientId) || null;
 
+      // Use the canonical `estimate` item shape so the row renders
+      // correctly everywhere downstream (kanban detail panel, PDF, public
+      // page, contract assistant). The previous schema
+      // ({description, quantity, unitPrice, total}) didn't match what
+      // `serializeEstimate` and `buildEstimatePdfBuffer` look for
+      // ({name, qty, unitPrice, price}), so older estimates created here
+      // appeared with blank service names and missing totals.
       const cleanedItems = form.items
         .filter((item) => String(item.description || "").trim())
         .map((item) => {
           const metrics = getRowMetrics(item);
           return {
-            description: String(item.description || "").trim(),
-            quantity: metrics.quantity,
+            id: item.id,
+            name: String(item.description || "").trim(),
+            qty: metrics.quantity,
             unitPrice: metrics.unitPrice,
-            total: metrics.rowTotal,
+            price: metrics.rowTotal,
           };
         });
 
-      const payload = {
-        tenant_id: user.id,
-        user_id: user.id,
-        client_id: form.clientId,
-        client_name: selectedClient?.name || "",
-        job_id: form.jobId || null,
-        estimate_number: form.estimateNumber.trim() || createEstimateNumber(),
-        status: form.status,
-        currency: form.currency,
-        items: cleanedItems,
+      const industryNotes = Object.entries(industryDetails)
+        .filter(([, value]) => String(value || "").trim())
+        .map(([key, value]) => {
+          const field = (industryProfile.estimateFields || []).find(
+            (entry) => entry.key === key,
+          );
+          return `${field?.label || key}: ${String(value || "").trim()}`;
+        })
+        .join("\n");
+      const noteText = [form.notes.trim(), industryNotes]
+        .filter(Boolean)
+        .join("\n");
+
+      // Route through the existing API so tenant scoping, server-side
+      // total recomputation, audit JSON, revision logging, and email
+      // delivery all flow through one canonical path. The previous
+      // implementation called supabase.from("estimates").insert(...)
+      // directly from the browser, which trusted the client's tenant_id
+      // and skipped every safeguard.
+      const apiPayload = {
+        clientName: selectedClient?.name || "",
+        clientEmail: selectedClient?.email || "",
+        clientPhone: selectedClient?.phone || "",
+        address: selectedClient?.address || "",
+        status: form.status === "sent" ? "sent" : "draft",
+        services: cleanedItems,
         subtotal,
         tax: taxAmount,
         total,
-        notes:
-          [
-            form.notes.trim(),
-            Object.entries(industryDetails)
-              .filter(([, value]) => String(value || "").trim())
-              .map(([key, value]) => {
-                const field = (industryProfile.estimateFields || []).find(
-                  (item) => item.key === key,
-                );
-                return `${field?.label || key}: ${String(value || "").trim()}`;
-              })
-              .join("\n"),
-          ]
-            .filter(Boolean)
-            .join("\n") || null,
+        notes: noteText,
+        estimateNumber: form.estimateNumber.trim() || createEstimateNumber(),
+        sendChannels: form.status === "sent" ? { email: true, text: false } : null,
       };
 
-      const { data, error } = await supabase
-        .from("estimates")
-        .insert(payload)
-        .select("id, estimate_number, total")
-        .single();
+      const response = await apiFetch("/api/estimates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apiPayload),
+      });
+      const payload = await getJsonOrThrow(response, "Unable to create estimate.");
+      const created = payload?.data || null;
 
-      if (error) {
-        console.error("[NewEstimateForm] Supabase estimate insert error", error);
-        throw new Error(error.message);
-      }
-
-      setSuccess(t("estimateForm.success.estimateReady", { number: data?.estimate_number || "" }));
+      setSuccess(
+        t("estimateForm.success.estimateReady", {
+          number: created?.estimateNumber || "",
+        }),
+      );
       setSubmitAttempted(false);
       setForm((prev) => ({
         ...createEmptyEstimate(),
@@ -403,7 +401,11 @@ export default function NewEstimateForm({ onCreated }) {
       });
 
       if (typeof onCreated === "function") {
-        onCreated(data);
+        onCreated({
+          id: created?.id || null,
+          estimate_number: created?.estimateNumber || "",
+          total: created?.total || total,
+        });
       }
     } catch (error) {
       console.error("[NewEstimateForm] submit error", error);

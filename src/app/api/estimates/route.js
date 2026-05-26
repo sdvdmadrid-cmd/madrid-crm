@@ -49,12 +49,25 @@ function parseNotes(notes) {
         changesRequestedAt: "",
         resentAt: "",
         resendCount: 0,
+        signature: null,
       },
     };
   }
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && parsed.kind === "estimate_pipeline") {
+      // The kanban detail panel reads `audit.signature.name` to show who
+      // signed the estimate. The list serializer used to omit the
+      // signature object, so the panel never rendered the row even on
+      // signed estimates. Mirrors the single-GET parser in [id]/route.js.
+      const signature =
+        parsed.audit?.signature && typeof parsed.audit.signature === "object"
+          ? {
+              name: String(parsed.audit.signature.name || ""),
+              signedAt: String(parsed.audit.signature.signedAt || ""),
+              ip: String(parsed.audit.signature.ip || ""),
+            }
+          : null;
       return {
         address: String(parsed.address || ""),
         noteText: String(parsed.noteText || ""),
@@ -67,6 +80,7 @@ function parseNotes(notes) {
           changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
           resentAt: String(parsed.audit?.resentAt || ""),
           resendCount: Number(parsed.audit?.resendCount || 0),
+          signature,
         },
       };
     }
@@ -85,6 +99,7 @@ function parseNotes(notes) {
       changesRequestedAt: "",
       resentAt: "",
       resendCount: 0,
+      signature: null,
     },
   };
 }
@@ -102,6 +117,14 @@ function buildAuditForCreate(status, nowIso) {
 }
 
 function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", audit = {} }) {
+  const signature =
+    audit.signature && typeof audit.signature === "object"
+      ? {
+          name: String(audit.signature.name || ""),
+          signedAt: String(audit.signature.signedAt || ""),
+          ip: String(audit.signature.ip || ""),
+        }
+      : null;
   return JSON.stringify({
     kind: "estimate_pipeline",
     address: String(address || ""),
@@ -115,6 +138,7 @@ function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientP
       changesRequestedAt: String(audit.changesRequestedAt || ""),
       resentAt: String(audit.resentAt || ""),
       resendCount: Number(audit.resendCount || 0),
+      ...(signature ? { signature } : {}),
     },
   });
 }
@@ -150,11 +174,44 @@ function serializeEstimate(row) {
   };
 }
 
+/**
+ * Recompute the line-item subtotal from a services array. Mirrors the
+ * client-side math in `/estimates/new` and the public PDF builder so the
+ * server has a single source of truth instead of trusting client totals.
+ *
+ * Each service row is expected to provide one of:
+ *   - `price` (a final line total)
+ *   - `unitPrice * qty` (the row was just typed in)
+ * Rounded to cents using bankers-safe arithmetic.
+ */
+function recomputeSubtotal(services) {
+  if (!Array.isArray(services)) return 0;
+  let cents = 0;
+  for (const service of services) {
+    const qty = Number.isFinite(Number(service?.qty)) ? Number(service.qty) : 1;
+    const unit = Number.isFinite(Number(service?.unitPrice ?? service?.price))
+      ? Number(service?.unitPrice ?? service?.price)
+      : 0;
+    const explicit = service?.price !== undefined ? Number(service.price) : NaN;
+    const lineTotal = Number.isFinite(explicit) ? explicit : unit * qty;
+    if (!Number.isFinite(lineTotal)) continue;
+    cents += Math.round(lineTotal * 100);
+  }
+  return cents / 100;
+}
+
 function buildEstimateRow(body = {}, nowIso) {
   const services = Array.isArray(body.services) ? body.services : [];
-  const subtotal = toNumber(body.subtotal);
-  const tax = toNumber(body.tax);
-  const total = toNumber(body.total, subtotal + tax);
+  // Recompute subtotal from line items so a tampered or stale client
+  // payload can't silently desync totals. The provided subtotal is kept
+  // only if the line items can't be summed (empty array, etc).
+  const computedSubtotal = recomputeSubtotal(services);
+  const subtotal =
+    services.length === 0 && body.subtotal !== undefined
+      ? toNumber(body.subtotal)
+      : Math.round(computedSubtotal * 100) / 100;
+  const tax = Math.max(0, Math.round(toNumber(body.tax) * 100) / 100);
+  const total = Math.round((subtotal + tax) * 100) / 100;
   const normalizedStatus = normalizeStatus(body.status);
   return {
     client_name: String(body.clientName || "").trim(),
@@ -183,20 +240,26 @@ function jsonResponse(payload, status = 200) {
 /**
  * Generate the next EST-#### identifier for a tenant.
  *
- * The previous implementation used `COUNT(*) + 1`, which is vulnerable to a
- * race where two concurrent creations produce the same number. We now pick
- * the highest existing EST-#### suffix and add one. The same-origin guard +
- * unique index on (tenant_id, estimate_number) added in the companion
- * migration are what make this safe under contention.
+ * Strategy: fetch the most-recently-created estimates and scan their
+ * numbers for the max numeric suffix. Ordering by `created_at desc` (not
+ * `estimate_number desc`) avoids lexicographic ordering pitfalls — once a
+ * tenant crosses EST-9999, the string "EST-10000" sorts *below*
+ * "EST-9999" lexicographically, so a top-50 lex query would miss the
+ * five-digit numbers. created_at puts the newest first regardless of
+ * digit count, which is what we actually want.
+ *
+ * The unique index on (tenant_id, estimate_number) from
+ * 20260528200000_estimate_number_uniqueness.sql still guards against
+ * concurrent creates; the call-site retries on 23505.
  */
 async function nextEstimateNumber(tenantId) {
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
-    .select("estimate_number")
+    .select("estimate_number, created_at")
     .eq("tenant_id", tenantId)
     .ilike("estimate_number", "EST-%")
-    .order("estimate_number", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
 

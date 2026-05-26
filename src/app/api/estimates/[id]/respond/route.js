@@ -15,6 +15,7 @@ import {
   isSignatureRequiredForEstimate,
   sanitizeSignatureName,
 } from "@/lib/estimate-signature-policy";
+import { recordEstimateRevision } from "@/lib/estimate-revisions";
 
 const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
@@ -202,6 +203,30 @@ export async function POST(request, { params }) {
 
   await recordPublicQuoteAttempt({ token, ip, action: "approval" });
 
+  // Append a revision so the contractor's timeline reflects what the
+  // customer just did. Best-effort — failures don't break the response.
+  // The actor is the customer (no internal user id), so we mark the
+  // action label with their name when known and leave user_id null.
+  const revisionKind =
+    action === "approved"
+      ? "approved"
+      : action === "declined"
+        ? "declined"
+        : "changes_requested";
+  const customerLabel = existing.client_name
+    ? `client (${existing.client_name})`
+    : "client";
+  await recordEstimateRevision({
+    estimateId: existing.id,
+    tenantId: existing.tenant_id || null,
+    userId: null,
+    actorLabel: customerLabel,
+    kind: revisionKind,
+    before: { status: currentStatus, total: Number(existing.total || 0) },
+    after: { status: action, total: Number(existing.total || 0) },
+    note: clientNote ? `Client note: ${clientNote.slice(0, 1000)}` : "",
+  });
+
   // From this point the estimate status has already been written successfully.
   // The follow-up quote auto-creation is a convenience handoff — if it fails
   // we still tell the customer their approval was accepted (it was) and log
@@ -277,7 +302,9 @@ async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
       created_by: existing.created_by || null,
       quote_number: baseNumber || String(Date.now()),
       title: `Quote for ${existing.client_name || "Client"}`,
-      client_id: "",
+      // Previously persisted as an empty string, which fails UUID-typed
+      // FK checks on `quotes.client_id`. Null is the canonical "unset".
+      client_id: existing.client_id || null,
       client_name: existing.client_name || "",
       client_email: parsed.clientEmail || "",
       client_phone: parsed.clientPhone || "",
