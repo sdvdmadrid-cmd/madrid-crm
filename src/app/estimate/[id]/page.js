@@ -1,6 +1,7 @@
 ﻿"use client";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import SignaturePad from "@/components/SignaturePad";
 
 function formatMoney(amount) {
   const num = Number(amount) || 0;
@@ -35,9 +36,14 @@ export default function EstimateClientPage() {
   const [newItemPrice, setNewItemPrice] = useState("");
 
   // Signature flow (paquete I). Driven by `estimate.signatureRequired`.
+  // `signatureDraw` is an optional inline image data URL the customer
+  // hand-draws into the SignaturePad below the typed name. The typed
+  // name is still the canonical identifier; the drawing is supplementary
+  // evidence the server records under audit.signature.dataUrl.
   const [showSignaturePanel, setShowSignaturePanel] = useState(false);
   const [signatureName, setSignatureName] = useState("");
   const [signatureAgreement, setSignatureAgreement] = useState(false);
+  const [signatureDraw, setSignatureDraw] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -83,7 +89,14 @@ export default function EstimateClientPage() {
     setNewItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  async function respond(action, { signatureName: sigName, signatureAgreement: sigAgreement } = {}) {
+  async function respond(
+    action,
+    {
+      signatureName: sigName,
+      signatureAgreement: sigAgreement,
+      signatureDrawDataUrl: sigDraw,
+    } = {},
+  ) {
     setActionLoading(true);
     setError("");
     try {
@@ -107,6 +120,7 @@ export default function EstimateClientPage() {
           ...(requestedItems !== null ? { requestedItems } : {}),
           ...(sigName ? { signatureName: sigName } : {}),
           ...(sigAgreement === true ? { signatureAgreement: true } : {}),
+          ...(sigDraw ? { signatureDrawDataUrl: sigDraw } : {}),
         }),
       });
       const json = await res.json();
@@ -147,6 +161,9 @@ export default function EstimateClientPage() {
     respond("approved", {
       signatureName: trimmed,
       signatureAgreement: true,
+      // The drawn signature is optional — the server treats `typed` as
+      // the canonical method when this is empty.
+      signatureDrawDataUrl: signatureDraw || "",
     });
   }
 
@@ -302,6 +319,30 @@ export default function EstimateClientPage() {
           </div>
         ) : null}
 
+        {/* Signed evidence — surfaces the typed name + drawn signature
+            back to the customer on already-approved estimates so they
+            can confirm what they signed when they revisit the link. */}
+        {estimate.signature?.name ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm mb-4 print:shadow-none">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed</div>
+            <div className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Brush Script MT','Comic Sans MS',cursive" }}>
+              {estimate.signature.name}
+            </div>
+            {estimate.signature.signedAt ? (
+              <div className="mt-1 text-xs text-slate-600">
+                {new Date(estimate.signature.signedAt).toLocaleString()}
+              </div>
+            ) : null}
+            {estimate.signature.dataUrl ? (
+              <img
+                src={estimate.signature.dataUrl}
+                alt="Drawn signature"
+                className="mt-3 max-h-32 rounded-lg border border-emerald-200 bg-white p-2"
+              />
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Client actions */}
         {canRespond && !actionDone ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-4 print:hidden">
@@ -443,6 +484,14 @@ export default function EstimateClientPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold tracking-wide text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
                   style={{ fontFamily: "'Brush Script MT','Comic Sans MS',cursive" }}
                 />
+                <div className="mt-1">
+                  <SignaturePad
+                    value={signatureDraw}
+                    onChange={setSignatureDraw}
+                    label="Or draw your signature (optional)"
+                    clearLabel="Clear"
+                  />
+                </div>
                 <label className="flex items-start gap-2 text-xs text-slate-600">
                   <input
                     type="checkbox"

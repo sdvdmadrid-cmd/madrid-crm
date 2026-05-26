@@ -25,6 +25,20 @@ const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
 const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 
+// Cap the drawn-signature payload. A 640x180 PNG from the SignaturePad
+// canvas typically lives well under 30KB, so 200KB is a generous ceiling
+// that still prevents a malicious caller from stuffing megabytes into
+// the notes JSON blob (which is stored in a TEXT column).
+const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
+
+function sanitizeSignatureDataUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!raw.startsWith("data:image/")) return "";
+  if (raw.length > MAX_SIGNATURE_DATA_URL_BYTES) return "";
+  return raw;
+}
+
 function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -112,10 +126,20 @@ export async function POST(request, { params }) {
         );
       }
 
+      // Optional drawn signature attached on top of the typed name. The
+      // typed name remains the canonical identifier; the drawing is
+      // supplementary evidence for jurisdictions / contractors that want
+      // a hand-signed visual. Reject anything that isn't a small inline
+      // image data URL so we never persist a remote URL or an oversized
+      // payload that would balloon the notes blob.
+      const drawn = sanitizeSignatureDataUrl(body.signatureDrawDataUrl);
+
       audit.signature = {
         name: signatureName,
         signedAt: nowIso,
         ip: String(ip || ""),
+        method: drawn ? "drawn_and_typed" : "typed",
+        ...(drawn ? { dataUrl: drawn } : {}),
       };
     }
   }

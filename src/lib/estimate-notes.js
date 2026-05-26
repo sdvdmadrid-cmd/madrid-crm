@@ -38,12 +38,38 @@ export function createEmptyAudit() {
   };
 }
 
+// `method` enumerates how the customer authenticated the approval:
+//   "typed"            — typed full name only (the default since paquete I).
+//   "drawn_and_typed"  — typed full name + drawn signature (the typed name
+//                        is always the canonical identifier; the drawing
+//                        is supplementary evidence).
+//
+// Older signed estimates predate this column, so missing/invalid values
+// fall back to "typed" — they are typed-name only by construction.
+const SIGNATURE_METHODS = new Set(["typed", "drawn_and_typed"]);
+
+function normalizeSignatureMethod(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  return SIGNATURE_METHODS.has(raw) ? raw : "typed";
+}
+
+function normalizeSignatureDataUrl(value) {
+  const raw = String(value || "").trim();
+  // Only persist inline image data URLs so we never accidentally store
+  // a remote URL fragment the renderer would have to fetch.
+  if (!raw.startsWith("data:image/")) return "";
+  return raw;
+}
+
 function normalizeSignature(signature) {
   if (!signature || typeof signature !== "object") return null;
+  const dataUrl = normalizeSignatureDataUrl(signature.dataUrl);
   return {
     name: String(signature.name || ""),
     signedAt: String(signature.signedAt || ""),
     ip: String(signature.ip || ""),
+    method: normalizeSignatureMethod(signature.method),
+    ...(dataUrl ? { dataUrl } : {}),
   };
 }
 
@@ -212,6 +238,12 @@ export function redactAuditForPublic(audit) {
       ? {
           name: String(audit.signature.name || ""),
           signedAt: String(audit.signature.signedAt || ""),
+          method: normalizeSignatureMethod(audit.signature.method),
+          // The customer's own drawn signature is safe to echo back; we
+          // strip `ip` only since the IP is internal-audit metadata.
+          ...(audit.signature.dataUrl
+            ? { dataUrl: normalizeSignatureDataUrl(audit.signature.dataUrl) }
+            : {}),
         }
       : null;
   // Always include the `signature` key (null or object) so the public

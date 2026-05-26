@@ -44,6 +44,44 @@ test("parseEstimateNotes pulls audit.signature.ip from the canonical blob", () =
   assert.equal(result.audit.resendCount, 2);
   assert.equal(result.audit.signature.name, "Jane");
   assert.equal(result.audit.signature.ip, "1.2.3.4");
+  // Older signatures predate the method/dataUrl fields; the normalizer
+  // defaults `method` to "typed" and omits `dataUrl`.
+  assert.equal(result.audit.signature.method, "typed");
+  assert.equal("dataUrl" in result.audit.signature, false);
+});
+
+test("parseEstimateNotes preserves drawn-signature dataUrl + method", () => {
+  const blob = JSON.stringify({
+    kind: ESTIMATE_NOTES_KIND,
+    noteText: "Hello",
+    audit: {
+      signature: {
+        name: "Jane",
+        signedAt: "T",
+        ip: "1.2.3.4",
+        method: "drawn_and_typed",
+        dataUrl: "data:image/png;base64,iVBORw0",
+      },
+    },
+  });
+  const result = parseEstimateNotes(blob);
+  assert.equal(result.audit.signature.method, "drawn_and_typed");
+  assert.equal(result.audit.signature.dataUrl, "data:image/png;base64,iVBORw0");
+});
+
+test("parseEstimateNotes drops non-data-URL signature.dataUrl values", () => {
+  const blob = JSON.stringify({
+    kind: ESTIMATE_NOTES_KIND,
+    audit: {
+      signature: {
+        name: "Jane",
+        signedAt: "T",
+        dataUrl: "https://evil.example/track.gif",
+      },
+    },
+  });
+  const result = parseEstimateNotes(blob);
+  assert.equal("dataUrl" in result.audit.signature, false);
 });
 
 test("parseEstimateNotes falls back to legacy parsed.note key", () => {
@@ -130,6 +168,21 @@ test("redactAuditForPublic strips signature.ip", () => {
   const redacted = redactAuditForPublic(audit);
   assert.equal(redacted.signature.name, "Jane");
   assert.equal(redacted.signature.signedAt, "T1");
+  assert.equal("ip" in redacted.signature, false);
+});
+
+test("redactAuditForPublic echoes drawn signature back to the customer", () => {
+  const audit = createEmptyAudit();
+  audit.signature = {
+    name: "Jane",
+    signedAt: "T1",
+    ip: "1.2.3.4",
+    method: "drawn_and_typed",
+    dataUrl: "data:image/png;base64,abc",
+  };
+  const redacted = redactAuditForPublic(audit);
+  assert.equal(redacted.signature.method, "drawn_and_typed");
+  assert.equal(redacted.signature.dataUrl, "data:image/png;base64,abc");
   assert.equal("ip" in redacted.signature, false);
 });
 
