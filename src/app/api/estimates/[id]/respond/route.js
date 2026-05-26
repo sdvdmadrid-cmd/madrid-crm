@@ -16,6 +16,7 @@ import {
   sanitizeSignatureName,
 } from "@/lib/estimate-signature-policy";
 import {
+  buildAuditForStatusTransition,
   parseEstimateNotes,
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
@@ -93,10 +94,18 @@ export async function POST(request, { params }) {
 
   const nowIso = new Date().toISOString();
   const parsedNotes = parseEstimateNotes(existing.notes);
-  const audit = { ...parsedNotes.audit };
-  if (action === "approved") audit.approvedAt = nowIso;
-  if (action === "declined") audit.declinedAt = nowIso;
-  if (action === "changes_requested") audit.changesRequestedAt = nowIso;
+  // Use the shared status-transition helper so the contractor PATCH path
+  // (/api/estimates/[id]) and this customer respond path stamp audit
+  // timestamps through the same source of truth. Any future tweaks to
+  // the audit shape (resendCount semantics, signature carry-forward,
+  // field normalization) then automatically apply to both surfaces and
+  // can't drift between them.
+  const audit = buildAuditForStatusTransition(
+    parsedNotes.audit,
+    currentStatus,
+    action,
+    nowIso,
+  );
 
   // Paquete I: require a typed signature on approvals once the estimate
   // exceeds the tenant's configured threshold. If the customer never sent

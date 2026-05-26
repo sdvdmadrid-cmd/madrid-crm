@@ -492,12 +492,13 @@ export default function EstimateClientPage() {
                     clearLabel="Clear"
                   />
                 </div>
-                <label className="flex items-start gap-2 text-xs text-slate-600">
+                <label className="flex min-h-[44px] items-start gap-3 text-xs text-slate-600">
                   <input
                     type="checkbox"
                     checked={signatureAgreement}
                     onChange={(e) => setSignatureAgreement(e.target.checked)}
-                    className="mt-0.5"
+                    className="mt-0.5 h-5 w-5 flex-shrink-0 cursor-pointer accent-emerald-600"
+                    aria-label="I agree to the scope of work and total"
                   />
                   <span>
                     I agree to the scope of work and total shown above, and my typed name acts as my electronic
