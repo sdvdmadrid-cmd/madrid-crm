@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   canSendExternal,
@@ -110,6 +111,9 @@ function serializeQuote(doc) {
  */
 export async function POST(request, { params }) {
   try {
+    const csrf = enforceSameOriginForMutation(request);
+    if (csrf) return csrf;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {

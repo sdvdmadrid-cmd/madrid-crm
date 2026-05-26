@@ -1,4 +1,5 @@
 import { buildEstimateBuilderInsertRow } from "@/lib/estimate-builder-records";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { assertTenantClient } from "@/lib/tenant-fk-validation";
 import {
@@ -107,6 +108,9 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const csrf = enforceSameOriginForMutation(request);
+    if (csrf) return csrf;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {

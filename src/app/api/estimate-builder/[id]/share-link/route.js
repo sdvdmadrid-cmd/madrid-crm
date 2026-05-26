@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ESTIMATE_INVOICE_DISCLAIMER } from "@/lib/legal";
 import { enforceLegalAcceptance } from "@/lib/legal-enforcement";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canSendExternal,
   forbiddenResponse,
@@ -97,6 +98,9 @@ function appendDisclaimer(text, lang = "en") {
 
 export async function POST(request, { params }) {
   try {
+    const csrf = enforceSameOriginForMutation(request);
+    if (csrf) return csrf;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {

@@ -1,4 +1,5 @@
 import { sendEmail } from "@/lib/email";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   canSendExternal,
@@ -110,6 +111,9 @@ function buildEstimateEmail(estimate) {
 
 export async function POST(request, { params }) {
   try {
+    const csrf = enforceSameOriginForMutation(request);
+    if (csrf) return csrf;
+
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {
