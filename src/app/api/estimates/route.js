@@ -192,7 +192,10 @@ export async function GET(request) {
       data: (data || []).map(serializeEstimate),
     });
   } catch (error) {
-    console.error("[api/estimates][GET] error", error);
+    console.error("[api/estimates][GET] error", {
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
@@ -201,11 +204,17 @@ export async function POST(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
 
+  // Hoist diagnostic ids so the catch block can include them.
+  let logTenantId = null;
+  let logUserId = null;
+
   try {
     const { tenantDbId, userId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
+    logTenantId = tenantDbId || null;
+    logUserId = userId || null;
 
     const parsedBody = await parseJsonBody(request);
     if (!parsedBody.ok) return parsedBody.response;
@@ -303,7 +312,12 @@ export async function POST(request) {
 
     return jsonResponse({ success: true, data: { ...serialized, delivery } });
   } catch (error) {
-    console.error("[api/estimates][POST] error", error);
+    console.error("[api/estimates][POST] error", {
+      tenantId: logTenantId,
+      userId: logUserId,
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }

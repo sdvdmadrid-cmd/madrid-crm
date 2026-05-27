@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { generateContractAssistant } from "@/lib/document-ai";
 import { parseEstimateNotes } from "@/lib/estimate-notes";
@@ -59,10 +58,14 @@ function buildScopeFromItems(items, fallbackNote) {
  */
 export async function POST(request, { params }) {
   try {
+    // Single same-origin / Referer guard. Previously this route
+    // invoked the same check twice: once as
+    // enforceSameOriginForMutation, again as applyMutationCsrfGuard
+    // (which is a one-line wrapper around the same function). Pure
+    // dead work, and confusing because it implied two layers of
+    // CSRF enforcement when only one exists.
     const sameOriginBlock = enforceSameOriginForMutation(request);
     if (sameOriginBlock) return sameOriginBlock;
-    const csrfBlock = applyMutationCsrfGuard(request);
-    if (csrfBlock) return csrfBlock;
 
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);

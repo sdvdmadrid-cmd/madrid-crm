@@ -212,7 +212,10 @@ export async function GET(request, { params }) {
 
     return jsonResponse({ success: true, data: serializeEstimate(data) });
   } catch (error) {
-    console.error("[api/estimates/:id][GET] error", error);
+    console.error("[api/estimates/:id][GET] error", {
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
@@ -221,16 +224,29 @@ export async function PATCH(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
 
+  // Hoist a few diagnostic ids out of the try block so the catch
+  // branch's structured log can include them even when the error
+  // happens after we've established the context but before we
+  // return. Filled inside the try when the values become available;
+  // remain null if the error fires earlier (e.g. context fetch
+  // failure).
+  let logEstimateId = null;
+  let logTenantId = null;
+  let logUserId = null;
+
   try {
-    const { tenantDbId, role, authenticated } =
+    const { tenantDbId, userId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
+    logTenantId = tenantDbId || null;
+    logUserId = userId || null;
 
     const { id } = await params;
     if (!id) {
       return jsonResponse({ success: false, error: "Invalid estimate id" }, 400);
     }
+    logEstimateId = id;
 
     const parsedBody = await parseJsonBody(request);
     if (!parsedBody.ok) return parsedBody.response;
@@ -350,7 +366,17 @@ export async function PATCH(request, { params }) {
 
     return jsonResponse({ success: true, data: { ...serialized, delivery } });
   } catch (error) {
-    console.error("[api/estimates/:id][PATCH] error", error);
+    // Structured log line so production traces capture enough context
+    // to repro / triage. Previously: `[api/estimates/:id][PATCH] error
+    // <Error>` with no id, tenant, or user — correlating with surrounding
+    // requests required walking the timestamp.
+    console.error("[api/estimates/:id][PATCH] error", {
+      estimateId: logEstimateId,
+      tenantId: logTenantId,
+      userId: logUserId,
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
