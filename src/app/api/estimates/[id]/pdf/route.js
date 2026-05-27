@@ -9,11 +9,28 @@ import {
 
 const ESTIMATES_TABLE = "estimates";
 
+// pdfkit depends on node:Buffer / node:stream and cannot run on
+// edge runtimes. Pin nodejs explicitly so any future hosting target
+// that defaults to edge inference doesn't silently break PDF
+// downloads. Mirrors estimate-builder/[id]/checkout which already
+// pins this.
+export const runtime = "nodejs";
+
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// Safe Number coercion: replaces the unsafe `Number(x || 0)` pattern
+// that produces NaN for non-numeric inputs (e.g. string "abc" from
+// a manual DB edit). NaN reaches formatMoney downstream, which
+// coerces to $0.00 — works today but defensive normalization keeps
+// the API shape predictable.
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function buildEstimatePayload(row) {
@@ -29,9 +46,9 @@ function buildEstimatePayload(row) {
     address: parsed.address || "",
     notes: parsed.noteText || "",
     services: Array.isArray(row.items) ? row.items : [],
-    subtotal: Number(row.subtotal || 0),
-    tax: Number(row.tax || 0),
-    total: Number(row.total || 0),
+    subtotal: toNumber(row.subtotal),
+    tax: toNumber(row.tax),
+    total: toNumber(row.total),
     createdAt: row.created_at || null,
   };
 }

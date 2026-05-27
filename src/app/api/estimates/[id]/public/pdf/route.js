@@ -14,6 +14,24 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const ESTIMATES_TABLE = "estimates";
 
+// pdfkit depends on node:Buffer / node:stream and cannot run on
+// edge runtimes. Pin nodejs explicitly so any future hosting
+// target that defaults to edge inference doesn't silently break
+// PDF downloads. Mirrors estimate-builder/[id]/checkout which
+// already pins this.
+export const runtime = "nodejs";
+
+// Safe Number coercion: replaces the unsafe `Number(x || 0)` pattern
+// that silently produces NaN for non-numeric inputs (e.g. when the
+// underlying column is the string "abc" from a manual edit). NaN
+// values reach formatMoney downstream, which happens to coerce to
+// $0.00 today, but defensive normalization here means the API shape
+// stays predictable for any future downstream consumer.
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -91,9 +109,9 @@ export async function GET(request, { params }) {
       address: parsedNotes.address || "",
       notes: parsedNotes.noteText || "",
       services: Array.isArray(data.items) ? data.items : [],
-      subtotal: Number(data.subtotal || 0),
-      tax: Number(data.tax || 0),
-      total: Number(data.total || 0),
+      subtotal: toNumber(data.subtotal),
+      tax: toNumber(data.tax),
+      total: toNumber(data.total),
       createdAt: data.created_at || null,
     };
 
