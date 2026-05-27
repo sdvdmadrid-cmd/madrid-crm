@@ -23,15 +23,9 @@ import {
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
 
-const INVOICES = "invoices";
+import { normalizeBaseNumber } from "@/lib/quote-numbering";
 
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
-}
+const INVOICES = "invoices";
 
 function serialize(doc) {
   const amount = Number(

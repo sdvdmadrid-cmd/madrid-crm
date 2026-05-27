@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { normalizeBaseNumber, toCents } from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -47,26 +48,6 @@ async function nextQuoteNumber(tenantId) {
     }
   }
   return String(max + 1);
-}
-
-/**
- * Round a dollar amount to integer cents using safe arithmetic. JS
- * floating point makes `12.34 * 100` = 1234.0000000000002, which a
- * `bigint`-typed cents column will reject. Always pipe payment math
- * through this helper.
- */
-function toCents(amount) {
-  const num = Number(amount || 0);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num * 100);
-}
-
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
 }
 
 function serializeQuote(doc) {

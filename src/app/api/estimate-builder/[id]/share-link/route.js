@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ESTIMATE_INVOICE_DISCLAIMER } from "@/lib/legal";
 import { enforceLegalAcceptance } from "@/lib/legal-enforcement";
+import { normalizeBaseNumber, toCents } from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canSendExternal,
@@ -68,25 +69,6 @@ async function nextQuoteNumber(tenantId) {
     }
   }
   return String(max + 1);
-}
-
-/**
- * Round dollars to integer cents using safe arithmetic. JS floats make
- * `12.34 * 100` = 1234.0000000000002, which a `bigint` cents column
- * rejects. All cent math must flow through this helper.
- */
-function toCents(amount) {
-  const num = Number(amount || 0);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num * 100);
-}
-
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
 }
 
 function appendDisclaimer(text, lang = "en") {
