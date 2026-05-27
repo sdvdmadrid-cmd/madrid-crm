@@ -258,10 +258,29 @@ export async function PATCH(request, { params }) {
       currentStatus: existing.status || "draft",
     });
 
+    // Optimistic concurrency: only update if updated_at still
+    // matches what we read into `existing` a few lines up. Prevents
+    // two contractors (or a contractor + the customer's public
+    // respond endpoint) from clobbering each other silently.
+    //
+    // The previous shape used `.eq("id", id)` alone with `.select`
+    // returning the row, so an update that wrote the same row from
+    // a stale snapshot would succeed without surfacing any signal.
+    // The race documented in F2 of the hardening audit (contractor
+    // edits overwriting a customer's just-recorded signature) was
+    // a concrete instance of this.
+    //
+    // If the (id, updated_at) selector matches zero rows, the row
+    // either was just updated by someone else (409 conflict) or
+    // was deleted in the interim. We return 409 in both cases — a
+    // 404 path is reserved for the initial read above; by the time
+    // we are here we know the row exists at-or-after that read.
+    const previousUpdatedAt = existing.updated_at;
     let updateQuery = supabaseAdmin
       .from(ESTIMATES_TABLE)
       .update(toUpdate)
       .eq("id", id)
+      .eq("updated_at", previousUpdatedAt)
       .select("*")
       .maybeSingle();
 
@@ -272,7 +291,15 @@ export async function PATCH(request, { params }) {
     const { data, error } = await updateQuery;
     if (error) throw new Error(error.message);
     if (!data) {
-      return jsonResponse({ success: false, error: "Estimate not found" }, 404);
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "This estimate was modified by another user. Please reload and try again.",
+          conflict: true,
+        },
+        409,
+      );
     }
 
     const serialized = serializeEstimate(data);

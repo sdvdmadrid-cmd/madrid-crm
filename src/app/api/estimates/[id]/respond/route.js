@@ -185,7 +185,21 @@ export async function POST(request, { params }) {
     ? (parsedNotes.noteText ? `${parsedNotes.noteText}\n\nClient note: ${clientNote}` : `Client note: ${clientNote}`)
     : parsedNotes.noteText;
 
-  const { error: updateErr } = await supabaseAdmin
+  // Optimistic concurrency guard: only update the row if
+  // updated_at still matches what we read into `existing` above.
+  // Prevents the customer's approval from clobbering a concurrent
+  // contractor edit (and vice versa). Without this, the following
+  // race silently corrupted state:
+  //   t0  contractor PATCH reads estimate (snapshot S)
+  //   t1  customer hits respond, writes approved + signature
+  //   t2  contractor PATCH writes using S (signature now lost,
+  //       status reverted)
+  //
+  // The DB write below selects to detect the no-rows-matched case
+  // explicitly so we can return a 409 with a clear message rather
+  // than a generic 500.
+  const previousUpdatedAt = existing.updated_at;
+  const { data: updateData, error: updateErr } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
     .update({
       status: action,
@@ -197,9 +211,29 @@ export async function POST(request, { params }) {
       }),
       updated_at: nowIso,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("updated_at", previousUpdatedAt)
+    .select("id")
+    .maybeSingle();
 
   if (updateErr) return json({ success: false, error: updateErr.message }, 500);
+
+  if (!updateData) {
+    // No row matched both (id, updated_at). The estimate exists
+    // (we already proved that earlier) but updated_at moved while
+    // we were computing — concurrent modification. The customer-
+    // facing page surfaces this error to the user, who should
+    // refresh and try again.
+    return json(
+      {
+        success: false,
+        error:
+          "This estimate was just updated by the contractor. Please refresh the page and try again.",
+        conflict: true,
+      },
+      409,
+    );
+  }
 
   // (recordPublicQuoteAttempt already ran near the top of this handler,
   // so the attacker who sprays invalid actions also drains their bucket;
