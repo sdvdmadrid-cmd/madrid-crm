@@ -38,6 +38,10 @@ async function nextEstimateBuilderNumber(tenantId) {
       if (Number.isFinite(n) && n > max) max = n;
     }
   }
+  // padStart(4) is a floor (EST-0001..EST-9999); past 10000 the suffix
+  // grows naturally without truncation. See nextEstimateNumber in
+  // /api/estimates/route.js for the full rationale and
+  // tests/unit/estimate-number-format.test.mjs for the pinned behavior.
   return `EST-${String(max + 1).padStart(4, "0")}`;
 }
 

@@ -167,6 +167,18 @@ async function nextEstimateNumber(tenantId) {
       if (Number.isFinite(n) && n > max) max = n;
     }
   }
+  // `padStart(4, "0")` is a floor, not a width cap. Values <= 9999 render
+  // as 4-digit zero-padded strings (EST-0001 .. EST-9999); the moment a
+  // tenant rolls over 10000 the suffix grows naturally to 5 digits (no
+  // truncation), then to 6, etc. We deliberately don't widen the floor
+  // (e.g. to 5) because that would change the rendered width of new
+  // estimate numbers for existing tenants who today see EST-0123 and
+  // would suddenly see EST-00124 mid-sequence. The lookup endpoint at
+  // /api/estimates/lookup already accepts both padded and unpadded
+  // forms, and ordering is driven by created_at so post-9999 numbers
+  // remain correctly sortable. See:
+  // - tests/unit/estimate-number-format.test.mjs (pinned behavior)
+  // - docs/ESTIMATE_WORKFLOW_AUDIT_2026_05.md (known low-severity note)
   return `EST-${String(max + 1).padStart(4, "0")}`;
 }
 
