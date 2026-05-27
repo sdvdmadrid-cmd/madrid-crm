@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
-import { normalizeBaseNumber, toCents } from "@/lib/quote-numbering";
+import {
+  QUOTE_LOOKUP_LIMIT,
+  normalizeBaseNumber,
+  pickMaxQuoteSequence,
+  toCents,
+} from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -29,7 +34,7 @@ async function nextQuoteNumber(tenantId) {
     .select("quote_number")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(QUOTE_LOOKUP_LIMIT);
 
   if (error) {
     console.error(
@@ -39,15 +44,7 @@ async function nextQuoteNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  let max = 0;
-  for (const row of data || []) {
-    const match = String(row.quote_number || "").match(/(\d+)/);
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  }
-  return String(max + 1);
+  return String(pickMaxQuoteSequence(data) + 1);
 }
 
 function serializeQuote(doc) {

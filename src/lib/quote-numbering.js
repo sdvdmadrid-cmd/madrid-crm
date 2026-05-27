@@ -39,6 +39,44 @@ export function toCents(amount) {
 }
 
 /**
+ * Number of recent quote rows to scan for max(numeric suffix).
+ *
+ * Mirrors INVOICE_LOOKUP_LIMIT / ESTIMATE_LOOKUP_LIMIT. Picked at 200
+ * because that matches the existing in-route lookup limits in
+ * /api/estimate-builder/[id]/promote and /share-link before the
+ * refactor; raising it would scan more rows for no real benefit
+ * (tenants with >200 quotes since their last gap still allocate
+ * monotonically because the max is taken from the most-recent
+ * batch).
+ */
+export const QUOTE_LOOKUP_LIMIT = 200;
+
+/**
+ * Given a batch of rows that each carry a `quote_number` string,
+ * return the highest numeric suffix found (or 0 if none parsed).
+ *
+ * Unlike pickMaxInvoiceSequence (which requires "INV-####"), this
+ * helper is permissive: it scans for any embedded digits via
+ * /(\d+)/ — matching what /api/estimate-builder/[id]/promote and
+ * /share-link already do. Tenants may have legacy quote numbers
+ * like "2024-001" or hand-typed numbers ("Q4-RUSH-12"); the digit
+ * sequence still contributes to the max so allocation stays
+ * monotonic.
+ *
+ * Pure — no DB, no state.
+ */
+export function pickMaxQuoteSequence(rows) {
+  let max = 0;
+  for (const row of rows || []) {
+    const match = String(row?.quote_number || "").match(/(\d+)/);
+    if (!match) continue;
+    const n = Number(match[1]);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
+}
+
+/**
  * Strip a leading "EST-" / "QT-" / "INV-" prefix and trim whitespace
  * so the remaining suffix can be reused by another allocator.
  *
