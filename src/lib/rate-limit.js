@@ -11,6 +11,11 @@ const RESET_EMAIL_MAX_ATTEMPTS = 10;
 const RESET_IP_MAX_ATTEMPTS = 40;
 const PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS = 40;
 const PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS = 25;
+// PDF downloads are read-only like `view` but live in a separate bucket
+// so a customer hammering the PDF endpoint cannot exhaust the JSON-view
+// budget (or vice versa). Caps mirror `view` since both are non-mutating.
+const PUBLIC_QUOTE_PDF_IP_MAX_ATTEMPTS = 40;
+const PUBLIC_QUOTE_PDF_TOKEN_MAX_ATTEMPTS = 25;
 const PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS = 15;
 const PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS = 10;
 const WEBSITE_LEAD_IP_MAX_ATTEMPTS = 20;
@@ -301,20 +306,41 @@ export async function checkPublicQuoteRateLimit({
   );
 }
 
+// Read-only actions get the more generous "view-like" caps; everything
+// else falls into the stricter mutation bucket. Each action also lives
+// in its own key namespace (via `public-quote:${action}:...`), so a
+// burst against the PDF endpoint cannot consume the JSON-view budget.
+const PUBLIC_QUOTE_READ_ACTIONS = new Set(["view", "pdf"]);
+
+function publicQuoteCapsForAction(action) {
+  if (action === "pdf") {
+    return {
+      ip: PUBLIC_QUOTE_PDF_IP_MAX_ATTEMPTS,
+      token: PUBLIC_QUOTE_PDF_TOKEN_MAX_ATTEMPTS,
+    };
+  }
+  if (PUBLIC_QUOTE_READ_ACTIONS.has(action)) {
+    return {
+      ip: PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS,
+      token: PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS,
+    };
+  }
+  return {
+    ip: PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS,
+    token: PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS,
+  };
+}
+
 export async function recordPublicQuoteAttempt({ token, ip, action = "view" }) {
-  const isMutation = action !== "view";
+  const caps = publicQuoteCapsForAction(action);
   return recordScopedAttempt([
     {
       key: buildKey(`public-quote:${action}:ip`, ip),
-      maxAttempts: isMutation
-        ? PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS
-        : PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS,
+      maxAttempts: caps.ip,
     },
     {
       key: buildKey(`public-quote:${action}:token`, token),
-      maxAttempts: isMutation
-        ? PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS
-        : PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS,
+      maxAttempts: caps.token,
     },
   ]);
 }
