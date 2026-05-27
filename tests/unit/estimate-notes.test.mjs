@@ -190,3 +190,59 @@ test("redactAuditForPublic returns null signature when audit has no signature", 
   const redacted = redactAuditForPublic(createEmptyAudit());
   assert.equal(redacted.signature, null);
 });
+
+test("parseEstimateNotes round-trips requestedItems through stringify", () => {
+  // Regression guard for the PATCH-drops-requestedItems bug (F1).
+  // The contractor PATCH path now reads existingNotes.requestedItems
+  // and threads it back through stringifyEstimateNotes. This test
+  // pins the round-trip so a future change to either helper that
+  // breaks the contract gets caught.
+  const items = [
+    { ref: "svc-a", change: "Swap to bronze frame" },
+    { ref: "svc-b", change: "Reduce trim scope" },
+  ];
+  const blob = stringifyEstimateNotes({
+    address: "1 Main St",
+    noteText: "Original scope",
+    requestedItems: items,
+    audit: createEmptyAudit(),
+  });
+  const parsed = parseEstimateNotes(blob);
+  assert.deepEqual(parsed.requestedItems, items);
+  assert.equal(parsed.address, "1 Main St");
+  assert.equal(parsed.noteText, "Original scope");
+});
+
+test("stringifyEstimateNotes omits requestedItems when null (legacy 'no items' shape)", () => {
+  const blob = stringifyEstimateNotes({
+    address: "1 Main St",
+    noteText: "scope",
+    requestedItems: null,
+    audit: createEmptyAudit(),
+  });
+  const decoded = JSON.parse(blob);
+  // The key must not appear at all — older parsers that don't know
+  // about the field would otherwise see `requestedItems: null` and
+  // potentially blow up.
+  assert.equal("requestedItems" in decoded, false);
+});
+
+test("stringifyEstimateNotes omits requestedItems when non-array (defensive)", () => {
+  // If a caller accidentally passes a non-array (e.g. an object,
+  // string, or number), we must not persist it — the contractor view
+  // expects either an array or no key at all.
+  for (const bogus of ["a", 42, { id: 1 }, true]) {
+    const blob = stringifyEstimateNotes({
+      address: "",
+      noteText: "",
+      requestedItems: bogus,
+      audit: createEmptyAudit(),
+    });
+    const decoded = JSON.parse(blob);
+    assert.equal(
+      "requestedItems" in decoded,
+      false,
+      `non-array (${typeof bogus}) must be dropped`,
+    );
+  }
+});

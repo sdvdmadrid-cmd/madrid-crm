@@ -141,6 +141,20 @@ function buildUpdateRow(body = {}) {
       requestedStatus,
       nowIso,
     );
+    // Carry forward requestedItems by default. The previous version of
+    // this helper omitted the field entirely from the rewrite, which
+    // silently wiped any change-request payload the customer had
+    // submitted via /api/estimates/[id]/respond — the contractor would
+    // open the estimate to edit it and the change-request list would
+    // disappear. The customer surface only adds items via respond, so
+    // the contractor PATCH must either pass them through unchanged or
+    // explicitly clear them by setting body.requestedItems to null/[].
+    let nextRequestedItems = existingNotes.requestedItems || null;
+    if ("requestedItems" in body) {
+      nextRequestedItems = Array.isArray(body.requestedItems)
+        ? body.requestedItems
+        : null;
+    }
     next.notes = stringifyEstimateNotes({
       address: "address" in body
         ? String(body.address || "").trim()
@@ -154,6 +168,7 @@ function buildUpdateRow(body = {}) {
       clientPhone: "clientPhone" in body
         ? String(body.clientPhone || "").trim()
         : existingNotes.clientPhone,
+      requestedItems: nextRequestedItems,
       audit: mergedAudit,
     });
   }
