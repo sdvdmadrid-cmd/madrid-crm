@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { ESTIMATE_INVOICE_DISCLAIMER } from "@/lib/legal";
 import { enforceLegalAcceptance } from "@/lib/legal-enforcement";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canSendExternal,
   forbiddenResponse,
@@ -36,11 +37,19 @@ function serializeQuote(doc) {
   };
 }
 
+/**
+ * Compute the next sequential quote number for a tenant via MAX(suffix) + 1
+ * rather than COUNT(*) + 1, which would collide on concurrent share-link
+ * creations and reset if rows were soft-deleted. Callers should retry on
+ * a unique-violation since two simultaneous requests can still race.
+ */
 async function nextQuoteNumber(tenantId) {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from(QUOTES_COL)
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+    .select("quote_number")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if (error) {
     console.error(
@@ -50,7 +59,26 @@ async function nextQuoteNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  return String(Number(count || 0) + 1);
+  let max = 0;
+  for (const row of data || []) {
+    const match = String(row.quote_number || "").match(/(\d+)/);
+    if (match) {
+      const n = Number(match[1]);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return String(max + 1);
+}
+
+/**
+ * Round dollars to integer cents using safe arithmetic. JS floats make
+ * `12.34 * 100` = 1234.0000000000002, which a `bigint` cents column
+ * rejects. All cent math must flow through this helper.
+ */
+function toCents(amount) {
+  const num = Number(amount || 0);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num * 100);
 }
 
 function normalizeBaseNumber(value) {
@@ -70,6 +98,9 @@ function appendDisclaimer(text, lang = "en") {
 
 export async function POST(request, { params }) {
   try {
+    const csrf = enforceSameOriginForMutation(request);
+    if (csrf) return csrf;
+
     const { tenantDbId, role, userId, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) {
@@ -208,10 +239,14 @@ export async function POST(request, { params }) {
           const existingLineItems = Array.isArray(existingQuote.line_items)
             ? existingQuote.line_items
             : [];
-          const invoiceAmount = existingLineItems.reduce(
-            (sum, item) => sum + Number(item?.total || 0),
-            0,
-          );
+          const invoiceAmount =
+            Math.round(
+              existingLineItems.reduce(
+                (sum, item) => sum + Number(item?.total || 0),
+                0,
+              ) * 100,
+            ) / 100;
+          const invoiceAmountCents = toCents(invoiceAmount);
           const nowIso = new Date().toISOString();
 
           const { error: createInvoiceError } = await supabaseAdmin
@@ -231,9 +266,9 @@ export async function POST(request, { params }) {
                 Date.now() + 30 * 24 * 60 * 60 * 1000,
               ).toISOString(),
               items: existingLineItems,
-              subtotal_cents: invoiceAmount * 100,
+              subtotal_cents: invoiceAmountCents,
               tax_cents: 0,
-              total_cents: invoiceAmount * 100,
+              total_cents: invoiceAmountCents,
               notes: appendDisclaimer(existingQuote.scope_of_work || ""),
               preferred_payment_method: "",
               payments: [],
@@ -304,14 +339,19 @@ export async function POST(request, { params }) {
       );
     }
 
-    const lineItems = (estimate.lines || []).map((line, index) => ({
-      id: line.serviceId || `li-${index}`,
-      name: line.name || "",
-      description: line.name || "",
-      qty: Number(line.qty) || 1,
-      unitPrice: Number(line.finalPrice) || 0,
-      total: (Number(line.qty) || 1) * (Number(line.finalPrice) || 0),
-    }));
+    const lineItems = (estimate.lines || []).map((line, index) => {
+      const qty = Number(line.qty) || 1;
+      const unit = Number(line.finalPrice) || 0;
+      const total = Math.round(qty * unit * 100) / 100;
+      return {
+        id: line.serviceId || `li-${index}`,
+        name: line.name || "",
+        description: line.name || "",
+        qty,
+        unitPrice: unit,
+        total,
+      };
+    });
 
     const nowIso = new Date().toISOString();
     const baseNumber =
@@ -379,7 +419,11 @@ export async function POST(request, { params }) {
       // Non-fatal: quote was created, just the write-back failed
     }
 
-    const invoiceAmount = lineItems.reduce((sum, item) => sum + item.total, 0);
+    const invoiceAmount =
+      Math.round(
+        lineItems.reduce((sum, item) => sum + Number(item.total || 0), 0) * 100,
+      ) / 100;
+    const invoiceAmountCents = toCents(invoiceAmount);
     const invoiceNumber = baseNumber;
     const { data: existingInvoice, error: existingInvoiceError } = await supabaseAdmin
       .from(INVOICES_COL)
@@ -426,9 +470,9 @@ export async function POST(request, { params }) {
         Date.now() + 30 * 24 * 60 * 60 * 1000,
       ).toISOString(),
       items: lineItems,
-      subtotal_cents: invoiceAmount * 100,
+      subtotal_cents: invoiceAmountCents,
       tax_cents: 0,
-      total_cents: invoiceAmount * 100,
+      total_cents: invoiceAmountCents,
       notes: appendDisclaimer(quoteDoc.scope_of_work),
       preferred_payment_method: "",
       payments: [],

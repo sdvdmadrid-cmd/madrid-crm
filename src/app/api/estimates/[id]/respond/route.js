@@ -15,72 +15,29 @@ import {
   isSignatureRequiredForEstimate,
   sanitizeSignatureName,
 } from "@/lib/estimate-signature-policy";
+import {
+  buildAuditForStatusTransition,
+  parseEstimateNotes,
+  stringifyEstimateNotes,
+} from "@/lib/estimate-notes";
+import { recordEstimateRevision } from "@/lib/estimate-revisions";
 
 const ESTIMATES_TABLE = "estimates";
 const QUOTES_TABLE = "quotes";
 const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 
-function parseNotes(notes) {
-  const raw = String(notes || "").trim();
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed?.kind === "estimate_pipeline") {
-      const signature =
-        parsed.audit?.signature && typeof parsed.audit.signature === "object"
-          ? {
-              name: String(parsed.audit.signature.name || ""),
-              signedAt: String(parsed.audit.signature.signedAt || ""),
-              ip: String(parsed.audit.signature.ip || ""),
-            }
-          : null;
-      return {
-        address: String(parsed.address || ""),
-        noteText: String(parsed.noteText || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-        audit: {
-          sentAt: String(parsed.audit?.sentAt || ""),
-          approvedAt: String(parsed.audit?.approvedAt || ""),
-          declinedAt: String(parsed.audit?.declinedAt || ""),
-          changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
-          resentAt: String(parsed.audit?.resentAt || ""),
-          resendCount: Number(parsed.audit?.resendCount || 0),
-          signature,
-        },
-      };
-    }
-  } catch {
-    // legacy
-  }
-  return {
-    address: "", noteText: raw, clientEmail: "", clientPhone: "",
-    audit: { sentAt: "", approvedAt: "", declinedAt: "", changesRequestedAt: "", resentAt: "", resendCount: 0, signature: null },
-  };
-}
+// Cap the drawn-signature payload. A 640x180 PNG from the SignaturePad
+// canvas typically lives well under 30KB, so 200KB is a generous ceiling
+// that still prevents a malicious caller from stuffing megabytes into
+// the notes JSON blob (which is stored in a TEXT column).
+const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
 
-function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", requestedItems = null, audit = {} }) {
-  const signature =
-    audit.signature && typeof audit.signature === "object"
-      ? {
-          name: String(audit.signature.name || ""),
-          signedAt: String(audit.signature.signedAt || ""),
-          ip: String(audit.signature.ip || ""),
-        }
-      : null;
-  return JSON.stringify({
-    kind: "estimate_pipeline",
-    address, noteText, clientEmail, clientPhone,
-    ...(requestedItems !== null ? { requestedItems } : {}),
-    audit: {
-      sentAt: String(audit.sentAt || ""),
-      approvedAt: String(audit.approvedAt || ""),
-      declinedAt: String(audit.declinedAt || ""),
-      changesRequestedAt: String(audit.changesRequestedAt || ""),
-      resentAt: String(audit.resentAt || ""),
-      resendCount: Number(audit.resendCount || 0),
-      ...(signature ? { signature } : {}),
-    },
-  });
+function sanitizeSignatureDataUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!raw.startsWith("data:image/")) return "";
+  if (raw.length > MAX_SIGNATURE_DATA_URL_BYTES) return "";
+  return raw;
 }
 
 function json(payload, status = 200) {
@@ -136,11 +93,19 @@ export async function POST(request, { params }) {
   }
 
   const nowIso = new Date().toISOString();
-  const parsedNotes = parseNotes(existing.notes);
-  const audit = { ...parsedNotes.audit };
-  if (action === "approved") audit.approvedAt = nowIso;
-  if (action === "declined") audit.declinedAt = nowIso;
-  if (action === "changes_requested") audit.changesRequestedAt = nowIso;
+  const parsedNotes = parseEstimateNotes(existing.notes);
+  // Use the shared status-transition helper so the contractor PATCH path
+  // (/api/estimates/[id]) and this customer respond path stamp audit
+  // timestamps through the same source of truth. Any future tweaks to
+  // the audit shape (resendCount semantics, signature carry-forward,
+  // field normalization) then automatically apply to both surfaces and
+  // can't drift between them.
+  const audit = buildAuditForStatusTransition(
+    parsedNotes.audit,
+    currentStatus,
+    action,
+    nowIso,
+  );
 
   // Paquete I: require a typed signature on approvals once the estimate
   // exceeds the tenant's configured threshold. If the customer never sent
@@ -170,10 +135,20 @@ export async function POST(request, { params }) {
         );
       }
 
+      // Optional drawn signature attached on top of the typed name. The
+      // typed name remains the canonical identifier; the drawing is
+      // supplementary evidence for jurisdictions / contractors that want
+      // a hand-signed visual. Reject anything that isn't a small inline
+      // image data URL so we never persist a remote URL or an oversized
+      // payload that would balloon the notes blob.
+      const drawn = sanitizeSignatureDataUrl(body.signatureDrawDataUrl);
+
       audit.signature = {
         name: signatureName,
         signedAt: nowIso,
         ip: String(ip || ""),
+        method: drawn ? "drawn_and_typed" : "typed",
+        ...(drawn ? { dataUrl: drawn } : {}),
       };
     }
   }
@@ -188,7 +163,7 @@ export async function POST(request, { params }) {
     .from(ESTIMATES_TABLE)
     .update({
       status: action,
-      notes: stringifyNotes({
+      notes: stringifyEstimateNotes({
         ...parsedNotes,
         noteText: updatedNoteText,
         requestedItems,
@@ -201,6 +176,30 @@ export async function POST(request, { params }) {
   if (updateErr) return json({ success: false, error: updateErr.message }, 500);
 
   await recordPublicQuoteAttempt({ token, ip, action: "approval" });
+
+  // Append a revision so the contractor's timeline reflects what the
+  // customer just did. Best-effort — failures don't break the response.
+  // The actor is the customer (no internal user id), so we mark the
+  // action label with their name when known and leave user_id null.
+  const revisionKind =
+    action === "approved"
+      ? "approved"
+      : action === "declined"
+        ? "declined"
+        : "changes_requested";
+  const customerLabel = existing.client_name
+    ? `client (${existing.client_name})`
+    : "client";
+  await recordEstimateRevision({
+    estimateId: existing.id,
+    tenantId: existing.tenant_id || null,
+    userId: null,
+    actorLabel: customerLabel,
+    kind: revisionKind,
+    before: { status: currentStatus, total: Number(existing.total || 0) },
+    after: { status: action, total: Number(existing.total || 0) },
+    note: clientNote ? `Client note: ${clientNote.slice(0, 1000)}` : "",
+  });
 
   // From this point the estimate status has already been written successfully.
   // The follow-up quote auto-creation is a convenience handoff — if it fails
@@ -252,7 +251,7 @@ async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
   }
 
   const baseNumber = String(existing.estimate_number || "").trim();
-  const parsed = parseNotes(existing.notes);
+  const parsed = parseEstimateNotes(existing.notes);
   const lineItems = Array.isArray(existing.items) ? existing.items : [];
 
   const { data: existingQuote, error: existingQuoteError } = await supabaseAdmin
@@ -277,7 +276,9 @@ async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
       created_by: existing.created_by || null,
       quote_number: baseNumber || String(Date.now()),
       title: `Quote for ${existing.client_name || "Client"}`,
-      client_id: "",
+      // Previously persisted as an empty string, which fails UUID-typed
+      // FK checks on `quotes.client_id`. Null is the canonical "unset".
+      client_id: existing.client_id || null,
       client_name: existing.client_name || "",
       client_email: parsed.clientEmail || "",
       client_phone: parsed.clientPhone || "",

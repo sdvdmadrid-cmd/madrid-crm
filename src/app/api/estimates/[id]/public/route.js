@@ -1,6 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import {
+  parseEstimateNotes,
+  redactAuditForPublic,
+} from "@/lib/estimate-notes";
+import {
   checkPublicQuoteRateLimit,
   getRequestIp,
   recordPublicQuoteAttempt,
@@ -16,38 +20,6 @@ const ESTIMATES_TABLE = "estimates";
 function toNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function parseNotes(notes) {
-  const raw = String(notes || "").trim();
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed?.kind === "estimate_pipeline") {
-      const signature =
-        parsed.audit?.signature && typeof parsed.audit.signature === "object"
-          ? {
-              name: String(parsed.audit.signature.name || ""),
-              signedAt: String(parsed.audit.signature.signedAt || ""),
-            }
-          : null;
-      return {
-        address: String(parsed.address || ""),
-        noteText: String(parsed.noteText || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-        audit: {
-          sentAt: String(parsed.audit?.sentAt || ""),
-          approvedAt: String(parsed.audit?.approvedAt || ""),
-          declinedAt: String(parsed.audit?.declinedAt || ""),
-          changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
-          signature,
-        },
-      };
-    }
-  } catch {
-    // legacy
-  }
-  return { address: "", noteText: raw, clientEmail: "", clientPhone: "", audit: {} };
 }
 
 function json(payload, status = 200) {
@@ -90,7 +62,11 @@ export async function GET(request, { params }) {
 
   await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
-  const parsedNotes = parseNotes(data.notes);
+  const parsedNotes = parseEstimateNotes(data.notes);
+  // Strip the customer's signature IP before returning over the public
+  // (token-gated) endpoint — the IP only matters in the contractor's
+  // audit log.
+  const publicAudit = redactAuditForPublic(parsedNotes.audit);
   const total = toNumber(data.total);
 
   // Paquete I: surface whether this estimate needs a typed signature
@@ -122,10 +98,10 @@ export async function GET(request, { params }) {
       tax: toNumber(data.tax),
       total,
       notes: parsedNotes.noteText,
-      audit: parsedNotes.audit,
+      audit: publicAudit,
       signatureRequired,
       signatureThreshold,
-      signature: parsedNotes.audit?.signature || null,
+      signature: publicAudit?.signature || null,
       createdAt: data.created_at || null,
       updatedAt: data.updated_at || null,
       branding: {

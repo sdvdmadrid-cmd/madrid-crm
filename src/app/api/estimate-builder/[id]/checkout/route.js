@@ -3,6 +3,7 @@ import {
   getStripeSecretKey,
 } from "@/lib/stripe-payments";
 import { normalizeMoney } from "@/lib/invoice-payments";
+import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError, normalizeUuid } from "@/lib/supabase-db";
 import {
@@ -75,6 +76,9 @@ export async function POST(request, { params }) {
   let createdInvoiceId = "";
 
   try {
+    const csrf = enforceSameOriginForMutation(request);
+    if (csrf) return csrf;
+
     const context = await getAuthenticatedTenantContext(request);
     if (!context.authenticated) {
       return unauthenticatedResponse();

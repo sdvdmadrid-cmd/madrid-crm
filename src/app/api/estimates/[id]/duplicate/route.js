@@ -1,4 +1,5 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
+import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   canWrite,
@@ -17,18 +18,19 @@ function json(payload, status = 200) {
 }
 
 /**
- * Pick the next EST-#### identifier for a tenant by inspecting the highest
- * existing suffix. Mirrors the helper in /api/estimates so the duplicate
- * flow stays consistent with the create flow.
+ * Pick the next EST-#### identifier for a tenant by inspecting the most
+ * recently-created rows. Mirrors the helper in /api/estimates. Ordering
+ * by `created_at desc` avoids the lexicographic pitfall at the EST-10000
+ * boundary where "EST-10000" sorts below "EST-9999" by string compare.
  */
 async function nextEstimateNumber(tenantId) {
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
-    .select("estimate_number")
+    .select("estimate_number, created_at")
     .eq("tenant_id", tenantId)
     .ilike("estimate_number", "EST-%")
-    .order("estimate_number", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false })
+    .limit(500);
 
   if (error) throw new Error(error.message);
 
@@ -158,6 +160,24 @@ export async function POST(request, { params }) {
 
     if (lastError) throw new Error(lastError.message);
     if (!inserted) throw new Error("Failed to allocate a unique estimate number");
+
+    // Log the duplication on the *new* row so the timeline opens with
+    // "duplicated from <source>" and the kanban detail panel shows a
+    // proper provenance trail. Best-effort.
+    await recordEstimateRevision({
+      estimateId: inserted.id,
+      tenantId: inserted.tenant_id || null,
+      userId: userId || null,
+      actorLabel: source.estimate_number
+        ? `duplicated from ${source.estimate_number}`
+        : "duplicated",
+      kind: "duplicated",
+      before: { status: source.status || "draft", total: Number(source.total || 0) },
+      after: { status: inserted.status || "draft", total: Number(inserted.total || 0) },
+      note: source.estimate_number
+        ? `Cloned from ${source.estimate_number}`
+        : "",
+    });
 
     return json({
       success: true,

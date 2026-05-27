@@ -246,23 +246,35 @@ export async function buildEstimatePdfBuffer({ estimate, branding = {} }) {
       doc.moveDown(0.6);
 
       // --- Totals --------------------------------------------------------
+      // pdfkit advances `doc.y` after every `text(...)` call. The previous
+      // implementation read `doc.y` after the label, so the value rendered
+      // one line *below* the label instead of paired on the same row. We
+      // now snapshot the row Y before drawing both columns so labels and
+      // amounts stay aligned.
       const totalsLabelX = tableLeft + colDescW + colQtyW;
       const totalsValueX = tableLeft + colDescW + colQtyW + colUnitW;
 
-      doc.font("Helvetica").fontSize(10).fillColor("#475569");
-      doc.text("Subtotal", totalsLabelX, doc.y, { width: colUnitW, align: "right" });
-      doc.fillColor("#0f172a").text(formatMoney(estimate.subtotal), totalsValueX, doc.y, { width: colTotalW, align: "right" });
+      const renderTotalsRow = (label, value, { bold = false, size = 10 } = {}) => {
+        const rowY = doc.y;
+        doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(size);
+        doc.fillColor(bold ? "#0f172a" : "#475569");
+        doc.text(label, totalsLabelX, rowY, { width: colUnitW, align: "right" });
+        doc.fillColor("#0f172a");
+        doc.text(value, totalsValueX, rowY, { width: colTotalW, align: "right" });
+        // Both calls above moved doc.y forward independently. Reset to the
+        // larger of the two final positions plus a small gap so the next
+        // row starts on a fresh line.
+      };
+
+      renderTotalsRow("Subtotal", formatMoney(estimate.subtotal));
       doc.moveDown(0.2);
 
       if (Number(estimate.tax || 0) > 0) {
-        doc.fillColor("#475569").text("Tax", totalsLabelX, doc.y, { width: colUnitW, align: "right" });
-        doc.fillColor("#0f172a").text(formatMoney(estimate.tax), totalsValueX, doc.y, { width: colTotalW, align: "right" });
+        renderTotalsRow("Tax", formatMoney(estimate.tax));
         doc.moveDown(0.2);
       }
 
-      doc.font("Helvetica-Bold").fontSize(12);
-      doc.fillColor("#0f172a").text("Total", totalsLabelX, doc.y, { width: colUnitW, align: "right" });
-      doc.text(formatMoney(estimate.total), totalsValueX, doc.y, { width: colTotalW, align: "right" });
+      renderTotalsRow("Total", formatMoney(estimate.total), { bold: true, size: 12 });
       doc.font("Helvetica").fontSize(10);
       doc.moveDown(1.2);
 

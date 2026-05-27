@@ -1,6 +1,7 @@
 ﻿"use client";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import SignaturePad from "@/components/SignaturePad";
 
 function formatMoney(amount) {
   const num = Number(amount) || 0;
@@ -35,9 +36,14 @@ export default function EstimateClientPage() {
   const [newItemPrice, setNewItemPrice] = useState("");
 
   // Signature flow (paquete I). Driven by `estimate.signatureRequired`.
+  // `signatureDraw` is an optional inline image data URL the customer
+  // hand-draws into the SignaturePad below the typed name. The typed
+  // name is still the canonical identifier; the drawing is supplementary
+  // evidence the server records under audit.signature.dataUrl.
   const [showSignaturePanel, setShowSignaturePanel] = useState(false);
   const [signatureName, setSignatureName] = useState("");
   const [signatureAgreement, setSignatureAgreement] = useState(false);
+  const [signatureDraw, setSignatureDraw] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -83,7 +89,14 @@ export default function EstimateClientPage() {
     setNewItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  async function respond(action, { signatureName: sigName, signatureAgreement: sigAgreement } = {}) {
+  async function respond(
+    action,
+    {
+      signatureName: sigName,
+      signatureAgreement: sigAgreement,
+      signatureDrawDataUrl: sigDraw,
+    } = {},
+  ) {
     setActionLoading(true);
     setError("");
     try {
@@ -107,6 +120,7 @@ export default function EstimateClientPage() {
           ...(requestedItems !== null ? { requestedItems } : {}),
           ...(sigName ? { signatureName: sigName } : {}),
           ...(sigAgreement === true ? { signatureAgreement: true } : {}),
+          ...(sigDraw ? { signatureDrawDataUrl: sigDraw } : {}),
         }),
       });
       const json = await res.json();
@@ -147,6 +161,9 @@ export default function EstimateClientPage() {
     respond("approved", {
       signatureName: trimmed,
       signatureAgreement: true,
+      // The drawn signature is optional — the server treats `typed` as
+      // the canonical method when this is empty.
+      signatureDrawDataUrl: signatureDraw || "",
     });
   }
 
@@ -154,19 +171,40 @@ export default function EstimateClientPage() {
   const canRespond = status === "sent";
 
   if (loading) {
+    // Skeleton mirrors the loaded layout so the page doesn't jump on hydrate.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-sm text-slate-500">Loading estimate...</div>
+      <div className="min-h-screen bg-slate-50 py-10 px-4">
+        <div className="mx-auto max-w-2xl animate-pulse">
+          <div className="mb-6 flex items-start justify-between">
+            <div className="space-y-2">
+              <div className="h-3 w-24 rounded bg-slate-200" />
+              <div className="h-6 w-40 rounded bg-slate-200" />
+            </div>
+            <div className="h-6 w-24 rounded-full bg-slate-200" />
+          </div>
+          <div className="mb-4 h-24 rounded-2xl border border-slate-200 bg-white" />
+          <div className="mb-4 h-40 rounded-2xl border border-slate-200 bg-white" />
+          <div className="h-32 rounded-2xl border border-slate-200 bg-white" />
+        </div>
       </div>
     );
   }
 
   if (error && !estimate) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="rounded-2xl bg-white p-8 shadow text-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow text-center">
           <div className="text-lg font-bold text-slate-800">Estimate not found</div>
           <div className="mt-2 text-sm text-slate-500">{error}</div>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") window.location.reload();
+            }}
+            className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -281,6 +319,30 @@ export default function EstimateClientPage() {
           </div>
         ) : null}
 
+        {/* Signed evidence — surfaces the typed name + drawn signature
+            back to the customer on already-approved estimates so they
+            can confirm what they signed when they revisit the link. */}
+        {estimate.signature?.name ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm mb-4 print:shadow-none">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Signed</div>
+            <div className="text-base font-semibold text-slate-900" style={{ fontFamily: "'Brush Script MT','Comic Sans MS',cursive" }}>
+              {estimate.signature.name}
+            </div>
+            {estimate.signature.signedAt ? (
+              <div className="mt-1 text-xs text-slate-600">
+                {new Date(estimate.signature.signedAt).toLocaleString()}
+              </div>
+            ) : null}
+            {estimate.signature.dataUrl ? (
+              <img
+                src={estimate.signature.dataUrl}
+                alt="Drawn signature"
+                className="mt-3 max-h-32 rounded-lg border border-emerald-200 bg-white p-2"
+              />
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Client actions */}
         {canRespond && !actionDone ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-4 print:hidden">
@@ -301,13 +363,13 @@ export default function EstimateClientPage() {
                         return (
                           <label
                             key={key}
-                            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition ${kept ? "border-slate-200 bg-white" : "border-rose-200 bg-rose-50 opacity-60"}`}
+                            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-4 text-sm transition min-h-[52px] ${kept ? "border-slate-200 bg-white" : "border-rose-200 bg-rose-50 opacity-60"}`}
                           >
                             <input
                               type="checkbox"
                               checked={kept}
                               onChange={() => toggleItem(key)}
-                              className="h-4 w-4 rounded accent-emerald-600"
+                              className="h-5 w-5 rounded accent-emerald-600"
                             />
                             <span className={`flex-1 font-medium ${kept ? "text-slate-800" : "text-rose-700 line-through"}`}>
                               {s.name}
@@ -326,15 +388,16 @@ export default function EstimateClientPage() {
                     Add Items / Requests
                   </div>
                   {newItems.map((item, idx) => (
-                    <div key={item.id} className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm">
+                    <div key={item.id} className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
                       <span className="flex-1 font-medium text-blue-800">{item.name}</span>
                       {item.price > 0 ? <span className="text-blue-600">{formatMoney(item.price)}</span> : null}
                       <button
                         type="button"
                         onClick={() => removeNewItem(idx)}
-                        className="ml-2 text-rose-500 hover:text-rose-700 font-bold text-lg leading-none"
+                        aria-label="Remove item"
+                        className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-rose-500 hover:bg-rose-100 hover:text-rose-700 font-bold text-base leading-none"
                       >
-                        x
+                        ×
                       </button>
                     </div>
                   ))}
@@ -421,12 +484,21 @@ export default function EstimateClientPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold tracking-wide text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
                   style={{ fontFamily: "'Brush Script MT','Comic Sans MS',cursive" }}
                 />
-                <label className="flex items-start gap-2 text-xs text-slate-600">
+                <div className="mt-1">
+                  <SignaturePad
+                    value={signatureDraw}
+                    onChange={setSignatureDraw}
+                    label="Or draw your signature (optional)"
+                    clearLabel="Clear"
+                  />
+                </div>
+                <label className="flex min-h-[44px] items-start gap-3 text-xs text-slate-600">
                   <input
                     type="checkbox"
                     checked={signatureAgreement}
                     onChange={(e) => setSignatureAgreement(e.target.checked)}
-                    className="mt-0.5"
+                    className="mt-0.5 h-5 w-5 flex-shrink-0 cursor-pointer accent-emerald-600"
+                    aria-label="I agree to the scope of work and total"
                   />
                   <span>
                     I agree to the scope of work and total shown above, and my typed name acts as my electronic

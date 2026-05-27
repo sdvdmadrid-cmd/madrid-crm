@@ -1,8 +1,12 @@
 import {
   buildPublicEstimateLink,
   isPublicEstimateStatus,
-  normalizeEstimateStatus,
 } from "@/lib/estimate-public-access";
+import {
+  buildAuditForStatusTransition,
+  parseEstimateNotes,
+  stringifyEstimateNotes,
+} from "@/lib/estimate-notes";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
@@ -35,139 +39,8 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function parseNotes(notes) {
-  const raw = String(notes || "").trim();
-  if (!raw) {
-    return {
-      address: "",
-      noteText: "",
-      clientEmail: "",
-      clientPhone: "",
-      audit: {
-        sentAt: "",
-        approvedAt: "",
-        declinedAt: "",
-        changesRequestedAt: "",
-        resentAt: "",
-        resendCount: 0,
-      },
-    };
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && parsed.kind === "estimate_pipeline") {
-      const signature =
-        parsed.audit?.signature && typeof parsed.audit.signature === "object"
-          ? {
-              name: String(parsed.audit.signature.name || ""),
-              signedAt: String(parsed.audit.signature.signedAt || ""),
-              ip: String(parsed.audit.signature.ip || ""),
-            }
-          : null;
-      return {
-        address: String(parsed.address || ""),
-        noteText: String(parsed.noteText || ""),
-        clientEmail: String(parsed.clientEmail || ""),
-        clientPhone: String(parsed.clientPhone || ""),
-        audit: {
-          sentAt: String(parsed.audit?.sentAt || ""),
-          approvedAt: String(parsed.audit?.approvedAt || ""),
-          declinedAt: String(parsed.audit?.declinedAt || ""),
-          changesRequestedAt: String(parsed.audit?.changesRequestedAt || ""),
-          resentAt: String(parsed.audit?.resentAt || ""),
-          resendCount: Number(parsed.audit?.resendCount || 0),
-          signature,
-        },
-      };
-    }
-  } catch {
-    // Legacy notes are plain text.
-  }
-  return {
-    address: "",
-    noteText: raw,
-    clientEmail: "",
-    clientPhone: "",
-    audit: {
-      sentAt: "",
-      approvedAt: "",
-      declinedAt: "",
-      changesRequestedAt: "",
-      resentAt: "",
-      resendCount: 0,
-      signature: null,
-    },
-  };
-}
-
-function stringifyNotes({ address = "", noteText = "", clientEmail = "", clientPhone = "", audit = {} }) {
-  // Carry the signature through if the customer signed previously, so a
-  // subsequent contractor PATCH doesn't accidentally wipe the audit trail.
-  const signature =
-    audit.signature && typeof audit.signature === "object"
-      ? {
-          name: String(audit.signature.name || ""),
-          signedAt: String(audit.signature.signedAt || ""),
-          ip: String(audit.signature.ip || ""),
-        }
-      : null;
-  return JSON.stringify({
-    kind: "estimate_pipeline",
-    address: String(address || ""),
-    noteText: String(noteText || ""),
-    clientEmail: String(clientEmail || ""),
-    clientPhone: String(clientPhone || ""),
-    audit: {
-      sentAt: String(audit.sentAt || ""),
-      approvedAt: String(audit.approvedAt || ""),
-      declinedAt: String(audit.declinedAt || ""),
-      changesRequestedAt: String(audit.changesRequestedAt || ""),
-      resentAt: String(audit.resentAt || ""),
-      resendCount: Number(audit.resendCount || 0),
-      ...(signature ? { signature } : {}),
-    },
-  });
-}
-
-function withStatusAudit(existingAudit, previousStatus, nextStatus, nowIso) {
-  const audit = {
-    sentAt: String(existingAudit?.sentAt || ""),
-    approvedAt: String(existingAudit?.approvedAt || ""),
-    declinedAt: String(existingAudit?.declinedAt || ""),
-    changesRequestedAt: String(existingAudit?.changesRequestedAt || ""),
-    resentAt: String(existingAudit?.resentAt || ""),
-    resendCount: Number(existingAudit?.resendCount || 0),
-    signature:
-      existingAudit?.signature && typeof existingAudit.signature === "object"
-        ? existingAudit.signature
-        : null,
-  };
-
-  if (!nextStatus || nextStatus === previousStatus) return audit;
-
-  if (nextStatus === "sent") {
-    if (!audit.sentAt) {
-      audit.sentAt = nowIso;
-    } else if (previousStatus === "changes_requested") {
-      audit.resentAt = nowIso;
-      audit.resendCount += 1;
-    }
-  }
-  if (nextStatus === "approved") {
-    audit.approvedAt = nowIso;
-  }
-  if (nextStatus === "declined") {
-    audit.declinedAt = nowIso;
-  }
-  if (nextStatus === "changes_requested") {
-    audit.changesRequestedAt = nowIso;
-  }
-
-  return audit;
-}
-
 function serializeEstimate(row, { includePublicLink = true } = {}) {
-  const parsedNotes = parseNotes(row.notes);
+  const parsedNotes = parseEstimateNotes(row.notes);
   const status = normalizeStatus(row.status);
   const publicLink =
     includePublicLink && isPublicEstimateStatus(status) && row.id
@@ -198,9 +71,30 @@ function serializeEstimate(row, { includePublicLink = true } = {}) {
   };
 }
 
+/**
+ * Recompute subtotal from a services array — mirrors the create route. Keeps
+ * server-side numbers consistent with line items regardless of what the
+ * client sent in the body.
+ */
+function recomputeSubtotal(services) {
+  if (!Array.isArray(services)) return 0;
+  let cents = 0;
+  for (const service of services) {
+    const qty = Number.isFinite(Number(service?.qty)) ? Number(service.qty) : 1;
+    const unit = Number.isFinite(Number(service?.unitPrice ?? service?.price))
+      ? Number(service?.unitPrice ?? service?.price)
+      : 0;
+    const explicit = service?.price !== undefined ? Number(service.price) : NaN;
+    const lineTotal = Number.isFinite(explicit) ? explicit : unit * qty;
+    if (!Number.isFinite(lineTotal)) continue;
+    cents += Math.round(lineTotal * 100);
+  }
+  return cents / 100;
+}
+
 function buildUpdateRow(body = {}) {
   const nowIso = new Date().toISOString();
-  const existingNotes = parseNotes(body.currentNotes || "");
+  const existingNotes = parseEstimateNotes(body.currentNotes || "");
   const previousStatus = normalizeStatus(body.currentStatus);
   const requestedStatus = "status" in body ? normalizeStatus(body.status) : previousStatus;
 
@@ -214,27 +108,40 @@ function buildUpdateRow(body = {}) {
   if ("status" in body) {
     next.status = requestedStatus;
   }
-  if ("services" in body) {
-    next.items = Array.isArray(body.services) ? body.services : [];
-  }
-  if ("subtotal" in body) {
-    next.subtotal = toNumber(body.subtotal);
-  }
-  if ("tax" in body) {
-    next.tax = toNumber(body.tax);
-  }
-  if ("total" in body) {
-    next.total = toNumber(body.total);
+
+  // When services are touched, recompute subtotal/tax/total from the items
+  // and the supplied tax so totals stay consistent even if the client sent
+  // a stale or tampered value. When only totals are patched (e.g. a tax
+  // adjustment without items), we accept the provided numbers verbatim.
+  const servicesProvided = "services" in body;
+  if (servicesProvided) {
+    const services = Array.isArray(body.services) ? body.services : [];
+    next.items = services;
+    const computedSubtotal = Math.round(recomputeSubtotal(services) * 100) / 100;
+    next.subtotal = computedSubtotal;
+    const providedTax = "tax" in body ? Math.max(0, toNumber(body.tax)) : 0;
+    next.tax = Math.round(providedTax * 100) / 100;
+    next.total = Math.round((next.subtotal + next.tax) * 100) / 100;
+  } else {
+    if ("subtotal" in body) {
+      next.subtotal = Math.round(toNumber(body.subtotal) * 100) / 100;
+    }
+    if ("tax" in body) {
+      next.tax = Math.max(0, Math.round(toNumber(body.tax) * 100) / 100);
+    }
+    if ("total" in body) {
+      next.total = Math.round(toNumber(body.total) * 100) / 100;
+    }
   }
 
   if ("address" in body || "notes" in body || "status" in body) {
-    const mergedAudit = withStatusAudit(
+    const mergedAudit = buildAuditForStatusTransition(
       existingNotes.audit,
       previousStatus,
       requestedStatus,
       nowIso,
     );
-    next.notes = stringifyNotes({
+    next.notes = stringifyEstimateNotes({
       address: "address" in body
         ? String(body.address || "").trim()
         : existingNotes.address,

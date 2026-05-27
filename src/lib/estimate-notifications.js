@@ -8,6 +8,37 @@ import { sendEmail } from "@/lib/email";
 import { sendTextMessage } from "@/lib/sms";
 
 /**
+ * HTML-escape a value before interpolating into the email template. This
+ * closes an injection hole where a tenant-controlled field (companyName,
+ * clientName) containing `<script>...</script>` would render unescaped in
+ * the customer's email client.
+ */
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * Escape a URL so it's safe to embed in an `href` attribute. Strips any
+ * non-http(s) scheme to defend against `javascript:` links. The caller
+ * still controls whether the URL is actually rendered.
+ */
+function escapeUrl(value) {
+  const raw = String(value || "").trim();
+  if (!/^https?:\/\//i.test(raw)) return "";
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
  * Send the estimate-ready email and/or SMS and return a structured delivery
  * report. The caller propagates this report to the UI so the contractor sees
  * a warning if the customer never received the link, instead of silently
@@ -67,6 +98,14 @@ export async function deliverEstimateNotifications({
     // email itself still goes out.
     const attachments = await buildEstimateEmailAttachments(estimate);
     try {
+      const safeClientName = escapeHtml(clientName);
+      const safeCompanyName = escapeHtml(branding.companyName || "");
+      const safeTotal = escapeHtml(total);
+      const safeLinkHref = escapeUrl(estimateLink);
+      const safeLinkText = escapeHtml(estimateLink);
+      const safeEstimateNumber = escapeHtml(
+        estimate.estimateNumber || estimate.id,
+      );
       const emailResult = await sendEmail({
         to: [estimate.clientEmail],
         subject: `Your Estimate is Ready — ${estimate.estimateNumber || estimate.id}`,
@@ -76,20 +115,21 @@ export async function deliverEstimateNotifications({
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
             ${logoHeader}
             <h2 style="color:#0f172a;margin-bottom:8px">Your Estimate is Ready</h2>
-            <p style="color:#475569;margin-bottom:16px">Hi ${clientName},</p>
+            <p style="color:#475569;margin-bottom:4px;font-size:12px">Reference: ${safeEstimateNumber}</p>
+            <p style="color:#475569;margin-bottom:16px">Hi ${safeClientName},</p>
             <p style="color:#475569">${
-              branding.companyName
-                ? `Your estimate from <strong>${branding.companyName.replace(/</g, "&lt;")}</strong> has been prepared.`
+              safeCompanyName
+                ? `Your estimate from <strong>${safeCompanyName}</strong> has been prepared.`
                 : "Your estimate has been prepared."
             } Please review the details and let us know how you'd like to proceed.</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:20px 0">
               <div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.05em">Total</div>
-              <div style="color:#0f172a;font-size:24px;font-weight:700">${total}</div>
+              <div style="color:#0f172a;font-size:24px;font-weight:700">${safeTotal}</div>
             </div>
-            <a href="${estimateLink}" style="display:inline-block;background:#059669;color:#fff;font-weight:600;padding:14px 28px;border-radius:10px;text-decoration:none;margin-bottom:16px">
+            <a href="${safeLinkHref}" style="display:inline-block;background:#059669;color:#fff;font-weight:600;padding:14px 28px;border-radius:10px;text-decoration:none;margin-bottom:16px">
               View Estimate &amp; Respond
             </a>
-            <p style="color:#94a3b8;font-size:12px;margin-top:24px">If the button doesn't work, copy this link:<br><a href="${estimateLink}" style="color:#3b82f6">${estimateLink}</a></p>
+            <p style="color:#94a3b8;font-size:12px;margin-top:24px">If the button doesn't work, copy this link:<br><a href="${safeLinkHref}" style="color:#3b82f6">${safeLinkText}</a></p>
           </div>`,
       });
       if (emailResult?.success === false) {

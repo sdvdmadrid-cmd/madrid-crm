@@ -293,11 +293,21 @@ function NewEstimatePageInner() {
 
     let draft;
     try {
-      const decoded =
-        typeof window !== "undefined"
-          ? decodeURIComponent(escape(window.atob(aiDraftParam)))
-          : "";
-      draft = decoded ? JSON.parse(decoded) : null;
+      if (typeof window !== "undefined") {
+        const binary = window.atob(aiDraftParam);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        // `escape() + decodeURIComponent` is deprecated and silently
+        // mangles non-Latin characters (Polish, accented Spanish, emoji).
+        // TextDecoder('utf-8') round-trips the same UTF-8 payload that
+        // the AI bubble produces via btoa(encodeURIComponent(...)).
+        const decoded = new TextDecoder("utf-8").decode(bytes);
+        draft = decoded ? JSON.parse(decoded) : null;
+      } else {
+        draft = null;
+      }
     } catch {
       draft = null;
     }
