@@ -1,3 +1,8 @@
+import {
+  ESTIMATE_LOOKUP_LIMIT,
+  formatEstimateNumber,
+  pickMaxEstimateSequence,
+} from "@/lib/estimate-number";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -18,10 +23,11 @@ function json(payload, status = 200) {
 }
 
 /**
- * Pick the next EST-#### identifier for a tenant by inspecting the most
- * recently-created rows. Mirrors the helper in /api/estimates. Ordering
- * by `created_at desc` avoids the lexicographic pitfall at the EST-10000
- * boundary where "EST-10000" sorts below "EST-9999" by string compare.
+ * Allocate the next EST-#### for this tenant. The format helpers live
+ * in @/lib/estimate-number so the create / duplicate / estimate-builder
+ * routes all share a single canonical formatter; only the DB read
+ * lives here. See nextEstimateNumber in /api/estimates/route.js for
+ * the full concurrency / ordering rationale.
  */
 async function nextEstimateNumber(tenantId) {
   const { data, error } = await supabaseAdmin
@@ -30,23 +36,9 @@ async function nextEstimateNumber(tenantId) {
     .eq("tenant_id", tenantId)
     .ilike("estimate_number", "EST-%")
     .order("created_at", { ascending: false })
-    .limit(500);
-
+    .limit(ESTIMATE_LOOKUP_LIMIT);
   if (error) throw new Error(error.message);
-
-  let max = 0;
-  for (const row of data || []) {
-    const match = String(row.estimate_number || "").match(/^EST-(\d+)$/i);
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  }
-  // padStart(4) is a floor (EST-0001..EST-9999); past 10000 the suffix
-  // grows naturally. See nextEstimateNumber in /api/estimates/route.js
-  // for the full rationale and tests/unit/estimate-number-format.test.mjs
-  // for the pinned behavior.
-  return `EST-${String(max + 1).padStart(4, "0")}`;
+  return formatEstimateNumber(pickMaxEstimateSequence(data) + 1);
 }
 
 /**
