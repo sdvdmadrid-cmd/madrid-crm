@@ -1,10 +1,10 @@
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
-import { parseEstimateNotes } from "@/lib/estimate-notes";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 import {
   isValidEstimatePublicToken,
   verifyEstimatePublicAccess,
 } from "@/lib/estimate-public-access";
+import { serializeEstimateBase } from "@/lib/estimate-serializer";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -20,17 +20,6 @@ const ESTIMATES_TABLE = "estimates";
 // PDF downloads. Mirrors estimate-builder/[id]/checkout which
 // already pins this.
 export const runtime = "nodejs";
-
-// Safe Number coercion: replaces the unsafe `Number(x || 0)` pattern
-// that silently produces NaN for non-numeric inputs (e.g. when the
-// underlying column is the string "abc" from a manual edit). NaN
-// values reach formatMoney downstream, which happens to coerce to
-// $0.00 today, but defensive normalization here means the API shape
-// stays predictable for any future downstream consumer.
-function toNumber(value, fallback = 0) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -97,23 +86,7 @@ export async function GET(request, { params }) {
       return jsonResponse({ success: false, error: access.error }, access.status);
     }
 
-    const parsedNotes = parseEstimateNotes(data.notes);
-    const estimate = {
-      id: data.id,
-      tenantId: data.tenant_id || null,
-      estimateNumber: data.estimate_number || "",
-      status: String(data.status || "draft").toLowerCase(),
-      clientName: data.client_name || "",
-      clientEmail: parsedNotes.clientEmail || "",
-      clientPhone: parsedNotes.clientPhone || "",
-      address: parsedNotes.address || "",
-      notes: parsedNotes.noteText || "",
-      services: Array.isArray(data.items) ? data.items : [],
-      subtotal: toNumber(data.subtotal),
-      tax: toNumber(data.tax),
-      total: toNumber(data.total),
-      createdAt: data.created_at || null,
-    };
+    const estimate = serializeEstimateBase(data);
 
     const branding = await getEstimateBrandingByTenant(estimate.tenantId);
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });

@@ -1,6 +1,6 @@
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
-import { parseEstimateNotes } from "@/lib/estimate-notes";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
+import { serializeEstimateBase } from "@/lib/estimate-serializer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
@@ -21,36 +21,6 @@ function jsonResponse(payload, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-// Safe Number coercion: replaces the unsafe `Number(x || 0)` pattern
-// that produces NaN for non-numeric inputs (e.g. string "abc" from
-// a manual DB edit). NaN reaches formatMoney downstream, which
-// coerces to $0.00 — works today but defensive normalization keeps
-// the API shape predictable.
-function toNumber(value, fallback = 0) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function buildEstimatePayload(row) {
-  const parsed = parseEstimateNotes(row.notes);
-  return {
-    id: row.id,
-    tenantId: row.tenant_id || null,
-    estimateNumber: row.estimate_number || "",
-    status: row.status || "draft",
-    clientName: row.client_name || "",
-    clientEmail: parsed.clientEmail || "",
-    clientPhone: parsed.clientPhone || "",
-    address: parsed.address || "",
-    notes: parsed.noteText || "",
-    services: Array.isArray(row.items) ? row.items : [],
-    subtotal: toNumber(row.subtotal),
-    tax: toNumber(row.tax),
-    total: toNumber(row.total),
-    createdAt: row.created_at || null,
-  };
 }
 
 /**
@@ -87,7 +57,7 @@ export async function GET(request, { params }) {
     if (error) throw new Error(error.message);
     if (!data) return jsonResponse({ success: false, error: "Estimate not found" }, 404);
 
-    const estimate = buildEstimatePayload(data);
+    const estimate = serializeEstimateBase(data);
     const branding = await getEstimateBrandingByTenant(estimate.tenantId);
 
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });

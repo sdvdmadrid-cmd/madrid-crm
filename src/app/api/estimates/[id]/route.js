@@ -9,6 +9,10 @@ import {
 } from "@/lib/estimate-notes";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
+import {
+  serializeEstimateBase,
+  toNumber,
+} from "@/lib/estimate-serializer";
 import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -35,41 +39,13 @@ function normalizeStatus(value, fallback = "draft") {
   return fallback;
 }
 
-function toNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function serializeEstimate(row, { includePublicLink = true } = {}) {
-  const parsedNotes = parseEstimateNotes(row.notes);
-  const status = normalizeStatus(row.status);
+  const base = serializeEstimateBase(row);
   const publicLink =
-    includePublicLink && isPublicEstimateStatus(status) && row.id
-      ? buildPublicEstimateLink(row.id)
+    includePublicLink && isPublicEstimateStatus(base.status) && base.id
+      ? buildPublicEstimateLink(base.id)
       : null;
-
-  return {
-    id: row.id,
-    _id: row.id,
-    tenantId: row.tenant_id || null,
-    publicLink,
-    userId: row.user_id || null,
-    createdBy: row.created_by || null,
-    clientName: row.client_name || "",
-    clientEmail: parsedNotes.clientEmail || "",
-    clientPhone: parsedNotes.clientPhone || "",
-    address: parsedNotes.address,
-    status: normalizeStatus(row.status),
-    services: Array.isArray(row.items) ? row.items : [],
-    subtotal: toNumber(row.subtotal),
-    tax: toNumber(row.tax),
-    total: toNumber(row.total),
-    notes: parsedNotes.noteText,
-    audit: parsedNotes.audit,
-    estimateNumber: row.estimate_number || "",
-    createdAt: row.created_at || null,
-    updatedAt: row.updated_at || null,
-  };
+  return { ...base, publicLink };
 }
 
 /**
