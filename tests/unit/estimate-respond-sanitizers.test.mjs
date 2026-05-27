@@ -1,12 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import {
+  MAX_CLIENT_NOTE_CHARS,
+  MAX_REQUESTED_ITEMS,
+  MAX_REQUESTED_ITEM_BYTES,
+  MAX_REQUESTED_ITEMS_TOTAL_BYTES,
+  sanitizeClientNote,
+  sanitizeRequestedItems,
+} from "../../src/lib/estimate-respond-sanitizers.js";
+
 /**
  * Tests for the defensive sanitizers used by
- * /api/estimates/[id]/respond. The helpers are intentionally inlined
- * in the route file (App Router rejects non-handler exports from
- * route.js modules), so this test mirrors them. If you change the
- * route caps you MUST update both files.
+ * /api/estimates/[id]/respond. The helpers are imported directly
+ * from the shared module so any drift between production and the
+ * test is caught immediately.
  *
  * The route receives untrusted, public, token-gated input and writes
  * directly into the estimates.notes TEXT column. Without these caps a
@@ -15,37 +23,15 @@ import assert from "node:assert/strict";
  * that ride along on every PDF/email regeneration.
  */
 
-const MAX_REQUESTED_ITEMS = 50;
-const MAX_REQUESTED_ITEM_BYTES = 4 * 1024;
-const MAX_REQUESTED_ITEMS_TOTAL_BYTES = 64 * 1024;
-const MAX_CLIENT_NOTE_CHARS = 5 * 1024;
-
-function sanitizeRequestedItems(value) {
-  if (!Array.isArray(value)) return null;
-  const limitedByCount = value.slice(0, MAX_REQUESTED_ITEMS);
-  const accepted = [];
-  let totalBytes = 0;
-  for (const item of limitedByCount) {
-    let serialized;
-    try {
-      serialized = JSON.stringify(item);
-    } catch {
-      continue;
-    }
-    if (typeof serialized !== "string") continue;
-    if (serialized.length === 0) continue;
-    if (serialized.length > MAX_REQUESTED_ITEM_BYTES) continue;
-    if (totalBytes + serialized.length > MAX_REQUESTED_ITEMS_TOTAL_BYTES) break;
-    totalBytes += serialized.length;
-    accepted.push(item);
-  }
-  return accepted.length > 0 ? accepted : null;
-}
-
-function sanitizeClientNote(value) {
-  const raw = String(value || "");
-  return raw.slice(0, MAX_CLIENT_NOTE_CHARS).trim();
-}
+test("exported cap constants are stable", () => {
+  // Pin the exact public API so a tweak to the values is loud and
+  // requires updating this assertion in lockstep with the
+  // documentation in the module's header comment.
+  assert.equal(MAX_REQUESTED_ITEMS, 50);
+  assert.equal(MAX_REQUESTED_ITEM_BYTES, 4 * 1024);
+  assert.equal(MAX_REQUESTED_ITEMS_TOTAL_BYTES, 64 * 1024);
+  assert.equal(MAX_CLIENT_NOTE_CHARS, 5 * 1024);
+});
 
 test("requestedItems: non-array returns null", () => {
   assert.equal(sanitizeRequestedItems(undefined), null);

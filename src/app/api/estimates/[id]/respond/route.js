@@ -20,6 +20,10 @@ import {
   parseEstimateNotes,
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
+import {
+  sanitizeClientNote,
+  sanitizeRequestedItems,
+} from "@/lib/estimate-respond-sanitizers";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 
 const ESTIMATES_TABLE = "estimates";
@@ -30,29 +34,13 @@ const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 // canvas typically lives well under 30KB, so 200KB is a generous ceiling
 // that still prevents a malicious caller from stuffing megabytes into
 // the notes JSON blob (which is stored in a TEXT column).
-const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
-
-// Defensive caps for the customer-supplied payload. The "notes" column is
-// TEXT (no DB-side length enforcement), and the contractor reads every
-// requested item back when rendering the timeline / change-request UI,
-// so an unbounded array lets a malicious caller (a) bloat the DB row,
-// (b) push the JSON-encoded notes past the 1MB Supabase row-size soft
-// limit, and (c) slow every subsequent estimate read for that record.
 //
-// Caps:
-//   - At most 50 requested items per submission (a real estimate with
-//     more line items than this is almost certainly malformed).
-//   - At most 4KB per individual item after JSON-serialization (a
-//     reasonable line-item description with a few flags fits easily).
-//   - At most 64KB total across all items (so 50 max-size items would
-//     overflow this cap and be truncated — the cap is the hard limit).
-//   - At most 5KB for the free-form client note (the revision log
-//     already truncates to 1000 chars for the timeline; this guards
-//     the appended-to noteText field that lives in the notes blob).
-const MAX_REQUESTED_ITEMS = 50;
-const MAX_REQUESTED_ITEM_BYTES = 4 * 1024;
-const MAX_REQUESTED_ITEMS_TOTAL_BYTES = 64 * 1024;
-const MAX_CLIENT_NOTE_CHARS = 5 * 1024;
+// (The other body-shape caps — MAX_REQUESTED_ITEMS / _ITEM_BYTES /
+// _ITEMS_TOTAL_BYTES / MAX_CLIENT_NOTE_CHARS — live in
+// @/lib/estimate-respond-sanitizers so the unit tests can import them
+// directly. The signature cap stays here because it's coupled to the
+// SignaturePad canvas dimensions on the public estimate page.)
+const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
 
 function sanitizeSignatureDataUrl(value) {
   const raw = String(value || "").trim();
@@ -60,59 +48,6 @@ function sanitizeSignatureDataUrl(value) {
   if (!raw.startsWith("data:image/")) return "";
   if (raw.length > MAX_SIGNATURE_DATA_URL_BYTES) return "";
   return raw;
-}
-
-/**
- * Sanitize a client-supplied `requestedItems` array. Returns `null` if
- * the input is not an array (matching the previous behavior — callers
- * downstream branch on null vs array), otherwise returns a filtered
- * array that respects per-item and total size caps.
- *
- * Sanitization rules (each applied in order):
- *   1. Truncate to MAX_REQUESTED_ITEMS entries.
- *   2. Drop entries that cannot be JSON-serialized (circular refs,
- *      symbols, etc.).
- *   3. Drop entries whose serialized length exceeds
- *      MAX_REQUESTED_ITEM_BYTES (a single huge item).
- *   4. Stop accepting further entries once the running total reaches
- *      MAX_REQUESTED_ITEMS_TOTAL_BYTES (cumulative cap).
- *
- * Returns `null` if every entry was rejected (so the downstream
- * stringifyEstimateNotes can leave the field unset rather than persist
- * an empty array, matching the legacy "no items" shape).
- */
-function sanitizeRequestedItems(value) {
-  if (!Array.isArray(value)) return null;
-  const limitedByCount = value.slice(0, MAX_REQUESTED_ITEMS);
-  const accepted = [];
-  let totalBytes = 0;
-  for (const item of limitedByCount) {
-    let serialized;
-    try {
-      serialized = JSON.stringify(item);
-    } catch {
-      continue;
-    }
-    if (typeof serialized !== "string") continue;
-    if (serialized.length === 0) continue;
-    if (serialized.length > MAX_REQUESTED_ITEM_BYTES) continue;
-    if (totalBytes + serialized.length > MAX_REQUESTED_ITEMS_TOTAL_BYTES) break;
-    totalBytes += serialized.length;
-    accepted.push(item);
-  }
-  return accepted.length > 0 ? accepted : null;
-}
-
-/**
- * Cap free-form client notes before they get concatenated into the
- * stored noteText field. The revision-log path already independently
- * truncates to 1000 chars for the timeline display.
- */
-function sanitizeClientNote(value) {
-  const raw = String(value || "");
-  // Trim AFTER slicing so an attacker can't pad with whitespace to
-  // push real content past the cap.
-  return raw.slice(0, MAX_CLIENT_NOTE_CHARS).trim();
 }
 
 function json(payload, status = 200) {
