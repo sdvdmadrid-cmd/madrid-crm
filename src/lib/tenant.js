@@ -157,3 +157,10 @@ export function withTenant(baseQuery, tenantId, role) {
   }
   return { ...baseQuery, tenantId };
 }
+
+// Re-export the pure derived-row tenant resolver from its own module
+// so the unit test in tests/unit/resolve-insert-tenant.test.mjs can
+// import it without pulling in the full auth / Supabase tree that
+// the rest of this file depends on. Routes can continue to import it
+// from "@/lib/tenant" alongside the auth helpers.
+export { resolveInsertTenant } from "@/lib/tenant-insert";

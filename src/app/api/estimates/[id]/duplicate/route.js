@@ -10,6 +10,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  resolveInsertTenant,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -112,13 +113,24 @@ export async function POST(request, { params }) {
 
     const nowIso = new Date().toISOString();
 
+    // The duplicate row follows the source estimate's tenant — see
+    // resolveInsertTenant in @/lib/tenant for the policy. For regular
+    // callers this is identical to the caller's tenant (the source
+    // read above already filtered by tenant). For super_admin we
+    // explicitly keep the duplicate under the source tenant so the
+    // contractor sees it in their pipeline.
+    const insertTenantId = resolveInsertTenant({
+      sourceTenantId: source.tenant_id,
+      callerTenantId: tenantDbId,
+    });
+
     // Insert with retry on the partial unique index added in
     // 20260528200000. Same retry shape used by POST /api/estimates so
     // concurrent duplicates don't collide on the same EST-####.
     let inserted = null;
     let lastError = null;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const estimateNumber = await nextEstimateNumber(source.tenant_id);
+      const estimateNumber = await nextEstimateNumber(insertTenantId);
       const insert = await supabaseAdmin
         .from(ESTIMATES_TABLE)
         .insert({
@@ -131,7 +143,7 @@ export async function POST(request, { params }) {
           notes: buildDuplicatedNotes(source.notes),
           estimate_number: estimateNumber,
           currency: source.currency || "USD",
-          tenant_id: source.tenant_id,
+          tenant_id: insertTenantId,
           user_id: userId || null,
           created_by: userId || null,
           client_id: source.client_id || null,
