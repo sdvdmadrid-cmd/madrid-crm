@@ -143,6 +143,18 @@ export async function POST(request, { params }) {
   if (!rate.allowed) {
     return json({ success: false, error: "Too many requests. Please try again later." }, 429);
   }
+  // Record the attempt up front (BEFORE any of the downstream
+  // validation: action enum check, DB fetch, access verification,
+  // status guard, signature policy). Otherwise an attacker who sprays
+  // well-formed tokens but invalid actions / wrong-target IDs never
+  // consumes their per-IP "approval" budget — the bucket-check passes
+  // (count below cap), the request fails 400/404/403 downstream, and
+  // the original record-on-success call below is skipped. Recording
+  // up front means every reach into this endpoint counts against the
+  // 15/IP per 10-min mutation cap, regardless of outcome. Legitimate
+  // customers are unaffected because their happy-path approval always
+  // passes validation anyway.
+  await recordPublicQuoteAttempt({ token, ip, action: "approval" });
 
   const action = String(body.action || "").trim().toLowerCase();
   if (!ALLOWED_ACTIONS.has(action)) {
@@ -250,7 +262,9 @@ export async function POST(request, { params }) {
 
   if (updateErr) return json({ success: false, error: updateErr.message }, 500);
 
-  await recordPublicQuoteAttempt({ token, ip, action: "approval" });
+  // (recordPublicQuoteAttempt already ran near the top of this handler,
+  // so the attacker who sprays invalid actions also drains their bucket;
+  // we don't double-count the happy path here.)
 
   // Append a revision so the contractor's timeline reflects what the
   // customer just did. Best-effort — failures don't break the response.

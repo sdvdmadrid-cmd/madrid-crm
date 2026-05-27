@@ -56,6 +56,11 @@ export async function GET(request, { params }) {
         429,
       );
     }
+    // Record the attempt BEFORE token/access validation so token-spraying
+    // attackers consume their per-IP budget even though every individual
+    // request fails 404/403 downstream. Legitimate clients are unaffected
+    // because their valid token always passes validation.
+    await recordPublicQuoteAttempt({ token, ip, action: "pdf" });
 
     const { data, error } = await supabaseAdmin
       .from(ESTIMATES_TABLE)
@@ -73,8 +78,6 @@ export async function GET(request, { params }) {
     if (!access.ok) {
       return jsonResponse({ success: false, error: access.error }, access.status);
     }
-
-    await recordPublicQuoteAttempt({ token, ip, action: "pdf" });
 
     const parsedNotes = parseEstimateNotes(data.notes);
     const estimate = {
