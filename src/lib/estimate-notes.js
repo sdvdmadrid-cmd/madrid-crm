@@ -53,11 +53,18 @@ function normalizeSignatureMethod(value) {
   return SIGNATURE_METHODS.has(raw) ? raw : "typed";
 }
 
+// Defense in depth: only persist raster signature mime types we can
+// actually render (PNG / JPEG). Mirrors the
+// SIGNATURE_DATA_URL_PATTERN check in the respond route — anchored
+// here too so legacy / migrated rows that contain an SVG (or any
+// other non-raster image) get stripped on read instead of round-
+// tripped back out through redactAuditForPublic. SignaturePad emits
+// "image/png" today so legitimate flows are unaffected.
+const SIGNATURE_DATA_URL_PATTERN = /^data:image\/(png|jpe?g);base64,/i;
+
 function normalizeSignatureDataUrl(value) {
   const raw = String(value || "").trim();
-  // Only persist inline image data URLs so we never accidentally store
-  // a remote URL fragment the renderer would have to fetch.
-  if (!raw.startsWith("data:image/")) return "";
+  if (!SIGNATURE_DATA_URL_PATTERN.test(raw)) return "";
   return raw;
 }
 
@@ -233,6 +240,14 @@ export function buildAuditForStatusTransition(existingAudit, previousStatus, nex
  */
 export function redactAuditForPublic(audit) {
   if (!audit || typeof audit !== "object") return audit;
+  // Normalize the dataUrl FIRST (which strips non-raster mimes per
+  // F9). Only emit the `dataUrl` key when the resulting string is
+  // non-empty, so a legacy SVG row gets dropped on the public
+  // surface rather than echoed back as `dataUrl: ""`.
+  const normalizedDataUrl =
+    audit.signature && typeof audit.signature === "object"
+      ? normalizeSignatureDataUrl(audit.signature.dataUrl)
+      : "";
   const signature =
     audit.signature && typeof audit.signature === "object"
       ? {
@@ -241,9 +256,7 @@ export function redactAuditForPublic(audit) {
           method: normalizeSignatureMethod(audit.signature.method),
           // The customer's own drawn signature is safe to echo back; we
           // strip `ip` only since the IP is internal-audit metadata.
-          ...(audit.signature.dataUrl
-            ? { dataUrl: normalizeSignatureDataUrl(audit.signature.dataUrl) }
-            : {}),
+          ...(normalizedDataUrl ? { dataUrl: normalizedDataUrl } : {}),
         }
       : null;
   // Always include the `signature` key (null or object) so the public

@@ -46,10 +46,28 @@ const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 // SignaturePad canvas dimensions on the public estimate page.)
 const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
 
+// Defense in depth: restrict accepted signature mime types to raster
+// formats the PDF generator actually renders (PNG / JPEG). Previously
+// the check was `raw.startsWith("data:image/")`, which would accept
+// `data:image/svg+xml;base64,...`. SVG is XML and SVG renderers
+// historically have executed inline <script> — the customer-facing
+// page renders the signature via <img src=...> (which does NOT
+// execute SVG <script>), so this is not an open XSS today, but
+// 1) the PDF generator silently drops anything that isn't PNG/JPEG
+//    (mime check in estimate-pdf.js's decodeDataUrlImage), creating
+//    surprising "the signature disappeared from the PDF" UX, and
+// 2) saving SVG into the audit blob may surprise downstream
+//    renderers added later (email-attached approvals, slack
+//    notifications with rich preview, etc.).
+// Anchoring on `^data:image\/(png|jpe?g);base64,` is also what
+// SignaturePad emits today (`canvas.toDataURL("image/png")`), so
+// legitimate flows are unaffected.
+const SIGNATURE_DATA_URL_PATTERN = /^data:image\/(png|jpe?g);base64,/i;
+
 function sanitizeSignatureDataUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  if (!raw.startsWith("data:image/")) return "";
+  if (!SIGNATURE_DATA_URL_PATTERN.test(raw)) return "";
   if (raw.length > MAX_SIGNATURE_DATA_URL_BYTES) return "";
   return raw;
 }

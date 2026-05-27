@@ -227,6 +227,76 @@ test("stringifyEstimateNotes omits requestedItems when null (legacy 'no items' s
   assert.equal("requestedItems" in decoded, false);
 });
 
+test("normalizeSignature strips non-raster signature mime types (F9 defense in depth)", () => {
+  // SVG signatures could carry inline <script> when rendered by an
+  // SVG-aware renderer. We only accept PNG / JPEG raster data URLs.
+  // Validated via round-trip: persisted notes coming back through
+  // parseEstimateNotes must NOT carry an SVG dataUrl.
+  const blob = JSON.stringify({
+    kind: ESTIMATE_NOTES_KIND,
+    audit: {
+      signature: {
+        name: "Jane Doe",
+        signedAt: "2026-05-26T00:00:00Z",
+        method: "drawn_and_typed",
+        // Maliciously-shaped SVG signature
+        dataUrl:
+          "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+",
+      },
+    },
+  });
+  const parsed = parseEstimateNotes(blob);
+  // The signature shape is still present (name / signedAt / method)
+  // but dataUrl was dropped because it failed the raster check.
+  assert.equal(parsed.audit.signature.name, "Jane Doe");
+  assert.equal(parsed.audit.signature.dataUrl, undefined);
+});
+
+test("normalizeSignature preserves legitimate PNG / JPEG dataUrls", () => {
+  for (const mime of [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "IMAGE/PNG", // case-insensitive
+  ]) {
+    const blob = JSON.stringify({
+      kind: ESTIMATE_NOTES_KIND,
+      audit: {
+        signature: {
+          name: "OK Customer",
+          signedAt: "2026-05-26T00:00:00Z",
+          method: "drawn_and_typed",
+          dataUrl: `data:${mime};base64,iVBORw0KGgoAAAANSUhEUgAA`,
+        },
+      },
+    });
+    const parsed = parseEstimateNotes(blob);
+    assert.ok(
+      parsed.audit.signature.dataUrl,
+      `mime ${mime} should be preserved`,
+    );
+  }
+});
+
+test("redactAuditForPublic does not echo non-raster dataUrls back", () => {
+  // Even if a legacy row somehow has an SVG dataUrl persisted, the
+  // public-facing redactor must NOT echo it. The dataUrl key is
+  // dropped entirely (rather than emitting an empty string) so the
+  // client renders the typed signature only.
+  const audit = {
+    signature: {
+      name: "Jane Doe",
+      signedAt: "2026-05-26T00:00:00Z",
+      method: "drawn_and_typed",
+      dataUrl:
+        "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+",
+    },
+  };
+  const redacted = redactAuditForPublic(audit);
+  assert.equal(redacted.signature.name, "Jane Doe");
+  assert.equal("dataUrl" in redacted.signature, false);
+});
+
 test("stringifyEstimateNotes omits requestedItems when non-array (defensive)", () => {
   // If a caller accidentally passes a non-array (e.g. an object,
   // string, or number), we must not persist it — the contractor view
