@@ -9,6 +9,7 @@ import {
 } from "@/lib/estimate-notes";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
+import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -231,7 +232,9 @@ export async function PATCH(request, { params }) {
       return jsonResponse({ success: false, error: "Invalid estimate id" }, 400);
     }
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     let existingQuery = supabaseAdmin
       .from(ESTIMATES_TABLE)

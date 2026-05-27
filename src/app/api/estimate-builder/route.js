@@ -4,6 +4,7 @@ import {
   formatEstimateNumber,
   pickMaxEstimateSequence,
 } from "@/lib/estimate-number";
+import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { assertTenantClient } from "@/lib/tenant-fk-validation";
@@ -115,7 +116,9 @@ export async function POST(request) {
       return forbiddenResponse();
     }
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
     const nowIso = new Date().toISOString();
 
     const clientId = String(body.client_id || body.clientId || "").trim();
