@@ -1,6 +1,11 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+// Tier caps + cap-resolver for the public-quote action buckets live
+// in a pure sibling module so the unit tests can import them without
+// dragging server-only / supabase into the test harness. See that
+// file's header for the full bucketing strategy.
+import { publicQuoteCapsForAction } from "@/lib/public-quote-rate-limit-buckets";
 
 const RATE_LIMIT_TABLE = "auth_rate_limits";
 const WINDOW_MS = 10 * 60 * 1000;
@@ -9,15 +14,6 @@ const EMAIL_MAX_ATTEMPTS = 8;
 const IP_MAX_ATTEMPTS = 30;
 const RESET_EMAIL_MAX_ATTEMPTS = 10;
 const RESET_IP_MAX_ATTEMPTS = 40;
-const PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS = 40;
-const PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS = 25;
-// PDF downloads are read-only like `view` but live in a separate bucket
-// so a customer hammering the PDF endpoint cannot exhaust the JSON-view
-// budget (or vice versa). Caps mirror `view` since both are non-mutating.
-const PUBLIC_QUOTE_PDF_IP_MAX_ATTEMPTS = 40;
-const PUBLIC_QUOTE_PDF_TOKEN_MAX_ATTEMPTS = 25;
-const PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS = 15;
-const PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS = 10;
 const WEBSITE_LEAD_IP_MAX_ATTEMPTS = 20;
 const WEBSITE_LEAD_SLUG_MAX_ATTEMPTS = 12;
 const AI_REQUEST_IP_MAX_ATTEMPTS = 45;
@@ -304,31 +300,6 @@ export async function checkPublicQuoteRateLimit({
       },
     ].filter(Boolean),
   );
-}
-
-// Read-only actions get the more generous "view-like" caps; everything
-// else falls into the stricter mutation bucket. Each action also lives
-// in its own key namespace (via `public-quote:${action}:...`), so a
-// burst against the PDF endpoint cannot consume the JSON-view budget.
-const PUBLIC_QUOTE_READ_ACTIONS = new Set(["view", "pdf"]);
-
-function publicQuoteCapsForAction(action) {
-  if (action === "pdf") {
-    return {
-      ip: PUBLIC_QUOTE_PDF_IP_MAX_ATTEMPTS,
-      token: PUBLIC_QUOTE_PDF_TOKEN_MAX_ATTEMPTS,
-    };
-  }
-  if (PUBLIC_QUOTE_READ_ACTIONS.has(action)) {
-    return {
-      ip: PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS,
-      token: PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS,
-    };
-  }
-  return {
-    ip: PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS,
-    token: PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS,
-  };
 }
 
 export async function recordPublicQuoteAttempt({ token, ip, action = "view" }) {
