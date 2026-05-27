@@ -1,6 +1,11 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+// Tier caps + cap-resolver for the public-quote action buckets live
+// in a pure sibling module so the unit tests can import them without
+// dragging server-only / supabase into the test harness. See that
+// file's header for the full bucketing strategy.
+import { publicQuoteCapsForAction } from "@/lib/public-quote-rate-limit-buckets";
 
 const RATE_LIMIT_TABLE = "auth_rate_limits";
 const WINDOW_MS = 10 * 60 * 1000;
@@ -9,10 +14,6 @@ const EMAIL_MAX_ATTEMPTS = 8;
 const IP_MAX_ATTEMPTS = 30;
 const RESET_EMAIL_MAX_ATTEMPTS = 10;
 const RESET_IP_MAX_ATTEMPTS = 40;
-const PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS = 40;
-const PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS = 25;
-const PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS = 15;
-const PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS = 10;
 const WEBSITE_LEAD_IP_MAX_ATTEMPTS = 20;
 const WEBSITE_LEAD_SLUG_MAX_ATTEMPTS = 12;
 const AI_REQUEST_IP_MAX_ATTEMPTS = 45;
@@ -302,19 +303,15 @@ export async function checkPublicQuoteRateLimit({
 }
 
 export async function recordPublicQuoteAttempt({ token, ip, action = "view" }) {
-  const isMutation = action !== "view";
+  const caps = publicQuoteCapsForAction(action);
   return recordScopedAttempt([
     {
       key: buildKey(`public-quote:${action}:ip`, ip),
-      maxAttempts: isMutation
-        ? PUBLIC_QUOTE_MUTATION_IP_MAX_ATTEMPTS
-        : PUBLIC_QUOTE_VIEW_IP_MAX_ATTEMPTS,
+      maxAttempts: caps.ip,
     },
     {
       key: buildKey(`public-quote:${action}:token`, token),
-      maxAttempts: isMutation
-        ? PUBLIC_QUOTE_MUTATION_TOKEN_MAX_ATTEMPTS
-        : PUBLIC_QUOTE_VIEW_TOKEN_MAX_ATTEMPTS,
+      maxAttempts: caps.token,
     },
   ]);
 }

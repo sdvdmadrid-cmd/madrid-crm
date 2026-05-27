@@ -44,6 +44,14 @@ export async function GET(request, { params }) {
   if (!rate.allowed) {
     return json({ success: false, error: "Too many requests. Please try again later." }, 429);
   }
+  // Record the attempt BEFORE token/access validation. Otherwise an
+  // attacker who sprays well-formed-but-invalid tokens never consumes
+  // their IP budget (the bucket-check returns allowed, validation fails
+  // with 404/403, and the call to recordPublicQuoteAttempt below would
+  // be skipped). Recording up front means every attempt counts against
+  // the per-IP cap, while well-behaved customers see no change because
+  // their valid token always passes validation anyway.
+  await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
   const { data, error } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
@@ -59,8 +67,6 @@ export async function GET(request, { params }) {
   if (!access.ok) {
     return json({ success: false, error: access.error }, access.status);
   }
-
-  await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
   const parsedNotes = parseEstimateNotes(data.notes);
   // Strip the customer's signature IP before returning over the public

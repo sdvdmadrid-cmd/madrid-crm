@@ -1,4 +1,9 @@
 import { buildEstimateBuilderInsertRow } from "@/lib/estimate-builder-records";
+import {
+  ESTIMATE_LOOKUP_LIMIT,
+  formatEstimateNumber,
+  pickMaxEstimateSequence,
+} from "@/lib/estimate-number";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { assertTenantClient } from "@/lib/tenant-fk-validation";
@@ -12,12 +17,11 @@ import {
 // Tabla relacional: estimate_builder
 
 /**
- * See estimate-builder-records.js for the table layout. Numbering follows the
- * same max-suffix-plus-one strategy used by /api/estimates so that concurrent
- * creates don't collide. Orders by `created_at desc` instead of by the
- * estimate_number column to avoid the lexicographic-vs-numeric pitfall at
- * the EST-9999 -> EST-10000 boundary (where "EST-10000" sorts below
- * "EST-9999" alphabetically and a small LIMIT misses it).
+ * Allocate the next EST-#### for this tenant from the estimate_builder
+ * table. The format helpers live in @/lib/estimate-number so we stay
+ * in lockstep with the create / duplicate routes; only the DB read
+ * lives here. See nextEstimateNumber in /api/estimates/route.js for
+ * the concurrency / ordering rationale.
  */
 async function nextEstimateBuilderNumber(tenantId) {
   const { data, error } = await supabaseAdmin
@@ -26,19 +30,9 @@ async function nextEstimateBuilderNumber(tenantId) {
     .eq("tenant_id", tenantId)
     .ilike("estimate_number", "EST-%")
     .order("created_at", { ascending: false })
-    .limit(500);
-
+    .limit(ESTIMATE_LOOKUP_LIMIT);
   if (error) throw new Error(error.message);
-
-  let max = 0;
-  for (const row of data || []) {
-    const match = String(row.estimate_number || "").match(/^EST-(\d+)$/i);
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  }
-  return `EST-${String(max + 1).padStart(4, "0")}`;
+  return formatEstimateNumber(pickMaxEstimateSequence(data) + 1);
 }
 
 /**

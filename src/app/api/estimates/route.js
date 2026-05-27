@@ -7,6 +7,11 @@ import {
   parseEstimateNotes,
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
+import {
+  ESTIMATE_LOOKUP_LIMIT,
+  formatEstimateNumber,
+  pickMaxEstimateSequence,
+} from "@/lib/estimate-number";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
@@ -134,19 +139,21 @@ function jsonResponse(payload, status = 200) {
 }
 
 /**
- * Generate the next EST-#### identifier for a tenant.
+ * Generate the next EST-#### identifier for this tenant. The format
+ * helpers (uppercase prefix, padStart-as-floor) live in
+ * @/lib/estimate-number so they stay in lockstep with the other two
+ * estimate-creation routes (duplicate, estimate-builder) and so the
+ * unit tests can import them directly. Only the DB read is here.
  *
- * Strategy: fetch the most-recently-created estimates and scan their
- * numbers for the max numeric suffix. Ordering by `created_at desc` (not
- * `estimate_number desc`) avoids lexicographic ordering pitfalls — once a
- * tenant crosses EST-9999, the string "EST-10000" sorts *below*
- * "EST-9999" lexicographically, so a top-50 lex query would miss the
- * five-digit numbers. created_at puts the newest first regardless of
- * digit count, which is what we actually want.
+ * Concurrency: the unique index on (tenant_id, estimate_number) from
+ * 20260528200000_estimate_number_uniqueness.sql guards against
+ * collisions; the call-site below retries on 23505 with a fresh
+ * number a few times before giving up.
  *
- * The unique index on (tenant_id, estimate_number) from
- * 20260528200000_estimate_number_uniqueness.sql still guards against
- * concurrent creates; the call-site retries on 23505.
+ * Why limit() instead of `order(estimate_number desc) limit 1`: lex
+ * order breaks at the 9999 -> 10000 boundary, so we order by
+ * `created_at desc` and pick the max numeric suffix ourselves via
+ * pickMaxEstimateSequence.
  */
 async function nextEstimateNumber(tenantId) {
   const { data, error } = await supabaseAdmin
@@ -155,19 +162,9 @@ async function nextEstimateNumber(tenantId) {
     .eq("tenant_id", tenantId)
     .ilike("estimate_number", "EST-%")
     .order("created_at", { ascending: false })
-    .limit(500);
-
+    .limit(ESTIMATE_LOOKUP_LIMIT);
   if (error) throw new Error(error.message);
-
-  let max = 0;
-  for (const row of data || []) {
-    const match = String(row.estimate_number || "").match(/^EST-(\d+)$/i);
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  }
-  return `EST-${String(max + 1).padStart(4, "0")}`;
+  return formatEstimateNumber(pickMaxEstimateSequence(data) + 1);
 }
 
 export async function GET(request) {

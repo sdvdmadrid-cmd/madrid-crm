@@ -44,13 +44,23 @@ export async function GET(request, { params }) {
     }
 
     const ip = getRequestIp(request);
-    const rate = await checkPublicQuoteRateLimit({ token, ip, action: "view" });
+    // PDF downloads live in their own rate-limit bucket ("pdf"), separate
+    // from the JSON public-view bucket ("view"). They are still read-only
+    // and use generous caps (see PUBLIC_QUOTE_PDF_* in rate-limit.js),
+    // but a flood of PDF requests cannot starve the JSON view endpoint
+    // that the customer's browser hits when they first land on the page.
+    const rate = await checkPublicQuoteRateLimit({ token, ip, action: "pdf" });
     if (!rate.allowed) {
       return jsonResponse(
         { success: false, error: "Too many requests. Please try again later." },
         429,
       );
     }
+    // Record the attempt BEFORE token/access validation so token-spraying
+    // attackers consume their per-IP budget even though every individual
+    // request fails 404/403 downstream. Legitimate clients are unaffected
+    // because their valid token always passes validation.
+    await recordPublicQuoteAttempt({ token, ip, action: "pdf" });
 
     const { data, error } = await supabaseAdmin
       .from(ESTIMATES_TABLE)
@@ -68,8 +78,6 @@ export async function GET(request, { params }) {
     if (!access.ok) {
       return jsonResponse({ success: false, error: access.error }, access.status);
     }
-
-    await recordPublicQuoteAttempt({ token, ip, action: "view" });
 
     const parsedNotes = parseEstimateNotes(data.notes);
     const estimate = {

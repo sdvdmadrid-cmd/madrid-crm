@@ -20,6 +20,10 @@ import {
   parseEstimateNotes,
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
+import {
+  sanitizeClientNote,
+  sanitizeRequestedItems,
+} from "@/lib/estimate-respond-sanitizers";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 
 const ESTIMATES_TABLE = "estimates";
@@ -30,6 +34,12 @@ const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 // canvas typically lives well under 30KB, so 200KB is a generous ceiling
 // that still prevents a malicious caller from stuffing megabytes into
 // the notes JSON blob (which is stored in a TEXT column).
+//
+// (The other body-shape caps — MAX_REQUESTED_ITEMS / _ITEM_BYTES /
+// _ITEMS_TOTAL_BYTES / MAX_CLIENT_NOTE_CHARS — live in
+// @/lib/estimate-respond-sanitizers so the unit tests can import them
+// directly. The signature cap stays here because it's coupled to the
+// SignaturePad canvas dimensions on the public estimate page.)
 const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
 
 function sanitizeSignatureDataUrl(value) {
@@ -68,6 +78,18 @@ export async function POST(request, { params }) {
   if (!rate.allowed) {
     return json({ success: false, error: "Too many requests. Please try again later." }, 429);
   }
+  // Record the attempt up front (BEFORE any of the downstream
+  // validation: action enum check, DB fetch, access verification,
+  // status guard, signature policy). Otherwise an attacker who sprays
+  // well-formed tokens but invalid actions / wrong-target IDs never
+  // consumes their per-IP "approval" budget — the bucket-check passes
+  // (count below cap), the request fails 400/404/403 downstream, and
+  // the original record-on-success call below is skipped. Recording
+  // up front means every reach into this endpoint counts against the
+  // 15/IP per 10-min mutation cap, regardless of outcome. Legitimate
+  // customers are unaffected because their happy-path approval always
+  // passes validation anyway.
+  await recordPublicQuoteAttempt({ token, ip, action: "approval" });
 
   const action = String(body.action || "").trim().toLowerCase();
   if (!ALLOWED_ACTIONS.has(action)) {
@@ -153,8 +175,8 @@ export async function POST(request, { params }) {
     }
   }
 
-  const clientNote = String(body.note || "").trim();
-  const requestedItems = Array.isArray(body.requestedItems) ? body.requestedItems : null;
+  const clientNote = sanitizeClientNote(body.note);
+  const requestedItems = sanitizeRequestedItems(body.requestedItems);
   const updatedNoteText = clientNote
     ? (parsedNotes.noteText ? `${parsedNotes.noteText}\n\nClient note: ${clientNote}` : `Client note: ${clientNote}`)
     : parsedNotes.noteText;
@@ -175,7 +197,9 @@ export async function POST(request, { params }) {
 
   if (updateErr) return json({ success: false, error: updateErr.message }, 500);
 
-  await recordPublicQuoteAttempt({ token, ip, action: "approval" });
+  // (recordPublicQuoteAttempt already ran near the top of this handler,
+  // so the attacker who sprays invalid actions also drains their bucket;
+  // we don't double-count the happy path here.)
 
   // Append a revision so the contractor's timeline reflects what the
   // customer just did. Best-effort — failures don't break the response.
