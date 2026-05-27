@@ -263,15 +263,21 @@ export async function POST(request, { params }) {
 async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
   const tenantId = String(existing.tenant_id || "").trim();
   if (!tenantId) {
-    // No tenant_id means we cannot scope the quote to a contractor account.
-    // Skip without throwing — the estimate is still approved and surfaced
-    // under the estimate list. Adding an orphan quote row would just create
-    // junk data.
-    console.warn(
-      "[api/estimates/:id/respond] skipping quote creation: estimate has no tenant_id",
-      { estimateId: existing.id },
+    // Integrity error: every estimate is supposed to carry a tenant_id
+    // (the create paths reject missing tenants and the table is
+    // expected to have a NOT NULL constraint downstream). If we
+    // reach here it means a row leaked through one of those guards,
+    // and the customer flow is now ambiguous — they think their
+    // approval is in-flight to a contractor, but no quote can be
+    // produced. Surfacing as an error gets the failure recorded in
+    // the caller's try/catch path, which already emits a structured
+    // log line AND degrades the response to a "warning" shape
+    // ("Approval recorded. The contractor will follow up...").
+    // Previously a console.warn was the only signal and it was
+    // trivial to miss in production logs.
+    throw new Error(
+      `Estimate ${existing.id} has no tenant_id; cannot create approved quote`,
     );
-    return;
   }
 
   const baseNumber = String(existing.estimate_number || "").trim();
