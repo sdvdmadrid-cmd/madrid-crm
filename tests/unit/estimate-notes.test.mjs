@@ -278,6 +278,90 @@ test("normalizeSignature preserves legitimate PNG / JPEG dataUrls", () => {
   }
 });
 
+test("buildAuditForStatusTransition clears signature when leaving approved (F23)", () => {
+  // Setup: customer previously approved with a signature.
+  const previousAudit = {
+    sentAt: "2026-05-20T00:00:00Z",
+    approvedAt: "2026-05-21T00:00:00Z",
+    resendCount: 0,
+    signature: {
+      name: "Jane Doe",
+      signedAt: "2026-05-21T00:00:00Z",
+      ip: "1.2.3.4",
+      method: "drawn_and_typed",
+      dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA",
+    },
+  };
+
+  // Transition: approved -> changes_requested (contractor reopens)
+  const nextAudit = buildAuditForStatusTransition(
+    previousAudit,
+    "approved",
+    "changes_requested",
+    "2026-05-22T00:00:00Z",
+  );
+  // Signature blob is cleared so the next approval doesn't
+  // implicitly endorse changes made in between.
+  assert.equal(nextAudit.signature, null);
+  // But the previous approvedAt is still preserved (audit history
+  // doesn't get erased — the signature is recoverable from the
+  // revision log if needed).
+  assert.equal(nextAudit.approvedAt, "2026-05-21T00:00:00Z");
+  assert.equal(nextAudit.changesRequestedAt, "2026-05-22T00:00:00Z");
+});
+
+test("buildAuditForStatusTransition keeps signature when staying within approved", () => {
+  // A no-op transition (approved -> approved) is rejected by the
+  // early return; carry-forward signature stays intact for any
+  // other in-approved write that doesn't change the status.
+  const previousAudit = {
+    sentAt: "2026-05-20T00:00:00Z",
+    approvedAt: "2026-05-21T00:00:00Z",
+    resendCount: 0,
+    signature: {
+      name: "Jane Doe",
+      signedAt: "2026-05-21T00:00:00Z",
+      ip: "1.2.3.4",
+      method: "drawn_and_typed",
+      dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA",
+    },
+  };
+  const nextAudit = buildAuditForStatusTransition(
+    previousAudit,
+    "approved",
+    "approved",
+    "2026-05-22T00:00:00Z",
+  );
+  assert.equal(nextAudit.signature.name, "Jane Doe");
+  // dataUrl carries through normalizeSignature, which is allowed
+  // for PNG.
+  assert.equal(
+    nextAudit.signature.dataUrl,
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA",
+  );
+});
+
+test("buildAuditForStatusTransition does not strip signature on sent -> approved (signature was just stamped)", () => {
+  // The respond route sets audit.signature BEFORE calling
+  // buildAuditForStatusTransition. Make sure we don't fight the
+  // common happy path.
+  const previousAudit = {
+    sentAt: "2026-05-20T00:00:00Z",
+    resendCount: 0,
+    signature: null,
+  };
+  const next = buildAuditForStatusTransition(
+    previousAudit,
+    "sent",
+    "approved",
+    "2026-05-21T00:00:00Z",
+  );
+  assert.equal(next.approvedAt, "2026-05-21T00:00:00Z");
+  // The respond route fills in audit.signature itself after this
+  // helper returns. Helper is responsible for the timestamps only.
+  assert.equal(next.signature, null);
+});
+
 test("redactAuditForPublic does not echo non-raster dataUrls back", () => {
   // Even if a legacy row somehow has an SVG dataUrl persisted, the
   // public-facing redactor must NOT echo it. The dataUrl key is

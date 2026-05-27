@@ -229,6 +229,28 @@ export function buildAuditForStatusTransition(existingAudit, previousStatus, nex
   if (next === "declined") audit.declinedAt = nowIso;
   if (next === "changes_requested") audit.changesRequestedAt = nowIso;
 
+  // Integrity guard (F23): once an estimate leaves the `approved`
+  // state, the persisted signature no longer attests to the
+  // current document. A flow like:
+  //   sent  -> approved (customer signs)
+  //         -> changes_requested (contractor reopens via PATCH)
+  //         -> approved again
+  // would otherwise carry the original signature blob forward to
+  // the second approval, where it implicitly endorses whatever
+  // line items / totals the contractor changed in between. That
+  // is a forge-the-customer's-signature pattern, even if
+  // unintentional.
+  //
+  // Clearing the signature on transitions OUT of approved forces
+  // the next approval to either capture a fresh signature
+  // (signature-required tenants) or proceed without one
+  // (signature-optional tenants). The previous signedAt is still
+  // recoverable from the revision history if needed for an audit
+  // trail.
+  if (prev === "approved" && next !== "approved") {
+    audit.signature = null;
+  }
+
   return audit;
 }
 
