@@ -747,8 +747,32 @@
     "messages": {
       "confirmDelete": "Usunac tego klienta?"
     },
+    "search": {
+      "label": "Szukaj klientow",
+      "placeholder": "Szukaj po imieniu, firmie, telefonie, emailu lub adresie…",
+      "hint": "Wpisz, aby znalezc klienta — uzyj ↑↓ i Enter, aby wybrac.",
+      "searching": "Szukanie…",
+      "noResults": "Brak pasujacych klientow",
+      "clear": "Wyczysc wyszukiwanie",
+      "errors": {
+        "fetch": "Wyszukiwanie klientow nie powiodlo sie"
+      }
+    },
+    "csvMenu": {
+      "label": "Opcje importu i eksportu klientow"
+    },
+    "export": {
+      "menuLabel": "Eksportuj klientow",
+      "menuHint": "Pobierz CSV zgodny z importem Jobber",
+      "exporting": "Eksportowanie…",
+      "errors": {
+        "failed": "Nie udalo sie wyeksportowac klientow"
+      }
+    },
     "import": {
       "open": "Importuj CSV",
+      "menuLabel": "Importuj klientow",
+      "menuHint": "Wgraj CSV z Jobber lub innego CRM",
       "title": "Import klientow z CSV",
       "subtitle": "Przenies klientow z Jobber lub innego CRM. Dane pozostaja tylko w Twoim workspace.",
       "providerLabel": "Zrodlo eksportu",

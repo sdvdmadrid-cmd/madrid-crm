@@ -879,8 +879,32 @@
     "messages": {
       "confirmDelete": "Eliminar este cliente?"
     },
+    "search": {
+      "label": "Buscar clientes",
+      "placeholder": "Buscar por nombre, empresa, telefono, email o direccion…",
+      "hint": "Escribe para encontrar un cliente — usa ↑↓ y Enter para seleccionar.",
+      "searching": "Buscando…",
+      "noResults": "No hay clientes coincidentes",
+      "clear": "Borrar busqueda",
+      "errors": {
+        "fetch": "Error al buscar clientes"
+      }
+    },
+    "csvMenu": {
+      "label": "Opciones de importar y exportar clientes"
+    },
+    "export": {
+      "menuLabel": "Exportar clientes",
+      "menuHint": "Descargar CSV compatible con Jobber",
+      "exporting": "Exportando…",
+      "errors": {
+        "failed": "No se pudieron exportar los clientes"
+      }
+    },
     "import": {
       "open": "Importar CSV",
+      "menuLabel": "Importar clientes",
+      "menuHint": "Subir CSV desde Jobber u otro CRM",
       "title": "Importar clientes desde CSV",
       "subtitle": "Migra clientes desde Jobber u otro CRM. Los datos quedan solo en tu espacio de trabajo.",
       "providerLabel": "Origen de exportacion",

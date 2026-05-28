@@ -879,8 +879,32 @@
     "messages": {
       "confirmDelete": "Delete this client?"
     },
+    "search": {
+      "label": "Search clients",
+      "placeholder": "Search by name, company, phone, email, or address…",
+      "hint": "Type to find a client — use ↑↓ and Enter to select quickly.",
+      "searching": "Searching…",
+      "noResults": "No matching clients",
+      "clear": "Clear search",
+      "errors": {
+        "fetch": "Client search failed"
+      }
+    },
+    "csvMenu": {
+      "label": "Client import and export options"
+    },
+    "export": {
+      "menuLabel": "Export clients",
+      "menuHint": "Download CSV compatible with Jobber import",
+      "exporting": "Exporting…",
+      "errors": {
+        "failed": "Could not export clients"
+      }
+    },
     "import": {
       "open": "Import CSV",
+      "menuLabel": "Import clients",
+      "menuHint": "Upload CSV from Jobber or another CRM",
       "title": "Import clients from CSV",
       "subtitle": "Migrate customers from Jobber or another CRM. Your data stays in your workspace only.",
       "providerLabel": "Export source",
