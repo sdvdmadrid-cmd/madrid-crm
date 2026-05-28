@@ -32,6 +32,7 @@ export default function ClientsList({
   t,
   clients,
   loading,
+  highlightedId = "",
   onEdit,
   onDelete,
   canDelete,
@@ -50,8 +51,23 @@ export default function ClientsList({
       ) : null}
 
       <div style={{ display: "grid", gap: 12, marginTop: loading ? 12 : 0 }}>
-        {clients.map((client) => (
-          <article key={client.id} className="cf-panel cf-client-card" style={{ padding: 16 }}>
+        {clients.map((client) => {
+          const isHighlighted = highlightedId && client.id === highlightedId;
+          return (
+          <article
+            key={client.id}
+            id={`client-card-${client.id}`}
+            className="cf-panel cf-client-card"
+            style={{
+              padding: 16,
+              ...(isHighlighted
+                ? {
+                    borderColor: "rgba(56, 189, 248, 0.45)",
+                    boxShadow: "0 0 0 1px rgba(14, 165, 233, 0.25)",
+                  }
+                : {}),
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -102,7 +118,8 @@ export default function ClientsList({
               </div>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

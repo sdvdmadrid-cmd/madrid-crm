@@ -5,7 +5,9 @@ import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
+import ClientCsvActionsMenu from "@/components/clients/ClientCsvActionsMenu";
 import ClientCsvImportWizard from "@/components/clients/ClientCsvImportWizard";
+import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
 import ClientsList from "@/components/clients/ClientsList";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import ws from "@/styles/workspace-dark.module.css";
@@ -139,6 +141,15 @@ export default function ClientsPageClient() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const selectClient = (client) => {
+    editClient(client);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`client-card-${client.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
+
   const deleteClient = async (id) => {
     const confirmed = window.confirm(t("clients.messages.confirmDelete"));
     if (!confirmed) return;
@@ -162,13 +173,7 @@ export default function ClientsPageClient() {
       title={t("clients.title")}
       subtitle={t("clients.description")}
       actions={
-        <button
-          type="button"
-          className={ws.btnSecondary}
-          onClick={() => setImportOpen(true)}
-        >
-          {t("clients.import.open")}
-        </button>
+        <ClientCsvActionsMenu onImport={() => setImportOpen(true)} />
       }
     >
       <ClientCsvImportWizard
@@ -177,6 +182,11 @@ export default function ClientsPageClient() {
         onComplete={fetchClients}
       />
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
+
+      <section style={{ marginTop: 20, maxWidth: 720 }}>
+        <ClientSearchAutocomplete onSelect={selectClient} />
+      </section>
+
       <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
         <ClientForm
           t={t}
@@ -192,6 +202,7 @@ export default function ClientsPageClient() {
           t={t}
           clients={clients}
           loading={loading}
+          highlightedId={selectedId}
           onEdit={editClient}
           onDelete={deleteClient}
           canDelete={capabilities.canDeleteRecords}
