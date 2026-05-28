@@ -9,11 +9,7 @@ import {
   MAX_CSV_ROWS,
   parseCsvText,
 } from "@/lib/import-engine/csv-parse";
-import {
-  getProviderById,
-  IMPORT_PROVIDERS,
-  suggestColumnMapping,
-} from "@/lib/import-engine/providers";
+import { suggestColumnMapping } from "@/lib/import-engine/providers";
 import ws from "@/styles/workspace-dark.module.css";
 import imp from "./client-import.module.css";
 
@@ -37,7 +33,6 @@ function statusBadgeClass(status) {
 export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
   const { t } = useTranslation();
   const [step, setStep] = useState("upload");
-  const [providerId, setProviderId] = useState("jobber");
   const [headers, setHeaders] = useState([]);
   const [records, setRecords] = useState([]);
   const [parseMeta, setParseMeta] = useState({ truncated: false, totalParsed: 0 });
@@ -53,7 +48,6 @@ export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
 
   const reset = useCallback(() => {
     setStep("upload");
-    setProviderId("jobber");
     setHeaders([]);
     setRecords([]);
     setParseMeta({ truncated: false, totalParsed: 0 });
@@ -71,6 +65,10 @@ export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const handleRestart = () => {
+    reset();
   };
 
   const handleFile = async (event) => {
@@ -106,17 +104,10 @@ export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
         truncated: parsed.truncated,
         totalParsed: parsed.totalParsed,
       });
-      setMapping(suggestColumnMapping(parsed.headers, providerId));
+      setMapping(suggestColumnMapping(parsed.headers, "generic"));
       setStep("map");
     } catch {
       setError(t("clients.import.errors.parseFailed"));
-    }
-  };
-
-  const onProviderChange = (nextId) => {
-    setProviderId(nextId);
-    if (headers.length) {
-      setMapping(suggestColumnMapping(headers, nextId));
     }
   };
 
@@ -218,7 +209,6 @@ export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
   };
 
   const stepIndex = STEPS.indexOf(step);
-  const provider = getProviderById(providerId);
 
   const previewStatusLabel = useMemo(
     () => ({
@@ -234,43 +224,30 @@ export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
 
   return (
     <div className={imp.overlay} role="dialog" aria-modal="true">
-      <div className={imp.panel}>
-        <h2 style={{ margin: 0, color: "#f8fafc" }}>{t("clients.import.title")}</h2>
-        <p className={imp.hint}>{t("clients.import.subtitle")}</p>
+      <div className={`${imp.panel} ${imp.panelEnter}`}>
+        <div className={imp.header}>
+          <h2 style={{ margin: 0, color: "#f8fafc" }}>{t("clients.import.title")}</h2>
+          <p className={imp.hint}>{t("clients.import.subtitle")}</p>
 
-        <div className={imp.steps}>
-          {STEPS.map((key, index) => {
-            let cls = imp.step;
-            if (index === stepIndex) cls = `${imp.step} ${imp.stepActive}`;
-            else if (index < stepIndex) cls = `${imp.step} ${imp.stepDone}`;
-            return (
-              <span key={key} className={cls}>
-                {t(`clients.import.steps.${key}`)}
-              </span>
-            );
-          })}
+          <div className={imp.steps}>
+            {STEPS.map((key, index) => {
+              let cls = imp.step;
+              if (index === stepIndex) cls = `${imp.step} ${imp.stepActive}`;
+              else if (index < stepIndex) cls = `${imp.step} ${imp.stepDone}`;
+              return (
+                <span key={key} className={cls}>
+                  {t(`clients.import.steps.${key}`)}
+                </span>
+              );
+            })}
+          </div>
+
+          {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
         </div>
-
-        {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
         {step === "upload" ? (
           <>
-            <label className={imp.hint} htmlFor="import-provider" style={{ display: "block", marginBottom: 6 }}>
-              {t("clients.import.providerLabel")}
-            </label>
-            <select
-              id="import-provider"
-              className={ws.input}
-              value={providerId}
-              onChange={(e) => onProviderChange(e.target.value)}
-            >
-              {IMPORT_PROVIDERS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <p className={imp.hint}>{provider.description}</p>
+            <p className={imp.hint}>{t("clients.import.providerLabel")}</p>
 
             <div style={{ marginTop: 16 }}>
               <label className={ws.btnPrimary} style={{ cursor: "pointer" }}>
@@ -480,6 +457,16 @@ export default function ClientCsvImportWizard({ open, onClose, onComplete }) {
           <button type="button" className={ws.btnSecondary} onClick={handleClose}>
             {step === "done" ? t("clients.import.close") : t("clients.buttons.clear")}
           </button>
+
+          {step === "done" ? (
+            <button
+              type="button"
+              className={ws.btnSecondary}
+              onClick={handleRestart}
+            >
+              {t("clients.import.uploadAnother")}
+            </button>
+          ) : null}
 
           {step === "map" ? (
             <>

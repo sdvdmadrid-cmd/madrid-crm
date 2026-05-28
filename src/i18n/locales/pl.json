@@ -774,8 +774,8 @@
       "menuLabel": "Importuj klientow",
       "menuHint": "Wgraj CSV z Jobber lub innego CRM",
       "title": "Import klientow z CSV",
-      "subtitle": "Przenies klientow z Jobber lub innego CRM. Dane pozostaja tylko w Twoim workspace.",
-      "providerLabel": "Zrodlo eksportu",
+      "subtitle": "Przenies klientow z dowolnego CRM lub arkusza. Dane pozostaja tylko w Twoim workspace.",
+      "providerLabel": "Inteligentne mapowanie jest wlaczone dla popularnych formatow CSV.",
       "chooseFile": "Wybierz plik CSV",
       "uploadHint": "CSV UTF-8 do 5 MB i 10 000 wierszy. Obslugiwane cudzyslowy i przecinki.",
       "mapHint": "Wykryto {{count}} wierszy. Mapuj pola FieldBase na kolumny pliku.",
@@ -791,6 +791,7 @@
       "importing": "Importowanie…",
       "back": "Wstecz",
       "close": "Gotowe",
+      "uploadAnother": "Wgraj kolejny plik",
       "existingMatch": "Pasuje do: {{name}}",
       "errorReport": "Wiersze, ktorych nie udalo sie zaimportowac",
       "steps": {

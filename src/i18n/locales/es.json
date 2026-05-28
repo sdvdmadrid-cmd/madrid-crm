@@ -906,8 +906,8 @@
       "menuLabel": "Importar clientes",
       "menuHint": "Subir CSV desde Jobber u otro CRM",
       "title": "Importar clientes desde CSV",
-      "subtitle": "Migra clientes desde Jobber u otro CRM. Los datos quedan solo en tu espacio de trabajo.",
-      "providerLabel": "Origen de exportacion",
+      "subtitle": "Migra clientes desde cualquier CRM o hoja de calculo. Los datos quedan solo en tu espacio de trabajo.",
+      "providerLabel": "Mapeo inteligente activado para formatos CSV comunes.",
       "chooseFile": "Elegir archivo CSV",
       "uploadHint": "CSV UTF-8 hasta 5 MB y 10.000 filas. Se admiten comillas y comas.",
       "mapHint": "{{count}} filas detectadas. Asocia cada campo de FieldBase a una columna.",
@@ -923,6 +923,7 @@
       "importing": "Importando…",
       "back": "Atras",
       "close": "Listo",
+      "uploadAnother": "Subir otro archivo",
       "existingMatch": "Coincide con: {{name}}",
       "errorReport": "Filas que no se pudieron importar",
       "steps": {
