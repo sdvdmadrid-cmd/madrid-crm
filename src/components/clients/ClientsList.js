@@ -33,6 +33,7 @@ export default function ClientsList({
   clients,
   loading,
   highlightedId = "",
+  onSelect,
   onEdit,
   onDelete,
   canDelete,
@@ -58,8 +59,19 @@ export default function ClientsList({
             key={client.id}
             id={`client-card-${client.id}`}
             className="cf-panel cf-client-card"
+            role="button"
+            tabIndex={0}
+            aria-label={t("clients.actions.viewFullDetails")}
+            onClick={() => onSelect?.(client)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect?.(client);
+              }
+            }}
             style={{
               padding: 16,
+              cursor: "pointer",
               ...(isHighlighted
                 ? {
                     borderColor: "rgba(56, 189, 248, 0.45)",
@@ -96,19 +108,29 @@ export default function ClientsList({
                   </p>
                 ) : null}
                 <p className="cf-muted" style={{ margin: "8px 0 0", fontSize: 12, opacity: 0.85 }}>
-                  {t("clients.labels.createdAt")}: {formatCreatedAt(client.created_at)}
+                  {t("clients.labels.createdAt")}: {formatCreatedAt(client.createdAt || client.created_at)}
                 </p>
               </div>
 
               <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <button type="button" onClick={() => onEdit(client)} className="cf-action-btn">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onEdit(client);
+                  }}
+                  className="cf-action-btn"
+                >
                   <IconPencil />
                   {t("clients.buttons.edit")}
                 </button>
                 {canDelete ? (
                   <button
                     type="button"
-                    onClick={() => onDelete(client.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(client.id);
+                    }}
                     className="cf-action-btn cf-action-btn--danger"
                   >
                     <IconTrash />

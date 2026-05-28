@@ -724,7 +724,8 @@
       "notes": "Notatki",
       "serviceAddress": "Adres uslugi",
       "billingAddress": "Adres rozliczeniowy",
-      "billingSameAsService": "Taki sam jak adres uslugi"
+      "billingSameAsService": "Taki sam jak adres uslugi",
+      "total": "Razem"
     },
     "buttons": {
       "saving": "Zapisywanie...",
@@ -742,7 +743,15 @@
       "saveFallback": "Blad podczas zapisu klienta",
       "nameRequired": "Nazwa klienta jest wymagana",
       "delete": "Nie udalo sie usunac klienta",
-      "deleteFallback": "Blad podczas usuwania klienta"
+      "deleteFallback": "Blad podczas usuwania klienta",
+      "details": "Nie udalo sie zaladowac szczegolow klienta"
+    },
+    "actions": {
+      "newEstimate": "Nowa wycena",
+      "viewEstimates": "Zobacz wyceny",
+      "createInvoice": "Utworz fakture",
+      "viewInvoices": "Zobacz faktury",
+      "viewFullDetails": "Pelne dane klienta"
     },
     "messages": {
       "confirmDelete": "Usunac tego klienta?"
