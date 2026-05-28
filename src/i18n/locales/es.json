@@ -856,7 +856,8 @@
       "notes": "Notas",
       "serviceAddress": "Direccion de servicio",
       "billingAddress": "Direccion de facturacion",
-      "billingSameAsService": "Igual que la direccion de servicio"
+      "billingSameAsService": "Igual que la direccion de servicio",
+      "total": "Total"
     },
     "buttons": {
       "saving": "Guardando...",
@@ -874,7 +875,15 @@
       "saveFallback": "Error al guardar cliente",
       "nameRequired": "El nombre del cliente es obligatorio",
       "delete": "No se pudo eliminar el cliente",
-      "deleteFallback": "Error al eliminar cliente"
+      "deleteFallback": "Error al eliminar cliente",
+      "details": "No se pudieron cargar los detalles del cliente"
+    },
+    "actions": {
+      "newEstimate": "Nuevo estimado",
+      "viewEstimates": "Ver estimados",
+      "createInvoice": "Crear factura",
+      "viewInvoices": "Ver facturas",
+      "viewFullDetails": "Ver detalles completos del cliente"
     },
     "messages": {
       "confirmDelete": "Eliminar este cliente?"

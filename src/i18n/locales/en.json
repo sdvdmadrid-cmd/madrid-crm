@@ -856,7 +856,8 @@
       "notes": "Notes",
       "serviceAddress": "Service address",
       "billingAddress": "Billing address",
-      "billingSameAsService": "Same as service address"
+      "billingSameAsService": "Same as service address",
+      "total": "Total"
     },
     "buttons": {
       "saving": "Saving...",
@@ -874,7 +875,15 @@
       "saveFallback": "Error saving client",
       "nameRequired": "Client name is required",
       "delete": "Unable to delete client",
-      "deleteFallback": "Error deleting client"
+      "deleteFallback": "Error deleting client",
+      "details": "Unable to load client details"
+    },
+    "actions": {
+      "newEstimate": "New Estimate",
+      "viewEstimates": "View Estimates",
+      "createInvoice": "Create Invoice",
+      "viewInvoices": "View Invoices",
+      "viewFullDetails": "View Full Client Details"
     },
     "messages": {
       "confirmDelete": "Delete this client?"

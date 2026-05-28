@@ -1,11 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientCsvActionsMenu from "@/components/clients/ClientCsvActionsMenu";
+import ClientDetailsPanel from "@/components/clients/ClientDetailsPanel";
 import ClientCsvImportWizard from "@/components/clients/ClientCsvImportWizard";
 import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
 import ClientsList from "@/components/clients/ClientsList";
@@ -14,6 +16,7 @@ import ws from "@/styles/workspace-dark.module.css";
 
 export default function ClientsPageClient() {
   const { t } = useTranslation();
+  const router = useRouter();
   const { capabilities } = useCurrentUserAccess();
   const [clients, setClients] = useState([]);
   const [form, setForm] = useState(EMPTY_CLIENT_FORM);
@@ -22,6 +25,8 @@ export default function ClientsPageClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -29,7 +34,14 @@ export default function ClientsPageClient() {
     try {
       const res = await apiFetch("/api/clients");
       const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
-      setClients(data);
+      const rows = Array.isArray(data) ? data : [];
+      setClients(rows);
+      setDetails((prev) => {
+        if (!prev?.client?.id) return prev;
+        const updated = rows.find((c) => c.id === prev.client.id);
+        if (!updated) return prev;
+        return { ...prev, client: updated };
+      });
     } catch (err) {
 
       setError(err.message || t("clients.errors.load"));
@@ -46,6 +58,25 @@ export default function ClientsPageClient() {
     setForm(EMPTY_CLIENT_FORM);
     setSelectedId("");
   };
+
+  const loadClientDetails = useCallback(
+    async (clientId) => {
+      if (!clientId) return;
+      setDetailsLoading(true);
+      try {
+        const res = await apiFetch(`/api/clients/${clientId}/details`, {
+          cache: "no-store",
+        });
+        const json = await getJsonOrThrow(res, t("clients.errors.details"));
+        setDetails(json.data || null);
+      } catch (err) {
+        setError(err.message || t("clients.errors.details"));
+      } finally {
+        setDetailsLoading(false);
+      }
+    },
+    [t],
+  );
 
   const saveClient = async () => {
     const name = String(form.name || "").trim();
@@ -138,11 +169,13 @@ export default function ClientsPageClient() {
       billingSameAsService: client.billing_same_as_service !== false,
     });
     setSelectedId(client.id);
+    setDetails((prev) => (prev ? { ...prev, client } : prev));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const selectClient = (client) => {
     editClient(client);
+    loadClientDetails(client.id);
     requestAnimationFrame(() => {
       document
         .getElementById(`client-card-${client.id}`)
@@ -161,7 +194,10 @@ export default function ClientsPageClient() {
       });
       await getJsonOrThrow(res, t("clients.errors.delete"));
       setClients((prev) => prev.filter((client) => client.id !== id));
-      if (selectedId === id) resetForm();
+      if (selectedId === id) {
+        resetForm();
+        setDetails(null);
+      }
     } catch (err) {
 
       setError(err.message || t("clients.errors.deleteFallback"));
@@ -187,6 +223,23 @@ export default function ClientsPageClient() {
         <ClientSearchAutocomplete onSelect={selectClient} />
       </section>
 
+      {selectedId ? (
+        <ClientDetailsPanel
+          t={t}
+          loading={detailsLoading}
+          details={details}
+          onNewEstimate={() => router.push(`/estimates/new?clientId=${encodeURIComponent(selectedId)}`)}
+          onViewEstimates={() => router.push(`/estimates?clientId=${encodeURIComponent(selectedId)}`)}
+          onCreateInvoice={() => router.push(`/invoices?clientId=${encodeURIComponent(selectedId)}&create=1`)}
+          onViewInvoices={() => router.push(`/invoices?clientId=${encodeURIComponent(selectedId)}`)}
+          onEdit={() => {
+            const client = clients.find((c) => c.id === selectedId);
+            if (client) editClient(client);
+          }}
+          onDelete={() => deleteClient(selectedId)}
+        />
+      ) : null}
+
       <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
         <ClientForm
           t={t}
@@ -203,6 +256,7 @@ export default function ClientsPageClient() {
           clients={clients}
           loading={loading}
           highlightedId={selectedId}
+          onSelect={selectClient}
           onEdit={editClient}
           onDelete={deleteClient}
           canDelete={capabilities.canDeleteRecords}
