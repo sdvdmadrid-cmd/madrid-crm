@@ -225,6 +225,44 @@ export function createClientValidationError(message) {
   return error;
 }
 
+/**
+ * Find an existing client for duplicate detection (email first, then phone).
+ * Matches lead-inbox and public contact flows.
+ */
+export async function findClientByEmailOrPhone(
+  supabase,
+  tenantId,
+  { email = "", phone = "" } = {},
+) {
+  const trimmedEmail = String(email || "").trim();
+  if (trimmedEmail) {
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name, email, phone")
+      .eq("tenant_id", tenantId)
+      .eq("email", trimmedEmail)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  const trimmedPhone = String(phone || "").trim();
+  if (trimmedPhone) {
+    const { data } = await supabase
+      .from("clients")
+      .select("id, name, email, phone")
+      .eq("tenant_id", tenantId)
+      .eq("phone", trimmedPhone)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) return data;
+  }
+
+  return null;
+}
+
 export function getClientSchemaMismatchColumn(error) {
   const message = String(error?.message || "");
   const postgrestMatch = message.match(

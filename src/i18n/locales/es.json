@@ -878,6 +878,66 @@
     },
     "messages": {
       "confirmDelete": "Eliminar este cliente?"
+    },
+    "import": {
+      "open": "Importar CSV",
+      "title": "Importar clientes desde CSV",
+      "subtitle": "Migra clientes desde Jobber u otro CRM. Los datos quedan solo en tu espacio de trabajo.",
+      "providerLabel": "Origen de exportacion",
+      "chooseFile": "Elegir archivo CSV",
+      "uploadHint": "CSV UTF-8 hasta 5 MB y 10.000 filas. Se admiten comillas y comas.",
+      "mapHint": "{{count}} filas detectadas. Asocia cada campo de FieldBase a una columna.",
+      "rowsTruncated": "El archivo tenia {{total}} filas; solo se importan las primeras {{shown}}.",
+      "unmapped": "— Sin mapear —",
+      "duplicateModeLabel": "Si el cliente ya existe (email o telefono)",
+      "duplicateSkip": "Omitir duplicados",
+      "duplicateUpdate": "Actualizar clientes existentes",
+      "duplicateCreate": "Crear igualmente (puede duplicar)",
+      "preview": "Vista previa",
+      "previewTruncated": "La vista previa muestra las primeras 500 filas. La importacion procesa el archivo completo.",
+      "startImport": "Importar clientes",
+      "importing": "Importando…",
+      "back": "Atras",
+      "close": "Listo",
+      "existingMatch": "Coincide con: {{name}}",
+      "errorReport": "Filas que no se pudieron importar",
+      "steps": {
+        "upload": "Subir",
+        "map": "Mapear",
+        "preview": "Vista previa",
+        "import": "Importar",
+        "done": "Resumen"
+      },
+      "status": {
+        "ready": "Listo",
+        "invalid": "Invalido",
+        "duplicateFile": "Duplicado en archivo",
+        "duplicateExisting": "Ya en FieldBase"
+      },
+      "columns": {
+        "status": "Estado",
+        "details": "Detalle"
+      },
+      "summary": {
+        "total": "Filas",
+        "create": "Crearan",
+        "update": "Actualizaran",
+        "skip": "Omitiran",
+        "invalid": "Invalidas",
+        "created": "Creados",
+        "updated": "Actualizados",
+        "skipped": "Omitidos",
+        "failed": "Fallidos"
+      },
+      "errors": {
+        "fileTooLarge": "Archivo demasiado grande (max {{maxMb}} MB).",
+        "emptyFile": "El CSV esta vacio.",
+        "noDataRows": "No hay filas de datos (solo encabezado).",
+        "parseFailed": "No se pudo leer el CSV.",
+        "nameColumnRequired": "Mapea la columna Nombre antes de continuar.",
+        "previewFailed": "Error en vista previa",
+        "importFailed": "Error al importar"
+      }
     }
   },
   "jobs": {

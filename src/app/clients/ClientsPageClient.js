@@ -5,6 +5,7 @@ import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
+import ClientCsvImportWizard from "@/components/clients/ClientCsvImportWizard";
 import ClientsList from "@/components/clients/ClientsList";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import ws from "@/styles/workspace-dark.module.css";
@@ -18,6 +19,7 @@ export default function ClientsPageClient() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -159,7 +161,21 @@ export default function ClientsPageClient() {
     <PremiumPageShell
       title={t("clients.title")}
       subtitle={t("clients.description")}
+      actions={
+        <button
+          type="button"
+          className={ws.btnSecondary}
+          onClick={() => setImportOpen(true)}
+        >
+          {t("clients.import.open")}
+        </button>
+      }
     >
+      <ClientCsvImportWizard
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onComplete={fetchClients}
+      />
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
       <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
         <ClientForm
