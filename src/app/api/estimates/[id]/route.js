@@ -7,6 +7,7 @@ import {
   parseEstimateNotes,
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
+import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import {
@@ -298,6 +299,27 @@ export async function PATCH(request, { params }) {
     }
 
     const serialized = serializeEstimate(data);
+
+    // F3: contractor kanban can mark an estimate approved in-person.
+    // Mirror the public respond handoff so the row gets a quote +
+    // invoice instead of stopping at status=approved with no
+    // downstream documents. Best-effort — approval already persisted.
+    const previousStatus = normalizeStatus(existing.status);
+    const newStatus = normalizeStatus(serialized.status);
+    if (newStatus === "approved" && previousStatus !== "approved") {
+      try {
+        await runEstimateApprovalHandoff({
+          estimate: data,
+          nowIso: data.updated_at || new Date().toISOString(),
+        });
+      } catch (handoffError) {
+        console.warn("[api/estimates/:id][PATCH] approval handoff failed", {
+          estimateId: serialized.id,
+          tenantId: serialized.tenantId,
+          error: handoffError?.message || String(handoffError),
+        });
+      }
+    }
 
     // Append revision (best-effort, never blocks the response).
     await recordEstimateRevision({

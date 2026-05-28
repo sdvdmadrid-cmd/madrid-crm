@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   checkPublicQuoteRateLimit,
@@ -25,13 +24,9 @@ import {
   sanitizeRequestedItems,
 } from "@/lib/estimate-respond-sanitizers";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
-import {
-  QUOTE_LOOKUP_LIMIT,
-  pickMaxQuoteSequence,
-} from "@/lib/quote-numbering";
+import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
 
 const ESTIMATES_TABLE = "estimates";
-const QUOTES_TABLE = "quotes";
 const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 
 // Cap the drawn-signature payload. A 640x180 PNG from the SignaturePad
@@ -290,7 +285,7 @@ export async function POST(request, { params }) {
   // believed approval failed and the contractor's dashboard showed approved.
   if (action === "approved") {
     try {
-      await ensureQuoteForApprovedEstimate({ existing, nowIso });
+      await runEstimateApprovalHandoff({ estimate: existing, nowIso });
     } catch (quoteError) {
       console.error(
         "[api/estimates/:id/respond] quote auto-create failed (estimate already approved)",
@@ -310,115 +305,4 @@ export async function POST(request, { params }) {
   }
 
   return json({ success: true, status: action });
-}
-
-/**
- * Idempotently materialize a quote row for an approved estimate. Throws on
- * failure so the caller can decide how to surface the error to the customer.
- */
-async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
-  const tenantId = String(existing.tenant_id || "").trim();
-  if (!tenantId) {
-    // Integrity error: every estimate is supposed to carry a tenant_id
-    // (the create paths reject missing tenants and the table is
-    // expected to have a NOT NULL constraint downstream). If we
-    // reach here it means a row leaked through one of those guards,
-    // and the customer flow is now ambiguous — they think their
-    // approval is in-flight to a contractor, but no quote can be
-    // produced. Surfacing as an error gets the failure recorded in
-    // the caller's try/catch path, which already emits a structured
-    // log line AND degrades the response to a "warning" shape
-    // ("Approval recorded. The contractor will follow up...").
-    // Previously a console.warn was the only signal and it was
-    // trivial to miss in production logs.
-    throw new Error(
-      `Estimate ${existing.id} has no tenant_id; cannot create approved quote`,
-    );
-  }
-
-  const baseNumber = String(existing.estimate_number || "").trim();
-  const parsed = parseEstimateNotes(existing.notes);
-  const lineItems = Array.isArray(existing.items) ? existing.items : [];
-
-  // Idempotency: if a quote already exists with the estimate's
-  // canonical number for this tenant, skip. Backed by the partial
-  // unique index on (tenant_id, quote_number) so concurrent
-  // approvals that race past this check will fail the insert
-  // (which the outer try/catch in the caller surfaces as a
-  // gracefully-degraded "approval recorded" response).
-  if (baseNumber) {
-    const { data: existingQuote, error: existingQuoteError } =
-      await supabaseAdmin
-        .from(QUOTES_TABLE)
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("quote_number", baseNumber)
-        .maybeSingle();
-
-    if (existingQuoteError) {
-      throw new Error(existingQuoteError.message);
-    }
-    if (existingQuote) return;
-  }
-
-  // Allocate a quote number. Prefer the estimate's existing
-  // EST-#### (so contractor and customer see matching numbers); fall
-  // back to a fresh MAX(numeric suffix) + 1 allocation when the
-  // estimate somehow has no canonical number. Previously the
-  // fallback was `String(Date.now())`, which produced non-monotonic
-  // 13-digit timestamps that don't align with the contractor's
-  // quote sequence. With the F4 migration, baseNumber is now
-  // expected to always be present for new rows, but the fallback
-  // is kept correct for safety on legacy data.
-  let quoteNumber = baseNumber;
-  if (!quoteNumber) {
-    const { data: recentQuotes, error: recentQuotesError } =
-      await supabaseAdmin
-        .from(QUOTES_TABLE)
-        .select("quote_number")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false })
-        .limit(QUOTE_LOOKUP_LIMIT);
-    if (recentQuotesError) {
-      throw new Error(recentQuotesError.message);
-    }
-    quoteNumber = String(pickMaxQuoteSequence(recentQuotes) + 1);
-  }
-
-  const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
-
-  const { error: createQuoteError } = await supabaseAdmin
-    .from(QUOTES_TABLE)
-    .insert({
-      tenant_id: tenantId,
-      user_id: existing.user_id || null,
-      created_by: existing.created_by || null,
-      quote_number: quoteNumber,
-      title: `Quote for ${existing.client_name || "Client"}`,
-      // Previously persisted as an empty string, which fails UUID-typed
-      // FK checks on `quotes.client_id`. Null is the canonical "unset".
-      client_id: existing.client_id || null,
-      client_name: existing.client_name || "",
-      client_email: parsed.clientEmail || "",
-      client_phone: parsed.clientPhone || "",
-      address_line1: parsed.address || "",
-      address_line2: "",
-      city: "",
-      state: "",
-      zip: "",
-      property_address: parsed.address || "",
-      line_items: lineItems,
-      scope_of_work: parsed.noteText || "",
-      status: "approved",
-      quote_token: quoteToken,
-      quote_shared_at: nowIso,
-      sent_at: nowIso,
-      approved_at: nowIso,
-      created_at: nowIso,
-      updated_at: nowIso,
-    });
-
-  if (createQuoteError) {
-    throw new Error(createQuoteError.message);
-  }
 }

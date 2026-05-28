@@ -171,7 +171,7 @@ test("redactAuditForPublic strips signature.ip", () => {
   assert.equal("ip" in redacted.signature, false);
 });
 
-test("redactAuditForPublic echoes drawn signature back to the customer", () => {
+test("redactAuditForPublic does not echo drawn signature dataUrl (F19)", () => {
   const audit = createEmptyAudit();
   audit.signature = {
     name: "Jane",
@@ -182,7 +182,7 @@ test("redactAuditForPublic echoes drawn signature back to the customer", () => {
   };
   const redacted = redactAuditForPublic(audit);
   assert.equal(redacted.signature.method, "drawn_and_typed");
-  assert.equal(redacted.signature.dataUrl, "data:image/png;base64,abc");
+  assert.equal("dataUrl" in redacted.signature, false);
   assert.equal("ip" in redacted.signature, false);
 });
 

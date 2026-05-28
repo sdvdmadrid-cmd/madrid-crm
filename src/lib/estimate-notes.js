@@ -262,23 +262,18 @@ export function buildAuditForStatusTransition(existingAudit, previousStatus, nex
  */
 export function redactAuditForPublic(audit) {
   if (!audit || typeof audit !== "object") return audit;
-  // Normalize the dataUrl FIRST (which strips non-raster mimes per
-  // F9). Only emit the `dataUrl` key when the resulting string is
-  // non-empty, so a legacy SVG row gets dropped on the public
-  // surface rather than echoed back as `dataUrl: ""`.
-  const normalizedDataUrl =
-    audit.signature && typeof audit.signature === "object"
-      ? normalizeSignatureDataUrl(audit.signature.dataUrl)
-      : "";
   const signature =
     audit.signature && typeof audit.signature === "object"
       ? {
           name: String(audit.signature.name || ""),
           signedAt: String(audit.signature.signedAt || ""),
           method: normalizeSignatureMethod(audit.signature.method),
-          // The customer's own drawn signature is safe to echo back; we
-          // strip `ip` only since the IP is internal-audit metadata.
-          ...(normalizedDataUrl ? { dataUrl: normalizedDataUrl } : {}),
+          // F19: do not echo the raster `dataUrl` over the token-gated
+          // public API. Anyone holding the share link (90-day TTL) could
+          // recover the drawn image if we replay it here. The customer
+          // page still shows name + signedAt; the drawing was captured
+          // at submit time and remains in the contractor's audit trail.
+          // `ip` is also stripped — internal metadata only.
         }
       : null;
   // Always include the `signature` key (null or object) so the public
