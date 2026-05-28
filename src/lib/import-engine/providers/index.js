@@ -10,9 +10,48 @@ export const IMPORT_PROVIDERS = [
 ];
 
 /** @type {Record<string, Record<string, string[]>>} */
+const SMART_HEADER_ALIASES = {
+  name: [
+    "name",
+    "full name",
+    "client name",
+    "customer name",
+    "display name",
+    "contact name",
+  ],
+  firstName: ["first name", "firstname", "given name"],
+  lastName: ["last name", "lastname", "surname", "family name"],
+  email: ["email", "email address", "e-mail", "primary email", "contact email"],
+  phone: [
+    "phone",
+    "phone number",
+    "mobile",
+    "mobile phone",
+    "cell",
+    "primary phone",
+    "contact phone",
+  ],
+  address: [
+    "address",
+    "street",
+    "street address",
+    "service address",
+    "property address",
+    "address 1",
+    "address line 1",
+    "street 1",
+  ],
+  city: ["city", "service city", "property city", "town"],
+  state: ["state", "province", "region", "service state"],
+  zip: ["zip", "zip code", "postal code", "postal", "service zip"],
+  company: ["company", "company name", "business name"],
+  notes: ["notes", "note", "client notes", "customer notes", "tags"],
+};
+
+/** @type {Record<string, Record<string, string[]>>} */
 const PROVIDER_ALIASES = {
   jobber: JOBBER_HEADER_ALIASES,
-  generic: {},
+  generic: SMART_HEADER_ALIASES,
 };
 
 /**
