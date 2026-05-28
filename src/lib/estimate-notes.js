@@ -53,11 +53,18 @@ function normalizeSignatureMethod(value) {
   return SIGNATURE_METHODS.has(raw) ? raw : "typed";
 }
 
+// Defense in depth: only persist raster signature mime types we can
+// actually render (PNG / JPEG). Mirrors the
+// SIGNATURE_DATA_URL_PATTERN check in the respond route — anchored
+// here too so legacy / migrated rows that contain an SVG (or any
+// other non-raster image) get stripped on read instead of round-
+// tripped back out through redactAuditForPublic. SignaturePad emits
+// "image/png" today so legitimate flows are unaffected.
+const SIGNATURE_DATA_URL_PATTERN = /^data:image\/(png|jpe?g);base64,/i;
+
 function normalizeSignatureDataUrl(value) {
   const raw = String(value || "").trim();
-  // Only persist inline image data URLs so we never accidentally store
-  // a remote URL fragment the renderer would have to fetch.
-  if (!raw.startsWith("data:image/")) return "";
+  if (!SIGNATURE_DATA_URL_PATTERN.test(raw)) return "";
   return raw;
 }
 
@@ -222,6 +229,28 @@ export function buildAuditForStatusTransition(existingAudit, previousStatus, nex
   if (next === "declined") audit.declinedAt = nowIso;
   if (next === "changes_requested") audit.changesRequestedAt = nowIso;
 
+  // Integrity guard (F23): once an estimate leaves the `approved`
+  // state, the persisted signature no longer attests to the
+  // current document. A flow like:
+  //   sent  -> approved (customer signs)
+  //         -> changes_requested (contractor reopens via PATCH)
+  //         -> approved again
+  // would otherwise carry the original signature blob forward to
+  // the second approval, where it implicitly endorses whatever
+  // line items / totals the contractor changed in between. That
+  // is a forge-the-customer's-signature pattern, even if
+  // unintentional.
+  //
+  // Clearing the signature on transitions OUT of approved forces
+  // the next approval to either capture a fresh signature
+  // (signature-required tenants) or proceed without one
+  // (signature-optional tenants). The previous signedAt is still
+  // recoverable from the revision history if needed for an audit
+  // trail.
+  if (prev === "approved" && next !== "approved") {
+    audit.signature = null;
+  }
+
   return audit;
 }
 
@@ -239,11 +268,12 @@ export function redactAuditForPublic(audit) {
           name: String(audit.signature.name || ""),
           signedAt: String(audit.signature.signedAt || ""),
           method: normalizeSignatureMethod(audit.signature.method),
-          // The customer's own drawn signature is safe to echo back; we
-          // strip `ip` only since the IP is internal-audit metadata.
-          ...(audit.signature.dataUrl
-            ? { dataUrl: normalizeSignatureDataUrl(audit.signature.dataUrl) }
-            : {}),
+          // F19: do not echo the raster `dataUrl` over the token-gated
+          // public API. Anyone holding the share link (90-day TTL) could
+          // recover the drawn image if we replay it here. The customer
+          // page still shows name + signedAt; the drawing was captured
+          // at submit time and remains in the contractor's audit trail.
+          // `ip` is also stripped — internal metadata only.
         }
       : null;
   // Always include the `signature` key (null or object) so the public

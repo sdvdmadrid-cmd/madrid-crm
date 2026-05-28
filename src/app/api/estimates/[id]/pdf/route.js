@@ -1,6 +1,6 @@
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
-import { parseEstimateNotes } from "@/lib/estimate-notes";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
+import { serializeEstimateBase } from "@/lib/estimate-serializer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
@@ -9,31 +9,18 @@ import {
 
 const ESTIMATES_TABLE = "estimates";
 
+// pdfkit depends on node:Buffer / node:stream and cannot run on
+// edge runtimes. Pin nodejs explicitly so any future hosting target
+// that defaults to edge inference doesn't silently break PDF
+// downloads. Mirrors estimate-builder/[id]/checkout which already
+// pins this.
+export const runtime = "nodejs";
+
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-function buildEstimatePayload(row) {
-  const parsed = parseEstimateNotes(row.notes);
-  return {
-    id: row.id,
-    tenantId: row.tenant_id || null,
-    estimateNumber: row.estimate_number || "",
-    status: row.status || "draft",
-    clientName: row.client_name || "",
-    clientEmail: parsed.clientEmail || "",
-    clientPhone: parsed.clientPhone || "",
-    address: parsed.address || "",
-    notes: parsed.noteText || "",
-    services: Array.isArray(row.items) ? row.items : [],
-    subtotal: Number(row.subtotal || 0),
-    tax: Number(row.tax || 0),
-    total: Number(row.total || 0),
-    createdAt: row.created_at || null,
-  };
 }
 
 /**
@@ -70,7 +57,7 @@ export async function GET(request, { params }) {
     if (error) throw new Error(error.message);
     if (!data) return jsonResponse({ success: false, error: "Estimate not found" }, 404);
 
-    const estimate = buildEstimatePayload(data);
+    const estimate = serializeEstimateBase(data);
     const branding = await getEstimateBrandingByTenant(estimate.tenantId);
 
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });

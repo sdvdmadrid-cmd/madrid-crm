@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { generateContractAssistant } from "@/lib/document-ai";
 import { parseEstimateNotes } from "@/lib/estimate-notes";
@@ -7,6 +6,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  resolveInsertTenant,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -59,10 +59,14 @@ function buildScopeFromItems(items, fallbackNote) {
  */
 export async function POST(request, { params }) {
   try {
+    // Single same-origin / Referer guard. Previously this route
+    // invoked the same check twice: once as
+    // enforceSameOriginForMutation, again as applyMutationCsrfGuard
+    // (which is a one-line wrapper around the same function). Pure
+    // dead work, and confusing because it implied two layers of
+    // CSRF enforcement when only one exists.
     const sameOriginBlock = enforceSameOriginForMutation(request);
     if (sameOriginBlock) return sameOriginBlock;
-    const csrfBlock = applyMutationCsrfGuard(request);
-    if (csrfBlock) return csrfBlock;
 
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
@@ -141,8 +145,21 @@ export async function POST(request, { params }) {
     // the rendered text, and the references travel via client_name + amount.
     // We intentionally do NOT set job_id or invoice_id here, since the
     // contract is being created from an estimate (no job exists yet).
+    // The derived contract row follows the source estimate's tenant.
+    // For non-super-admin callers this is identical to `tenantDbId`
+    // (the read above filtered the estimate by the caller's tenant).
+    // For super_admin callers acting on behalf of tenant X, this
+    // keeps the generated contract under tenant X — previously the
+    // contract was stamped with the super_admin's own tenant
+    // (typically the platform tenant) and ended up orphaned from
+    // the contractor it was generated for.
+    const insertTenantId = resolveInsertTenant({
+      sourceTenantId: estimate.tenant_id,
+      callerTenantId: tenantDbId,
+    });
+
     const insertPayload = {
-      tenant_id: tenantDbId,
+      tenant_id: insertTenantId,
       client_id: estimate.client_id || null,
       client_name: estimate.client_name || "",
       job_id: estimate.job_id || null,

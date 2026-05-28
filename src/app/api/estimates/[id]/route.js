@@ -7,8 +7,14 @@ import {
   parseEstimateNotes,
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
+import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
+import {
+  serializeEstimateBase,
+  toNumber,
+} from "@/lib/estimate-serializer";
+import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -34,41 +40,13 @@ function normalizeStatus(value, fallback = "draft") {
   return fallback;
 }
 
-function toNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function serializeEstimate(row, { includePublicLink = true } = {}) {
-  const parsedNotes = parseEstimateNotes(row.notes);
-  const status = normalizeStatus(row.status);
+  const base = serializeEstimateBase(row);
   const publicLink =
-    includePublicLink && isPublicEstimateStatus(status) && row.id
-      ? buildPublicEstimateLink(row.id)
+    includePublicLink && isPublicEstimateStatus(base.status) && base.id
+      ? buildPublicEstimateLink(base.id)
       : null;
-
-  return {
-    id: row.id,
-    _id: row.id,
-    tenantId: row.tenant_id || null,
-    publicLink,
-    userId: row.user_id || null,
-    createdBy: row.created_by || null,
-    clientName: row.client_name || "",
-    clientEmail: parsedNotes.clientEmail || "",
-    clientPhone: parsedNotes.clientPhone || "",
-    address: parsedNotes.address,
-    status: normalizeStatus(row.status),
-    services: Array.isArray(row.items) ? row.items : [],
-    subtotal: toNumber(row.subtotal),
-    tax: toNumber(row.tax),
-    total: toNumber(row.total),
-    notes: parsedNotes.noteText,
-    audit: parsedNotes.audit,
-    estimateNumber: row.estimate_number || "",
-    createdAt: row.created_at || null,
-    updatedAt: row.updated_at || null,
-  };
+  return { ...base, publicLink };
 }
 
 /**
@@ -141,6 +119,20 @@ function buildUpdateRow(body = {}) {
       requestedStatus,
       nowIso,
     );
+    // Carry forward requestedItems by default. The previous version of
+    // this helper omitted the field entirely from the rewrite, which
+    // silently wiped any change-request payload the customer had
+    // submitted via /api/estimates/[id]/respond — the contractor would
+    // open the estimate to edit it and the change-request list would
+    // disappear. The customer surface only adds items via respond, so
+    // the contractor PATCH must either pass them through unchanged or
+    // explicitly clear them by setting body.requestedItems to null/[].
+    let nextRequestedItems = existingNotes.requestedItems || null;
+    if ("requestedItems" in body) {
+      nextRequestedItems = Array.isArray(body.requestedItems)
+        ? body.requestedItems
+        : null;
+    }
     next.notes = stringifyEstimateNotes({
       address: "address" in body
         ? String(body.address || "").trim()
@@ -154,6 +146,7 @@ function buildUpdateRow(body = {}) {
       clientPhone: "clientPhone" in body
         ? String(body.clientPhone || "").trim()
         : existingNotes.clientPhone,
+      requestedItems: nextRequestedItems,
       audit: mergedAudit,
     });
   }
@@ -196,7 +189,10 @@ export async function GET(request, { params }) {
 
     return jsonResponse({ success: true, data: serializeEstimate(data) });
   } catch (error) {
-    console.error("[api/estimates/:id][GET] error", error);
+    console.error("[api/estimates/:id][GET] error", {
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
@@ -205,18 +201,33 @@ export async function PATCH(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
 
+  // Hoist a few diagnostic ids out of the try block so the catch
+  // branch's structured log can include them even when the error
+  // happens after we've established the context but before we
+  // return. Filled inside the try when the values become available;
+  // remain null if the error fires earlier (e.g. context fetch
+  // failure).
+  let logEstimateId = null;
+  let logTenantId = null;
+  let logUserId = null;
+
   try {
-    const { tenantDbId, role, authenticated } =
+    const { tenantDbId, userId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
+    logTenantId = tenantDbId || null;
+    logUserId = userId || null;
 
     const { id } = await params;
     if (!id) {
       return jsonResponse({ success: false, error: "Invalid estimate id" }, 400);
     }
+    logEstimateId = id;
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     let existingQuery = supabaseAdmin
       .from(ESTIMATES_TABLE)
@@ -243,10 +254,29 @@ export async function PATCH(request, { params }) {
       currentStatus: existing.status || "draft",
     });
 
+    // Optimistic concurrency: only update if updated_at still
+    // matches what we read into `existing` a few lines up. Prevents
+    // two contractors (or a contractor + the customer's public
+    // respond endpoint) from clobbering each other silently.
+    //
+    // The previous shape used `.eq("id", id)` alone with `.select`
+    // returning the row, so an update that wrote the same row from
+    // a stale snapshot would succeed without surfacing any signal.
+    // The race documented in F2 of the hardening audit (contractor
+    // edits overwriting a customer's just-recorded signature) was
+    // a concrete instance of this.
+    //
+    // If the (id, updated_at) selector matches zero rows, the row
+    // either was just updated by someone else (409 conflict) or
+    // was deleted in the interim. We return 409 in both cases — a
+    // 404 path is reserved for the initial read above; by the time
+    // we are here we know the row exists at-or-after that read.
+    const previousUpdatedAt = existing.updated_at;
     let updateQuery = supabaseAdmin
       .from(ESTIMATES_TABLE)
       .update(toUpdate)
       .eq("id", id)
+      .eq("updated_at", previousUpdatedAt)
       .select("*")
       .maybeSingle();
 
@@ -257,10 +287,39 @@ export async function PATCH(request, { params }) {
     const { data, error } = await updateQuery;
     if (error) throw new Error(error.message);
     if (!data) {
-      return jsonResponse({ success: false, error: "Estimate not found" }, 404);
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "This estimate was modified by another user. Please reload and try again.",
+          conflict: true,
+        },
+        409,
+      );
     }
 
     const serialized = serializeEstimate(data);
+
+    // F3: contractor kanban can mark an estimate approved in-person.
+    // Mirror the public respond handoff so the row gets a quote +
+    // invoice instead of stopping at status=approved with no
+    // downstream documents. Best-effort — approval already persisted.
+    const previousStatus = normalizeStatus(existing.status);
+    const newStatus = normalizeStatus(serialized.status);
+    if (newStatus === "approved" && previousStatus !== "approved") {
+      try {
+        await runEstimateApprovalHandoff({
+          estimate: data,
+          nowIso: data.updated_at || new Date().toISOString(),
+        });
+      } catch (handoffError) {
+        console.warn("[api/estimates/:id][PATCH] approval handoff failed", {
+          estimateId: serialized.id,
+          tenantId: serialized.tenantId,
+          error: handoffError?.message || String(handoffError),
+        });
+      }
+    }
 
     // Append revision (best-effort, never blocks the response).
     await recordEstimateRevision({
@@ -305,7 +364,17 @@ export async function PATCH(request, { params }) {
 
     return jsonResponse({ success: true, data: { ...serialized, delivery } });
   } catch (error) {
-    console.error("[api/estimates/:id][PATCH] error", error);
+    // Structured log line so production traces capture enough context
+    // to repro / triage. Previously: `[api/estimates/:id][PATCH] error
+    // <Error>` with no id, tenant, or user — correlating with surrounding
+    // requests required walking the timestamp.
+    console.error("[api/estimates/:id][PATCH] error", {
+      estimateId: logEstimateId,
+      tenantId: logTenantId,
+      userId: logUserId,
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }

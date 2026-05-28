@@ -171,7 +171,7 @@ test("redactAuditForPublic strips signature.ip", () => {
   assert.equal("ip" in redacted.signature, false);
 });
 
-test("redactAuditForPublic echoes drawn signature back to the customer", () => {
+test("redactAuditForPublic does not echo drawn signature dataUrl (F19)", () => {
   const audit = createEmptyAudit();
   audit.signature = {
     name: "Jane",
@@ -182,11 +182,221 @@ test("redactAuditForPublic echoes drawn signature back to the customer", () => {
   };
   const redacted = redactAuditForPublic(audit);
   assert.equal(redacted.signature.method, "drawn_and_typed");
-  assert.equal(redacted.signature.dataUrl, "data:image/png;base64,abc");
+  assert.equal("dataUrl" in redacted.signature, false);
   assert.equal("ip" in redacted.signature, false);
 });
 
 test("redactAuditForPublic returns null signature when audit has no signature", () => {
   const redacted = redactAuditForPublic(createEmptyAudit());
   assert.equal(redacted.signature, null);
+});
+
+test("parseEstimateNotes round-trips requestedItems through stringify", () => {
+  // Regression guard for the PATCH-drops-requestedItems bug (F1).
+  // The contractor PATCH path now reads existingNotes.requestedItems
+  // and threads it back through stringifyEstimateNotes. This test
+  // pins the round-trip so a future change to either helper that
+  // breaks the contract gets caught.
+  const items = [
+    { ref: "svc-a", change: "Swap to bronze frame" },
+    { ref: "svc-b", change: "Reduce trim scope" },
+  ];
+  const blob = stringifyEstimateNotes({
+    address: "1 Main St",
+    noteText: "Original scope",
+    requestedItems: items,
+    audit: createEmptyAudit(),
+  });
+  const parsed = parseEstimateNotes(blob);
+  assert.deepEqual(parsed.requestedItems, items);
+  assert.equal(parsed.address, "1 Main St");
+  assert.equal(parsed.noteText, "Original scope");
+});
+
+test("stringifyEstimateNotes omits requestedItems when null (legacy 'no items' shape)", () => {
+  const blob = stringifyEstimateNotes({
+    address: "1 Main St",
+    noteText: "scope",
+    requestedItems: null,
+    audit: createEmptyAudit(),
+  });
+  const decoded = JSON.parse(blob);
+  // The key must not appear at all — older parsers that don't know
+  // about the field would otherwise see `requestedItems: null` and
+  // potentially blow up.
+  assert.equal("requestedItems" in decoded, false);
+});
+
+test("normalizeSignature strips non-raster signature mime types (F9 defense in depth)", () => {
+  // SVG signatures could carry inline <script> when rendered by an
+  // SVG-aware renderer. We only accept PNG / JPEG raster data URLs.
+  // Validated via round-trip: persisted notes coming back through
+  // parseEstimateNotes must NOT carry an SVG dataUrl.
+  const blob = JSON.stringify({
+    kind: ESTIMATE_NOTES_KIND,
+    audit: {
+      signature: {
+        name: "Jane Doe",
+        signedAt: "2026-05-26T00:00:00Z",
+        method: "drawn_and_typed",
+        // Maliciously-shaped SVG signature
+        dataUrl:
+          "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+",
+      },
+    },
+  });
+  const parsed = parseEstimateNotes(blob);
+  // The signature shape is still present (name / signedAt / method)
+  // but dataUrl was dropped because it failed the raster check.
+  assert.equal(parsed.audit.signature.name, "Jane Doe");
+  assert.equal(parsed.audit.signature.dataUrl, undefined);
+});
+
+test("normalizeSignature preserves legitimate PNG / JPEG dataUrls", () => {
+  for (const mime of [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "IMAGE/PNG", // case-insensitive
+  ]) {
+    const blob = JSON.stringify({
+      kind: ESTIMATE_NOTES_KIND,
+      audit: {
+        signature: {
+          name: "OK Customer",
+          signedAt: "2026-05-26T00:00:00Z",
+          method: "drawn_and_typed",
+          dataUrl: `data:${mime};base64,iVBORw0KGgoAAAANSUhEUgAA`,
+        },
+      },
+    });
+    const parsed = parseEstimateNotes(blob);
+    assert.ok(
+      parsed.audit.signature.dataUrl,
+      `mime ${mime} should be preserved`,
+    );
+  }
+});
+
+test("buildAuditForStatusTransition clears signature when leaving approved (F23)", () => {
+  // Setup: customer previously approved with a signature.
+  const previousAudit = {
+    sentAt: "2026-05-20T00:00:00Z",
+    approvedAt: "2026-05-21T00:00:00Z",
+    resendCount: 0,
+    signature: {
+      name: "Jane Doe",
+      signedAt: "2026-05-21T00:00:00Z",
+      ip: "1.2.3.4",
+      method: "drawn_and_typed",
+      dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA",
+    },
+  };
+
+  // Transition: approved -> changes_requested (contractor reopens)
+  const nextAudit = buildAuditForStatusTransition(
+    previousAudit,
+    "approved",
+    "changes_requested",
+    "2026-05-22T00:00:00Z",
+  );
+  // Signature blob is cleared so the next approval doesn't
+  // implicitly endorse changes made in between.
+  assert.equal(nextAudit.signature, null);
+  // But the previous approvedAt is still preserved (audit history
+  // doesn't get erased — the signature is recoverable from the
+  // revision log if needed).
+  assert.equal(nextAudit.approvedAt, "2026-05-21T00:00:00Z");
+  assert.equal(nextAudit.changesRequestedAt, "2026-05-22T00:00:00Z");
+});
+
+test("buildAuditForStatusTransition keeps signature when staying within approved", () => {
+  // A no-op transition (approved -> approved) is rejected by the
+  // early return; carry-forward signature stays intact for any
+  // other in-approved write that doesn't change the status.
+  const previousAudit = {
+    sentAt: "2026-05-20T00:00:00Z",
+    approvedAt: "2026-05-21T00:00:00Z",
+    resendCount: 0,
+    signature: {
+      name: "Jane Doe",
+      signedAt: "2026-05-21T00:00:00Z",
+      ip: "1.2.3.4",
+      method: "drawn_and_typed",
+      dataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA",
+    },
+  };
+  const nextAudit = buildAuditForStatusTransition(
+    previousAudit,
+    "approved",
+    "approved",
+    "2026-05-22T00:00:00Z",
+  );
+  assert.equal(nextAudit.signature.name, "Jane Doe");
+  // dataUrl carries through normalizeSignature, which is allowed
+  // for PNG.
+  assert.equal(
+    nextAudit.signature.dataUrl,
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA",
+  );
+});
+
+test("buildAuditForStatusTransition does not strip signature on sent -> approved (signature was just stamped)", () => {
+  // The respond route sets audit.signature BEFORE calling
+  // buildAuditForStatusTransition. Make sure we don't fight the
+  // common happy path.
+  const previousAudit = {
+    sentAt: "2026-05-20T00:00:00Z",
+    resendCount: 0,
+    signature: null,
+  };
+  const next = buildAuditForStatusTransition(
+    previousAudit,
+    "sent",
+    "approved",
+    "2026-05-21T00:00:00Z",
+  );
+  assert.equal(next.approvedAt, "2026-05-21T00:00:00Z");
+  // The respond route fills in audit.signature itself after this
+  // helper returns. Helper is responsible for the timestamps only.
+  assert.equal(next.signature, null);
+});
+
+test("redactAuditForPublic does not echo non-raster dataUrls back", () => {
+  // Even if a legacy row somehow has an SVG dataUrl persisted, the
+  // public-facing redactor must NOT echo it. The dataUrl key is
+  // dropped entirely (rather than emitting an empty string) so the
+  // client renders the typed signature only.
+  const audit = {
+    signature: {
+      name: "Jane Doe",
+      signedAt: "2026-05-26T00:00:00Z",
+      method: "drawn_and_typed",
+      dataUrl:
+        "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+",
+    },
+  };
+  const redacted = redactAuditForPublic(audit);
+  assert.equal(redacted.signature.name, "Jane Doe");
+  assert.equal("dataUrl" in redacted.signature, false);
+});
+
+test("stringifyEstimateNotes omits requestedItems when non-array (defensive)", () => {
+  // If a caller accidentally passes a non-array (e.g. an object,
+  // string, or number), we must not persist it — the contractor view
+  // expects either an array or no key at all.
+  for (const bogus of ["a", 42, { id: 1 }, true]) {
+    const blob = stringifyEstimateNotes({
+      address: "",
+      noteText: "",
+      requestedItems: bogus,
+      audit: createEmptyAudit(),
+    });
+    const decoded = JSON.parse(blob);
+    assert.equal(
+      "requestedItems" in decoded,
+      false,
+      `non-array (${typeof bogus}) must be dropped`,
+    );
+  }
 });

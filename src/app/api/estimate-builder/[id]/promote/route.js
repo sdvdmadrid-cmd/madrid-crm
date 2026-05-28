@@ -1,4 +1,10 @@
 import crypto from "node:crypto";
+import {
+  QUOTE_LOOKUP_LIMIT,
+  normalizeBaseNumber,
+  pickMaxQuoteSequence,
+  toCents,
+} from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -28,7 +34,7 @@ async function nextQuoteNumber(tenantId) {
     .select("quote_number")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(QUOTE_LOOKUP_LIMIT);
 
   if (error) {
     console.error(
@@ -38,35 +44,7 @@ async function nextQuoteNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  let max = 0;
-  for (const row of data || []) {
-    const match = String(row.quote_number || "").match(/(\d+)/);
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  }
-  return String(max + 1);
-}
-
-/**
- * Round a dollar amount to integer cents using safe arithmetic. JS
- * floating point makes `12.34 * 100` = 1234.0000000000002, which a
- * `bigint`-typed cents column will reject. Always pipe payment math
- * through this helper.
- */
-function toCents(amount) {
-  const num = Number(amount || 0);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num * 100);
-}
-
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
+  return String(pickMaxQuoteSequence(data) + 1);
 }
 
 function serializeQuote(doc) {

@@ -2,6 +2,11 @@ import {
   createStripeCheckoutSessionForAccess,
   getStripeSecretKey,
 } from "@/lib/stripe-payments";
+import {
+  INVOICE_LOOKUP_LIMIT,
+  formatInvoiceNumber,
+  pickMaxInvoiceSequence,
+} from "@/lib/invoice-number";
 import { normalizeMoney } from "@/lib/invoice-payments";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -30,11 +35,30 @@ function isSuperAdmin(role) {
   return String(role || "").trim().toLowerCase() === "super_admin";
 }
 
+/**
+ * Allocate the next INV-#### for this tenant.
+ *
+ * Previously this used `COUNT(*) + 1`, which had three failure modes:
+ * concurrent collisions (two checkouts compute the same number),
+ * deletion collisions (any deleted invoice shifts subsequent numbers
+ * onto existing rows), and no retry path. We now match the
+ * estimate-number scheme: MAX(numeric suffix) + 1, with the call
+ * site wrapping the insert in a retry-on-23505 loop backed by the
+ * partial unique index on (tenant_id, invoice_number) from
+ * 20260606100000_quote_invoice_number_uniqueness.sql.
+ *
+ * Ordering by `created_at desc` (NOT invoice_number desc) avoids the
+ * lex pitfall at the 9999 -> 10000 boundary, same as the
+ * estimate-number routes.
+ */
 async function nextInvoiceNumber(tenantId) {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from(INVOICES)
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+    .select("invoice_number, created_at")
+    .eq("tenant_id", tenantId)
+    .ilike("invoice_number", "INV-%")
+    .order("created_at", { ascending: false })
+    .limit(INVOICE_LOOKUP_LIMIT);
 
   if (error) {
     logSupabaseError(
@@ -45,7 +69,7 @@ async function nextInvoiceNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  return `INV-${String(Number(count || 0) + 1).padStart(4, "0")}`;
+  return formatInvoiceNumber(pickMaxInvoiceSequence(data) + 1);
 }
 
 function mapEstimateLinesToInvoiceItems(lines = []) {
@@ -144,47 +168,75 @@ export async function POST(request, { params }) {
       client = clientRow || null;
     }
 
-    const invoiceNumber = await nextInvoiceNumber(context.tenantDbId);
     const nowIso = new Date().toISOString();
     const amountCents = Math.round(amount * 100);
     const lineItems = mapEstimateLinesToInvoiceItems(estimate.lines);
 
-    const { data: invoice, error: invoiceError } = await supabaseAdmin
-      .from(INVOICES)
-      .insert({
-        tenant_id: context.tenantDbId,
-        user_id: context.userId || null,
-        estimate_id: estimate.id,
-        invoice_number: invoiceNumber,
-        invoice_title: String(estimate.name || "Estimate invoice").trim(),
-        client_id: client?.id || null,
-        client_name: String(client?.name || "").trim(),
-        client_email: String(client?.email || "").trim().toLowerCase(),
-        amount,
-        items: lineItems,
-        subtotal_cents: amountCents,
-        tax_cents: 0,
-        total_cents: amountCents,
-        notes: String(estimate.notes || "").trim(),
-        preferred_payment_method: "credit_card",
-        payments: [],
-        paid_amount: 0,
-        balance_due: amount,
-        status: "Unpaid",
-        created_by: context.userId || null,
-        created_at: nowIso,
-        updated_at: nowIso,
-      })
-      .select("*")
-      .single();
+    // Retry-on-23505 loop, mirroring the estimate-number allocation
+    // pattern. The partial unique index on
+    // (tenant_id, invoice_number) added in
+    // 20260606100000_quote_invoice_number_uniqueness.sql is what
+    // makes the retry actually do something — without it, a
+    // concurrent checkout would silently produce a duplicate
+    // INV-#### instead of erroring out. We compute a fresh number
+    // each attempt because the previous one may have been claimed
+    // by another concurrent insert in the meantime.
+    let invoice = null;
+    let lastInvoiceError = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const invoiceNumber = await nextInvoiceNumber(context.tenantDbId);
+      const insertResult = await supabaseAdmin
+        .from(INVOICES)
+        .insert({
+          tenant_id: context.tenantDbId,
+          user_id: context.userId || null,
+          estimate_id: estimate.id,
+          invoice_number: invoiceNumber,
+          invoice_title: String(estimate.name || "Estimate invoice").trim(),
+          client_id: client?.id || null,
+          client_name: String(client?.name || "").trim(),
+          client_email: String(client?.email || "").trim().toLowerCase(),
+          amount,
+          items: lineItems,
+          subtotal_cents: amountCents,
+          tax_cents: 0,
+          total_cents: amountCents,
+          notes: String(estimate.notes || "").trim(),
+          preferred_payment_method: "credit_card",
+          payments: [],
+          paid_amount: 0,
+          balance_due: amount,
+          status: "Unpaid",
+          created_by: context.userId || null,
+          created_at: nowIso,
+          updated_at: nowIso,
+        })
+        .select("*")
+        .single();
 
-    if (invoiceError) {
+      if (!insertResult.error) {
+        invoice = insertResult.data;
+        lastInvoiceError = null;
+        break;
+      }
+      lastInvoiceError = insertResult.error;
+      const code = String(insertResult.error.code || "");
+      const msg = String(insertResult.error.message || "");
+      const isUniqueViolation =
+        code === "23505" || /duplicate key value/i.test(msg);
+      if (!isUniqueViolation) break;
+    }
+
+    if (lastInvoiceError) {
       logSupabaseError(
         "[api/estimate-builder/:id/checkout] invoice insert error",
-        invoiceError,
+        lastInvoiceError,
         { estimateId: id, tenantId: context.tenantDbId, amount },
       );
-      throw new Error(invoiceError.message);
+      throw new Error(lastInvoiceError.message);
+    }
+    if (!invoice) {
+      throw new Error("Failed to allocate a unique invoice number");
     }
 
     createdInvoiceId = String(invoice.id || "");

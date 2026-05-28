@@ -1,7 +1,13 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { ESTIMATE_INVOICE_DISCLAIMER } from "@/lib/legal";
+import { appendDisclaimer } from "@/lib/legal";
 import { enforceLegalAcceptance } from "@/lib/legal-enforcement";
+import {
+  QUOTE_LOOKUP_LIMIT,
+  normalizeBaseNumber,
+  pickMaxQuoteSequence,
+  toCents,
+} from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   canSendExternal,
@@ -38,10 +44,17 @@ function serializeQuote(doc) {
 }
 
 /**
- * Compute the next sequential quote number for a tenant via MAX(suffix) + 1
- * rather than COUNT(*) + 1, which would collide on concurrent share-link
- * creations and reset if rows were soft-deleted. Callers should retry on
- * a unique-violation since two simultaneous requests can still race.
+ * Compute the next sequential quote number for a tenant via
+ * MAX(numeric suffix) + 1, backed by the partial unique index on
+ * (tenant_id, quote_number) from
+ * 20260606100000_quote_invoice_number_uniqueness.sql. Callers
+ * retry on a unique-violation since two simultaneous requests can
+ * still race past the read.
+ *
+ * The pure parsing logic (pickMaxQuoteSequence) lives in
+ * src/lib/quote-numbering.js so the same numbering scheme is
+ * applied identically by /promote and (transitively, see
+ * /respond's ensureQuoteForApprovedEstimate fallback).
  */
 async function nextQuoteNumber(tenantId) {
   const { data, error } = await supabaseAdmin
@@ -49,7 +62,7 @@ async function nextQuoteNumber(tenantId) {
     .select("quote_number")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(QUOTE_LOOKUP_LIMIT);
 
   if (error) {
     console.error(
@@ -59,41 +72,7 @@ async function nextQuoteNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  let max = 0;
-  for (const row of data || []) {
-    const match = String(row.quote_number || "").match(/(\d+)/);
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isFinite(n) && n > max) max = n;
-    }
-  }
-  return String(max + 1);
-}
-
-/**
- * Round dollars to integer cents using safe arithmetic. JS floats make
- * `12.34 * 100` = 1234.0000000000002, which a `bigint` cents column
- * rejects. All cent math must flow through this helper.
- */
-function toCents(amount) {
-  const num = Number(amount || 0);
-  if (!Number.isFinite(num)) return 0;
-  return Math.round(num * 100);
-}
-
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
-}
-
-function appendDisclaimer(text, lang = "en") {
-  const disclaimer = ESTIMATE_INVOICE_DISCLAIMER[lang] || ESTIMATE_INVOICE_DISCLAIMER.en;
-  const base = String(text || "").trim();
-  if (!base) return disclaimer;
-  return `${base}\n\n---\n${disclaimer}`;
+  return String(pickMaxQuoteSequence(data) + 1);
 }
 
 export async function POST(request, { params }) {

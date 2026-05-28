@@ -1,4 +1,5 @@
 import { buildEstimateBuilderUpdateRow } from "@/lib/estimate-builder-records";
+import { parseJsonBody } from "@/lib/parse-json-body";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { assertTenantClient, assertTenantQuote } from "@/lib/tenant-fk-validation";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
@@ -59,7 +60,9 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     let estimateQuery = supabaseAdmin
       .from("estimate_builder")

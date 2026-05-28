@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   checkPublicQuoteRateLimit,
@@ -25,9 +24,9 @@ import {
   sanitizeRequestedItems,
 } from "@/lib/estimate-respond-sanitizers";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
+import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
 
 const ESTIMATES_TABLE = "estimates";
-const QUOTES_TABLE = "quotes";
 const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 
 // Cap the drawn-signature payload. A 640x180 PNG from the SignaturePad
@@ -42,10 +41,28 @@ const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
 // SignaturePad canvas dimensions on the public estimate page.)
 const MAX_SIGNATURE_DATA_URL_BYTES = 200 * 1024;
 
+// Defense in depth: restrict accepted signature mime types to raster
+// formats the PDF generator actually renders (PNG / JPEG). Previously
+// the check was `raw.startsWith("data:image/")`, which would accept
+// `data:image/svg+xml;base64,...`. SVG is XML and SVG renderers
+// historically have executed inline <script> — the customer-facing
+// page renders the signature via <img src=...> (which does NOT
+// execute SVG <script>), so this is not an open XSS today, but
+// 1) the PDF generator silently drops anything that isn't PNG/JPEG
+//    (mime check in estimate-pdf.js's decodeDataUrlImage), creating
+//    surprising "the signature disappeared from the PDF" UX, and
+// 2) saving SVG into the audit blob may surprise downstream
+//    renderers added later (email-attached approvals, slack
+//    notifications with rich preview, etc.).
+// Anchoring on `^data:image\/(png|jpe?g);base64,` is also what
+// SignaturePad emits today (`canvas.toDataURL("image/png")`), so
+// legitimate flows are unaffected.
+const SIGNATURE_DATA_URL_PATTERN = /^data:image\/(png|jpe?g);base64,/i;
+
 function sanitizeSignatureDataUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
-  if (!raw.startsWith("data:image/")) return "";
+  if (!SIGNATURE_DATA_URL_PATTERN.test(raw)) return "";
   if (raw.length > MAX_SIGNATURE_DATA_URL_BYTES) return "";
   return raw;
 }
@@ -181,7 +198,21 @@ export async function POST(request, { params }) {
     ? (parsedNotes.noteText ? `${parsedNotes.noteText}\n\nClient note: ${clientNote}` : `Client note: ${clientNote}`)
     : parsedNotes.noteText;
 
-  const { error: updateErr } = await supabaseAdmin
+  // Optimistic concurrency guard: only update the row if
+  // updated_at still matches what we read into `existing` above.
+  // Prevents the customer's approval from clobbering a concurrent
+  // contractor edit (and vice versa). Without this, the following
+  // race silently corrupted state:
+  //   t0  contractor PATCH reads estimate (snapshot S)
+  //   t1  customer hits respond, writes approved + signature
+  //   t2  contractor PATCH writes using S (signature now lost,
+  //       status reverted)
+  //
+  // The DB write below selects to detect the no-rows-matched case
+  // explicitly so we can return a 409 with a clear message rather
+  // than a generic 500.
+  const previousUpdatedAt = existing.updated_at;
+  const { data: updateData, error: updateErr } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
     .update({
       status: action,
@@ -193,9 +224,29 @@ export async function POST(request, { params }) {
       }),
       updated_at: nowIso,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("updated_at", previousUpdatedAt)
+    .select("id")
+    .maybeSingle();
 
   if (updateErr) return json({ success: false, error: updateErr.message }, 500);
+
+  if (!updateData) {
+    // No row matched both (id, updated_at). The estimate exists
+    // (we already proved that earlier) but updated_at moved while
+    // we were computing — concurrent modification. The customer-
+    // facing page surfaces this error to the user, who should
+    // refresh and try again.
+    return json(
+      {
+        success: false,
+        error:
+          "This estimate was just updated by the contractor. Please refresh the page and try again.",
+        conflict: true,
+      },
+      409,
+    );
+  }
 
   // (recordPublicQuoteAttempt already ran near the top of this handler,
   // so the attacker who sprays invalid actions also drains their bucket;
@@ -234,7 +285,7 @@ export async function POST(request, { params }) {
   // believed approval failed and the contractor's dashboard showed approved.
   if (action === "approved") {
     try {
-      await ensureQuoteForApprovedEstimate({ existing, nowIso });
+      await runEstimateApprovalHandoff({ estimate: existing, nowIso });
     } catch (quoteError) {
       console.error(
         "[api/estimates/:id/respond] quote auto-create failed (estimate already approved)",
@@ -254,76 +305,4 @@ export async function POST(request, { params }) {
   }
 
   return json({ success: true, status: action });
-}
-
-/**
- * Idempotently materialize a quote row for an approved estimate. Throws on
- * failure so the caller can decide how to surface the error to the customer.
- */
-async function ensureQuoteForApprovedEstimate({ existing, nowIso }) {
-  const tenantId = String(existing.tenant_id || "").trim();
-  if (!tenantId) {
-    // No tenant_id means we cannot scope the quote to a contractor account.
-    // Skip without throwing — the estimate is still approved and surfaced
-    // under the estimate list. Adding an orphan quote row would just create
-    // junk data.
-    console.warn(
-      "[api/estimates/:id/respond] skipping quote creation: estimate has no tenant_id",
-      { estimateId: existing.id },
-    );
-    return;
-  }
-
-  const baseNumber = String(existing.estimate_number || "").trim();
-  const parsed = parseEstimateNotes(existing.notes);
-  const lineItems = Array.isArray(existing.items) ? existing.items : [];
-
-  const { data: existingQuote, error: existingQuoteError } = await supabaseAdmin
-    .from(QUOTES_TABLE)
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("quote_number", baseNumber)
-    .maybeSingle();
-
-  if (existingQuoteError) {
-    throw new Error(existingQuoteError.message);
-  }
-  if (existingQuote) return;
-
-  const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
-
-  const { error: createQuoteError } = await supabaseAdmin
-    .from(QUOTES_TABLE)
-    .insert({
-      tenant_id: tenantId,
-      user_id: existing.user_id || null,
-      created_by: existing.created_by || null,
-      quote_number: baseNumber || String(Date.now()),
-      title: `Quote for ${existing.client_name || "Client"}`,
-      // Previously persisted as an empty string, which fails UUID-typed
-      // FK checks on `quotes.client_id`. Null is the canonical "unset".
-      client_id: existing.client_id || null,
-      client_name: existing.client_name || "",
-      client_email: parsed.clientEmail || "",
-      client_phone: parsed.clientPhone || "",
-      address_line1: parsed.address || "",
-      address_line2: "",
-      city: "",
-      state: "",
-      zip: "",
-      property_address: parsed.address || "",
-      line_items: lineItems,
-      scope_of_work: parsed.noteText || "",
-      status: "approved",
-      quote_token: quoteToken,
-      quote_shared_at: nowIso,
-      sent_at: nowIso,
-      approved_at: nowIso,
-      created_at: nowIso,
-      updated_at: nowIso,
-    });
-
-  if (createQuoteError) {
-    throw new Error(createQuoteError.message);
-  }
 }

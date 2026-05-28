@@ -68,9 +68,18 @@ function summarizeChanges(before = {}, after = {}) {
 }
 
 /**
- * Persist an entry into estimate_revisions. Best-effort: never throws —
- * failures only emit a console warning so the underlying estimate write
- * stays the source of truth.
+ * Persist an entry into estimate_revisions. Best-effort, fire-and-
+ * forget: never throws, returns nothing. Failures are logged via
+ * console.warn so the underlying estimate write stays the source of
+ * truth — a missing revision entry never blocks a customer's
+ * approval or a contractor's edit.
+ *
+ * Previously this returned { success, error } objects that NO call
+ * site inspected. The mismatch was misleading: it implied the
+ * caller should branch on the return, when in practice the caller
+ * always discarded it. Returning `void` makes the fire-and-forget
+ * contract obvious and removes any temptation to "handle the
+ * error" by, e.g., failing the parent request.
  */
 export async function recordEstimateRevision({
   estimateId,
@@ -82,7 +91,7 @@ export async function recordEstimateRevision({
   after = {},
   note = "",
 }) {
-  if (!estimateId) return { success: false, error: "missing_estimate_id" };
+  if (!estimateId) return;
 
   const resolvedKind = ALLOWED_KINDS.has(String(kind || "").toLowerCase())
     ? String(kind).toLowerCase()
@@ -92,7 +101,7 @@ export async function recordEstimateRevision({
 
   // Skip pure no-ops on plain "updated" entries to avoid timeline spam.
   if (resolvedKind === "updated" && Object.keys(changes).length === 0 && !note.trim()) {
-    return { success: true, skipped: true };
+    return;
   }
 
   try {
@@ -112,17 +121,16 @@ export async function recordEstimateRevision({
     if (error) {
       console.warn("[estimate-revisions] insert failed", {
         estimateId,
+        tenantId,
         error: error.message,
       });
-      return { success: false, error: error.message };
     }
-    return { success: true };
   } catch (err) {
     console.warn("[estimate-revisions] insert exception", {
       estimateId,
+      tenantId,
       error: err?.message || String(err),
     });
-    return { success: false, error: err?.message || String(err) };
   }
 }
 

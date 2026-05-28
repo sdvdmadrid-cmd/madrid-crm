@@ -1,4 +1,5 @@
 import { sendEmail } from "@/lib/email";
+import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -132,7 +133,9 @@ export async function POST(request, { params }) {
       );
     }
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
     const { method, to } = body;
 
     if (method !== "email") {

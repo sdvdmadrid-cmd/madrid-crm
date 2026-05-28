@@ -3,6 +3,7 @@ import {
   normalizeMoney,
   normalizePaymentMethod,
 } from "@/lib/invoice-payments";
+import { normalizeBaseNumber } from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -19,14 +20,6 @@ import {
 } from "@/lib/tenant";
 
 const INVOICES = "invoices";
-
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
-}
 
 function serialize(doc) {
   const amount = Number(

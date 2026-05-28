@@ -561,6 +561,11 @@ export default function EstimatesPage() {
                             </span>
                             <span style={{ color: "#94a3b8" }}>{formatDateTime(rev.createdAt)}</span>
                           </div>
+                          {rev.actorLabel ? (
+                            <div style={{ marginTop: 2, color: "#cbd5e1", fontStyle: "italic" }}>
+                              by {rev.actorLabel}
+                            </div>
+                          ) : null}
                           {rev.statusBefore && rev.statusAfter && rev.statusBefore !== rev.statusAfter ? (
                             <div style={{ marginTop: 2, color: "#94a3b8" }}>
                               {rev.statusBefore} → {rev.statusAfter}

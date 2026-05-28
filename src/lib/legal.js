@@ -77,3 +77,28 @@ export const ESTIMATE_INVOICE_DISCLAIMER = {
   es: "Este documento no tiene caracter juridicamente vinculante hasta que sea aceptado formalmente por ambas partes. El alcance, los materiales y el precio final pueden cambiar segun las condiciones del sitio o modificaciones solicitadas por el cliente. FieldBase y sus operadores no son responsables de disputas derivadas de trabajos realizados o pagos efectuados fuera de esta plataforma. Todos los servicios estan sujetos a los Terminos y Condiciones de FieldBase disponibles en /legal.",
   pl: "Ten dokument nie jest prawnie wiazacy az do formalnej akceptacji przez obie strony. Zakres, materialy i ostateczna cena moga ulec zmianie w zaleznosci od warunkow terenowych lub zmian zadanych przez klienta. FieldBase i jego operatorzy nie ponosza odpowiedzialnosci za spory wynikajace z prac wykonanych lub platnosci dokonanych poza ta platforma. Wszystkie uslugi podlegaja Regulaminowi FieldBase dostepnemu pod adresem /legal.",
 };
+
+/**
+ * Append the locale-appropriate estimate / invoice disclaimer to a
+ * scope-of-work string. Used by every code path that materializes a
+ * quote or invoice from an estimate so the legal text is always
+ * present on customer-visible documents.
+ *
+ * Behavior:
+ *   - blank input -> disclaimer alone
+ *   - non-blank input -> "<text>\n\n---\n<disclaimer>"
+ *   - unknown lang -> falls back to English (existing rows already
+ *     persisted in English; this keeps the behavior stable)
+ *
+ * Previously inlined in src/app/api/estimate-builder/[id]/share-link/
+ *   route.js as `appendDisclaimer`. Moved here so the public
+ *   estimate respond path can also use it consistently (see the
+ *   open F6 design decision in the hardening PR description).
+ */
+export function appendDisclaimer(text, lang = "en") {
+  const disclaimer =
+    ESTIMATE_INVOICE_DISCLAIMER[lang] || ESTIMATE_INVOICE_DISCLAIMER.en;
+  const base = String(text || "").trim();
+  if (!base) return disclaimer;
+  return `${base}\n\n---\n${disclaimer}`;
+}

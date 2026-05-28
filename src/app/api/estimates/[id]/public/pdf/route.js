@@ -1,10 +1,10 @@
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
-import { parseEstimateNotes } from "@/lib/estimate-notes";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 import {
   isValidEstimatePublicToken,
   verifyEstimatePublicAccess,
 } from "@/lib/estimate-public-access";
+import { serializeEstimateBase } from "@/lib/estimate-serializer";
 import {
   checkPublicQuoteRateLimit,
   getRequestIp,
@@ -13,6 +13,13 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const ESTIMATES_TABLE = "estimates";
+
+// pdfkit depends on node:Buffer / node:stream and cannot run on
+// edge runtimes. Pin nodejs explicitly so any future hosting
+// target that defaults to edge inference doesn't silently break
+// PDF downloads. Mirrors estimate-builder/[id]/checkout which
+// already pins this.
+export const runtime = "nodejs";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -79,23 +86,7 @@ export async function GET(request, { params }) {
       return jsonResponse({ success: false, error: access.error }, access.status);
     }
 
-    const parsedNotes = parseEstimateNotes(data.notes);
-    const estimate = {
-      id: data.id,
-      tenantId: data.tenant_id || null,
-      estimateNumber: data.estimate_number || "",
-      status: String(data.status || "draft").toLowerCase(),
-      clientName: data.client_name || "",
-      clientEmail: parsedNotes.clientEmail || "",
-      clientPhone: parsedNotes.clientPhone || "",
-      address: parsedNotes.address || "",
-      notes: parsedNotes.noteText || "",
-      services: Array.isArray(data.items) ? data.items : [],
-      subtotal: Number(data.subtotal || 0),
-      tax: Number(data.tax || 0),
-      total: Number(data.total || 0),
-      createdAt: data.created_at || null,
-    };
+    const estimate = serializeEstimateBase(data);
 
     const branding = await getEstimateBrandingByTenant(estimate.tenantId);
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });

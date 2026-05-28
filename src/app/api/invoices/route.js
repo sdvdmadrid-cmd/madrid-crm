@@ -1,4 +1,9 @@
 import {
+  INVOICE_LOOKUP_LIMIT,
+  formatInvoiceNumber,
+  pickMaxInvoiceSequence,
+} from "@/lib/invoice-number";
+import {
   computeInvoicePaymentState,
   normalizeMoney,
   normalizePaymentMethod,
@@ -18,15 +23,9 @@ import {
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
 
-const INVOICES = "invoices";
+import { normalizeBaseNumber } from "@/lib/quote-numbering";
 
-function normalizeBaseNumber(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const stripped = raw.replace(/^(EST|QT|INV)[-_\s]*/i, "").trim();
-  const compact = stripped.replace(/\s+/g, "");
-  return compact || raw;
-}
+const INVOICES = "invoices";
 
 function serialize(doc) {
   const amount = Number(
@@ -66,11 +65,27 @@ function serialize(doc) {
   };
 }
 
+/**
+ * Allocate the next INV-#### for this tenant. Uses MAX(numeric
+ * suffix) + 1 over the most-recently-created INV-shaped rows, same
+ * shape the estimate-number scheme uses. The insert at the call
+ * site retries on 23505 against the partial unique index on
+ * (tenant_id, invoice_number) from
+ * 20260606100000_quote_invoice_number_uniqueness.sql so two
+ * simultaneous invoice creates can't end up with the same number.
+ *
+ * Previously this used `COUNT(*) + 1`, which collided whenever any
+ * invoice was deleted (the count shrinks, the max doesn't) and
+ * could not survive concurrency at all.
+ */
 async function nextInvoiceNumber(tenantId) {
-  const { count, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from(INVOICES)
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenantId);
+    .select("invoice_number, created_at")
+    .eq("tenant_id", tenantId)
+    .ilike("invoice_number", "INV-%")
+    .order("created_at", { ascending: false })
+    .limit(INVOICE_LOOKUP_LIMIT);
 
   if (error) {
     logSupabaseError("[api/invoices] nextInvoiceNumber query error", error, {
@@ -79,7 +94,7 @@ async function nextInvoiceNumber(tenantId) {
     throw new Error(error.message);
   }
 
-  return `INV-${String(Number(count || 0) + 1).padStart(4, "0")}`;
+  return formatInvoiceNumber(pickMaxInvoiceSequence(data) + 1);
 }
 
 export async function GET(request) {
@@ -169,9 +184,14 @@ export async function POST(request) {
     const submittedQuoteId = normalizeUuid(body.quoteId);
     const submittedQuoteNumber = normalizeBaseNumber(body.quoteNumber);
 
-    const invoiceNumber =
-      normalizeBaseNumber(body.invoiceNumber) ||
-      (await nextInvoiceNumber(tenantDbId));
+    // Explicit (caller-provided) invoice numbers are honored as-is
+    // and must NOT be retried — if they collide, the caller wants
+    // to know. Auto-allocated numbers go through the retry-on-23505
+    // loop below.
+    const explicitInvoiceNumber = normalizeBaseNumber(body.invoiceNumber);
+    const hasExplicitInvoiceNumber = explicitInvoiceNumber.length > 0;
+    let invoiceNumber =
+      explicitInvoiceNumber || (await nextInvoiceNumber(tenantDbId));
 
     // Auto-link quote/estimate using explicit quote fields first, then invoice number.
     let estimateId = null;
@@ -262,23 +282,67 @@ export async function POST(request) {
       quote_number: quoteNumber,
     };
 
-    const { data, error } = await supabaseAdmin
-      .from(INVOICES)
-      .insert(toInsert)
-      .select("*")
-      .single();
+    // Retry-on-23505 only when the invoice number was auto-allocated.
+    // Caller-provided numbers do NOT retry: a unique violation there
+    // should bubble back to the caller as a 409 so they can pick a
+    // different number.
+    let insertedInvoice = null;
+    let lastInsertError = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const insertResult = await supabaseAdmin
+        .from(INVOICES)
+        .insert(toInsert)
+        .select("*")
+        .single();
 
-    if (error) {
-      logSupabaseError("[api/invoices][POST] Supabase insert error", error, {
+      if (!insertResult.error) {
+        insertedInvoice = insertResult.data;
+        lastInsertError = null;
+        break;
+      }
+
+      lastInsertError = insertResult.error;
+      const code = String(insertResult.error.code || "");
+      const msg = String(insertResult.error.message || "");
+      const isUniqueViolation =
+        code === "23505" || /duplicate key value/i.test(msg);
+
+      if (!isUniqueViolation || hasExplicitInvoiceNumber) break;
+
+      // Auto-allocated collision: recompute and try again. Don't
+      // mutate `toInsert` apart from the number — caller-visible
+      // shape stays identical.
+      invoiceNumber = await nextInvoiceNumber(tenantDbId);
+      toInsert.invoice_number = invoiceNumber;
+    }
+
+    if (lastInsertError) {
+      logSupabaseError("[api/invoices][POST] Supabase insert error", lastInsertError, {
         tenantDbId,
         userId,
         toInsert,
       });
-      throw new Error(error.message);
+      const code = String(lastInsertError.code || "");
+      const msg = String(lastInsertError.message || "");
+      const isUniqueViolation =
+        code === "23505" || /duplicate key value/i.test(msg);
+      if (isUniqueViolation && hasExplicitInvoiceNumber) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Invoice number "${invoiceNumber}" is already in use for this tenant.`,
+          }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw new Error(lastInsertError.message);
+    }
+    if (!insertedInvoice) {
+      throw new Error("Failed to allocate a unique invoice number");
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: serialize(data) }),
+      JSON.stringify({ success: true, data: serialize(insertedInvoice) }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },

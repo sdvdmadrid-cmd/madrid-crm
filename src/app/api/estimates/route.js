@@ -13,7 +13,12 @@ import {
   pickMaxEstimateSequence,
 } from "@/lib/estimate-number";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
+import {
+  serializeEstimateBase,
+  toNumber,
+} from "@/lib/estimate-serializer";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
+import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -39,40 +44,19 @@ function normalizeStatus(value, fallback = "draft") {
   return fallback;
 }
 
-function toNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
+/**
+ * Contractor-facing serializer. Delegates the canonical shape to
+ * serializeEstimateBase (shared with /api/estimates/[id] and the
+ * PDF / public routes) and layers on `publicLink` — which only the
+ * authenticated list/read surfaces need.
+ */
 function serializeEstimate(row) {
-  const parsedNotes = parseEstimateNotes(row.notes);
-  const services = Array.isArray(row.items) ? row.items : [];
-  const status = normalizeStatus(row.status);
+  const base = serializeEstimateBase(row);
   const publicLink =
-    isPublicEstimateStatus(status) && row.id ? buildPublicEstimateLink(row.id) : null;
-
-  return {
-    id: row.id,
-    _id: row.id,
-    tenantId: row.tenant_id || null,
-    publicLink,
-    userId: row.user_id || null,
-    createdBy: row.created_by || null,
-    clientName: row.client_name || "",
-    clientEmail: parsedNotes.clientEmail || "",
-    clientPhone: parsedNotes.clientPhone || "",
-    address: parsedNotes.address,
-    status: normalizeStatus(row.status),
-    services,
-    subtotal: toNumber(row.subtotal),
-    tax: toNumber(row.tax),
-    total: toNumber(row.total),
-    notes: parsedNotes.noteText,
-    audit: parsedNotes.audit,
-    estimateNumber: row.estimate_number || "",
-    createdAt: row.created_at || null,
-    updatedAt: row.updated_at || null,
-  };
+    isPublicEstimateStatus(base.status) && base.id
+      ? buildPublicEstimateLink(base.id)
+      : null;
+  return { ...base, publicLink };
 }
 
 /**
@@ -191,7 +175,10 @@ export async function GET(request) {
       data: (data || []).map(serializeEstimate),
     });
   } catch (error) {
-    console.error("[api/estimates][GET] error", error);
+    console.error("[api/estimates][GET] error", {
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
@@ -200,13 +187,21 @@ export async function POST(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
 
+  // Hoist diagnostic ids so the catch block can include them.
+  let logTenantId = null;
+  let logUserId = null;
+
   try {
     const { tenantDbId, userId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
+    logTenantId = tenantDbId || null;
+    logUserId = userId || null;
 
-    const body = await request.json();
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
     const nowIso = new Date().toISOString();
     const mapped = buildEstimateRow(body, nowIso);
     if (!mapped.client_name) {
@@ -300,7 +295,12 @@ export async function POST(request) {
 
     return jsonResponse({ success: true, data: { ...serialized, delivery } });
   } catch (error) {
-    console.error("[api/estimates][POST] error", error);
+    console.error("[api/estimates][POST] error", {
+      tenantId: logTenantId,
+      userId: logUserId,
+      error: error?.message || String(error),
+      stack: error?.stack,
+    });
     return jsonResponse({ success: false, error: error.message }, 500);
   }
 }
