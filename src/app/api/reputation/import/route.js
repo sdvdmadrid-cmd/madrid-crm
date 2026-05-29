@@ -55,11 +55,15 @@ export async function POST(request) {
         photo_url: String(item.photoUrl || "").trim().slice(0, 500),
         video_url: String(item.videoUrl || "").trim().slice(0, 500),
         service_type: String(item.serviceType || "").trim().slice(0, 120),
-        verified: item.verified === true || platform === "google",
+        verified: false,
         pinned: false,
         hidden: false,
-        show_on_website: item.showOnWebsite !== false,
-        metadata: { importedAt: now, importMode: body.mode || "paste" },
+        show_on_website: false,
+        metadata: {
+          importedAt: now,
+          importMode: body.mode || "paste",
+          syncSource: "manual",
+        },
         created_at: now,
         updated_at: now,
       }))

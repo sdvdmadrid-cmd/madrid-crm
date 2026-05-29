@@ -22,12 +22,19 @@ const PLATFORMS = [
 const SOCIAL_PLATFORMS = ["facebook", "instagram", "tiktok", "youtube", "google", "yelp"];
 
 export default function ReviewsReputationClient() {
-  const [tab, setTab] = useState("reviews");
+  const [tab, setTab] = useState("connect");
   const [reviews, setReviews] = useState([]);
   const [social, setSocial] = useState([]);
+  const [sources, setSources] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const [googlePlaceId, setGooglePlaceId] = useState("");
+  const [googleSearch, setGoogleSearch] = useState("");
+  const [placeSuggestions, setPlaceSuggestions] = useState([]);
+  const [yelpUrl, setYelpUrl] = useState("");
 
   const [importUrl, setImportUrl] = useState("");
   const [importText, setImportText] = useState("");
@@ -38,14 +45,20 @@ export default function ReviewsReputationClient() {
     setLoading(true);
     setError("");
     try {
-      const [revRes, socRes] = await Promise.all([
+      const [revRes, socRes, srcRes] = await Promise.all([
         apiFetch("/api/reputation/reviews"),
         apiFetch("/api/reputation/social"),
+        apiFetch("/api/reputation/sources"),
       ]);
       const revJson = await getJsonOrThrow(revRes, "Failed to load reviews");
       const socJson = await getJsonOrThrow(socRes, "Failed to load social");
+      const srcJson = srcRes.ok ? await srcRes.json() : { data: null };
       setReviews(Array.isArray(revJson.data) ? revJson.data : []);
       setSocial(Array.isArray(socJson.data) ? socJson.data : []);
+      const src = srcJson.data || null;
+      setSources(src);
+      setGooglePlaceId(src?.googlePlaceId || "");
+      setYelpUrl(src?.yelpProfileUrl || "");
     } catch (err) {
       setError(err.message || "Load failed");
     } finally {
@@ -57,6 +70,26 @@ export default function ReviewsReputationClient() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const q = googleSearch.trim();
+    if (q.length < 3) {
+      setPlaceSuggestions([]);
+      return undefined;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await apiFetch(
+          `/api/places/autocomplete?input=${encodeURIComponent(q)}&type=establishment`,
+        );
+        const json = await res.json();
+        setPlaceSuggestions(Array.isArray(json.predictions) ? json.predictions : []);
+      } catch {
+        setPlaceSuggestions([]);
+      }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [googleSearch]);
+
   const patchReview = async (id, patch) => {
     const res = await apiFetch(`/api/reputation/reviews/${id}`, {
       method: "PATCH",
@@ -65,6 +98,52 @@ export default function ReviewsReputationClient() {
     });
     await getJsonOrThrow(res, "Update failed");
     await load();
+  };
+
+  const saveSources = async () => {
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch("/api/reputation/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          googlePlaceId,
+          yelpProfileUrl: yelpUrl,
+        }),
+      });
+      await getJsonOrThrow(res, "Save failed");
+      setNotice("Connected sources saved.");
+      await load();
+    } catch (err) {
+      setError(err.message || "Save failed");
+    }
+  };
+
+  const runSync = async (platforms) => {
+    setSyncing(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch("/api/reputation/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platforms }),
+      });
+      const json = await getJsonOrThrow(res, "Sync failed");
+      const r = json.data?.results || {};
+      const parts = [];
+      if (r.google?.ok) parts.push(`Google: ${r.google.count || 0} reviews`);
+      else if (r.google?.error) parts.push(`Google: ${r.google.error}`);
+      if (r.yelp?.ok) parts.push(`Yelp: ${r.yelp.count || 0} reviews`);
+      else if (r.yelp?.error) parts.push(`Yelp: ${r.yelp.error}`);
+      setNotice(parts.length ? parts.join(" · ") : "Sync complete.");
+      await load();
+    } catch (err) {
+      setError(err.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleImport = async () => {
@@ -84,7 +163,9 @@ export default function ReviewsReputationClient() {
         }),
       });
       const json = await getJsonOrThrow(res, "Import failed");
-      setNotice(`Imported ${json.imported || 1} review(s).`);
+      setNotice(
+        `Saved ${json.imported || 1} review(s) for your records. Only API-synced reviews appear on your public website.`,
+      );
       setImportText("");
       setImportAuthor("");
       await load();
@@ -109,10 +190,15 @@ export default function ReviewsReputationClient() {
     }
   };
 
+  const syncedReviews = reviews.filter((r) => r.metadata?.syncSource === "api");
+  const lastSync = sources?.lastSyncAt
+    ? new Date(sources.lastSyncAt).toLocaleString()
+    : "Never";
+
   return (
     <PremiumPageShell
       title="Reviews & Reputation"
-      subtitle="Private FieldBase workspace — manage what homeowners see on your public website only."
+      subtitle="Sync real reviews from Google and Yelp. Only verified API reviews appear on your public website."
     >
       <PlatformZoneBanner zone="private" />
       {notice ? <div className={ws.noticeSuccess}>{notice}</div> : null}
@@ -121,10 +207,17 @@ export default function ReviewsReputationClient() {
       <div className={rep.tabs}>
         <button
           type="button"
+          className={tab === "connect" ? rep.tabActive : rep.tab}
+          onClick={() => setTab("connect")}
+        >
+          Connect & sync
+        </button>
+        <button
+          type="button"
           className={tab === "reviews" ? rep.tabActive : rep.tab}
           onClick={() => setTab("reviews")}
         >
-          Reviews
+          Reviews ({syncedReviews.length})
         </button>
         <button
           type="button"
@@ -137,13 +230,97 @@ export default function ReviewsReputationClient() {
 
       {loading ? <p className={rep.muted}>Loading…</p> : null}
 
+      {!loading && tab === "connect" ? (
+        <div className={rep.connectGrid}>
+          <div className={rep.importCard}>
+            <h3>Google Business</h3>
+            <p className={rep.muted}>
+              Search your business, select it, then sync. Reviews are pulled from Google Places
+              (public data, up to 5 recent reviews per sync).
+            </p>
+            <input
+              className={rep.input}
+              placeholder="Search business name + city"
+              value={googleSearch}
+              onChange={(e) => setGoogleSearch(e.target.value)}
+            />
+            {placeSuggestions.length > 0 ? (
+              <ul className={rep.suggestList}>
+                {placeSuggestions.map((item) => (
+                  <li key={item.placeId}>
+                    <button
+                      type="button"
+                      className={rep.suggestBtn}
+                      onClick={() => {
+                        setGooglePlaceId(item.placeId);
+                        setGoogleSearch(item.description || "");
+                        setPlaceSuggestions([]);
+                      }}
+                    >
+                      {item.description}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <input
+              className={rep.input}
+              placeholder="Google Place ID (ChIJ…)"
+              value={googlePlaceId}
+              onChange={(e) => setGooglePlaceId(e.target.value)}
+            />
+          </div>
+
+          <div className={rep.importCard}>
+            <h3>Yelp</h3>
+            <p className={rep.muted}>
+              Paste your Yelp business page URL (yelp.com/biz/…). Yelp provides up to 3 review
+              excerpts via their official API.
+            </p>
+            <input
+              className={rep.input}
+              placeholder="https://www.yelp.com/biz/your-business"
+              value={yelpUrl}
+              onChange={(e) => setYelpUrl(e.target.value)}
+            />
+          </div>
+
+          <div className={rep.syncActions}>
+            <button type="button" className={ws.btnSecondary} onClick={saveSources}>
+              Save connections
+            </button>
+            <button
+              type="button"
+              className={ws.btnPrimary}
+              disabled={syncing}
+              onClick={() => runSync([])}
+            >
+              {syncing ? "Syncing…" : "Sync all platforms"}
+            </button>
+          </div>
+          <p className={rep.muted}>
+            Last sync: {lastSync}
+            {sources?.lastSyncStatus?.google?.error
+              ? ` · Google: ${sources.lastSyncStatus.google.error}`
+              : null}
+            {sources?.lastSyncStatus?.yelp?.error
+              ? ` · Yelp: ${sources.lastSyncStatus.yelp.error}`
+              : null}
+          </p>
+          <p className={rep.muted}>
+            Requires <code>GOOGLE_PLACES_API_KEY</code> and <code>YELP_FUSION_API_KEY</code> on
+            the server. AI or template quotes from the website builder are never shown as reviews.
+          </p>
+        </div>
+      ) : null}
+
       {!loading && tab === "reviews" ? (
         <>
           <div className={rep.importCard}>
-            <h3>Import a review</h3>
+            <h3>Archive import (private only)</h3>
             <p className={rep.muted}>
-              Paste a public review link (Google, Yelp, Facebook, etc.) and the review text. Only
-              reviews you approve appear on your public site.
+              Paste a review for your own records. It will not appear on your public site unless
+              synced from Google or Yelp above.
             </p>
             <input
               className={rep.input}
@@ -178,23 +355,30 @@ export default function ReviewsReputationClient() {
               onChange={(e) => setImportText(e.target.value)}
             />
             <button type="button" className={ws.btnPrimary} onClick={handleImport}>
-              Import review
+              Save to archive
             </button>
           </div>
 
           <div className={rep.list}>
-            {reviews.length === 0 ? (
-              <p className={rep.muted}>No reviews yet. Import your first review above.</p>
+            {syncedReviews.length === 0 ? (
+              <p className={rep.muted}>
+                No synced reviews yet. Connect Google or Yelp and run Sync.
+              </p>
             ) : (
-              reviews.map((review) => (
+              syncedReviews.map((review) => (
                 <article key={review.id} className={rep.reviewCard}>
                   <div className={rep.reviewHead}>
                     <strong>{review.authorName}</strong>
                     <span className={rep.badge}>{review.platform}</span>
+                    <span className={rep.badgePin}>API verified</span>
                     {review.pinned ? <span className={rep.badgePin}>Pinned</span> : null}
-                    {review.hidden ? <span className={rep.badgeHide}>Hidden</span> : null}
                   </div>
                   <p className={rep.quote}>{review.reviewText}</p>
+                  {review.sourceUrl ? (
+                    <a href={review.sourceUrl} target="_blank" rel="noreferrer" className={rep.link}>
+                      View on {review.platform} →
+                    </a>
+                  ) : null}
                   <div className={rep.actions}>
                     <button
                       type="button"
@@ -211,20 +395,6 @@ export default function ReviewsReputationClient() {
                       }
                     >
                       {review.showOnWebsite ? "Hide from website" : "Show on website"}
-                    </button>
-                    <button
-                      type="button"
-                      className={ws.btnSecondary}
-                      onClick={() => patchReview(review.id, { hidden: !review.hidden })}
-                    >
-                      {review.hidden ? "Unhide" : "Mark spam/hidden"}
-                    </button>
-                    <button
-                      type="button"
-                      className={ws.btnSecondary}
-                      onClick={() => patchReview(review.id, { verified: true })}
-                    >
-                      Mark verified
                     </button>
                   </div>
                 </article>
