@@ -34,18 +34,31 @@ export default function ReviewsReputationClient() {
   const [importAuthor, setImportAuthor] = useState("");
   const [importRating, setImportRating] = useState("5");
 
+  // Review-request state (Paquete D)
+  const [requests, setRequests] = useState([]);
+  const [reqEmail, setReqEmail] = useState("");
+  const [reqPhone, setReqPhone] = useState("");
+  const [reqName, setReqName] = useState("");
+  const [reqMessage, setReqMessage] = useState("");
+  const [reqChannel, setReqChannel] = useState("email");
+  const [reqSending, setReqSending] = useState(false);
+  const [lastReviewLink, setLastReviewLink] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [revRes, socRes] = await Promise.all([
+      const [revRes, socRes, reqRes] = await Promise.all([
         apiFetch("/api/reputation/reviews"),
         apiFetch("/api/reputation/social"),
+        apiFetch("/api/reputation/request-review"),
       ]);
       const revJson = await getJsonOrThrow(revRes, "Failed to load reviews");
       const socJson = await getJsonOrThrow(socRes, "Failed to load social");
+      const reqJson = await reqRes.json().catch(() => ({}));
       setReviews(Array.isArray(revJson.data) ? revJson.data : []);
       setSocial(Array.isArray(socJson.data) ? socJson.data : []);
+      setRequests(Array.isArray(reqJson?.data) ? reqJson.data : []);
     } catch (err) {
       setError(err.message || "Load failed");
     } finally {
@@ -93,6 +106,75 @@ export default function ReviewsReputationClient() {
     }
   };
 
+  const sendReviewRequest = async () => {
+    if (reqSending) return;
+    setError("");
+    setNotice("");
+    setLastReviewLink("");
+    if (!reqEmail && !reqPhone) {
+      setError("Please enter an email or phone for the customer.");
+      return;
+    }
+    setReqSending(true);
+    try {
+      const res = await apiFetch("/api/reputation/request-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: reqName,
+          customerEmail: reqEmail,
+          customerPhone: reqPhone,
+          message: reqMessage,
+          channel: reqChannel,
+        }),
+      });
+      const payload = await getJsonOrThrow(res, "Could not send review request");
+      const link = payload?.data?.reviewLink || "";
+      setLastReviewLink(link);
+      const emailOk = payload?.data?.delivery?.email?.success === true;
+      const smsOk = payload?.data?.delivery?.sms?.success === true;
+      const sentVia = [emailOk ? "email" : "", smsOk ? "SMS" : ""].filter(Boolean).join(" + ");
+      setNotice(
+        sentVia
+          ? `Review request sent via ${sentVia}. You can also share the link manually below.`
+          : "Review request saved. Copy the link below to share with your customer.",
+      );
+      setReqEmail("");
+      setReqPhone("");
+      setReqName("");
+      setReqMessage("");
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not send review request");
+    } finally {
+      setReqSending(false);
+    }
+  };
+
+  const revokeRequest = async (id) => {
+    if (!window.confirm("Revoke this review link? The customer won't be able to submit anymore.")) {
+      return;
+    }
+    try {
+      await apiFetch(`/api/reputation/request-review?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      await load();
+    } catch (err) {
+      setError(err.message || "Could not revoke");
+    }
+  };
+
+  const copyReviewLink = async (link) => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setNotice("Link copied to clipboard.");
+    } catch {
+      setNotice(link);
+    }
+  };
+
   const saveSocial = async (platform, profileUrl) => {
     setError("");
     try {
@@ -125,6 +207,13 @@ export default function ReviewsReputationClient() {
           onClick={() => setTab("reviews")}
         >
           Reviews
+        </button>
+        <button
+          type="button"
+          className={tab === "requests" ? rep.tabActive : rep.tab}
+          onClick={() => setTab("requests")}
+        >
+          Request reviews
         </button>
         <button
           type="button"
@@ -229,6 +318,163 @@ export default function ReviewsReputationClient() {
                   </div>
                 </article>
               ))
+            )}
+          </div>
+        </>
+      ) : null}
+
+      {!loading && tab === "requests" ? (
+        <>
+          <div className={rep.importCard}>
+            <h3>Send a customer a review link</h3>
+            <p className={rep.muted}>
+              We&apos;ll email/SMS a one-tap link they can use to leave a star rating + comment.
+              Their review lands in your queue (already marked verified) and is added to your
+              public website unless you hide it.
+            </p>
+
+            <div className={rep.row}>
+              <input
+                className={rep.input}
+                placeholder="Customer name"
+                value={reqName}
+                onChange={(e) => setReqName(e.target.value)}
+              />
+              <select
+                className={rep.input}
+                value={reqChannel}
+                onChange={(e) => setReqChannel(e.target.value)}
+              >
+                <option value="email">Email</option>
+                <option value="sms">SMS</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
+            <div className={rep.row}>
+              <input
+                className={rep.input}
+                type="email"
+                placeholder="customer@email.com"
+                value={reqEmail}
+                onChange={(e) => setReqEmail(e.target.value)}
+              />
+              <input
+                className={rep.input}
+                type="tel"
+                placeholder="+1 555 123 4567"
+                value={reqPhone}
+                onChange={(e) => setReqPhone(e.target.value)}
+              />
+            </div>
+            <textarea
+              className={rep.textarea}
+              rows={3}
+              placeholder="Optional note for your customer (shown inside the email)…"
+              value={reqMessage}
+              onChange={(e) => setReqMessage(e.target.value)}
+            />
+            <button
+              type="button"
+              className={ws.btnPrimary}
+              onClick={sendReviewRequest}
+              disabled={reqSending}
+            >
+              {reqSending ? "Sending…" : "Send review request"}
+            </button>
+
+            {lastReviewLink ? (
+              <div style={{ marginTop: 12, fontSize: 13, color: "#cbd5f5" }}>
+                <div style={{ marginBottom: 6 }}>Share this link manually if needed:</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <code style={{
+                    flex: 1,
+                    padding: "6px 8px",
+                    background: "#0b1220",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    wordBreak: "break-all",
+                  }}>{lastReviewLink}</code>
+                  <button
+                    type="button"
+                    className={ws.btnSecondary}
+                    onClick={() => copyReviewLink(lastReviewLink)}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className={rep.list}>
+            <h3 style={{ marginBottom: 12 }}>Sent review requests</h3>
+            {requests.length === 0 ? (
+              <p className={rep.muted}>No review requests sent yet.</p>
+            ) : (
+              <table style={{ width: "100%", fontSize: 13, color: "#e2e8f0", borderCollapse: "collapse" }}>
+                <thead style={{ color: "#94a3b8", textAlign: "left", fontSize: 12 }}>
+                  <tr>
+                    <th style={{ padding: "8px 6px" }}>Customer</th>
+                    <th style={{ padding: "8px 6px" }}>Sent</th>
+                    <th style={{ padding: "8px 6px" }}>Status</th>
+                    <th style={{ padding: "8px 6px" }}>Rating</th>
+                    <th style={{ padding: "8px 6px" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((req) => (
+                    <tr key={req.id} style={{ borderTop: "1px solid rgba(148,163,184,0.12)" }}>
+                      <td style={{ padding: "8px 6px" }}>
+                        <div>{req.customerName || "—"}</div>
+                        <div style={{ color: "#64748b", fontSize: 11 }}>
+                          {req.customerEmail || req.customerPhone}
+                        </div>
+                      </td>
+                      <td style={{ padding: "8px 6px", color: "#94a3b8" }}>
+                        {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : "—"}
+                      </td>
+                      <td style={{ padding: "8px 6px" }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background:
+                              req.status === "responded"
+                                ? "rgba(34,197,94,0.2)"
+                                : req.status === "revoked"
+                                  ? "rgba(248,113,113,0.2)"
+                                  : "rgba(96,165,250,0.18)",
+                            color:
+                              req.status === "responded"
+                                ? "#86efac"
+                                : req.status === "revoked"
+                                  ? "#fca5a5"
+                                  : "#93c5fd",
+                          }}
+                        >
+                          {req.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: "8px 6px" }}>
+                        {req.rating != null ? `★ ${Number(req.rating).toFixed(1)}` : "—"}
+                      </td>
+                      <td style={{ padding: "8px 6px", textAlign: "right" }}>
+                        {req.status === "sent" ? (
+                          <button
+                            type="button"
+                            className={ws.btnSecondary}
+                            onClick={() => revokeRequest(req.id)}
+                            style={{ fontSize: 11, padding: "3px 8px" }}
+                          >
+                            Revoke
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </>
