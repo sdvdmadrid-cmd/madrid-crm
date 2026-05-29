@@ -37,12 +37,21 @@ export const metadata = {
     title: "FieldBase — All-in-one platform for home service contractors",
     description:
       "Win leads, send estimates, run jobs, and get paid. FieldBase gives contractors a public website, lead inbox, and full operations in one place.",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "FieldBase — contractor operating system",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "FieldBase — All-in-one platform for home service contractors",
     description:
       "Win leads, send estimates, run jobs, and get paid. FieldBase gives contractors a public website, lead inbox, and full operations in one place.",
+    images: ["/og-default.png"],
   },
   robots: {
     index: true,

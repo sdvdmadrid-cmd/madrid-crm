@@ -21,6 +21,7 @@ import {
   resolvePostLoginPath,
 } from "@/lib/auth-redirect";
 import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
+import { useStoredUiLanguage } from "@/lib/ui-language";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -131,6 +132,7 @@ export default function AuthShell({ children }) {
   }, [isDedicatedLoginPage]);
 
   const { t, i18n } = useTranslation();
+  const [uiLanguage, setUiLanguage] = useStoredUiLanguage();
   const UI_LANGUAGE_OPTIONS = [
     { value: "en", label: "🇺🇸 English" },
     { value: "es", label: "🇲🇽 Español" },
@@ -1000,9 +1002,10 @@ export default function AuthShell({ children }) {
       setLoginForm(initialLogin);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("user-industry");
-        // Redirect to home page after logout
-        router.push("/");
+        window.dispatchEvent(new CustomEvent("auth:logout"));
       }
+      router.replace("/");
+      router.refresh();
     } finally {
       setSubmitting(false);
     }
@@ -1751,15 +1754,24 @@ export default function AuthShell({ children }) {
                 marginBottom: 4,
               }}
             >
-              <select
-                value={i18n.language?.split("-")[0]}
-                onChange={(e) => {
-                  const lang = e.target.value;
-                  i18n.changeLanguage(lang);
-                  if (typeof window !== "undefined") {
-                    window.localStorage.setItem("ui-language", lang);
-                  }
+              <label
+                htmlFor="ui-language-select"
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#64748b",
+                  marginBottom: 6,
+                  paddingLeft: 2,
                 }}
+              >
+                {t("language")}
+              </label>
+              <select
+                id="ui-language-select"
+                value={uiLanguage}
+                onChange={(e) => setUiLanguage(e.target.value)}
+                aria-label={t("language")}
                 style={{
                   width: "100%",
                   padding: "7px 10px",
@@ -1782,6 +1794,17 @@ export default function AuthShell({ children }) {
                   </option>
                 ))}
               </select>
+              <p
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: 10,
+                  lineHeight: 1.35,
+                  color: "#64748b",
+                  paddingLeft: 2,
+                }}
+              >
+                {t("languageDefaultHint")}
+              </p>
             </div>
             <button
               type="button"

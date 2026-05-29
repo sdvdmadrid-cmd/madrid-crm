@@ -13,7 +13,7 @@ import { suggestColumnMapping } from "../../src/lib/import-engine/providers/inde
  * End-to-end pipeline test (browser parse → map → validate → classify)
  * without hitting the database.
  */
-test("client import pipeline: Jobber-style CSV through preview classification", () => {
+test("client import pipeline: split-name CRM CSV through preview classification", () => {
   const csv = [
     "First Name,Last Name,Email,Mobile Phone,Street 1,City,State,ZIP",
     "Alice,Smith,alice@example.com,312-555-0100,123 Main St,Chicago,IL,60601",
@@ -24,7 +24,7 @@ test("client import pipeline: Jobber-style CSV through preview classification", 
   const parsed = parseCsvText(csv);
   assert.equal(parsed.rows.length, 3);
 
-  const mapping = suggestColumnMapping(parsed.headers, "jobber");
+  const mapping = suggestColumnMapping(parsed.headers, "standard");
   assert.ok(mapping.firstName);
   assert.ok(mapping.email);
 
@@ -54,5 +54,8 @@ test("client import pipeline: Jobber-style CSV through preview classification", 
   assert.equal(preview[0].status, "ready");
   assert.equal(preview[0].payload.name, "Alice Smith");
   assert.equal(preview[1].status, "ready");
-  assert.equal(preview[2].status, "invalid");
+  assert.equal(preview[2].status, "ready");
+  assert.equal(preview[2].payload.name, "Bad");
+  assert.equal(preview[2].payload.email, "");
+  assert.equal(preview[2].payload.phone, "");
 });

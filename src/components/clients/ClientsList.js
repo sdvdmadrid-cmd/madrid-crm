@@ -1,31 +1,20 @@
 "use client";
 
-function IconPencil() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 113 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-    </svg>
-  );
-}
-
-function IconTrash() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  );
-}
+import { useRouter } from "next/navigation";
+import { formatClientCardLines } from "@/lib/client-display";
+import ClientCardActions from "./ClientCardActions";
+import list from "./clients-list.module.css";
 
 function formatCreatedAt(value) {
-  if (!value) return "-";
+  if (!value) return "";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+  if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString();
+}
+
+function ContactLine({ value }) {
+  if (!value) return null;
+  return <p className={list.metaLine}>{value}</p>;
 }
 
 export default function ClientsList({
@@ -38,9 +27,19 @@ export default function ClientsList({
   onDelete,
   canDelete,
 }) {
+  const router = useRouter();
+
+  const goEstimate = (client) => {
+    if (!client?.id) return;
+    const params = new URLSearchParams({ clientId: client.id });
+    router.push(`/estimate-builder?${params.toString()}`);
+  };
+
   return (
     <section className="cf-card" style={{ padding: 22 }}>
-      <h2 style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 800 }}>{t("clients.listTitle")}</h2>
+      <h2 style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 800 }}>
+        {t("clients.listTitle")}
+      </h2>
 
       {loading ? <p className="cf-muted">{t("clients.loading")}</p> : null}
 
@@ -51,95 +50,80 @@ export default function ClientsList({
         </div>
       ) : null}
 
-      <div style={{ display: "grid", gap: 12, marginTop: loading ? 12 : 0 }}>
+      <div className={list.grid}>
         {clients.map((client) => {
           const isHighlighted = highlightedId && client.id === highlightedId;
-          return (
-          <article
-            key={client.id}
-            id={`client-card-${client.id}`}
-            className="cf-panel cf-client-card"
-            role="button"
-            tabIndex={0}
-            aria-label={t("clients.actions.viewFullDetails")}
-            onClick={() => onSelect?.(client)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onSelect?.(client);
-              }
-            }}
-            style={{
-              padding: 16,
-              cursor: "pointer",
-              ...(isHighlighted
-                ? {
-                    borderColor: "rgba(56, 189, 248, 0.45)",
-                    boxShadow: "0 0 0 1px rgba(14, 165, 233, 0.25)",
-                  }
-                : {}),
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <h3>{client.name || "-"}</h3>
-                <p className="cf-muted" style={{ margin: "6px 0 0" }}>
-                  {client.company || "-"}
-                </p>
-                <p className="cf-muted" style={{ margin: "4px 0 0" }}>
-                  {client.phone || "-"}
-                </p>
-                <p className="cf-muted" style={{ margin: "4px 0 0" }}>
-                  {client.email || "-"}
-                </p>
-                <p className="cf-muted" style={{ margin: "4px 0 0" }}>
-                  {client.address || "-"}
-                </p>
-                {client.notes ? (
-                  <p className="cf-muted" style={{ margin: "8px 0 0", fontSize: 13 }}>
-                    {client.notes}
-                  </p>
-                ) : null}
-                <p className="cf-muted" style={{ margin: "8px 0 0", fontSize: 12, opacity: 0.85 }}>
-                  {t("clients.labels.createdAt")}: {formatCreatedAt(client.createdAt || client.created_at)}
-                </p>
-              </div>
+          const lines = formatClientCardLines(client);
+          const created = formatCreatedAt(
+            client.createdAt || client.created_at,
+          );
 
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onEdit(client);
-                  }}
-                  className="cf-action-btn"
-                >
-                  <IconPencil />
-                  {t("clients.buttons.edit")}
-                </button>
-                {canDelete ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onDelete(client.id);
-                    }}
-                    className="cf-action-btn cf-action-btn--danger"
-                  >
-                    <IconTrash />
-                    {t("clients.buttons.delete")}
-                  </button>
-                ) : null}
+          return (
+            <article
+              key={client.id}
+              id={`client-card-${client.id}`}
+              className={`cf-panel cf-client-card ${list.card}`}
+              role={onSelect ? "button" : undefined}
+              tabIndex={onSelect ? 0 : undefined}
+              onClick={onSelect ? () => onSelect(client) : undefined}
+              onKeyDown={
+                onSelect
+                  ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelect(client);
+                      }
+                    }
+                  : undefined
+              }
+              data-highlighted={isHighlighted ? "true" : undefined}
+            >
+              <div className={list.cardRow}>
+                <div className={list.cardBody}>
+                  <h3 className={list.name}>{lines.name || "—"}</h3>
+                  {lines.company ? (
+                    <p className={list.company}>{lines.company}</p>
+                  ) : null}
+
+                  <div className={list.contactBlock}>
+                    <ContactLine value={lines.phone} />
+                    <ContactLine value={lines.email} />
+                    {lines.street ? (
+                      <p className={list.street}>{lines.street}</p>
+                    ) : null}
+                    {lines.locality ? (
+                      <p className={list.locality}>{lines.locality}</p>
+                    ) : null}
+                    {lines.missingStreet ? (
+                      <p className={list.missingHint}>
+                        {t("clients.list.missingStreet")}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {lines.notes ? (
+                    <p className={list.notes}>{lines.notes}</p>
+                  ) : null}
+
+                  {created ? (
+                    <p className={list.created}>
+                      {t("clients.labels.createdAt")}: {created}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className={list.actions}>
+                  <ClientCardActions
+                    client={client}
+                    canDelete={canDelete}
+                    onView={onSelect}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onEstimate={goEstimate}
+                  />
+                </div>
               </div>
-            </div>
-          </article>
+            </article>
           );
         })}
       </div>

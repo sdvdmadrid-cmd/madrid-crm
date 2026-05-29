@@ -1,6 +1,7 @@
 ﻿import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { Suspense } from "react";
 import ClientsPageClient from "./ClientsPageClient";
 
 const SESSION_COOKIE_NAME =
@@ -17,5 +18,9 @@ export default async function ClientsPage() {
     redirect("/login?next=/clients");
   }
 
-  return <ClientsPageClient />;
+  return (
+    <Suspense fallback={null}>
+      <ClientsPageClient />
+    </Suspense>
+  );
 }

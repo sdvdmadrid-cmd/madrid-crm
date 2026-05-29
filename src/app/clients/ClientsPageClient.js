@@ -1,32 +1,35 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
+import { splitStreetFromLocality } from "@/lib/client-display";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientCsvActionsMenu from "@/components/clients/ClientCsvActionsMenu";
-import ClientDetailsPanel from "@/components/clients/ClientDetailsPanel";
 import ClientCsvImportWizard from "@/components/clients/ClientCsvImportWizard";
 import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
+import ClientDetailsPanel from "@/components/clients/ClientDetailsPanel";
 import ClientsList from "@/components/clients/ClientsList";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import ws from "@/styles/workspace-dark.module.css";
 
 export default function ClientsPageClient() {
   const { t } = useTranslation();
-  const router = useRouter();
   const { capabilities } = useCurrentUserAccess();
   const [clients, setClients] = useState([]);
   const [form, setForm] = useState(EMPTY_CLIENT_FORM);
   const [selectedId, setSelectedId] = useState("");
+  const [highlightedClientId, setHighlightedClientId] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [importOpen, setImportOpen] = useState(false);
-  const [details, setDetails] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
+  const [clientDetails, setClientDetails] = useState(null);
+  const [detailsWarnings, setDetailsWarnings] = useState([]);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -34,14 +37,7 @@ export default function ClientsPageClient() {
     try {
       const res = await apiFetch("/api/clients");
       const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
-      const rows = Array.isArray(data) ? data : [];
-      setClients(rows);
-      setDetails((prev) => {
-        if (!prev?.client?.id) return prev;
-        const updated = rows.find((c) => c.id === prev.client.id);
-        if (!updated) return prev;
-        return { ...prev, client: updated };
-      });
+      setClients(data);
     } catch (err) {
 
       setError(err.message || t("clients.errors.load"));
@@ -57,26 +53,8 @@ export default function ClientsPageClient() {
   const resetForm = () => {
     setForm(EMPTY_CLIENT_FORM);
     setSelectedId("");
+    setError("");
   };
-
-  const loadClientDetails = useCallback(
-    async (clientId) => {
-      if (!clientId) return;
-      setDetailsLoading(true);
-      try {
-        const res = await apiFetch(`/api/clients/${clientId}/details`, {
-          cache: "no-store",
-        });
-        const json = await getJsonOrThrow(res, t("clients.errors.details"));
-        setDetails(json.data || null);
-      } catch (err) {
-        setError(err.message || t("clients.errors.details"));
-      } finally {
-        setDetailsLoading(false);
-      }
-    },
-    [t],
-  );
 
   const saveClient = async () => {
     const name = String(form.name || "").trim();
@@ -144,16 +122,23 @@ export default function ClientsPageClient() {
   };
 
   const editClient = (client) => {
+    const split = splitStreetFromLocality(
+      client.address,
+      client.city,
+      client.state,
+      client.zip || client.zipCode,
+    );
+
     setForm({
       id: client.id,
       name: client.name || "",
       company: client.company || client.companyName || "",
       email: client.email || "",
       phone: client.phone || "",
-      address: client.address || "",
-      city: client.city || "",
-      state: client.state || "",
-      zip: client.zip || "",
+      address: split.street,
+      city: split.city || "",
+      state: split.state || "",
+      zip: split.zip || "",
       latitude:
         typeof client.latitude === "number" ? client.latitude : null,
       longitude:
@@ -168,19 +153,98 @@ export default function ClientsPageClient() {
       billingZip: client.billing_zip || "",
       billingSameAsService: client.billing_same_as_service !== false,
     });
+    setHighlightedClientId(client.id);
     setSelectedId(client.id);
-    setDetails((prev) => (prev ? { ...prev, client } : prev));
+    setError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const selectClient = (client) => {
-    editClient(client);
+  const loadClientDetails = useCallback(
+    async (clientId) => {
+      if (!clientId) return;
+      setDetailsLoading(true);
+      setDetailsError("");
+      try {
+        const res = await apiFetch(`/api/clients/${clientId}/details`);
+        const payload = await getJsonOrThrow(res, t("clients.details.errors.load"));
+        setClientDetails(payload.data || null);
+        setDetailsWarnings(Array.isArray(payload.warnings) ? payload.warnings : []);
+      } catch (err) {
+        setClientDetails(null);
+        setDetailsWarnings([]);
+        setDetailsError(err.message || t("clients.details.errors.loadFallback"));
+      } finally {
+        setDetailsLoading(false);
+      }
+    },
+    [t],
+  );
+
+  const openClientDetails = (client) => {
+    if (!client?.id) return;
+    setHighlightedClientId(client.id);
+    setDetailsOpen(true);
+    setError("");
     loadClientDetails(client.id);
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`client-card-${client.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
+  };
+
+  const selectClient = (client) => {
+    openClientDetails(client);
+  };
+
+  const removeDuplicateClients = async () => {
+    setError("");
+    try {
+      const previewRes = await apiFetch("/api/clients/dedupe", {
+        cache: "no-store",
+      });
+      const previewJson = await getJsonOrThrow(
+        previewRes,
+        t("clients.dedupe.errors.preview"),
+      );
+      const preview = previewJson.data || {};
+      const toRemove = preview.duplicatesToRemove || 0;
+
+      if (!toRemove) {
+        window.alert(t("clients.dedupe.noneFound"));
+        return;
+      }
+
+      const confirmed = window.confirm(
+        t("clients.dedupe.confirm", {
+          count: toRemove,
+          groups: preview.duplicateGroups || 0,
+        }),
+      );
+      if (!confirmed) return;
+
+      const res = await apiFetch("/api/clients/dedupe", { method: "POST" });
+      const json = await getJsonOrThrow(res, t("clients.dedupe.errors.failed"));
+      const result = json.data || {};
+
+      await fetchClients();
+      resetForm();
+      setDetailsOpen(false);
+      setHighlightedClientId("");
+
+      if (result.errors?.length) {
+        setError(
+          t("clients.dedupe.partial", {
+            removed: result.duplicatesRemoved || 0,
+            failed: result.errors.length,
+          }),
+        );
+      } else {
+        window.alert(
+          t("clients.dedupe.done", {
+            removed: result.duplicatesRemoved || 0,
+            groups: result.groupsProcessed || 0,
+          }),
+        );
+      }
+    } catch (err) {
+      setError(err.message || t("clients.dedupe.errors.failed"));
+    }
   };
 
   const deleteClient = async (id) => {
@@ -196,7 +260,8 @@ export default function ClientsPageClient() {
       setClients((prev) => prev.filter((client) => client.id !== id));
       if (selectedId === id) {
         resetForm();
-        setDetails(null);
+        setDetailsOpen(false);
+        setClientDetails(null);
       }
     } catch (err) {
 
@@ -209,7 +274,11 @@ export default function ClientsPageClient() {
       title={t("clients.title")}
       subtitle={t("clients.description")}
       actions={
-        <ClientCsvActionsMenu onImport={() => setImportOpen(true)} />
+        <ClientCsvActionsMenu
+          onImport={() => setImportOpen(true)}
+          onRemoveDuplicates={removeDuplicateClients}
+          canRemoveDuplicates={capabilities.canDeleteRecords}
+        />
       }
     >
       <ClientCsvImportWizard
@@ -222,23 +291,6 @@ export default function ClientsPageClient() {
       <section style={{ marginTop: 20, maxWidth: 720 }}>
         <ClientSearchAutocomplete onSelect={selectClient} />
       </section>
-
-      {selectedId ? (
-        <ClientDetailsPanel
-          t={t}
-          loading={detailsLoading}
-          details={details}
-          onNewEstimate={() => router.push(`/estimates/new?clientId=${encodeURIComponent(selectedId)}`)}
-          onViewEstimates={() => router.push(`/estimates?clientId=${encodeURIComponent(selectedId)}`)}
-          onCreateInvoice={() => router.push(`/invoices?clientId=${encodeURIComponent(selectedId)}&create=1`)}
-          onViewInvoices={() => router.push(`/invoices?clientId=${encodeURIComponent(selectedId)}`)}
-          onEdit={() => {
-            const client = clients.find((c) => c.id === selectedId);
-            if (client) editClient(client);
-          }}
-          onDelete={() => deleteClient(selectedId)}
-        />
-      ) : null}
 
       <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
         <ClientForm
@@ -256,12 +308,33 @@ export default function ClientsPageClient() {
           clients={clients}
           loading={loading}
           highlightedId={selectedId}
-          onSelect={selectClient}
+          onSelect={openClientDetails}
           onEdit={editClient}
           onDelete={deleteClient}
           canDelete={capabilities.canDeleteRecords}
         />
       </div>
+
+      <ClientDetailsPanel
+        t={t}
+        open={detailsOpen}
+        loading={detailsLoading}
+        error={detailsError}
+        details={clientDetails}
+        warnings={detailsWarnings}
+        onClose={() => {
+          setDetailsOpen(false);
+          setDetailsError("");
+          setHighlightedClientId("");
+        }}
+        onEdit={(client) => {
+          editClient(client);
+          setDetailsOpen(false);
+        }}
+        onDelete={deleteClient}
+        canDelete={capabilities.canDeleteRecords}
+      />
+
     </PremiumPageShell>
   );
 }

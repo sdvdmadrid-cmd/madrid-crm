@@ -1,7 +1,6 @@
 /**
  * Canonical client import field definitions — shared by UI mapping,
- * validation, and the server import engine. Additional CRM providers
- * plug in via import-engine/providers/*.
+ * validation, and the server import engine.
  */
 
 export const CLIENT_IMPORT_FIELDS = [
@@ -31,14 +30,20 @@ export const CLIENT_IMPORT_FIELDS = [
   },
   {
     key: "phone",
-    label: "Phone",
+    label: "Phone (primary)",
     required: false,
-    description: "Used for duplicate detection when email is empty",
+    description: "Main phone; mobile/home/work columns are used if this is empty",
   },
   {
     key: "address",
-    label: "Street address",
+    label: "Street address (line 1)",
     required: false,
+  },
+  {
+    key: "addressLine2",
+    label: "Street address (line 2)",
+    required: false,
+    description: "Unit, suite, apt, or second line",
   },
   {
     key: "city",
@@ -61,12 +66,41 @@ export const CLIENT_IMPORT_FIELDS = [
     required: false,
   },
   {
-    key: "notes",
-    label: "Notes",
+    key: "billingAddress",
+    label: "Billing street",
     required: false,
+  },
+  {
+    key: "billingCity",
+    label: "Billing city",
+    required: false,
+  },
+  {
+    key: "billingState",
+    label: "Billing state / province",
+    required: false,
+  },
+  {
+    key: "billingZip",
+    label: "Billing ZIP / postal",
+    required: false,
+  },
+  {
+    key: "notes",
+    label: "Notes / tags",
+    required: false,
+  },
+  {
+    key: "leadStatus",
+    label: "Lead status",
+    required: false,
+    description: "Optional pipeline status from your export",
   },
 ];
 
 export const CLIENT_IMPORT_FIELD_KEYS = CLIENT_IMPORT_FIELDS.map((f) => f.key);
 
 export const DUPLICATE_MODES = ["skip", "update", "create"];
+
+/** Recommended when migrating a full client list from another app. */
+export const DEFAULT_DUPLICATE_MODE = "update";

@@ -6,7 +6,10 @@ import {
   IMPORT_PREVIEW_LIMIT,
   previewClientImport,
 } from "@/lib/client-import-service";
-import { DUPLICATE_MODES } from "@/lib/import-engine/client-fields";
+import {
+  DEFAULT_DUPLICATE_MODE,
+  DUPLICATE_MODES,
+} from "@/lib/import-engine/client-fields";
 import { parseJsonBody } from "@/lib/parse-json-body";
 
 export const runtime = "nodejs";
@@ -50,7 +53,7 @@ export async function POST(request) {
 
     const duplicateMode = DUPLICATE_MODES.includes(body.duplicateMode)
       ? body.duplicateMode
-      : "skip";
+      : DEFAULT_DUPLICATE_MODE;
 
     const limited = records.slice(0, IMPORT_PREVIEW_LIMIT);
     const { preview, summary } = await previewClientImport({

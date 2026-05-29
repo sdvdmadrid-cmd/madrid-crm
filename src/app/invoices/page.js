@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import ClientPickerField from "@/components/clients/ClientPickerField";
 import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
 import styles from "./invoices.module.css";
 import UniversalShareButton from "@/components/UniversalShareButton";
@@ -11,6 +12,7 @@ import "@/i18n";
 
 const initialInvoice = {
   invoiceNumber: "",
+  clientId: "",
   clientName: "",
   invoiceTitle: "",
   quoteNumber: "",
@@ -243,6 +245,26 @@ export default function InvoicesPage() {
     fetchInvoices();
   }, [fetchInvoices]);
 
+  useEffect(() => {
+    const clientId = String(searchParams.get("clientId") || "").trim();
+    if (!clientId) return;
+
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/clients/${clientId}`);
+        const client = await getJsonOrThrow(res, t("invoices.errors.fetch"));
+        if (!client?.name) return;
+        setForm((prev) => ({
+          ...prev,
+          clientId,
+          clientName: client.name || prev.clientName,
+        }));
+      } catch {
+        // Optional prefill — ignore if client fetch fails
+      }
+    })();
+  }, [searchParams, t]);
+
   const [paymentNoticeTone, setPaymentNoticeTone] = useState("success");
 
   useEffect(() => {
@@ -324,6 +346,7 @@ export default function InvoicesPage() {
   const editInvoice = (invoice) => {
     setForm({
       invoiceNumber: invoice.invoiceNumber || "",
+      clientId: invoice.clientId || "",
       clientName: invoice.clientName || "",
       invoiceTitle: invoice.invoiceTitle || "",
       quoteNumber: invoice.quoteNumber || "",
@@ -601,13 +624,20 @@ export default function InvoicesPage() {
                 }
                 className={styles.field}
               />
-              <input
+              <ClientPickerField
+                className={styles.clientPicker}
+                variant="dark"
+                clientId={form.clientId || ""}
+                displayValue={form.clientName}
+                showHint={false}
                 placeholder={t("invoices.placeholders.client")}
-                value={form.clientName}
-                onChange={(e) =>
-                  setForm({ ...form, clientName: e.target.value })
+                onChange={({ clientId, clientName, displayValue }) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    clientId: clientId || "",
+                    clientName: clientName || displayValue || "",
+                  }))
                 }
-                className={styles.field}
               />
               <input
                 placeholder={t("invoices.placeholders.invoiceTitle")}

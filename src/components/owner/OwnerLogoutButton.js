@@ -41,7 +41,7 @@ export default function OwnerLogoutButton({ variant = "sidebar" }) {
     }
 
     clearOwnerClientState();
-    router.replace("/login");
+    router.replace("/");
     router.refresh();
   }
 

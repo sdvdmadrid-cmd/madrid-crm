@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { resolveEstimateLinkedNumber } from "@/lib/estimate-builder-linking";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { appendDisclaimer } from "@/lib/legal";
 import { enforceLegalAcceptance } from "@/lib/legal-enforcement";
@@ -137,9 +138,7 @@ export async function POST(request, { params }) {
     }
 
     const estimateQuoteId = String(estimate.quote_id || "").trim();
-    const estimateQuoteNumber = String(
-      estimate.quote_number || estimate.quoteNumber || "",
-    ).trim();
+    const estimateQuoteNumber = resolveEstimateLinkedNumber(estimate);
 
     let existingQuote = null;
     if (estimateQuoteId) {
@@ -334,7 +333,7 @@ export async function POST(request, { params }) {
 
     const nowIso = new Date().toISOString();
     const baseNumber =
-      normalizeBaseNumber(estimate.quote_number || estimate.quoteNumber) ||
+      resolveEstimateLinkedNumber(estimate) ||
       (await nextQuoteNumber(tenantDbId));
     const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
     const quoteUrl = buildQuoteUrl(request, quoteToken);

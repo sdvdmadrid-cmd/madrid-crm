@@ -1,6 +1,11 @@
 {
+  "publicShell": {
+    "logIn": "Log in",
+    "createAccount": "Create account"
+  },
   "appSubtitle": "Complete contractor management system for clients jobs invoices and contracts.",
   "language": "Language",
+  "languageDefaultHint": "Default is English. Choose Español or Polski only if you prefer.",
   "loading": "Loading data...",
   "tabs": {
     "dashboard": "Dashboard",
@@ -530,7 +535,7 @@
       "kickerSoon": "Step 1",
       "title": "Turn on card payments in 5 minutes",
       "titleSoon": "Set up how clients pay you",
-      "body": "Easier than Jobber: one invoice link, secure checkout, money to your business.",
+      "body": "One invoice link, secure checkout, and payouts straight to your business.",
       "bodySoon": "Connect Stripe once. Clients pay through FieldBase; you receive the deposit.",
       "cta": "Connect Stripe now",
       "ctaSoon": "Start setup",
@@ -833,12 +838,31 @@
     "formTitleNew": "New client",
     "formTitleEdit": "Edit client",
     "listTitle": "Client list",
+    "list": {
+      "missingStreet": "Street number missing — re-import your original CSV with Update existing."
+    },
+    "cardMenu": {
+      "label": "Client actions",
+      "view": "View full profile",
+      "edit": "Edit client",
+      "estimate": "New estimate",
+      "delete": "Delete client"
+    },
+    "incompleteBanner": {
+      "title": "Many clients are missing street addresses",
+      "body": "{{count}} clients only have city/state saved. Export from FieldBase cannot add streets that were never imported. Use your original app export CSV and Import with Update existing.",
+      "action": "Import CSV to fix addresses"
+    },
+    "stickySave": {
+      "new": "New client draft",
+      "editing": "Editing {{name}}"
+    },
     "placeholders": {
       "name": "Name",
       "company": "Company",
       "email": "Email",
       "phone": "Phone",
-      "address": "Address",
+      "address": "Street address",
       "city": "City",
       "state": "State",
       "zip": "ZIP",
@@ -888,9 +912,58 @@
     "messages": {
       "confirmDelete": "Delete this client?"
     },
+    "details": {
+      "title": "Client profile",
+      "loadingName": "Loading…",
+      "loading": "Loading client details…",
+      "close": "Close",
+      "quickActions": "Quick actions",
+      "newEstimate": "New estimate",
+      "newJob": "New job",
+      "newInvoice": "New invoice",
+      "createEstimate": "Create estimate",
+      "createQuote": "Create quote",
+      "createInvoice": "Create invoice",
+      "createJob": "Create job",
+      "viewAllEstimates": "All estimates",
+      "viewAllQuotes": "All quotes",
+      "viewAllInvoices": "All invoices",
+      "viewAllJobs": "All jobs",
+      "openInvoices": "Open invoices",
+      "showMore": "View all {{count}} items",
+      "estimates": "Estimates",
+      "quotes": "Quotes",
+      "invoices": "Invoices",
+      "jobs": "Jobs",
+      "properties": "Properties",
+      "property": "Property",
+      "primaryProperty": "Primary",
+      "allEmails": "All emails",
+      "allPhones": "All phones",
+      "noteHistory": "Notes",
+      "visits": "Visit history",
+      "requests": "Requests",
+      "noEstimates": "No estimates linked to this client yet.",
+      "noQuotes": "No quotes linked to this client yet.",
+      "noInvoices": "No invoices linked to this client yet.",
+      "noJobs": "No jobs linked to this client yet.",
+      "noProperties": "No properties on file.",
+      "noNoteHistory": "No additional notes.",
+      "noVisits": "No visits on file.",
+      "noRequests": "No requests on file.",
+      "viewEstimate": "Open in Estimate Builder",
+      "viewInvoices": "Invoices",
+      "viewJob": "View job",
+      "errors": {
+        "load": "Unable to load client details",
+        "loadFallback": "Could not load client details"
+      }
+    },
     "search": {
       "label": "Search clients",
       "placeholder": "Search by name, company, phone, email, or address…",
+      "placeholderForm": "Type client name or phone…",
+      "linkedClient": "Linked to saved client",
       "hint": "Type to find a client — use ↑↓ and Enter to select quickly.",
       "searching": "Searching…",
       "noResults": "No matching clients",
@@ -902,9 +975,22 @@
     "csvMenu": {
       "label": "Client import and export options"
     },
+    "dedupe": {
+      "menuLabel": "Remove duplicate clients",
+      "menuHint": "Same name, phone, or email — keeps the best record",
+      "removing": "Removing duplicates…",
+      "noneFound": "No duplicate clients found. Each client has a unique name, phone, and email.",
+      "confirm": "Remove {{count}} duplicate client records in {{groups}} groups? The best record is kept (most complete address and contact info). Jobs and invoices are moved to the kept client. This cannot be undone.",
+      "done": "Removed {{removed}} duplicate clients across {{groups}} groups.",
+      "partial": "Removed {{removed}} duplicates, but {{failed}} groups could not be merged.",
+      "errors": {
+        "preview": "Could not scan for duplicates",
+        "failed": "Could not remove duplicate clients"
+      }
+    },
     "export": {
       "menuLabel": "Export clients",
-      "menuHint": "Download CSV compatible with Jobber import",
+      "menuHint": "Full client list with addresses, billing, and notes",
       "exporting": "Exporting…",
       "errors": {
         "failed": "Could not export clients"
@@ -913,25 +999,38 @@
     "import": {
       "open": "Import CSV",
       "menuLabel": "Import clients",
-      "menuHint": "Upload CSV from Jobber or another CRM",
+      "menuHint": "Bring in your full client list from any app",
       "title": "Import clients from CSV",
-      "subtitle": "Migrate customers from any CRM or spreadsheet. Your data stays in your workspace only.",
-      "providerLabel": "Smart mapping is enabled for common CSV formats.",
+      "subtitle": "Move your complete client list from Housecall Pro, ServiceTitan, a spreadsheet, or any CRM. FieldBase auto-maps common column names.",
+      "providerLabel": "We detect common export layouts automatically. You can adjust any column mapping before importing.",
       "chooseFile": "Choose CSV file",
       "uploadHint": "UTF-8 CSV up to 5 MB and 10,000 rows. Quoted fields and commas are supported.",
       "mapHint": "{{count}} rows detected. Map each FieldBase field to a column from your file.",
+      "mapBillingStreetWarning": "Street is mapped to a Billing column — change it to Address, Service Street 1, or Street 1 so house numbers import correctly.",
       "rowsTruncated": "File had {{total}} data rows; only the first {{shown}} are imported.",
       "unmapped": "— Not mapped —",
-      "duplicateModeLabel": "When a client already exists (email or phone)",
+      "stepsLabel": "Import steps",
+      "noDuplicatesTitle": "No duplicate clients",
+      "noDuplicatesBody": "If a client already exists (same name, email, or phone), FieldBase updates their record instead of creating a copy.",
+      "continueMapping": "Continue to mapping",
+      "savingClients": "Saving clients to FieldBase…",
+      "duplicateModeLabel": "When a client already exists (same name, email, or phone)",
+      "duplicateModeHint": "Recommended for migrations: Update existing fills in missing address, billing, and notes without creating duplicates.",
       "duplicateSkip": "Skip duplicates",
-      "duplicateUpdate": "Update existing clients",
+      "duplicateUpdate": "Update existing clients (recommended)",
       "duplicateCreate": "Create anyway (may duplicate)",
       "preview": "Preview import",
       "previewTruncated": "Preview shows the first 500 rows. Import still processes the full file.",
+      "previewTableHint": "Scroll horizontally to review street, city, and notes before importing.",
+      "skipModeWarning": "{{count}} clients already exist but will be skipped. Switch to \"Update existing clients (recommended)\" to fill phone, street, and email.",
       "startImport": "Import clients",
       "importing": "Importing…",
       "back": "Back",
       "close": "Done",
+      "doneTitle": "Import complete",
+      "doneHint": "Clients are saved in FieldBase. Click Done to close and refresh your list. Rows listed below were not imported — you can fix them in your CSV and import again.",
+      "errorReportFailed": "{{count}} rows could not be saved",
+      "errorReportSkipped": "{{count}} rows skipped (duplicate in your CSV file)",
       "uploadAnother": "Upload another file",
       "existingMatch": "Matches: {{name}}",
       "errorReport": "Rows that could not be imported",
@@ -950,6 +1049,8 @@
       },
       "columns": {
         "status": "Status",
+        "street": "Street",
+        "locality": "City / State / ZIP",
         "details": "Details"
       },
       "summary": {
@@ -970,6 +1071,8 @@
         "parseFailed": "Could not read this CSV file.",
         "nameColumnRequired": "Map the Name column before continuing.",
         "previewFailed": "Preview failed",
+        "useUpdateMode": "Choose \"Update existing clients (recommended)\" — Skip will not fill phone or street for clients already in FieldBase.",
+        "nothingToSave": "Nothing to save — fix invalid rows or map the Name column, then preview again.",
         "importFailed": "Import failed"
       }
     }

@@ -11,8 +11,8 @@ i18n.use(initReactI18next).init({
     es: { translation: es },
     pl: { translation: pl },
   },
-  // Always start with "en" on both server and client so SSR and hydration
-  // match. I18nProvider applies the stored user preference after mount.
+  // English is the product default. I18nProvider applies a stored choice
+  // (es/pl) only after the user selects it in the sidebar — never the browser locale.
   lng: "en",
   fallbackLng: "en",
   supportedLngs: ["en", "es", "pl"],

@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "react-i18next";
+import "@/i18n";
 
 export default function PublicPageShell({ children }) {
   const pathname = usePathname();
+  const { t } = useTranslation();
   const hideChrome =
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/reset-password" ||
     pathname?.startsWith("/quote/") ||
     pathname?.startsWith("/estimate/") ||
-    pathname?.startsWith("/site/") || pathname?.startsWith("/sites/");
+    pathname?.startsWith("/site/") ||
+    pathname?.startsWith("/sites/");
 
   if (hideChrome) {
     return children;
@@ -74,7 +79,7 @@ export default function PublicPageShell({ children }) {
               textDecoration: "none",
             }}
           >
-            Iniciar sesión
+            {t("publicShell.logIn")}
           </Link>
           <Link
             href="/login?mode=register"
@@ -88,7 +93,7 @@ export default function PublicPageShell({ children }) {
               textDecoration: "none",
             }}
           >
-            Crear cuenta
+            {t("publicShell.createAccount")}
           </Link>
         </div>
       </header>

@@ -41,6 +41,7 @@ test("buildClientsExportCsv includes UTF-8 BOM and header row", () => {
     { name: "Alice", email: "a@test.com" },
   ]);
   assert.ok(csv.startsWith("\uFEFF"));
-  assert.match(csv, /First Name,Last Name,Company/);
+  assert.match(csv, /First Name,Last Name,Company,Email/);
+  assert.match(csv, /Billing Street/);
   assert.match(csv, /Alice/);
 });

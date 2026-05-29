@@ -13,7 +13,7 @@ const PAGE_SIZE = 1000;
 
 /**
  * GET /api/clients/export
- * Download tenant clients as Jobber-compatible CSV.
+ * Download tenant clients as a full-profile CSV for re-import.
  */
 export async function GET(request) {
   const auth = await requirePrivateTenantApi(request);

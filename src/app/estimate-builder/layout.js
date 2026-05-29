@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
@@ -22,5 +23,5 @@ export default async function EstimateBuilderLayout({ children }) {
     redirect("/dashboard?feature=estimate-builder-disabled");
   }
 
-  return children;
+  return <Suspense fallback={null}>{children}</Suspense>;
 }

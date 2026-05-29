@@ -42,7 +42,10 @@ if (which.status !== 0) {
   process.exit(1);
 }
 
-const push = spawnSync("npx", ["supabase", "db", "push", "--linked", ...passwordFlag, "--yes"], {
+const push = spawnSync(
+  "npx",
+  ["supabase", "db", "push", "--linked", "--include-all", ...passwordFlag, "--yes"],
+  {
   shell: true,
   stdio: "inherit",
   env: process.env,

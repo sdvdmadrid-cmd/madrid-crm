@@ -15,7 +15,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import NewEstimateForm from "@/components/NewEstimateForm";
+import ClientPickerField, {
+  formatClientPickerLabel,
+} from "@/components/clients/ClientPickerField";
 import UniversalShareButton from "@/components/UniversalShareButton";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
@@ -768,6 +772,7 @@ export default function EstimateBuilderPage() {
   const [modalSuccess, setModalSuccess] = useState(false);
 
   // Clients
+  const searchParams = useSearchParams();
   const [clients, setClients] = useState([]);
   const [clientId, setClientId] = useState("");
   const [clientModalOpen, setClientModalOpen] = useState(false);
@@ -828,6 +833,24 @@ export default function EstimateBuilderPage() {
     fetchClients();
   }, [fetchSaved, fetchClients]);
 
+  useEffect(() => {
+    const urlClientId = String(searchParams.get("clientId") || "").trim();
+    const urlEstimateId = String(searchParams.get("id") || "").trim();
+    if (urlClientId) setClientId(urlClientId);
+    if (!urlEstimateId || !savedEstimates.length) return;
+    const match = savedEstimates.find(
+      (est) => String(est.id || est._id || "") === urlEstimateId,
+    );
+    if (match) {
+      setLines((match.lines || []).map(normalizeLine));
+      setEstimateName(match.name || "");
+      setEstimateNotes(match.notes || "");
+      setEstimateDescription(match.description || "");
+      setClientId(match.clientId || urlClientId || "");
+      setEditId(match._id || match.id || null);
+    }
+  }, [searchParams, savedEstimates]);
+
   // Close actions dropdown on outside click
   useEffect(() => {
     if (!actionsOpen) return;
@@ -846,6 +869,12 @@ export default function EstimateBuilderPage() {
     if (!q) return [];
     return catalog.filter((s) => s.name?.toLowerCase().includes(q)).slice(0, 8);
   }, [globalSearch, catalog]);
+
+  const clientPickerLabel = useMemo(() => {
+    if (!clientId) return "";
+    const match = clients.find((c) => String(c._id) === String(clientId));
+    return match ? formatClientPickerLabel(match) : "";
+  }, [clientId, clients]);
 
   useEffect(() => {
     if (!searchFocused) {
@@ -1511,41 +1540,14 @@ export default function EstimateBuilderPage() {
                     </div>
                   </div>
 
-                  {/* Client selector */}
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "10px",
-                      alignItems: "flex-end",
-                    }}
+                  {/* Client picker — search by name or phone */}
+                  <ClientPickerField
+                    htmlFor="estimate-client"
+                    label={t.client.sectionTitle}
+                    clientId={clientId}
+                    displayValue={clientPickerLabel}
+                    onChange={({ clientId: id }) => setClientId(id || "")}
                   >
-                    <div style={{ flex: 1 }}>
-                      <label
-                        htmlFor="estimate-client"
-                        style={{
-                          display: "block",
-                          fontSize: "12px",
-                          color: "#555",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {t.client.sectionTitle}
-                      </label>
-                      <select
-                        id="estimate-client"
-                        value={clientId}
-                        onChange={(e) => setClientId(e.target.value)}
-                        style={{ ...INPUT_STYLE, background: "white" }}
-                      >
-                        <option value="">{t.client.selectLabel}</option>
-                        {clients.map((c) => (
-                          <option key={c._id} value={c._id}>
-                            {c.name}
-                            {c.companyName ? ` \u2014 ${c.companyName}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                     <button
                       type="button"
                       onClick={() => setClientModalOpen(true)}
@@ -1563,7 +1565,7 @@ export default function EstimateBuilderPage() {
                     >
                       {t.client.addButton}
                     </button>
-                  </div>
+                  </ClientPickerField>
                 </div>
                 <div
                   style={{
@@ -2762,33 +2764,13 @@ export default function EstimateBuilderPage() {
                     />
                   </div>
                   <div>
-                    <label
+                    <ClientPickerField
                       htmlFor="estimate-client-right"
-                      style={{
-                        display: "block",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#374151",
-                        marginBottom: "5px",
-                      }}
+                      label={t.client.sectionTitle}
+                      clientId={clientId}
+                      displayValue={clientPickerLabel}
+                      onChange={({ clientId: id }) => setClientId(id || "")}
                     >
-                      {t.client.sectionTitle}
-                    </label>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <select
-                        id="estimate-client-right"
-                        value={clientId}
-                        onChange={(e) => setClientId(e.target.value)}
-                        style={{ ...INPUT_STYLE, flex: 1, background: "white" }}
-                      >
-                        <option value="">{t.client.selectLabel}</option>
-                        {clients.map((c) => (
-                          <option key={c._id} value={c._id}>
-                            {c.name}
-                            {c.companyName ? ` \u2014 ${c.companyName}` : ""}
-                          </option>
-                        ))}
-                      </select>
                       <button
                         type="button"
                         onClick={() => setClientModalOpen(true)}
@@ -2806,7 +2788,7 @@ export default function EstimateBuilderPage() {
                       >
                         {t.client.addButton}
                       </button>
-                    </div>
+                    </ClientPickerField>
                   </div>
                 </div>
               </section>
