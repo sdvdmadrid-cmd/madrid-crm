@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
@@ -199,6 +199,28 @@ export default function JobsPage() {
       }
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    const clientId = String(searchParams.get("clientId") || "").trim();
+    if (!clientId) return;
+
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/clients/${clientId}`);
+        const client = await getJsonOrThrow(res, t("jobs.errors.fetch"));
+        if (!client?.name) return;
+        setForm((prev) => ({
+          ...prev,
+          clientName: client.name || prev.clientName,
+        }));
+        if (searchParams.get("action") === "new" && typeof window !== "undefined") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      } catch {
+        // Optional prefill
+      }
+    })();
+  }, [searchParams, t]);
 
   const loadJobFiles = useCallback(
     async (jobId, page = 1, append = false) => {
@@ -511,6 +533,14 @@ export default function JobsPage() {
       setDeleteJobModal((current) => ({ ...current, loading: false }));
     }
   };
+
+  const filterClientId = String(searchParams.get("clientId") || "").trim();
+  const visibleJobs = useMemo(() => {
+    if (!filterClientId) return jobs;
+    return jobs.filter(
+      (job) => String(job.clientId || "") === filterClientId,
+    );
+  }, [jobs, filterClientId]);
 
   return (
     <main className={`${ws.page} ${jobStyles.jobsPage}`}>
@@ -848,7 +878,7 @@ export default function JobsPage() {
       <section>
         <h2>{t("jobs.listTitle")}</h2>
         <div className={jobStyles.jobList}>
-          {jobs.map((job) => (
+          {visibleJobs.map((job) => (
             <div key={job._id} className={jobStyles.jobCard}>
               {(() => {
                 const financials = computeEstimateFinancials({

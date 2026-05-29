@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import i18n from "@/i18n";
 
 // ─── Icons ─────────────────────────────────────────────────────────────
 function IconCustomerCenter() {
@@ -99,8 +100,17 @@ function WaveDivider({ fromColor, toColor }) {
 const STATS = [
   { number: "15 days", label: "Free trial — no credit card needed" },
   { number: "$35/mo", label: "Flat rate after your free trial" },
-  { number: "10 hrs+", label: "Saved on average per week" },
-  { number: "38%", label: "Revenue growth in first year" },
+  { number: "All-in-one", label: "CRM, estimates, jobs, invoices & site" },
+  { number: "Stripe", label: "Secure online payments built in" },
+];
+
+const PLATFORM_CAPABILITIES = [
+  { title: "Client CRM", desc: "Contacts, properties, notes, and job history in one profile.", href: "/login?mode=register" },
+  { title: "AI estimates", desc: "Draft line items and professional quotes in minutes.", href: "/login?mode=register" },
+  { title: "Invoices & payments", desc: "Send invoices with Stripe checkout and track status.", href: "/login?mode=register" },
+  { title: "Contractor website", desc: "AI-built public site with quote requests and lead inbox.", href: "/login?mode=register" },
+  { title: "Calendar & weather", desc: "Schedule jobs with Google Calendar sync and live forecasts.", href: "/login?mode=register" },
+  { title: "Client import", desc: "Bring your list from CSV with duplicate-safe updates.", href: "/login?mode=register" },
 ];
 
 const LANDING_PILLARS = [
@@ -109,7 +119,7 @@ const LANDING_PILLARS = [
     accent: "#14b8a6",
     tagline: "Field ops",
     title: "Run the day",
-    desc: "Clients, jobs, and calendar — the Jobber-style command center without the clutter.",
+    desc: "Clients, jobs, and calendar — your daily command center in one login.",
     links: [
       { href: "/login?mode=register", label: "Start free" },
       { href: "#features", label: "See scheduling" },
@@ -120,7 +130,7 @@ const LANDING_PILLARS = [
     accent: "#6366f1",
     tagline: "Money in",
     title: "Get paid",
-    desc: "Invoices and Stripe checkout so clients pay you online — QuickBooks-level collections, built for the field.",
+    desc: "Invoices and Stripe checkout so clients pay you online from the field.",
     links: [
       { href: "/login?mode=register", label: "Collect faster" },
     ],
@@ -169,10 +179,10 @@ const FEATURES = [
   },
   {
     Icon: IconComms,
-    title: "Automated Follow-Ups",
-    desc: "Appointment reminders, job-completion messages, and invoice nudges go out automatically. You focus on the work — FieldBase handles the communication.",
+    title: "Client communication",
+    desc: "Share quotes and invoices by link, email, or text. Keep every message tied to the job so nothing gets lost.",
     link: true,
-    learnMore: "Set follow-up rules once and FieldBase sends reminders and payment nudges automatically, reducing missed appointments and late payments.",
+    learnMore: "Send approval links, payment links, and updates from the same workspace — no separate inbox to manage.",
   },
   {
     Icon: IconCRM,
@@ -251,14 +261,13 @@ function Navbar() {
       </Link>
 
       <div className="hidden md:flex items-center gap-6 text-sm text-gray-300">
-        <Link href="#features" className="hover:text-white transition-colors">Product</Link>
+        <Link href="#product" className="hover:text-white transition-colors">Product</Link>
         <Link href="#industries" className="hover:text-white transition-colors">Industries</Link>
         <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
         <Link href="#resources" className="hover:text-white transition-colors">Resources</Link>
       </div>
 
       <div className="hidden md:flex items-center gap-4">
-        <span className="text-gray-400 text-sm">📞 1-800-FIELDBASE</span>
         <Link href="/login?mode=login" className="text-sm text-gray-300 hover:text-white transition-colors">Log In</Link>
         <Link href="/login?mode=register"
           className="font-bold text-sm px-4 py-2 rounded-md transition-colors"
@@ -278,7 +287,7 @@ function Navbar() {
       {menuOpen && (
         <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "#1e293b", borderTop: "1px solid rgba(255,255,255,0.1)" }}
           className="flex flex-col p-4 gap-3 text-sm text-gray-300 md:hidden">
-          <Link href="#features" className="hover:text-white">Product</Link>
+          <Link href="#product" className="hover:text-white">Product</Link>
           <Link href="#industries" className="hover:text-white">Industries</Link>
           <Link href="#pricing" className="hover:text-white">Pricing</Link>
           <Link href="#resources" className="hover:text-white">Resources</Link>
@@ -299,6 +308,10 @@ export default function MarketingPage() {
   const [email, setEmail] = useState("");
   const [activeTab, setActiveTab] = useState(0);
   const [expandedFeature, setExpandedFeature] = useState("");
+
+  useEffect(() => {
+    i18n.changeLanguage("en");
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
@@ -368,7 +381,19 @@ export default function MarketingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen bg-white marketing-landing" style={{ fontFamily: "Inter, sans-serif" }}>
+      <style>{`
+        @keyframes marketingFadeUp {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .marketing-landing .hero-animate {
+          animation: marketingFadeUp 0.7s ease-out both;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .marketing-landing .hero-animate { animation: none; }
+        }
+      `}</style>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
@@ -383,11 +408,11 @@ export default function MarketingPage() {
       <section style={{ background: "#1e293b" }} className="pt-16 pb-0 px-6 overflow-hidden">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start gap-10 lg:gap-16">
           {/* Left text */}
-          <div className="flex-1 pb-12">
+          <div className="flex-1 pb-12 hero-animate">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-4" style={{ background: "rgba(29,78,216,0.2)", color: "#93c5fd" }}>
               Run · Get paid · Grow — one platform for contractors
             </div>
-            <h1 className="text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
               Run the crew.<br />Collect on the job.<br />Win the next lead.
             </h1>
             <p className="text-lg mb-4 max-w-lg" style={{ color: "#94a3b8" }}>
@@ -408,21 +433,16 @@ export default function MarketingPage() {
                 See How It Works
               </Link>
             </div>
-            <div className="flex flex-wrap gap-6 text-sm" style={{ color: "#64748b" }}>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">📱</span>
-                <div>
-                  <div className="font-semibold text-white">4.8 ★★★★★</div>
-                  <div>App Store reviews</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">▶️</span>
-                <div>
-                  <div className="font-semibold text-white">4.5 ★★★★½</div>
-                  <div>Google Play reviews</div>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-3 text-xs font-semibold">
+              {["Built for contractors", "AI estimates included", "Stripe payments", "Free 15-day trial"].map((pill) => (
+                <span
+                  key={pill}
+                  className="px-3 py-1.5 rounded-full"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.25)" }}
+                >
+                  {pill}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -489,7 +509,7 @@ export default function MarketingPage() {
             Three moves. One login.
           </h2>
           <p className="text-center max-w-2xl mx-auto mb-10 text-base" style={{ color: "#94a3b8" }}>
-            Not a clone of Jobber, QuickBooks, or a growth bot — a tighter stack that does what contractors actually do every day.
+            One tighter stack for what contractors actually do every day — from the first lead to getting paid.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {LANDING_PILLARS.map((pillar) => (
@@ -522,11 +542,42 @@ export default function MarketingPage() {
 
       <WaveDivider fromColor="#0f172a" toColor="#eff6ff" />
 
+      {/* ── Platform capabilities ── */}
+      <section id="product" style={{ background: "#ffffff" }} className="py-16 px-6">
+        <div className="max-w-6xl mx-auto">
+          <p className="text-center text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "#64748b" }}>
+            Everything in one place
+          </p>
+          <h2 className="text-3xl lg:text-4xl font-extrabold text-center mb-4" style={{ color: "#1e293b" }}>
+            Run your entire contracting business here
+          </h2>
+          <p className="text-center max-w-2xl mx-auto mb-10 text-base" style={{ color: "#6b7280" }}>
+            CRM, estimates, invoices, websites, scheduling, and imports — not scattered tools with separate logins.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {PLATFORM_CAPABILITIES.map((cap) => (
+              <Link
+                key={cap.title}
+                href={cap.href}
+                className="rounded-2xl p-6 transition-shadow hover:shadow-md"
+                style={{ border: "1px solid #e2e8f0", background: "#f8fafc" }}
+              >
+                <h3 className="text-lg font-bold mb-2" style={{ color: "#1e293b" }}>{cap.title}</h3>
+                <p className="text-sm m-0" style={{ color: "#64748b", lineHeight: 1.55 }}>{cap.desc}</p>
+                <span className="inline-block mt-4 text-sm font-semibold" style={{ color: "#1d4ed8" }}>
+                  Start free →
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Photo strip ── */}
       <section style={{ background: "#eff6ff", overflow: "hidden" }}>
-        <div className="flex gap-2 overflow-x-hidden">
+        <div className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory">
           {HERO_PHOTOS.map((p, i) => (
-            <div key={i} className="relative shrink-0 overflow-hidden rounded-lg" style={{ width: 256, height: 176 }}>
+            <div key={i} className="relative shrink-0 overflow-hidden rounded-lg snap-start" style={{ width: 256, height: 176 }}>
               <Image src={p.src} alt={p.alt} fill sizes="256px" className="object-cover" unoptimized />
             </div>
           ))}
@@ -638,7 +689,7 @@ export default function MarketingPage() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
             {INDUSTRIES.map((ind) => (
-              <Link key={ind} href="/login"
+              <Link key={ind} href="/login?mode=register"
                 className="bg-white rounded-xl p-4 flex items-center font-semibold text-sm transition-shadow hover:shadow-md"
                 style={{ color: "#1e293b" }}>
                 <IndustryIcon name={ind} />
@@ -647,7 +698,7 @@ export default function MarketingPage() {
             ))}
           </div>
           <div className="text-center">
-            <Link href="/login" className="font-semibold transition-colors" style={{ color: "#1e293b", borderBottom: "2px solid #1e293b" }}>
+            <Link href="/login?mode=register" className="font-semibold transition-colors" style={{ color: "#1e293b", borderBottom: "2px solid #1e293b" }}>
               See All Industries →
             </Link>
           </div>
@@ -691,7 +742,7 @@ export default function MarketingPage() {
                 Whatever industry you work in, FieldBase&apos;s on-site service management software can be customized to suit your process.
               </p>
             </div>
-            <div className="flex-1 text-sm" style={{ columns: "3", columnGap: "2rem", color: "#1e293b" }}>
+            <div className="flex-1 text-sm columns-1 sm:columns-2 lg:columns-3 gap-8" style={{ color: "#1e293b" }}>
               {ALL_SECTORS.map((s) => (
                 <div key={s} className="mb-1" style={{ breakInside: "avoid" }}>
                   {s},
@@ -704,20 +755,49 @@ export default function MarketingPage() {
 
       <WaveDivider fromColor="#ffffff" toColor="#1e293b" />
 
-      {/* ── Pricing CTA ── */}
-      <section id="pricing" style={{ background: "#1e293b" }} className="py-16 px-6 text-center">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-5xl font-extrabold text-white mb-6">
-            15 days free.<br />Then $35/month.
-          </h2>
-          <p className="text-lg mb-10" style={{ color: "#94a3b8" }}>
-            No credit card required. Cancel anytime.
-          </p>
-          <Link href="/login?mode=register"
-            className="inline-block font-bold px-12 py-4 rounded-md text-lg transition-all hover:shadow-lg"
-            style={{ background: "#1d4ed8", color: "#ffffff" }}>
-            Start Free Trial — 15 Days
-          </Link>
+      {/* ── Pricing ── */}
+      <section id="pricing" style={{ background: "#1e293b" }} className="py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl lg:text-5xl font-extrabold text-white mb-4">
+              Simple pricing. No surprises.
+            </h2>
+            <p className="text-lg" style={{ color: "#94a3b8" }}>
+              15 days free, then one flat monthly rate. No credit card to start.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            <div className="rounded-2xl p-8 text-center" style={{ background: "#1e3a5f", border: "2px solid #1d4ed8" }}>
+              <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#93c5fd" }}>Standard</p>
+              <p className="text-5xl font-extrabold text-white mb-1">$35<span className="text-xl font-semibold">/mo</span></p>
+              <p className="text-sm mb-6" style={{ color: "#94a3b8" }}>After 15-day free trial · cancel anytime</p>
+              <ul className="text-left text-sm space-y-2 mb-8" style={{ color: "#cbd5e1" }}>
+                <li>✓ Full CRM, estimates, jobs & invoices</li>
+                <li>✓ AI website builder & lead inbox</li>
+                <li>✓ Calendar, weather & Stripe payments</li>
+              </ul>
+              <Link href="/login?mode=register"
+                className="inline-block w-full font-bold px-6 py-3 rounded-md transition-all hover:shadow-lg"
+                style={{ background: "#1d4ed8", color: "#ffffff" }}>
+                Start Free Trial
+              </Link>
+            </div>
+            <div className="rounded-2xl p-8 text-center relative overflow-hidden" style={{ background: "rgba(15,23,42,0.9)", border: "1px solid rgba(245,158,11,0.4)" }}>
+              <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#fbbf24" }}>Founding contractors</p>
+              <p className="text-3xl font-extrabold text-white mb-2">Lock in $35/mo</p>
+              <p className="text-sm mb-6" style={{ color: "#94a3b8" }}>
+                Early accounts keep the launch rate as we add integrations and polish. Limited onboarding each month.
+              </p>
+              <p className="text-xs font-semibold px-3 py-2 rounded-full inline-block mb-6" style={{ background: "rgba(245,158,11,0.15)", color: "#fcd34d" }}>
+                Same features · priority onboarding support
+              </p>
+              <Link href="/login?mode=register"
+                className="inline-block w-full font-bold px-6 py-3 rounded-md transition-all"
+                style={{ background: "#f59e0b", color: "#0f172a" }}>
+                Claim Founding Access
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -788,7 +868,7 @@ export default function MarketingPage() {
       <WaveDivider fromColor="#eff6ff" toColor="#0f172a" />
 
       {/* ── Footer ── */}
-      <footer style={{ background: "#0f172a" }} className="py-8 px-6 text-center text-sm" style2={{ color: "#6b7280" }}>
+      <footer style={{ background: "#0f172a", color: "#6b7280" }} className="py-8 px-6 text-center text-sm">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4" style={{ color: "#6b7280" }}>
           <span className="font-bold" style={{ color: "#94a3b8" }}>FieldBase</span>
           <div className="flex gap-6">

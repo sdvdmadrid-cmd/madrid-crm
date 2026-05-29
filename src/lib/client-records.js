@@ -33,6 +33,8 @@ export const CLIENT_SELECT_COLUMNS = [
   "billing_state",
   "billing_zip",
   "billing_same_as_service",
+  "jobber_id",
+  "jobber_metadata",
 ].join(", ");
 
 function toText(value) {
@@ -95,18 +97,25 @@ function normalizeClientBody(body = {}) {
 }
 
 export function serializeClient(doc = {}) {
+  const zip = doc.zip_code || doc.zip || doc.zipCode || "";
+  const address = doc.address || "";
+
   return {
     ...doc,
     id: doc.id,
     _id: doc.id,
+    name: doc.name || "",
+    email: doc.email || "",
+    phone: doc.phone || "",
+    address,
     tenantId: doc.tenant_id || "",
     userId: doc.user_id || null,
     company: doc.company || "",
     companyName: doc.company || "",
     city: doc.city || "",
     state: doc.state || "",
-    zip: doc.zip_code || "",
-    zipCode: doc.zip_code || "",
+    zip,
+    zipCode: zip,
     latitude:
       typeof doc.latitude === "number" ? doc.latitude : null,
     longitude:
@@ -122,6 +131,19 @@ export function serializeClient(doc = {}) {
     billing_state: doc.billing_state || "",
     billing_zip: doc.billing_zip || "",
     billing_same_as_service: doc.billing_same_as_service !== false,
+    jobberId: doc.jobber_id || "",
+    jobberMetadata:
+      doc.jobber_metadata && typeof doc.jobber_metadata === "object"
+        ? doc.jobber_metadata
+        : {},
+    contacts: {
+      emails:
+        doc.jobber_metadata?.emails ||
+        (doc.email ? [{ address: doc.email, primary: true }] : []),
+      phones:
+        doc.jobber_metadata?.phones ||
+        (doc.phone ? [{ number: doc.phone, primary: true }] : []),
+    },
   };
 }
 

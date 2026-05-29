@@ -1,6 +1,11 @@
 {
+  "publicShell": {
+    "logIn": "Zaloguj się",
+    "createAccount": "Utwórz konto"
+  },
   "appSubtitle": "Kompletny system do zarzadzania klientami, zleceniami, fakturami i umowami.",
   "language": "Jezyk",
+  "languageDefaultHint": "Domyslnie angielski. Wybierz hiszpanski lub polski tylko jesli wolisz.",
   "loading": "Ladowanie danych...",
   "tabs": {
     "dashboard": "Panel",
@@ -701,6 +706,16 @@
     "formTitleNew": "Nowy klient",
     "formTitleEdit": "Edytuj klienta",
     "listTitle": "Lista klientow",
+    "list": {
+      "missingStreet": "Brak numeru ulicy — zaimportuj ponownie oryginalny CSV z opcja Aktualizuj istniejace."
+    },
+    "cardMenu": {
+      "label": "Akcje klienta",
+      "view": "Zobacz pelny profil",
+      "edit": "Edytuj klienta",
+      "estimate": "Nowa wycena",
+      "delete": "Usun klienta"
+    },
     "placeholders": {
       "name": "Nazwa",
       "company": "Firma",
@@ -756,9 +771,58 @@
     "messages": {
       "confirmDelete": "Usunac tego klienta?"
     },
+    "details": {
+      "title": "Profil klienta",
+      "loadingName": "Ladowanie…",
+      "loading": "Ladowanie szczegolow klienta…",
+      "close": "Zamknij",
+      "quickActions": "Szybkie akcje",
+      "newEstimate": "Nowa wycena",
+      "newJob": "Nowe zlecenie",
+      "newInvoice": "Nowa faktura",
+      "createEstimate": "Utworz wycene",
+      "createQuote": "Utworz oferte",
+      "createInvoice": "Utworz fakture",
+      "createJob": "Utworz zlecenie",
+      "viewAllEstimates": "Wszystkie wyceny",
+      "viewAllQuotes": "Wszystkie oferty",
+      "viewAllInvoices": "Wszystkie faktury",
+      "viewAllJobs": "Wszystkie zlecenia",
+      "openInvoices": "Otworz faktury",
+      "showMore": "Zobacz wszystkie ({{count}})",
+      "estimates": "Wyceny",
+      "quotes": "Oferty",
+      "invoices": "Faktury",
+      "jobs": "Zlecenia",
+      "properties": "Nieruchomosci",
+      "property": "Nieruchomosc",
+      "primaryProperty": "Glowna",
+      "allEmails": "Wszystkie emaile",
+      "allPhones": "Wszystkie telefony",
+      "noteHistory": "Notatki",
+      "visits": "Historia wizyt",
+      "requests": "Zapytania",
+      "noEstimates": "Brak wycen dla tego klienta.",
+      "noQuotes": "Brak ofert dla tego klienta.",
+      "noInvoices": "Brak faktur dla tego klienta.",
+      "noJobs": "Brak zlecen dla tego klienta.",
+      "noProperties": "Brak zapisanych nieruchomosci.",
+      "noNoteHistory": "Brak dodatkowych notatek.",
+      "noVisits": "Brak wizyt.",
+      "noRequests": "Brak zapytan.",
+      "viewEstimate": "Otworz w Estimate Builder",
+      "viewInvoices": "Faktury",
+      "viewJob": "Zobacz zlecenie",
+      "errors": {
+        "load": "Nie udalo sie zaladowac szczegolow",
+        "loadFallback": "Blad ladowania profilu"
+      }
+    },
     "search": {
       "label": "Szukaj klientow",
       "placeholder": "Szukaj po imieniu, firmie, telefonie, emailu lub adresie…",
+      "placeholderForm": "Wpisz imie lub telefon klienta…",
+      "linkedClient": "Powiazano z zapisanym klientem",
       "hint": "Wpisz, aby znalezc klienta — uzyj ↑↓ i Enter, aby wybrac.",
       "searching": "Szukanie…",
       "noResults": "Brak pasujacych klientow",
@@ -770,9 +834,22 @@
     "csvMenu": {
       "label": "Opcje importu i eksportu klientow"
     },
+    "dedupe": {
+      "menuLabel": "Usun zduplikowanych klientow",
+      "menuHint": "To samo imie, telefon lub email — zostaje najlepszy wpis",
+      "removing": "Usuwanie duplikatow…",
+      "noneFound": "Brak zduplikowanych klientow.",
+      "confirm": "Usunac {{count}} zduplikowanych klientow w {{groups}} grupach? Zostaje najpelniejszy rekord. Zlecenia i faktury przechodza na zachowanego klienta. Tej operacji nie mozna cofnac.",
+      "done": "Usunieto {{removed}} duplikatow w {{groups}} grupach.",
+      "partial": "Usunieto {{removed}} duplikatow, ale {{failed}} grup nie udalo sie polaczyc.",
+      "errors": {
+        "preview": "Nie udalo sie przeskanowac duplikatow",
+        "failed": "Nie udalo sie usunac duplikatow"
+      }
+    },
     "export": {
       "menuLabel": "Eksportuj klientow",
-      "menuHint": "Pobierz CSV zgodny z importem Jobber",
+      "menuHint": "Pelna lista klientow z adresami i notatkami",
       "exporting": "Eksportowanie…",
       "errors": {
         "failed": "Nie udalo sie wyeksportowac klientow"
@@ -781,7 +858,7 @@
     "import": {
       "open": "Importuj CSV",
       "menuLabel": "Importuj klientow",
-      "menuHint": "Wgraj CSV z Jobber lub innego CRM",
+      "menuHint": "Przenies pelna liste klientow z dowolnej aplikacji",
       "title": "Import klientow z CSV",
       "subtitle": "Przenies klientow z dowolnego CRM lub arkusza. Dane pozostaja tylko w Twoim workspace.",
       "providerLabel": "Inteligentne mapowanie jest wlaczone dla popularnych formatow CSV.",
@@ -790,12 +867,15 @@
       "mapHint": "Wykryto {{count}} wierszy. Mapuj pola FieldBase na kolumny pliku.",
       "rowsTruncated": "Plik mial {{total}} wierszy; importowane sa pierwsze {{shown}}.",
       "unmapped": "— Nie mapuj —",
-      "duplicateModeLabel": "Gdy klient juz istnieje (email lub telefon)",
+      "duplicateModeLabel": "Gdy klient juz istnieje (ta sama nazwa, email lub telefon)",
+      "duplicateModeHint": "Zalecane przy migracji: Aktualizuj uzupelnia adres, rozliczenie i notatki bez duplikatow.",
       "duplicateSkip": "Pomin duplikaty",
-      "duplicateUpdate": "Aktualizuj istniejacych",
+      "duplicateUpdate": "Aktualizuj istniejacych (zalecane)",
       "duplicateCreate": "Utworz mimo to (mozliwe duplikaty)",
       "preview": "Podglad importu",
       "previewTruncated": "Podglad pokazuje pierwsze 500 wierszy. Import obejmuje caly plik.",
+      "previewTableHint": "Przewin w poziomie, aby sprawdzic ulice, miasto i notatki przed importem.",
+      "skipModeWarning": "{{count}} klientow juz istnieje, ale zostanie pominiete. Wybierz \"Aktualizuj istniejacych (zalecane)\", aby uzupelnic telefon, ulice i email.",
       "startImport": "Importuj klientow",
       "importing": "Importowanie…",
       "back": "Wstecz",
@@ -818,6 +898,8 @@
       },
       "columns": {
         "status": "Status",
+        "street": "Ulica",
+        "locality": "Miasto / region / ZIP",
         "details": "Szczegoly"
       },
       "summary": {

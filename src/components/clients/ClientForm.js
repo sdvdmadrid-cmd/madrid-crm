@@ -208,23 +208,35 @@ export default function ClientForm({
         />
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-        <button
-          type="button"
-          className="cf-btn cf-btn-primary"
-          onClick={onSubmit}
-          disabled={saving}
-        >
-          {saving
-            ? t("clients.buttons.saving")
-            : isEditing
-              ? t("clients.buttons.update")
-              : t("clients.buttons.save")}
-        </button>
-        <button type="button" className="cf-btn" onClick={onCancel}>
-          {t("clients.buttons.clear")}
-        </button>
-      </div>
+      <FormActions
+        t={t}
+        isEditing={isEditing}
+        saving={saving}
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />
     </section>
+  );
+}
+
+function FormActions({ t, isEditing, saving, onSubmit, onCancel }) {
+  return (
+    <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+      <button
+        type="button"
+        className="cf-btn cf-btn-primary"
+        onClick={onSubmit}
+        disabled={saving}
+      >
+        {saving
+          ? t("clients.buttons.saving")
+          : isEditing
+            ? t("clients.buttons.update")
+            : t("clients.buttons.save")}
+      </button>
+      <button type="button" className="cf-btn" onClick={onCancel}>
+        {t("clients.buttons.clear")}
+      </button>
+    </div>
   );
 }

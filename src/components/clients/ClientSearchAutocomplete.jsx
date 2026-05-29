@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
-import { formatClientSearchOption } from "@/lib/client-search";
+import {
+  formatClientPickerLabel,
+  formatClientSearchOption,
+} from "@/lib/client-search";
 import css from "./client-search.module.css";
 
 const DEBOUNCE_MS = 180;
@@ -41,6 +44,11 @@ function SearchIcon() {
  * @param {number} [props.limit=12]
  * @param {string} [props.className]
  * @param {string} [props.inputClassName]
+ * @param {string} [props.value] controlled input text
+ * @param {(value: string) => void} [props.onValueChange]
+ * @param {() => void} [props.onClear]
+ * @param {"dark"|"light"} [props.variant="dark"]
+ * @param {boolean} [props.showHint=true]
  */
 export default function ClientSearchAutocomplete({
   onSelect,
@@ -51,6 +59,11 @@ export default function ClientSearchAutocomplete({
   className = "",
   inputClassName = "",
   disabled = false,
+  value: controlledValue,
+  onValueChange,
+  onClear,
+  variant = "dark",
+  showHint = true,
 }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -59,7 +72,21 @@ export default function ClientSearchAutocomplete({
   const debounceRef = useRef(null);
   const requestSeq = useRef(0);
 
-  const [query, setQuery] = useState("");
+  const [internalQuery, setInternalQuery] = useState("");
+  const isControlled = onValueChange != null;
+  const query = isControlled ? String(controlledValue ?? "") : internalQuery;
+
+  const setQuery = useCallback(
+    (next) => {
+      const value = typeof next === "function" ? next(query) : next;
+      if (isControlled) {
+        onValueChange(value);
+      } else {
+        setInternalQuery(value);
+      }
+    },
+    [isControlled, onValueChange, query],
+  );
   const [options, setOptions] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -162,6 +189,9 @@ export default function ClientSearchAutocomplete({
       if (clearOnSelect) {
         setQuery("");
         setOptions([]);
+      } else {
+        setQuery(formatClientPickerLabel(option.client));
+        setOptions([]);
       }
       closeList();
       inputRef.current?.blur();
@@ -212,8 +242,11 @@ export default function ClientSearchAutocomplete({
       ? `${listId}-option-${activeIndex}`
       : undefined;
 
+  const wrapClass =
+    variant === "light" ? `${css.wrap} ${css.wrapLight}` : css.wrap;
+
   return (
-    <div ref={containerRef} className={`${css.wrap} ${className}`.trim()}>
+    <div ref={containerRef} className={`${wrapClass} ${className}`.trim()}>
       <SearchIcon />
       <input
         ref={inputRef}
@@ -258,6 +291,7 @@ export default function ClientSearchAutocomplete({
           onClick={() => {
             setQuery("");
             setOptions([]);
+            onClear?.();
             closeList();
             inputRef.current?.focus();
           }}
@@ -304,7 +338,11 @@ export default function ClientSearchAutocomplete({
                 {option.subtitle ? (
                   <div className={css.optionMeta}>{option.subtitle}</div>
                 ) : null}
-                {option.location && option.location !== option.subtitle ? (
+                {option.location &&
+                option.location !== option.subtitle &&
+                !String(option.name || "")
+                  .toLowerCase()
+                  .includes(option.location.toLowerCase().slice(0, 24)) ? (
                   <div className={css.optionMeta}>{option.location}</div>
                 ) : null}
               </button>
@@ -313,7 +351,9 @@ export default function ClientSearchAutocomplete({
         </ul>
       ) : null}
 
-      <p className={css.hint}>{t("clients.search.hint")}</p>
+      {showHint ? (
+        <p className={css.hint}>{t("clients.search.hint")}</p>
+      ) : null}
     </div>
   );
 }

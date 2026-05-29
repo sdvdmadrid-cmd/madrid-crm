@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
 import menu from "./client-csv-menu.module.css";
@@ -22,19 +23,68 @@ function IconMoreHorizontal() {
 }
 
 /**
- * Compact ⋯ menu for client CSV import / export.
+ * ⋯ menu — Import / Export dropdown (ported so it is never clipped).
  */
-export default function ClientCsvActionsMenu({ onImport, disabled = false }) {
+export default function ClientCsvActionsMenu({
+  onImport,
+  onRemoveDuplicates,
+  canRemoveDuplicates = false,
+  disabled = false,
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deduping, setDeduping] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
+
+  const updateMenuPosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = 260;
+    const left = Math.min(
+      Math.max(12, rect.right - menuWidth),
+      window.innerWidth - menuWidth - 12,
+    );
+
+    setMenuPosition({
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onReposition = () => updateMenuPosition();
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+
+    return () => {
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     function handlePointerDown(event) {
-      if (wrapRef.current && !wrapRef.current.contains(event.target)) {
-        setOpen(false);
+      const target = event.target;
+      if (
+        wrapRef.current?.contains(target) ||
+        (target instanceof Element && target.closest(`[data-csv-menu-floating]`))
+      ) {
+        return;
       }
+      setOpen(false);
     }
 
     function handleEscape(event) {
@@ -84,11 +134,91 @@ export default function ClientCsvActionsMenu({ onImport, disabled = false }) {
     }
   };
 
-  const busy = exporting || disabled;
+  const handleRemoveDuplicates = async () => {
+    if (!onRemoveDuplicates) return;
+    setOpen(false);
+    setDeduping(true);
+    try {
+      await onRemoveDuplicates();
+    } finally {
+      setDeduping(false);
+    }
+  };
+
+  const busy = exporting || deduping || disabled;
+
+  const floatingMenu =
+    open && menuPosition && typeof document !== "undefined"
+      ? createPortal(
+          <ul
+            data-csv-menu-floating
+            className={menu.menuFloating}
+            role="menu"
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              width: menuPosition.width,
+            }}
+          >
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className={menu.item}
+                onClick={() => {
+                  setOpen(false);
+                  onImport?.();
+                }}
+              >
+                {t("clients.import.menuLabel")}
+                <span className={menu.itemSub}>
+                  {t("clients.import.menuHint")}
+                </span>
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className={menu.item}
+                disabled={exporting}
+                onClick={handleExport}
+              >
+                {exporting
+                  ? t("clients.export.exporting")
+                  : t("clients.export.menuLabel")}
+                <span className={menu.itemSub}>
+                  {t("clients.export.menuHint")}
+                </span>
+              </button>
+            </li>
+            {canRemoveDuplicates ? (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`${menu.item} ${menu.itemDanger}`}
+                  disabled={deduping || exporting}
+                  onClick={handleRemoveDuplicates}
+                >
+                  {deduping
+                    ? t("clients.dedupe.removing")
+                    : t("clients.dedupe.menuLabel")}
+                  <span className={menu.itemSub}>
+                    {t("clients.dedupe.menuHint")}
+                  </span>
+                </button>
+              </li>
+            ) : null}
+          </ul>,
+          document.body,
+        )
+      : null;
 
   return (
     <div ref={wrapRef} className={menu.wrap}>
       <button
+        ref={triggerRef}
         type="button"
         className={menu.trigger}
         disabled={busy}
@@ -99,39 +229,7 @@ export default function ClientCsvActionsMenu({ onImport, disabled = false }) {
       >
         <IconMoreHorizontal />
       </button>
-
-      {open ? (
-        <ul className={menu.menu} role="menu">
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              className={menu.item}
-              onClick={() => {
-                setOpen(false);
-                onImport?.();
-              }}
-            >
-              {t("clients.import.menuLabel")}
-              <span className={menu.itemSub}>{t("clients.import.menuHint")}</span>
-            </button>
-          </li>
-          <li role="none">
-            <button
-              type="button"
-              role="menuitem"
-              className={menu.item}
-              disabled={exporting}
-              onClick={handleExport}
-            >
-              {exporting
-                ? t("clients.export.exporting")
-                : t("clients.export.menuLabel")}
-              <span className={menu.itemSub}>{t("clients.export.menuHint")}</span>
-            </button>
-          </li>
-        </ul>
-      ) : null}
+      {floatingMenu}
     </div>
   );
 }

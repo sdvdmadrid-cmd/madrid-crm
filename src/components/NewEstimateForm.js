@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import ClientPickerField, {
+  formatClientPickerLabel,
+} from "@/components/clients/ClientPickerField";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { getUsStateLabel, getUsStateTaxRate } from "@/lib/estimate-pricing";
 import { getIndustryProfile } from "@/lib/industry-profiles";
@@ -104,6 +107,15 @@ export default function NewEstimateForm({ onCreated }) {
   });
   const [industryDetails, setIndustryDetails] = useState({});
   const [form, setForm] = useState(createEmptyEstimate);
+
+  const clientPickerLabel = useMemo(() => {
+    if (!form.clientId) return "";
+    const match =
+      clients.find(
+        (client) => String(client._id || client.id) === String(form.clientId),
+      ) || null;
+    return match ? formatClientPickerLabel(match) : "";
+  }, [clients, form.clientId]);
 
   const industryProfile = useMemo(
     () => getIndustryProfile(userContext.industry),
@@ -504,18 +516,15 @@ export default function NewEstimateForm({ onCreated }) {
                   {t("estimateForm.links.newClient")}
                 </a>
               </div>
-              <select
-                value={form.clientId}
-                onChange={(e) => updateForm({ clientId: e.target.value })}
-                className="w-full rounded-xl border border-gray-200 bg-[#f9f9f9] px-3.5 py-2.5 text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#007aff]/40 focus:border-[#007aff] transition"
-              >
-                <option value="">{t("estimateForm.placeholders.client")}</option>
-                {clients.map((c) => (
-                  <option key={c._id || c.id} value={c._id || c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <ClientPickerField
+                clientId={form.clientId}
+                displayValue={clientPickerLabel}
+                placeholder={t("estimateForm.placeholders.client")}
+                showHint={false}
+                onChange={({ clientId }) =>
+                  updateForm({ clientId: clientId || "", jobId: "" })
+                }
+              />
               {submitAttempted && !form.clientId && (
                 <span className="text-[0.75rem] text-red-500">{t("estimateForm.errors.selectClient")}</span>
               )}

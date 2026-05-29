@@ -5,6 +5,7 @@ import {
   CLIENT_SEARCH_DEFAULT_LIMIT,
   CLIENT_SEARCH_MAX_LIMIT,
   CLIENT_SEARCH_MIN_QUERY_LENGTH,
+  dedupeClientSearchResults,
   sanitizeClientSearchQuery,
 } from "@/lib/client-search";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -50,7 +51,7 @@ export async function GET(request) {
         .select(CLIENT_SELECT_COLUMNS)
         .or(orFilter)
         .order("name", { ascending: true })
-        .limit(limit),
+        .limit(Math.min(limit * 4, 48)),
       { tenantDbId: auth.ctx.tenantDbId, role: auth.ctx.role },
     );
 
@@ -63,7 +64,10 @@ export async function GET(request) {
       throw new Error(error.message);
     }
 
-    const results = (data || []).map(serializeClient);
+    const results = dedupeClientSearchResults((data || []).map(serializeClient)).slice(
+      0,
+      limit,
+    );
 
     return privateJson({
       success: true,

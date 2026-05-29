@@ -1,6 +1,11 @@
 {
+  "publicShell": {
+    "logIn": "Iniciar sesión",
+    "createAccount": "Crear cuenta"
+  },
   "appSubtitle": "Sistema completo para gestionar clientes, trabajos, facturas y contratos.",
   "language": "Idioma",
+  "languageDefaultHint": "Por defecto es ingles. Elige espanol o polaco solo si lo prefieres.",
   "loading": "Cargando datos...",
   "tabs": {
     "dashboard": "Dashboard",
@@ -530,7 +535,7 @@
       "kickerSoon": "Paso 1",
       "title": "Activa cobros con tarjeta en 5 minutos",
       "titleSoon": "Configura como te pagan tus clientes",
-      "body": "Mas facil que Jobber: un enlace en la factura, pago seguro, y el dinero a tu negocio.",
+      "body": "Un enlace en la factura, pago seguro, y el dinero directo a tu negocio.",
       "bodySoon": "Conecta Stripe una vez. Tus clientes pagan desde FieldBase; tu recibes el deposito.",
       "cta": "Conectar Stripe ahora",
       "ctaSoon": "Empezar configuracion",
@@ -833,6 +838,25 @@
     "formTitleNew": "Nuevo cliente",
     "formTitleEdit": "Editar cliente",
     "listTitle": "Lista de clientes",
+    "list": {
+      "missingStreet": "Falta numero de calle — reimporta tu CSV original con Actualizar existentes."
+    },
+    "cardMenu": {
+      "label": "Acciones del cliente",
+      "view": "Ver perfil completo",
+      "edit": "Editar cliente",
+      "estimate": "Nuevo presupuesto",
+      "delete": "Eliminar cliente"
+    },
+    "incompleteBanner": {
+      "title": "A muchos clientes les falta la calle",
+      "body": "{{count}} clientes solo tienen ciudad/estado. Exportar desde FieldBase no agrega calles que nunca se importaron. Usa el CSV de tu app anterior e Importar con Actualizar existentes.",
+      "action": "Importar CSV para arreglar direcciones"
+    },
+    "stickySave": {
+      "new": "Borrador de cliente nuevo",
+      "editing": "Editando {{name}}"
+    },
     "placeholders": {
       "name": "Nombre",
       "company": "Empresa",
@@ -888,9 +912,58 @@
     "messages": {
       "confirmDelete": "Eliminar este cliente?"
     },
+    "details": {
+      "title": "Perfil del cliente",
+      "loadingName": "Cargando…",
+      "loading": "Cargando detalles del cliente…",
+      "close": "Cerrar",
+      "quickActions": "Acciones rapidas",
+      "newEstimate": "Nuevo estimado",
+      "newJob": "Nuevo trabajo",
+      "newInvoice": "Nueva factura",
+      "createEstimate": "Crear estimado",
+      "createQuote": "Crear cotizacion",
+      "createInvoice": "Crear factura",
+      "createJob": "Crear trabajo",
+      "viewAllEstimates": "Todos los estimados",
+      "viewAllQuotes": "Todas las cotizaciones",
+      "viewAllInvoices": "Todas las facturas",
+      "viewAllJobs": "Todos los trabajos",
+      "openInvoices": "Abrir facturas",
+      "showMore": "Ver los {{count}} elementos",
+      "estimates": "Estimados",
+      "quotes": "Cotizaciones",
+      "invoices": "Facturas",
+      "jobs": "Trabajos",
+      "properties": "Propiedades",
+      "property": "Propiedad",
+      "primaryProperty": "Principal",
+      "allEmails": "Todos los emails",
+      "allPhones": "Todos los telefonos",
+      "noteHistory": "Notas",
+      "visits": "Historial de visitas",
+      "requests": "Solicitudes",
+      "noEstimates": "Aun no hay estimados para este cliente.",
+      "noQuotes": "Aun no hay cotizaciones para este cliente.",
+      "noInvoices": "Aun no hay facturas para este cliente.",
+      "noJobs": "Aun no hay trabajos para este cliente.",
+      "noProperties": "Sin propiedades registradas.",
+      "noNoteHistory": "Sin notas adicionales.",
+      "noVisits": "Sin visitas registradas.",
+      "noRequests": "Sin solicitudes registradas.",
+      "viewEstimate": "Abrir en Estimate Builder",
+      "viewInvoices": "Facturas",
+      "viewJob": "Ver trabajo",
+      "errors": {
+        "load": "No se pudieron cargar los detalles",
+        "loadFallback": "Error al cargar el perfil"
+      }
+    },
     "search": {
       "label": "Buscar clientes",
       "placeholder": "Buscar por nombre, empresa, telefono, email o direccion…",
+      "placeholderForm": "Escribe nombre o telefono del cliente…",
+      "linkedClient": "Vinculado a un cliente guardado",
       "hint": "Escribe para encontrar un cliente — usa ↑↓ y Enter para seleccionar.",
       "searching": "Buscando…",
       "noResults": "No hay clientes coincidentes",
@@ -902,9 +975,22 @@
     "csvMenu": {
       "label": "Opciones de importar y exportar clientes"
     },
+    "dedupe": {
+      "menuLabel": "Eliminar clientes duplicados",
+      "menuHint": "Mismo nombre, telefono o email — conserva el mejor registro",
+      "removing": "Eliminando duplicados…",
+      "noneFound": "No hay clientes duplicados. Cada cliente tiene nombre, telefono y email unicos.",
+      "confirm": "Eliminar {{count}} clientes duplicados en {{groups}} grupos? Se conserva el registro mas completo. Trabajos y facturas se mueven al cliente que se queda. No se puede deshacer.",
+      "done": "Se eliminaron {{removed}} duplicados en {{groups}} grupos.",
+      "partial": "Se eliminaron {{removed}} duplicados, pero {{failed}} grupos no se pudieron fusionar.",
+      "errors": {
+        "preview": "No se pudo buscar duplicados",
+        "failed": "No se pudieron eliminar duplicados"
+      }
+    },
     "export": {
       "menuLabel": "Exportar clientes",
-      "menuHint": "Descargar CSV compatible con Jobber",
+      "menuHint": "Lista completa con direcciones, facturacion y notas",
       "exporting": "Exportando…",
       "errors": {
         "failed": "No se pudieron exportar los clientes"
@@ -913,25 +999,38 @@
     "import": {
       "open": "Importar CSV",
       "menuLabel": "Importar clientes",
-      "menuHint": "Subir CSV desde Jobber u otro CRM",
+      "menuHint": "Trae tu lista completa de clientes desde cualquier app",
       "title": "Importar clientes desde CSV",
-      "subtitle": "Migra clientes desde cualquier CRM o hoja de calculo. Los datos quedan solo en tu espacio de trabajo.",
-      "providerLabel": "Mapeo inteligente activado para formatos CSV comunes.",
+      "subtitle": "Pasa tu lista completa desde Housecall Pro, ServiceTitan, Excel o cualquier CRM. FieldBase reconoce columnas habituales.",
+      "providerLabel": "Detectamos formatos de exportacion comunes. Puedes ajustar el mapeo antes de importar.",
       "chooseFile": "Elegir archivo CSV",
       "uploadHint": "CSV UTF-8 hasta 5 MB y 10.000 filas. Se admiten comillas y comas.",
       "mapHint": "{{count}} filas detectadas. Asocia cada campo de FieldBase a una columna.",
+      "mapBillingStreetWarning": "La calle esta mapeada a una columna de facturacion (Billing) — cambiala a Address, Service Street 1 o Street 1 para importar numeros de casa.",
       "rowsTruncated": "El archivo tenia {{total}} filas; solo se importan las primeras {{shown}}.",
       "unmapped": "— Sin mapear —",
-      "duplicateModeLabel": "Si el cliente ya existe (email o telefono)",
+      "stepsLabel": "Pasos de importacion",
+      "noDuplicatesTitle": "Sin clientes duplicados",
+      "noDuplicatesBody": "Si el cliente ya existe (mismo nombre, email o telefono), FieldBase actualiza su ficha en lugar de crear una copia.",
+      "continueMapping": "Continuar al mapeo",
+      "savingClients": "Guardando clientes en FieldBase…",
+      "duplicateModeLabel": "Si el cliente ya existe (mismo nombre, email o telefono)",
+      "duplicateModeHint": "Recomendado al migrar: Actualizar rellena direccion, facturacion y notas sin crear duplicados.",
       "duplicateSkip": "Omitir duplicados",
-      "duplicateUpdate": "Actualizar clientes existentes",
+      "duplicateUpdate": "Actualizar existentes (recomendado)",
       "duplicateCreate": "Crear igualmente (puede duplicar)",
       "preview": "Vista previa",
       "previewTruncated": "La vista previa muestra las primeras 500 filas. La importacion procesa el archivo completo.",
+      "previewTableHint": "Desplaza horizontalmente para revisar calle, ciudad y notas antes de importar.",
+      "skipModeWarning": "{{count}} clientes ya existen pero se omitiran. Cambia a \"Actualizar existentes (recomendado)\" para completar telefono, calle y email.",
       "startImport": "Importar clientes",
       "importing": "Importando…",
       "back": "Atras",
       "close": "Listo",
+      "doneTitle": "Importacion terminada",
+      "doneHint": "Los clientes ya estan guardados en FieldBase. Pulsa Listo para cerrar y ver la lista actualizada. Las filas de abajo no se importaron — corrigelas en el CSV e importa de nuevo si hace falta.",
+      "errorReportFailed": "{{count}} filas no se pudieron guardar",
+      "errorReportSkipped": "{{count}} filas omitidas (duplicado en tu CSV)",
       "uploadAnother": "Subir otro archivo",
       "existingMatch": "Coincide con: {{name}}",
       "errorReport": "Filas que no se pudieron importar",
@@ -950,6 +1049,8 @@
       },
       "columns": {
         "status": "Estado",
+        "street": "Calle",
+        "locality": "Ciudad / Estado / ZIP",
         "details": "Detalle"
       },
       "summary": {
@@ -970,6 +1071,8 @@
         "parseFailed": "No se pudo leer el CSV.",
         "nameColumnRequired": "Mapea la columna Nombre antes de continuar.",
         "previewFailed": "Error en vista previa",
+        "useUpdateMode": "Elige \"Actualizar existentes (recomendado)\" — Omitir no llenara telefono ni calle para clientes que ya estan en FieldBase.",
+        "nothingToSave": "Nada que guardar — corrige filas invalidas o mapea Nombre y vuelve a la vista previa.",
         "importFailed": "Error al importar"
       }
     }

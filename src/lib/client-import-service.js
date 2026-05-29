@@ -5,12 +5,15 @@ import {
   buildClientUpdateRow,
 } from "@/lib/client-records";
 import {
+  buildImportClientUpdateBody,
   classifyImportRow,
   mapRecordToClientPayload,
   normalizeEmailForMatch,
+  normalizeNameForMatch,
   normalizePhoneForMatch,
   validateClientImportPayload,
 } from "@/lib/import-engine/client-import-validate";
+import { DEFAULT_DUPLICATE_MODE } from "@/lib/import-engine/client-fields";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const IMPORT_BATCH_SIZE = 100;
@@ -18,11 +21,12 @@ export const IMPORT_PREVIEW_LIMIT = 500;
 export const IMPORT_MAX_ROWS = 10_000;
 
 /**
- * Load tenant client email/phone keys for duplicate detection.
+ * Load tenant client keys for duplicate detection (email, phone, name).
  */
 export async function loadTenantClientMatchIndex(tenantId) {
   const emailToClient = new Map();
   const phoneToClient = new Map();
+  const nameToClient = new Map();
 
   let from = 0;
   const pageSize = 1000;
@@ -47,13 +51,17 @@ export async function loadTenantClientMatchIndex(tenantId) {
       if (phoneKey && !phoneToClient.has(phoneKey)) {
         phoneToClient.set(phoneKey, { id: row.id, name: row.name || "" });
       }
+      const nameKey = normalizeNameForMatch(row.name);
+      if (nameKey && !nameToClient.has(nameKey)) {
+        nameToClient.set(nameKey, { id: row.id, name: row.name || "" });
+      }
     }
 
     if (rows.length < pageSize) break;
     from += pageSize;
   }
 
-  return { emailToClient, phoneToClient };
+  return { emailToClient, phoneToClient, nameToClient };
 }
 
 function findExistingInIndex(payload, index) {
@@ -64,6 +72,10 @@ function findExistingInIndex(payload, index) {
   const phoneKey = normalizePhoneForMatch(payload.phone);
   if (phoneKey && index.phoneToClient.has(phoneKey)) {
     return index.phoneToClient.get(phoneKey);
+  }
+  const nameKey = normalizeNameForMatch(payload.name);
+  if (nameKey && index.nameToClient?.has(nameKey)) {
+    return index.nameToClient.get(nameKey);
   }
   return null;
 }
@@ -80,6 +92,7 @@ export async function previewClientImport({
   const index = await loadTenantClientMatchIndex(tenantId);
   const seenEmails = new Set();
   const seenPhones = new Set();
+  const seenNames = new Set();
 
   const preview = [];
   const summary = {
@@ -95,11 +108,13 @@ export async function previewClientImport({
 
   for (let rowIndex = 0; rowIndex < records.length; rowIndex += 1) {
     const record = records[rowIndex];
-    const payload = mapRecordToClientPayload(record, mapping);
-    const validation = validateClientImportPayload(payload);
+    const mapped = mapRecordToClientPayload(record, mapping);
+    const validation = validateClientImportPayload(mapped);
+    const payload = validation.payload;
 
     const emailKey = normalizeEmailForMatch(payload.email);
     const phoneKey = normalizePhoneForMatch(payload.phone);
+    const nameKey = normalizeNameForMatch(payload.name);
     let duplicateInFile = false;
 
     if (emailKey) {
@@ -109,6 +124,10 @@ export async function previewClientImport({
     if (phoneKey) {
       if (seenPhones.has(phoneKey)) duplicateInFile = true;
       else seenPhones.add(phoneKey);
+    }
+    if (nameKey) {
+      if (seenNames.has(nameKey)) duplicateInFile = true;
+      else seenNames.add(nameKey);
     }
 
     const existingClient = validation.ok
@@ -166,6 +185,9 @@ export async function commitClientImportBatch({
   const seenPhones = new Set(
     Array.isArray(seenKeys?.phones) ? seenKeys.phones : [],
   );
+  const seenNames = new Set(
+    Array.isArray(seenKeys?.names) ? seenKeys.names : [],
+  );
 
   const result = {
     created: 0,
@@ -180,11 +202,13 @@ export async function commitClientImportBatch({
   for (let offset = 0; offset < records.length; offset += 1) {
     const rowIndex = startRowIndex + offset;
     const record = records[offset];
-    const payload = mapRecordToClientPayload(record, mapping);
-    const validation = validateClientImportPayload(payload);
+    const mapped = mapRecordToClientPayload(record, mapping);
+    const validation = validateClientImportPayload(mapped);
+    const payload = validation.payload;
 
     const emailKey = normalizeEmailForMatch(payload.email);
     const phoneKey = normalizePhoneForMatch(payload.phone);
+    const nameKey = normalizeNameForMatch(payload.name);
 
     if (emailKey && seenEmails.has(emailKey)) {
       result.skipped += 1;
@@ -202,8 +226,17 @@ export async function commitClientImportBatch({
       });
       continue;
     }
+    if (nameKey && seenNames.has(nameKey)) {
+      result.skipped += 1;
+      result.errors.push({
+        rowIndex,
+        message: "Skipped: duplicate name within CSV",
+      });
+      continue;
+    }
     if (emailKey) seenEmails.add(emailKey);
     if (phoneKey) seenPhones.add(phoneKey);
+    if (nameKey) seenNames.add(nameKey);
 
     if (!validation.ok) {
       result.failed += 1;
@@ -224,17 +257,13 @@ export async function commitClientImportBatch({
 
       if (duplicateMode === "update") {
         try {
-          const updateRow = buildClientUpdateRow({
-            name: payload.name,
-            email: payload.email,
-            phone: payload.phone,
-            address: payload.address,
-            city: payload.city,
-            state: payload.state,
-            zip: payload.zip,
-            company: payload.company,
-            notes: payload.notes,
-          });
+          const updateBody = buildImportClientUpdateBody(payload);
+          if (!Object.keys(updateBody).length) {
+            result.skipped += 1;
+            continue;
+          }
+
+          const updateRow = buildClientUpdateRow(updateBody);
 
           const { error } = await supabaseAdmin
             .from("clients")
@@ -247,6 +276,7 @@ export async function commitClientImportBatch({
 
           if (emailKey) index.emailToClient.set(emailKey, existing);
           if (phoneKey) index.phoneToClient.set(phoneKey, existing);
+          if (nameKey) index.nameToClient?.set(nameKey, existing);
         } catch (err) {
           result.failed += 1;
           result.errors.push({
@@ -261,7 +291,7 @@ export async function commitClientImportBatch({
 
     try {
       const insertRow = buildClientInsertRow(payload, { tenantId, userId });
-      inserts.push({ rowIndex, insertRow, emailKey, phoneKey });
+      inserts.push({ rowIndex, insertRow, emailKey, phoneKey, nameKey });
     } catch (err) {
       result.failed += 1;
       result.errors.push({
@@ -299,6 +329,7 @@ export async function commitClientImportBatch({
         };
         if (item.emailKey) index.emailToClient.set(item.emailKey, clientRef);
         if (item.phoneKey) index.phoneToClient.set(item.phoneKey, clientRef);
+        if (item.nameKey) index.nameToClient?.set(item.nameKey, clientRef);
       }
     } else {
       result.created += inserts.length;
@@ -306,6 +337,7 @@ export async function commitClientImportBatch({
         const clientRef = { id: "pending", name: item.insertRow.name };
         if (item.emailKey) index.emailToClient.set(item.emailKey, clientRef);
         if (item.phoneKey) index.phoneToClient.set(item.phoneKey, clientRef);
+        if (item.nameKey) index.nameToClient?.set(item.nameKey, clientRef);
       }
     }
   }
@@ -315,6 +347,7 @@ export async function commitClientImportBatch({
     seenKeys: {
       emails: [...seenEmails],
       phones: [...seenPhones],
+      names: [...seenNames],
     },
   };
 }

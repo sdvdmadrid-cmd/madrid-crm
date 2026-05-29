@@ -3,6 +3,7 @@ import {
   normalizeMoney,
   normalizePaymentMethod,
 } from "@/lib/invoice-payments";
+import { findEstimateBuilderForNumber } from "@/lib/estimate-builder-linking";
 import { normalizeBaseNumber } from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -244,14 +245,13 @@ export async function PATCH(request, { params }) {
 
       const estimateLookupNumber = quoteNumber || invNum;
       if (estimateLookupNumber) {
-        const { data: est, error: estErr } = await supabaseAdmin
-          .from("estimate_builder")
-          .select("id,quote_number,client_id")
-          .eq("tenant_id", tenantDbId)
-          .eq("quote_number", estimateLookupNumber)
-          .maybeSingle();
+        const est = await findEstimateBuilderForNumber(
+          supabaseAdmin,
+          tenantDbId,
+          estimateLookupNumber,
+        );
 
-        if (!estErr && est?.id) {
+        if (est?.id) {
           estimateId = est.id;
           linkedClientId = linkedClientId || normalizeUuid(est.client_id);
         }

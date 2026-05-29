@@ -1,18 +1,31 @@
-/**
- * CSV export helpers — Jobber-friendly columns for round-trip import.
- */
+import {
+  formatPreviewLocality,
+  formatPreviewStreet,
+} from "./import-preview-format.js";
 
+/**
+ * CSV export helpers — full client profile columns for round-trip import.
+ */
 export const CLIENT_EXPORT_HEADERS = [
   "First Name",
   "Last Name",
   "Company",
   "Email",
+  "Phone",
   "Mobile Phone",
+  "Home Phone",
+  "Work Phone",
   "Street 1",
+  "Street 2",
   "City",
   "State",
   "ZIP",
+  "Billing Street",
+  "Billing City",
+  "Billing State",
+  "Billing ZIP",
   "Notes",
+  "Lead Status",
 ];
 
 export function encodeCsvCell(value) {
@@ -33,23 +46,57 @@ export function splitClientName(fullName) {
   };
 }
 
+function splitStreetLine2(address = "") {
+  const raw = String(address || "").trim();
+  if (!raw || !raw.includes(",")) return { line1: raw, line2: "" };
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return { line1: raw, line2: "" };
+  return { line1: parts[0], line2: parts.slice(1).join(", ") };
+}
+
 /**
  * @param {object} client serialized client row
  * @returns {string[]}
  */
 export function clientToExportCells(client = {}) {
   const { firstName, lastName } = splitClientName(client.name);
+  const payload = {
+    address: client.address,
+    city: client.city,
+    state: client.state,
+    zip: client.zip || client.zipCode,
+  };
+  const streetRaw = formatPreviewStreet(payload);
+  const { line1, line2 } = splitStreetLine2(streetRaw);
+  const city = formatPreviewLocality(payload) || client.city || "";
+  const billingSame = client.billing_same_as_service !== false;
+  const billingAddress = billingSame
+    ? ""
+    : client.billing_address || "";
+  const billingCity = billingSame ? "" : client.billing_city || "";
+  const billingState = billingSame ? "" : client.billing_state || "";
+  const billingZip = billingSame ? "" : client.billing_zip || "";
+
   return [
     firstName,
     lastName,
     client.company || client.companyName || "",
     client.email || "",
     client.phone || "",
-    client.address || "",
-    client.city || "",
+    "",
+    "",
+    "",
+    line1,
+    line2,
+    city,
     client.state || "",
     client.zip || client.zipCode || "",
+    billingAddress,
+    billingCity,
+    billingState,
+    billingZip,
     client.notes || "",
+    client.leadStatus || client.lead_status || "",
   ];
 }
 

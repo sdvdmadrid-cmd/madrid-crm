@@ -1,0 +1,24 @@
+.stickySaveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+  margin-top: 20px;
+  padding: 14px 18px;
+  border-radius: 14px 14px 0 0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-bottom: none;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.stickySaveLabel {
+  margin-right: auto;
+  font-size: 13px;
+  color: #94a3b8;
+}

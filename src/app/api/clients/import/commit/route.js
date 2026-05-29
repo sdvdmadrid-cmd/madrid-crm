@@ -6,7 +6,10 @@ import {
   IMPORT_MAX_ROWS,
   commitClientImportBatch,
 } from "@/lib/client-import-service";
-import { DUPLICATE_MODES } from "@/lib/import-engine/client-fields";
+import {
+  DEFAULT_DUPLICATE_MODE,
+  DUPLICATE_MODES,
+} from "@/lib/import-engine/client-fields";
 import { parseJsonBody } from "@/lib/parse-json-body";
 
 export const runtime = "nodejs";
@@ -63,7 +66,7 @@ export async function POST(request) {
 
     const duplicateMode = DUPLICATE_MODES.includes(body.duplicateMode)
       ? body.duplicateMode
-      : "skip";
+      : DEFAULT_DUPLICATE_MODE;
 
     const seenKeys =
       body.seenKeys && typeof body.seenKeys === "object" ? body.seenKeys : null;

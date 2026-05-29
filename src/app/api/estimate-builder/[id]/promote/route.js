@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { resolveEstimateLinkedNumber } from "@/lib/estimate-builder-linking";
 import {
   QUOTE_LOOKUP_LIMIT,
   normalizeBaseNumber,
@@ -206,9 +207,7 @@ export async function POST(request, { params }) {
     const invoiceAmountCents = toCents(invoiceAmount);
 
     const nowIso = new Date().toISOString();
-    const reusedBaseNumber = normalizeBaseNumber(
-      estimate.quote_number || estimate.quoteNumber,
-    );
+    const reusedBaseNumber = resolveEstimateLinkedNumber(estimate);
     const quoteToken = `${crypto.randomUUID().replace(/-/g, "")}${Date.now().toString(36)}`;
     const baseUrl = (process.env.APP_BASE_URL || new URL(request.url).origin)
       .replace(/\/$/, "");
@@ -290,7 +289,6 @@ export async function POST(request, { params }) {
     await supabaseAdmin
       .from(ESTIMATES_COL)
       .update({
-        quote_number: baseNumber,
         quote_id: insertedQuote.id,
         updated_at: nowIso,
       })

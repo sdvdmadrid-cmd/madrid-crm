@@ -137,6 +137,71 @@
   }
 }
 
+/* Forms (estimates, invoices) — light surface */
+.wrapLight .input {
+  min-height: 42px;
+  padding: 10px 40px 10px 40px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #111827;
+  box-shadow: none;
+}
+
+.wrapLight .input:focus {
+  border-color: #0b69ff;
+  box-shadow: 0 0 0 2px rgba(11, 105, 255, 0.15);
+}
+
+.wrapLight .input::placeholder {
+  color: #9ca3af;
+}
+
+.wrapLight .icon {
+  color: #6b7280;
+}
+
+.wrapLight .clearBtn {
+  color: #6b7280;
+}
+
+.wrapLight .clearBtn:hover {
+  color: #111827;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.wrapLight .list {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.wrapLight .optionName {
+  color: #111827;
+}
+
+.wrapLight .optionMeta {
+  color: #6b7280;
+}
+
+.wrapLight .optionActive {
+  background: rgba(11, 105, 255, 0.08);
+}
+
+.wrapLight .empty {
+  color: #6b7280;
+}
+
+.wrapLight .hint {
+  color: #6b7280;
+}
+
+.wrapLight .spinner {
+  border-color: rgba(107, 114, 128, 0.25);
+  border-top-color: #0b69ff;
+}
+
 @media (max-width: 640px) {
   .input {
     min-height: 52px;

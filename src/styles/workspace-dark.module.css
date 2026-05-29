@@ -71,7 +71,7 @@
   backdrop-filter: blur(22px) saturate(1.25);
   box-shadow: var(--fb-shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .topBar::after {
@@ -109,6 +109,8 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+  position: relative;
+  z-index: 30;
 }
 
 .btnPrimary {

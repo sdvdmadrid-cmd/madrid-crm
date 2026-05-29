@@ -140,6 +140,10 @@
   gap: 12px;
 }
 
+.clientPicker {
+  grid-column: 1 / -1;
+}
+
 .formActions {
   display: flex;
   gap: 10px;

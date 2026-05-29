@@ -1,3 +1,4 @@
+import { findEstimateBuilderForNumber } from "@/lib/estimate-builder-linking";
 import {
   INVOICE_LOOKUP_LIMIT,
   formatInvoiceNumber,
@@ -233,14 +234,13 @@ export async function POST(request) {
 
     const estimateLookupNumber = quoteNumber || invoiceNumber;
     if (estimateLookupNumber) {
-      const { data: est, error: estErr } = await supabaseAdmin
-        .from("estimate_builder")
-        .select("id,quote_number,client_id")
-        .eq("tenant_id", tenantDbId)
-        .eq("quote_number", estimateLookupNumber)
-        .maybeSingle();
+      const est = await findEstimateBuilderForNumber(
+        supabaseAdmin,
+        tenantDbId,
+        estimateLookupNumber,
+      );
 
-      if (!estErr && est?.id) {
+      if (est?.id) {
         estimateId = est.id;
         linkedClientId = linkedClientId || normalizeUuid(est.client_id);
       }
