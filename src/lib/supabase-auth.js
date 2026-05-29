@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { normalizeAppRole } from "@/lib/access-control";
 import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { getSessionFromRequest } from "@/lib/auth";
+import { applyComplimentarySessionFields } from "@/lib/complimentary-access";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
 
 let supabaseAdminClientPromise = null;
@@ -226,7 +227,7 @@ export function buildAppSessionFromSupabaseUser(
   profile = null,
 ) {
   const normalized = normalizeAuthUser(user, profile);
-  return {
+  return applyComplimentarySessionFields({
     userId: normalized.id,
     tenantId: normalized.tenantId,
     tenantDbId: normalized.tenantDbId,
@@ -241,7 +242,7 @@ export function buildAppSessionFromSupabaseUser(
     trialEndDate: normalized.trialEndDate,
     supabaseAccessToken: authSession?.access_token || null,
     supabaseRefreshToken: authSession?.refresh_token || null,
-  };
+  });
 }
 
 export async function getSupabaseUserFromRequest(request) {

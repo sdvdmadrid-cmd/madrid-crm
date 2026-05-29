@@ -73,6 +73,7 @@ export async function GET(request) {
               industry: appSession.businessType || appSession.industry || "",
               isSubscribed: appSession.isSubscribed === true,
               trialEndDate: appSession.trialEndDate || null,
+              complimentaryAccess: appSession.complimentaryAccess === true,
             }),
           }),
         {
@@ -111,6 +112,7 @@ export async function GET(request) {
       industry: session.businessType || session.industry || "",
       isSubscribed: session.isSubscribed === true,
       trialEndDate: session.trialEndDate || null,
+      complimentaryAccess: session.complimentaryAccess === true,
     };
 
     let setCookieHeader = null;
@@ -155,6 +157,7 @@ export async function GET(request) {
           industry: appSession.businessType || "",
           isSubscribed: appSession.isSubscribed === true,
           trialEndDate: appSession.trialEndDate || null,
+          complimentaryAccess: appSession.complimentaryAccess === true,
         };
       }
     }

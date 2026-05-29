@@ -1889,7 +1889,12 @@ export default function AuthShell({ children }) {
 
 // ─── Trial banner ────────────────────────────────────────────────────────────
 function TrialBanner({ authUser, trialExpired, t }) {
-  if (!authUser || authUser.isSubscribed || authUser.role === "super_admin")
+  if (
+    !authUser ||
+    authUser.isSubscribed ||
+    authUser.complimentaryAccess ||
+    authUser.role === "super_admin"
+  )
     return null;
 
   const now = Date.now();

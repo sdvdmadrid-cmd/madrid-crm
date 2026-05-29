@@ -8,6 +8,7 @@ import {
   normalizeAppRole,
 } from "@/lib/access-control";
 import { getSessionFromRequest } from "@/lib/auth";
+import { applyComplimentarySessionFields } from "@/lib/complimentary-access";
 import {
   getSupabaseUserFromRequest,
   normalizeAuthUser,
@@ -19,7 +20,7 @@ export function getTenantContext(request) {
   if (session?.tenantId) {
     const normalizedRole = normalizeAppRole(session.role);
     const capabilities = getRoleCapabilities(normalizedRole);
-    return {
+    return applyComplimentarySessionFields({
       tenantId: session.tenantId,
       tenantDbId: session.tenantDbId || session.userId || null,
       role: normalizedRole,
@@ -35,7 +36,7 @@ export function getTenantContext(request) {
       isSuperAdmin: isSuperAdminRole(normalizedRole),
       authenticated: true,
       capabilities,
-    };
+    });
   }
 
   // No header fallback — never trust client-supplied tenant/role headers.
@@ -87,7 +88,7 @@ export async function getAuthenticatedTenantContext(request) {
     const normalized = normalizeAuthUser(user, profile);
     const capabilities = getRoleCapabilities(normalized.role);
 
-    return {
+    return applyComplimentarySessionFields({
       tenantId: normalized.tenantId || fallback.tenantId,
       tenantDbId: normalized.tenantDbId || fallback.tenantDbId || user.id,
       role: normalized.role || fallback.role,
@@ -104,7 +105,7 @@ export async function getAuthenticatedTenantContext(request) {
       supabaseUser: user,
       profile,
       capabilities,
-    };
+    });
   } catch (error) {
     console.error("[tenant] Unexpected Supabase user resolution error", error);
     return fallback;

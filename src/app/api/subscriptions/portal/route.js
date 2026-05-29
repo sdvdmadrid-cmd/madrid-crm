@@ -7,6 +7,10 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import {
+  complimentaryBillingBlockedPayload,
+  isComplimentaryTenant,
+} from "@/lib/complimentary-access";
 import { getStripeServerClient } from "@/lib/stripe-payments";
 
 export async function POST(request) {
@@ -29,6 +33,13 @@ export async function POST(request) {
 
     if (!canWrite(context.role)) {
       return forbiddenResponse();
+    }
+
+    if (isComplimentaryTenant(context.tenantDbId)) {
+      return new Response(JSON.stringify(complimentaryBillingBlockedPayload()), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const stripe = getStripeServerClient();
