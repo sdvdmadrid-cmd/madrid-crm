@@ -8,8 +8,8 @@ import {
   getStripeSecretKey,
   getStripeWebhookSecret,
 } from "@/lib/stripe-payments";
+import { isSuperAdminRole } from "@/lib/access-control";
 import {
-  canManageSensitive,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -22,7 +22,8 @@ export async function GET(request) {
   if (!context.authenticated) {
     return unauthenticatedResponse();
   }
-  if (!canManageSensitive(context.role)) {
+  // Platform Stripe env / webhook diagnostics — not for contractor accounts.
+  if (!isSuperAdminRole(context.role)) {
     return forbiddenResponse();
   }
 

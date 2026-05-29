@@ -588,8 +588,8 @@ export default function InvoicesPage() {
 
       {capabilities.canManageSensitiveData ? (
         <InvoiceClientPaymentsGuide
+          variant="contractor"
           defaultExpanded={showClientPaymentsBanner}
-          stripePublishableConfigured={stripePublishableConfigured}
         />
       ) : null}
 
