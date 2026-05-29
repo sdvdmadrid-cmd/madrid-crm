@@ -1,5 +1,6 @@
 import AdminAiMonitoringClient from '@/components/admin/AdminAiMonitoringClient';
 import AdminBillPaymentsOpsClient from '@/components/admin/AdminBillPaymentsOpsClient';
+import InvoiceClientPaymentsGuide from '@/components/invoices/InvoiceClientPaymentsGuide';
 import OwnerSystemStatusCard from '@/components/owner/OwnerSystemStatusCard';
 import OwnerUsageDashboard from '@/components/owner/OwnerUsageDashboard';
 
@@ -21,6 +22,9 @@ export default function OwnerMonitoringPage() {
       </div>
       <OwnerUsageDashboard />
       <OwnerSystemStatusCard />
+      <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-1">
+        <InvoiceClientPaymentsGuide variant="platform" defaultExpanded />
+      </div>
       <AdminAiMonitoringClient />
       <AdminBillPaymentsOpsClient mode="platform-owner" />
     </section>
