@@ -9,6 +9,10 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import {
+  complimentaryBillingBlockedPayload,
+  isComplimentaryTenant,
+} from "@/lib/complimentary-access";
+import {
   createContractorSubscription,
   getStripeServerClient,
 } from "@/lib/stripe-payments";
@@ -36,6 +40,13 @@ export async function POST(request) {
 
     if (!context.authenticated) {
       return unauthenticatedResponse();
+    }
+
+    if (isComplimentaryTenant(context.tenantDbId)) {
+      return new Response(JSON.stringify(complimentaryBillingBlockedPayload()), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Only allow tenants to manage their own subscriptions

@@ -5,6 +5,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { isComplimentaryTenant } from "@/lib/complimentary-access";
 import { getContractorSubscription } from "@/lib/stripe-payments";
 
 /**
@@ -32,6 +33,10 @@ export async function GET(request) {
       );
     }
 
+    const complimentary =
+      isComplimentaryTenant(context.tenantDbId) ||
+      subscription.metadata?.complimentary === true;
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -47,6 +52,7 @@ export async function GET(request) {
           currentPeriodEnd: subscription.current_period_end,
           cancelledAt: subscription.cancelled_at,
           createdAt: subscription.created_at,
+          complimentary,
         },
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },

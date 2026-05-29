@@ -7,6 +7,10 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import {
+  complimentaryBillingBlockedPayload,
+  isComplimentaryTenant,
+} from "@/lib/complimentary-access";
 import { cancelContractorSubscription } from "@/lib/stripe-payments";
 
 /**
@@ -25,6 +29,13 @@ export async function POST(request) {
     // Only allow tenants to manage their own subscriptions
     if (!canWrite(context.role)) {
       return forbiddenResponse();
+    }
+
+    if (isComplimentaryTenant(context.tenantDbId)) {
+      return new Response(JSON.stringify(complimentaryBillingBlockedPayload()), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Get current subscription

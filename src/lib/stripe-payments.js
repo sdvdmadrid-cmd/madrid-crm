@@ -15,6 +15,7 @@ import {
   CONNECT_PAYOUT_REQUIRED_CODE,
   isStripeConnectEnabled,
 } from "@/lib/stripe-connect";
+import { isComplimentaryTenant } from "@/lib/complimentary-access";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getRequestOrigin } from "@/lib/supabase-auth";
 import { logSupabaseError } from "@/lib/supabase-db";
@@ -946,6 +947,58 @@ export async function createContractorSubscription({
  * Get current subscription for a tenant
  */
 export async function getContractorSubscription(tenantId) {
+  if (isComplimentaryTenant(tenantId)) {
+    const { data, error } = await supabaseAdmin
+      .from("contractor_subscriptions")
+      .select(
+        `
+      id,
+      tenant_id,
+      plan_id,
+      stripe_subscription_id,
+      status,
+      trial_ends_at,
+      current_period_start,
+      current_period_end,
+      cancelled_at,
+      created_at,
+      updated_at,
+      metadata,
+      subscription_plans (
+        id,
+        name,
+        price_monthly,
+        features
+      )
+    `,
+      )
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Error fetching subscription: ${error.message}`);
+    }
+
+    if (data) {
+      return {
+        ...data,
+        status: "active",
+        trial_ends_at: null,
+        metadata: { ...(data.metadata || {}), complimentary: true },
+      };
+    }
+
+    return {
+      tenant_id: tenantId,
+      status: "active",
+      trial_ends_at: null,
+      metadata: { complimentary: true },
+      subscription_plans: { name: "Complimentary", price_monthly: 0 },
+    };
+  }
+
   const { data, error } = await supabaseAdmin
     .from("contractor_subscriptions")
     .select(

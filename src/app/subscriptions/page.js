@@ -178,7 +178,10 @@ export default function SubscriptionsPage() {
     );
   }
 
-  const statusInfo = subscription ? getStatusBadge(subscription.status) : null;
+  const isComplimentary = subscription?.complimentary === true;
+  const statusInfo = subscription
+    ? getStatusBadge(isComplimentary ? "active" : subscription.status)
+    : null;
   const trialEndsAt = subscription?.trialEndsAt
     ? new Date(subscription.trialEndsAt)
     : null;
@@ -202,6 +205,16 @@ export default function SubscriptionsPage() {
       }
     >
         {error && <div className={styles.errorBanner}>{error}</div>}
+
+        {isComplimentary && (
+          <div className={styles.card} style={{ marginBottom: "1rem" }}>
+            <p>
+              <strong>Cuenta del propietario de la plataforma.</strong> Madrid
+              Landscaping tiene acceso completo y gratuito de por vida. No
+              necesitas activar ni pagar la suscripción SaaS de FieldBase.
+            </p>
+          </div>
+        )}
 
         {!subscription ? (
           <div className={styles.card}>
@@ -303,7 +316,7 @@ export default function SubscriptionsPage() {
                 </div>
               </div>
 
-              {subscription.status !== "cancelled" && (
+              {subscription.status !== "cancelled" && !isComplimentary && (
                 <>
                   <button
                     className={styles.buttonPrimary}
