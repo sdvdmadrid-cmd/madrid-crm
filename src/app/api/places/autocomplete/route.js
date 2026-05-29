@@ -34,9 +34,12 @@ export async function GET(request) {
     return Response.json({ success: true, predictions: [] });
   }
 
+  const searchType = String(searchParams.get("type") || "address").trim().toLowerCase();
+  const types = searchType === "establishment" ? "establishment" : "address";
+
   const params = new URLSearchParams({
     input,
-    types: "address",
+    types,
     language: "en",
     // Restrict to US only
     components: "country:us",

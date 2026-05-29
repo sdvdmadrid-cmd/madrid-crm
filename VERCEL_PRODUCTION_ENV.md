@@ -56,7 +56,9 @@ Plaid is only required if the bank-linking flow is enabled for Bill Payments.
 
 `OPENAI_API_KEY` is used by AI description endpoints.
 
-`GOOGLE_PLACES_API_KEY` is used by Places autocomplete and details endpoints.
+`GOOGLE_PLACES_API_KEY` is used by Places autocomplete, details, and **reputation sync** (Google reviews on public websites).
+
+- `YELP_FUSION_API_KEY` — Yelp Fusion API for syncing real Yelp review excerpts into `/reputation` (create at [Yelp Developers](https://www.yelp.com/developers)).
 
 ## Cron Jobs (Vercel — see `vercel.json`)
 

@@ -5,6 +5,7 @@ import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
 import PremiumGallery from "@/components/site/PremiumGallery";
 import PublicReviewsSection from "@/components/site/PublicReviewsSection";
+import PublicReviewsCta from "@/components/site/PublicReviewsCta";
 import { getPublicReviewsBySlug } from "@/lib/reputation-store";
 import PublicSiteEnhancements from "@/components/site/PublicSiteEnhancements";
 import PublicSiteLeadExperience from "@/components/site/PublicSiteLeadExperience";
@@ -139,10 +140,6 @@ export default async function PublicContractorSitePage({ params }) {
   const industryPack = getWebsiteBuilderPack(
     resolveWebsiteIndustryKey(data.companyProfile?.businessType),
   );
-  const testimonials =
-    Array.isArray(data.testimonials) && data.testimonials.length > 0
-      ? data.testimonials
-      : industryPack.testimonials;
   const requestServiceOptions = resolveWebsiteRequestServices({
     services: data.services,
     requestServices: data.requestServices,
@@ -491,23 +488,17 @@ export default async function PublicContractorSitePage({ params }) {
           />
         ) : null}
 
-        {testimonials.length > 0 && publicReviews.length === 0 ? (
-          <section className="s-testimonials ps-reveal">
-            <div className="s-test-grid">
-              {testimonials.slice(0, 2).map((item, index) => (
-                <div key={`${item.name}-${index}`} className="s-test-card">
-                  <p className="s-test-quote">&ldquo;{item.quote}&rdquo;</p>
-                  <div className="s-test-author">
-                    <div className="s-test-avatar">{(item.name || "C").charAt(0).toUpperCase()}</div>
-                    <div>
-                      <div className="s-test-name">{item.name}</div>
-                      <div className="s-test-co">{item.role}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+        {publicReviews.length === 0 ? (
+          <PublicReviewsCta
+            googleUrl={data.socialLinks?.google || data.companyProfile?.googleReviewsUrl}
+            yelpUrl={data.socialLinks?.yelp}
+            title={locale === "es" ? "Reseñas verificadas" : "Verified reviews"}
+            subtitle={
+              locale === "es"
+                ? "Lee opiniones reales en Google y Yelp."
+                : "Read real customer reviews on Google and Yelp."
+            }
+          />
         ) : null}
 
         <WaveDivider fromColor="#eff6ff" toColor="#1e293b" />

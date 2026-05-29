@@ -54,6 +54,16 @@ function ReviewCard({ review }) {
         </span>
       </div>
       <p className="ps-review-quote">&ldquo;{review.reviewText}&rdquo;</p>
+      {review.sourceUrl ? (
+        <a
+          className="ps-review-source-link"
+          href={review.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          View on {review.platform === "yelp" ? "Yelp" : review.platform === "google" ? "Google" : "source"} →
+        </a>
+      ) : null}
       {review.videoUrl ? (
         <a className="ps-review-video" href={review.videoUrl} target="_blank" rel="noreferrer">
           Watch video testimonial →

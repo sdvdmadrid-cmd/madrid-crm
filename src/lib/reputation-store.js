@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { isApiSyncedReview } from "@/lib/reputation-sync/shared.js";
 
 const REVIEW_PLATFORMS = new Set([
   "manual",
@@ -105,21 +106,25 @@ export async function getPublicReviewsBySlug(slug) {
   const { data, error } = await supabaseAdmin
     .from("contractor_reviews")
     .select(
-      "id, platform, author_name, rating, review_text, review_date, photo_url, video_url, verified, pinned, service_type",
+      "id, platform, source_url, author_name, rating, review_text, review_date, photo_url, video_url, verified, pinned, service_type, metadata",
     )
     .eq("tenant_id", website.tenantId)
     .eq("show_on_website", true)
     .eq("hidden", false)
+    .eq("verified", true)
     .order("pinned", { ascending: false })
     .order("review_date", { ascending: false, nullsFirst: false })
-    .limit(24);
+    .limit(48);
 
   if (error) {
     console.warn("[reputation] getPublicReviewsBySlug", error?.message || error);
     return { reviews: [], stats: null };
   }
 
-  const reviews = (data || []).map(serializeReview);
+  const reviews = (data || [])
+    .filter((row) => isApiSyncedReview(row))
+    .map(serializeReview)
+    .slice(0, 24);
   const ratings = reviews.map((r) => r.rating).filter((n) => Number.isFinite(n));
   const avg = ratings.length
     ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10

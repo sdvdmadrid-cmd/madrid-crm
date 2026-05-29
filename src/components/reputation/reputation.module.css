@@ -36,6 +36,50 @@
   margin-bottom: 24px;
 }
 
+.connectGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.syncActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.suggestList {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.suggestBtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.suggestBtn:hover {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+.link {
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .importCard h3 {
   margin: 0 0 8px;
   color: #f8fafc;

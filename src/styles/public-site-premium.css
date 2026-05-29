@@ -856,6 +856,24 @@
   font-size: 14px;
 }
 
+.ps-review-source-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--theme, #1d4ed8);
+  text-decoration: none;
+}
+
+.ps-review-source-link:hover {
+  text-decoration: underline;
+}
+
+.ps-reviews-cta {
+  padding: 48px 24px 56px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
+}
+
 .ps-review-quote {
   color: #334155;
   line-height: 1.65;
