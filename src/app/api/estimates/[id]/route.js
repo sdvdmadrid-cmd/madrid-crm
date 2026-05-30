@@ -8,6 +8,7 @@ import {
   stringifyEstimateNotes,
 } from "@/lib/estimate-notes";
 import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
+import { enforceSignedQuoteLockForEstimatePatch } from "@/lib/quote-signature-lock";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import {
@@ -243,6 +244,19 @@ export async function PATCH(request, { params }) {
     if (!existing) {
       return jsonResponse({ success: false, error: "Estimate not found" }, 404);
     }
+
+    const removeQuoteSignature = body.removeQuoteSignature === true;
+    if ("removeQuoteSignature" in body) {
+      delete body.removeQuoteSignature;
+    }
+
+    const lockResponse = await enforceSignedQuoteLockForEstimatePatch({
+      tenantDbId,
+      role,
+      estimateNumber: existing.estimate_number,
+      removeQuoteSignature,
+    });
+    if (lockResponse) return lockResponse;
 
     // Snapshot the prior shape *before* the update so we can record an
     // accurate revision diff even when the caller patches just one field.

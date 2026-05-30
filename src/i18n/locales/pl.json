@@ -810,7 +810,8 @@
       "noNoteHistory": "Brak dodatkowych notatek.",
       "noVisits": "Brak wizyt.",
       "noRequests": "Brak zapytan.",
-      "viewEstimate": "Otworz w Estimate Builder",
+      "viewEstimate": "Edytuj wycene",
+      "viewLegacyEstimate": "Zobacz w Wycenach (archiwum)",
       "viewInvoices": "Faktury",
       "viewJob": "Zobacz zlecenie",
       "errors": {

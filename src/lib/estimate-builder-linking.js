@@ -19,8 +19,9 @@ export function resolveEstimateLinkedNumber(estimate = {}) {
 }
 
 /**
- * Find an estimate_builder row when linking invoices/quotes by number.
- * Matches `estimate_number` first, then falls back to `quote_id` → quotes.
+ * Find an estimate row when linking invoices/quotes by number.
+ * Pipeline `estimates` table first; legacy `estimate_builder` rows remain
+ * readable for historical invoices only.
  */
 export async function findEstimateBuilderForNumber(
   supabase,
@@ -35,13 +36,26 @@ export async function findEstimateBuilderForNumber(
 
   for (const candidate of candidates) {
     const { data, error } = await supabase
+      .from("estimates")
+      .select("id, estimate_number, client_id")
+      .eq("tenant_id", tenantId)
+      .eq("estimate_number", candidate)
+      .maybeSingle();
+
+    if (!error && data?.id) {
+      return { ...data, quote_id: null, source: "estimates" };
+    }
+  }
+
+  for (const candidate of candidates) {
+    const { data, error } = await supabase
       .from("estimate_builder")
       .select("id, estimate_number, quote_id, client_id")
       .eq("tenant_id", tenantId)
       .eq("estimate_number", candidate)
       .maybeSingle();
 
-    if (!error && data?.id) return data;
+    if (!error && data?.id) return { ...data, source: "estimate_builder" };
   }
 
   const quoteTenantId = String(tenantId);

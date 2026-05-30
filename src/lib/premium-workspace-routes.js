@@ -8,7 +8,6 @@ const PREMIUM_WORKSPACE_PREFIXES = [
   "/jobs",
   "/invoices",
   "/estimates",
-  "/estimate-builder",
   "/smart-estimator",
   "/calendar",
   "/lead-inbox",

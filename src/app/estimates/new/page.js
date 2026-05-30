@@ -107,7 +107,6 @@ function NewEstimatePageInner() {
   const editId = searchParams.get("edit") || "";
   const aiDraftParam = searchParams.get("aiDraft") || "";
   const clientIdParam = searchParams.get("clientId") || "";
-  const legacyBuilderId = searchParams.get("legacyBuilderId") || "";
 
   const [clientPrefix, setClientPrefix] = useState("");
   const [clientFirstName, setClientFirstName] = useState("");
@@ -652,16 +651,6 @@ function NewEstimatePageInner() {
         onSubmit={(event) => event.preventDefault()}
         data-form-type="other"
       >
-        {legacyBuilderId ? (
-          <div
-            role="status"
-            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          >
-            This estimate editor replaces the older Estimate Builder. Saved catalog
-            estimates from the legacy tool remain in your account history; create new
-            estimates here for the kanban pipeline.
-          </div>
-        ) : null}
         {deliveryNotice ? (
           <div
             role="alert"
