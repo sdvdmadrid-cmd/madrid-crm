@@ -115,7 +115,9 @@ export async function POST(request, { params }) {
 
   const { data: existing, error: fetchErr } = await supabaseAdmin
     .from(ESTIMATES_TABLE)
-    .select("id, tenant_id, user_id, created_by, status, notes, client_name, items, subtotal, tax, total, estimate_number")
+    .select(
+      "id, tenant_id, user_id, created_by, status, notes, client_name, items, subtotal, tax, total, estimate_number, updated_at",
+    )
     .eq("id", id)
     .single();
 

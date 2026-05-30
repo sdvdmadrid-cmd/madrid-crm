@@ -99,6 +99,12 @@ if (missing.length > 0) {
 
 console.log("[ensure-dev-env] OK — SESSION_SECRET and required keys present.");
 
+if (!refreshed.get("GOOGLE_PLACES_API_KEY")) {
+  console.warn(
+    "[ensure-dev-env] GOOGLE_PLACES_API_KEY is not set — address autocomplete and Google review sync will return 503 until you add your Maps Platform API key to .env.local",
+  );
+}
+
 async function bootstrapWebsiteBuilderAi() {
   try {
     const { spawn } = await import("node:child_process");

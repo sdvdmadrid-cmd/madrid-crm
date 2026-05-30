@@ -1,7 +1,7 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
-  getTenantContext,
+  getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -80,10 +80,11 @@ async function safeRows(table, columns, tenantId, role, limit = 500) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } = getTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
+    const { tenantDbId, role } = context;
 
     const key = cacheKey(tenantDbId);
 
@@ -236,12 +237,12 @@ export async function DELETE(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
   try {
-    const { tenantDbId, authenticated } = getTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
 
-    cache.delete(cacheKey(tenantDbId));
+    cache.delete(cacheKey(context.tenantDbId));
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

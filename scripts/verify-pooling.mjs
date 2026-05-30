@@ -8,6 +8,9 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { loadEnvLocal } from "./load-env-local.mjs";
+
+loadEnvLocal();
 
 const pooledUrl = process.env.SUPABASE_CONNECTION_POOLED_URL;
 const directUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;

@@ -285,11 +285,21 @@ async function recordScopedAttempt(checks) {
   }
 }
 
+function bypassPublicQuoteRateLimit() {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.E2E_BYPASS_RATE_LIMIT === "1"
+  );
+}
+
 export async function checkPublicQuoteRateLimit({
   token,
   ip,
   action = "view",
 }) {
+  if (bypassPublicQuoteRateLimit()) {
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
   return checkScopedRateLimit(
     [
       {
@@ -303,6 +313,9 @@ export async function checkPublicQuoteRateLimit({
 }
 
 export async function recordPublicQuoteAttempt({ token, ip, action = "view" }) {
+  if (bypassPublicQuoteRateLimit()) {
+    return;
+  }
   const caps = publicQuoteCapsForAction(action);
   return recordScopedAttempt([
     {

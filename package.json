@@ -18,6 +18,7 @@
     "db:apply-connect": "node -e \"console.log('Paste scripts/apply-connect-columns-only.sql in Supabase SQL Editor, or run: SUPABASE_DB_PASSWORD=*** npx supabase db query --linked -f scripts/apply-connect-columns-only.sql')\"",
     "stripe:check": "node scripts/check-stripe-key.mjs",
     "verify:prod": "node scripts/verify-production.mjs",
+    "verify:places": "node scripts/verify-places-autocomplete.mjs",
     "validate:public": "node scripts/validate-public-production.mjs",
     "verify:turnstile": "node scripts/verify-turnstile-production.mjs",
     "auth:validate": "node scripts/validate-auth-reset-production.mjs",

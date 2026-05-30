@@ -29,6 +29,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_SHA: buildSha,
   },
+  serverExternalPackages: ["pdfkit"],
   reactCompiler: true,
   poweredByHeader: false,
   images: {

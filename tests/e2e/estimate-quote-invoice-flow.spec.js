@@ -4,6 +4,8 @@ const { createClient } = require("@supabase/supabase-js");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const ORIGIN_HEADERS = { Origin: "http://localhost:3000" };
+
 function loadDotEnvLocal() {
   const envPath = path.join(process.cwd(), ".env.local");
   const out = {};
@@ -95,7 +97,7 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
 
     // 1) Create sent estimate.
     const createEstimateRes = await api.post("/api/estimates", {
-      headers: { Origin: "http://localhost:3000" },
+      headers: ORIGIN_HEADERS,
       data: {
         clientName,
         clientEmail: `qa+${now}@example.com`,
@@ -200,7 +202,7 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     if (!clientId) {
       const createClientRes = await api.post("/api/clients", {
         headers: {
-          Origin: "http://localhost:3000",
+          ...ORIGIN_HEADERS,
           "Content-Type": "application/json",
         },
         data: {
@@ -219,6 +221,7 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     expect(clientId).toBeTruthy();
 
     const ebCreateRes = await api.post("/api/estimate-builder", {
+      headers: ORIGIN_HEADERS,
       data: {
         name: `EB Lock Test ${now}`,
         description: "Lock flow test",
@@ -242,6 +245,7 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     expect(ebId).toBeTruthy();
 
     const shareRes = await api.post(`/api/estimate-builder/${ebId}/share-link`, {
+      headers: ORIGIN_HEADERS,
       data: {},
     });
     const shareJson = await shareRes.json().catch(async () => ({

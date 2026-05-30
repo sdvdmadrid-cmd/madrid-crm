@@ -22,6 +22,9 @@ module.exports = defineConfig({
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      E2E_BYPASS_RATE_LIMIT: '1',
+    },
   },
   projects: [
     {

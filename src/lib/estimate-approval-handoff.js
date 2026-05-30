@@ -20,6 +20,15 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 const QUOTES_TABLE = "quotes";
 const INVOICES_TABLE = "invoices";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** invoices.client_id is uuid — omit invalid/empty values to avoid Postgres cast errors. */
+function invoiceClientId(raw) {
+  const value = String(raw || "").trim();
+  return UUID_RE.test(value) ? value : null;
+}
+
 /**
  * Materialize downstream quote + invoice rows after an estimate lands in
  * `approved`. Idempotent — safe to call from both the public respond path
@@ -92,7 +101,7 @@ async function ensureQuoteForApprovedEstimate({ estimate, nowIso }) {
       created_by: estimate.created_by || null,
       quote_number: quoteNumber,
       title: `Quote for ${estimate.client_name || "Client"}`,
-      client_id: estimate.client_id || null,
+      client_id: String(estimate.client_id || "").trim(),
       client_name: estimate.client_name || "",
       client_email: parsed.clientEmail || "",
       client_phone: parsed.clientPhone || "",
@@ -181,7 +190,7 @@ async function ensureInvoiceForApprovedEstimate({ estimate, quote, nowIso }) {
     quote_id: quoteId,
     quote_number: String(quote.quote_number || "").trim(),
     job_id: estimate.job_id || null,
-    client_id: estimate.client_id || null,
+    client_id: invoiceClientId(estimate.client_id),
     client_name: estimate.client_name || "",
     client_email: parsed.clientEmail || "",
     amount: invoiceAmount,
@@ -191,15 +200,15 @@ async function ensureInvoiceForApprovedEstimate({ estimate, quote, nowIso }) {
     tax_cents: toCents(Math.max(0, toNumber(estimate.tax))),
     total_cents: invoiceAmountCents,
     notes: appendDisclaimer(scopeBase),
-    preferred_payment_method: null,
+    preferred_payment_method: "bank_transfer",
     payments: [],
     paid_amount: 0,
     balance_due: invoiceAmount,
     status: "Unpaid",
     created_at: nowIso,
     updated_at: nowIso,
-    // estimate_id intentionally omitted — FK targets estimate_builder only.
-    estimate_id: null,
+    // Do not set estimate_id — FK targets estimate_builder (uuid) only; pipeline
+    // estimates use integer ids and must link via quote_id + invoice_number.
   };
 
   let lastError = null;
