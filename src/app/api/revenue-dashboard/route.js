@@ -1,7 +1,7 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
-  getTenantContext,
+  getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -58,10 +58,11 @@ function toNullableUuid(value) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } = getTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
+    const { tenantDbId, role } = context;
 
     const { searchParams } = new URL(request.url);
     const limit = toPositiveInt(searchParams.get("limit"), 14, 90);
@@ -135,10 +136,11 @@ export async function DELETE(request) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
   try {
-    const { tenantDbId, role, authenticated } = getTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
+    const { tenantDbId, role } = context;
 
     const { searchParams } = new URL(request.url);
     const limit = toPositiveInt(searchParams.get("limit"), 14, 90);

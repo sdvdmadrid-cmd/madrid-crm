@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "@/lib/client-auth";
 
 /**
  * PlacesAutocomplete
@@ -37,6 +38,7 @@ export default function PlacesAutocomplete({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [configError, setConfigError] = useState("");
 
   const debounceRef = useRef(null);
   const containerRef = useRef(null);
@@ -60,14 +62,23 @@ export default function PlacesAutocomplete({
       setLoading(true);
 
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/places/autocomplete?input=${encodeURIComponent(query)}`,
-          { credentials: "include" },
+          { suppressUnauthorizedEvent: true },
         );
         const data = await res.json();
 
         // Drop stale response if the user has typed further
         if (lastQueryRef.current !== query) return;
+
+        if (res.status === 503 || data.error === "Places API not configured") {
+          setConfigError("Address lookup is not configured on the server.");
+          setSuggestions([]);
+          setOpen(false);
+          return;
+        }
+
+        setConfigError("");
 
         if (
           data.success &&
@@ -132,9 +143,9 @@ export default function PlacesAutocomplete({
     // Fetch structured details (city / state / zip) from the server proxy
     setLoading(true);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/places/details?placeId=${encodeURIComponent(prediction.placeId)}`,
-        { credentials: "include" },
+        { suppressUnauthorizedEvent: true },
       );
       const data = await res.json();
       if (data.success) {
@@ -199,6 +210,10 @@ export default function PlacesAutocomplete({
 
   return (
     <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
+      {configError ? (
+        <p style={{ margin: "0 0 6px", fontSize: 12, color: "#b45309" }}>{configError}</p>
+      ) : null}
+
       <input
         id={id}
         ref={inputRef}

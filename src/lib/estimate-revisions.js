@@ -104,9 +104,17 @@ export async function recordEstimateRevision({
     return;
   }
 
+  const revisionEstimateId = Number(estimateId);
+  if (!Number.isFinite(revisionEstimateId)) {
+    console.warn("[estimate-revisions] skip insert — non-numeric estimate id", {
+      estimateId,
+    });
+    return;
+  }
+
   try {
     const { error } = await supabaseAdmin.from(REVISIONS_TABLE).insert({
-      estimate_id: estimateId,
+      estimate_id: revisionEstimateId,
       tenant_id: tenantId,
       user_id: userId,
       actor_label: String(actorLabel || "").slice(0, 200),

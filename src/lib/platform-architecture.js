@@ -67,6 +67,7 @@ export const PRIVATE_DASHBOARD_API_PREFIXES = [
   "/api/dashboard-metrics",
   "/api/notifications",
   "/api/appointments",
+  "/api/places",
   "/api/contracts",
   "/api/email/campaigns",
 ];
