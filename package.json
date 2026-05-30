@@ -19,6 +19,7 @@
     "stripe:check": "node scripts/check-stripe-key.mjs",
     "verify:prod": "node scripts/verify-production.mjs",
     "verify:places": "node scripts/verify-places-autocomplete.mjs",
+    "verify:estimates-unified": "node scripts/verify-estimate-builder-retired.mjs",
     "validate:public": "node scripts/validate-public-production.mjs",
     "verify:turnstile": "node scripts/verify-turnstile-production.mjs",
     "auth:validate": "node scripts/validate-auth-reset-production.mjs",

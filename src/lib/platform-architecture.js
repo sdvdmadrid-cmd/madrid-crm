@@ -38,7 +38,6 @@ export const PRIVATE_DASHBOARD_PAGE_PREFIXES = [
   "/jobs",
   "/invoices",
   "/estimates",
-  "/estimate-builder",
   "/smart-estimator",
   "/calendar",
   "/lead-inbox",

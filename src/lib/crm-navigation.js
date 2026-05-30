@@ -8,10 +8,6 @@ const TENANT_SECTIONS = {
   jobs: { href: "/jobs", labelKey: "sidebar.jobs" },
   invoices: { href: "/invoices", labelKey: "sidebar.invoices" },
   estimates: { href: "/estimates", labelKey: "sidebar.estimates" },
-  "estimate-builder": {
-    href: "/estimates/new",
-    labelKey: "sidebar.estimates",
-  },
   "lead-inbox": { href: "/lead-inbox", labelKey: "sidebar.leadInbox" },
   reputation: { href: "/reputation", labelKey: "sidebar.reputation" },
   calendar: { href: "/calendar", labelKey: "sidebar.calendar" },

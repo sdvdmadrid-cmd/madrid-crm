@@ -951,7 +951,8 @@
       "noNoteHistory": "Sin notas adicionales.",
       "noVisits": "Sin visitas registradas.",
       "noRequests": "Sin solicitudes registradas.",
-      "viewEstimate": "Abrir en Estimate Builder",
+      "viewEstimate": "Editar estimado",
+      "viewLegacyEstimate": "Ver en Estimados (archivado)",
       "viewInvoices": "Facturas",
       "viewJob": "Ver trabajo",
       "errors": {

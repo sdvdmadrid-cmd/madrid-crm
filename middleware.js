@@ -351,6 +351,28 @@ function notFoundResponse() {
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/estimate-builder" || pathname.startsWith("/estimate-builder/")) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/estimates/new";
+    const clientId = request.nextUrl.searchParams.get("clientId");
+    const legacyId = request.nextUrl.searchParams.get("id");
+    if (clientId) redirectUrl.searchParams.set("clientId", clientId);
+    if (legacyId) redirectUrl.searchParams.set("legacyBuilderId", legacyId);
+    return NextResponse.redirect(redirectUrl, 308);
+  }
+
+  if (pathname === "/api/estimate-builder" || pathname.startsWith("/api/estimate-builder/")) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "The legacy Estimate Builder API was retired. Use /api/estimates and /estimates/new instead.",
+        code: "ESTIMATE_BUILDER_RETIRED",
+      },
+      { status: 410, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // Legacy public quote links may use /quotes/<token>. Redirect those to /quote/<token>
   // so clients never land on authenticated dashboard routes.
   const disabledBillPayTarget = resolveDisabledBillPayTarget(pathname);

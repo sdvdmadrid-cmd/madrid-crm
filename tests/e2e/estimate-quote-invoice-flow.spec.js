@@ -187,83 +187,11 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     // 2) Base number must be preserved.
     expect(String(quoteFromEstimate?.quote_number || "")).toBe(estimateNumber);
 
-    // 3) Signed quote lock test via estimate-builder pipeline.
-    const { data: someClient, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("tenant_id", String(quoteFromEstimate?.tenant_id || estimateTenantId))
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // 3) Signed quote lock on the unified /api/estimates pipeline.
+    const quoteToken = String(quoteFromEstimate?.quote_token || "").trim();
+    expect(quoteToken).toBeTruthy();
 
-    expect(clientError).toBeNull();
-
-    let clientId = String(someClient?.id || "").trim();
-    if (!clientId) {
-      const createClientRes = await api.post("/api/clients", {
-        headers: {
-          ...ORIGIN_HEADERS,
-          "Content-Type": "application/json",
-        },
-        data: {
-          name: `E2E Quote Client ${now}`,
-          email: `e2e.client+${now}@example.com`,
-          phone: "+15550002222",
-          address: "456 E2E Ave, Austin, TX 73301",
-        },
-      });
-      expect(createClientRes.ok()).toBeTruthy();
-      const createClientJson = await createClientRes.json();
-      expect(createClientJson?.success).toBeTruthy();
-      clientId = String(createClientJson?.data?.id || "").trim();
-    }
-
-    expect(clientId).toBeTruthy();
-
-    const ebCreateRes = await api.post("/api/estimate-builder", {
-      headers: ORIGIN_HEADERS,
-      data: {
-        name: `EB Lock Test ${now}`,
-        description: "Lock flow test",
-        notes: "Lock flow test",
-        client_id: clientId,
-        lines: [
-          {
-            serviceId: "svc-lock-1",
-            name: "Pavers",
-            qty: 2,
-            finalPrice: 300,
-          },
-        ],
-        total_final: 600,
-      },
-    });
-    expect(ebCreateRes.ok()).toBeTruthy();
-    const ebCreateJson = await ebCreateRes.json();
-    expect(ebCreateJson?.success).toBeTruthy();
-    const ebId = ebCreateJson?.data?.id;
-    expect(ebId).toBeTruthy();
-
-    const shareRes = await api.post(`/api/estimate-builder/${ebId}/share-link`, {
-      headers: ORIGIN_HEADERS,
-      data: {},
-    });
-    const shareJson = await shareRes.json().catch(async () => ({
-      raw: await shareRes.text(),
-    }));
-    if (!shareRes.ok()) {
-      // eslint-disable-next-line no-console
-      console.log("share response", shareRes.status(), shareJson);
-    }
-    expect(shareRes.ok()).toBeTruthy();
-    expect(shareJson?.success).toBeTruthy();
-
-    const ebQuoteToken =
-      shareJson?.data?.quote?.quoteToken ||
-      String(shareJson?.data?.quoteUrl || "").split("/").filter(Boolean).pop();
-    expect(ebQuoteToken).toBeTruthy();
-
-    const signRes = await api.post(`/api/public/quotes/${ebQuoteToken}/approval`, {
+    const signRes = await api.post(`/api/public/quotes/${quoteToken}/approval`, {
       data: {
         action: "sign",
         contactName: "E2E QA",
@@ -283,31 +211,29 @@ test.describe("Estimate -> Quote flow checks (1,2,3)", () => {
     expect(signJson?.success).toBeTruthy();
     expect(signJson?.data?.quoteStatus).toBe("signed");
 
-    // Editing without explicit unlock should fail with lock error.
-    const ebPatchLockedRes = await api.patch(`/api/estimate-builder/${ebId}`, {
-      headers: { Origin: "http://localhost:3000" },
+    const patchLockedRes = await api.patch(`/api/estimates/${estimateId}`, {
+      headers: ORIGIN_HEADERS,
       data: { notes: "Attempt edit while signed" },
     });
-    const ebPatchLockedJson = await ebPatchLockedRes.json().catch(async () => ({
-      raw: await ebPatchLockedRes.text(),
+    const patchLockedJson = await patchLockedRes.json().catch(async () => ({
+      raw: await patchLockedRes.text(),
     }));
-    if (ebPatchLockedRes.status() !== 409) {
+    if (patchLockedRes.status() !== 409) {
       // eslint-disable-next-line no-console
-      console.log("patch locked response", ebPatchLockedRes.status(), ebPatchLockedJson);
+      console.log("patch locked response", patchLockedRes.status(), patchLockedJson);
     }
-    expect(ebPatchLockedRes.status()).toBe(409);
-    expect(String(ebPatchLockedJson?.error || "").toLowerCase()).toContain("locked");
+    expect(patchLockedRes.status()).toBe(409);
+    expect(String(patchLockedJson?.error || "").toLowerCase()).toContain("locked");
 
-    // Editing with explicit unlock should succeed.
-    const ebPatchUnlockRes = await api.patch(`/api/estimate-builder/${ebId}`, {
-      headers: { Origin: "http://localhost:3000" },
+    const patchUnlockRes = await api.patch(`/api/estimates/${estimateId}`, {
+      headers: ORIGIN_HEADERS,
       data: {
         notes: "Unlock + edit",
         removeQuoteSignature: true,
       },
     });
-    expect(ebPatchUnlockRes.ok()).toBeTruthy();
-    const ebPatchUnlockJson = await ebPatchUnlockRes.json();
-    expect(ebPatchUnlockJson?.success).toBeTruthy();
+    expect(patchUnlockRes.ok()).toBeTruthy();
+    const patchUnlockJson = await patchUnlockRes.json();
+    expect(patchUnlockJson?.success).toBeTruthy();
   });
 });

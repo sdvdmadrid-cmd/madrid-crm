@@ -264,12 +264,18 @@ export default function ClientDetailsPanel({
                       {row.estimateNumber ? `#${row.estimateNumber} · ` : ""}
                       {formatDate(row.updatedAt)}
                     </p>
-                    <Link
-                      href={`/estimates/new?edit=${encodeURIComponent(row.id)}&clientId=${encodeURIComponent(clientId)}`}
-                      className={panel.itemLink}
-                    >
-                      {t("clients.details.viewEstimate")}
-                    </Link>
+                    {row.isLegacy ? (
+                      <Link href="/estimates" className={panel.itemLink}>
+                        {t("clients.details.viewLegacyEstimate")}
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/estimates/new?edit=${encodeURIComponent(row.id)}&clientId=${encodeURIComponent(clientId)}`}
+                        className={panel.itemLink}
+                      >
+                        {t("clients.details.viewEstimate")}
+                      </Link>
+                    )}
                   </>
                 )}
               />

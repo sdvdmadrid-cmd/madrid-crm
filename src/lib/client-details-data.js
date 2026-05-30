@@ -12,15 +12,31 @@ async function safeSelect(builder, label) {
   return { rows: data || [], error: null };
 }
 
-function serializeEstimate(row = {}) {
+function serializePipelineEstimate(row = {}) {
   return {
     id: row.id,
-    name: row.name || "",
+    name: row.client_name || row.estimate_number || "",
+    estimateNumber: row.estimate_number || "",
+    quoteId: null,
+    status: row.status || "",
+    total: Number(row.total ?? row.subtotal ?? 0),
+    updatedAt: row.updated_at || null,
+    createdAt: row.created_at || null,
+    isLegacy: false,
+  };
+}
+
+function serializeLegacyBuilderEstimate(row = {}) {
+  return {
+    id: row.id,
+    name: row.name || row.estimate_number || "",
     estimateNumber: row.estimate_number || "",
     quoteId: row.quote_id || null,
+    status: "",
     total: Number(row.total_final ?? row.total_mid ?? 0),
     updatedAt: row.updated_at || null,
     createdAt: row.created_at || null,
+    isLegacy: true,
   };
 }
 
@@ -142,7 +158,8 @@ export async function loadClientDetailsBundle({
   };
 
   const [
-    estimatesResult,
+    pipelineEstimatesResult,
+    legacyEstimatesResult,
     quotesResult,
     invoicesResult,
     jobsResult,
@@ -154,6 +171,19 @@ export async function loadClientDetailsBundle({
     safeSelect(
       scope(
         supabaseAdmin
+          .from("estimates")
+          .select(
+            "id, client_name, estimate_number, status, total, subtotal, updated_at, created_at",
+          )
+          .eq("client_id", clientId)
+          .order("updated_at", { ascending: false })
+          .limit(50),
+      ),
+      "pipelineEstimates",
+    ),
+    safeSelect(
+      scope(
+        supabaseAdmin
           .from("estimate_builder")
           .select(
             "id, name, estimate_number, quote_id, total_final, total_mid, updated_at, created_at",
@@ -162,7 +192,7 @@ export async function loadClientDetailsBundle({
           .order("updated_at", { ascending: false })
           .limit(50),
       ),
-      "estimates",
+      "legacyEstimates",
     ),
     safeSelect(
       scopeQuotes(
@@ -261,7 +291,8 @@ export async function loadClientDetailsBundle({
   };
 
   const sectionResults = [
-    ["estimates", estimatesResult],
+    ["pipelineEstimates", pipelineEstimatesResult],
+    ["legacyEstimates", legacyEstimatesResult],
     ["quotes", quotesResult],
     ["invoices", invoicesResult],
     ["jobs", jobsResult],
@@ -279,7 +310,14 @@ export async function loadClientDetailsBundle({
 
   return {
     client: serializeClient(clientRow),
-    estimates: estimatesResult.rows.map(serializeEstimate),
+    estimates: [
+      ...pipelineEstimatesResult.rows.map(serializePipelineEstimate),
+      ...legacyEstimatesResult.rows.map(serializeLegacyBuilderEstimate),
+    ].sort((a, b) => {
+      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    }),
     quotes: quotesResult.rows.map(serializeQuote),
     invoices: invoicesResult.rows.map(serializeInvoice),
     jobs: jobsResult.rows.map(serializeJob),
