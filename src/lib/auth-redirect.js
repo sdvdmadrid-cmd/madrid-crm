@@ -5,7 +5,7 @@ const TENANT_CONTRACTOR_PREFIXES = [
   "/jobs",
   "/invoices",
   "/estimates",
-  "/estimate-builder",
+  "/estimates/new",
   "/smart-estimator",
   "/calendar",
   "/lead-inbox",

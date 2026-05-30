@@ -9,7 +9,7 @@ const TENANT_SECTIONS = {
   invoices: { href: "/invoices", labelKey: "sidebar.invoices" },
   estimates: { href: "/estimates", labelKey: "sidebar.estimates" },
   "estimate-builder": {
-    href: "/estimate-builder",
+    href: "/estimates/new",
     labelKey: "sidebar.estimates",
   },
   "lead-inbox": { href: "/lead-inbox", labelKey: "sidebar.leadInbox" },

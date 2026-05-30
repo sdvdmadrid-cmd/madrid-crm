@@ -15,12 +15,12 @@ export default async function EstimateBuilderLayout({ children }) {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/estimate-builder");
+    redirect("/login?next=/estimates/new");
   }
 
   const enabled = await isPlatformFeatureEnabled("feature_estimate_builder", true);
   if (!enabled) {
-    redirect("/dashboard?feature=estimate-builder-disabled");
+    redirect("/estimates/new");
   }
 
   return <Suspense fallback={null}>{children}</Suspense>;

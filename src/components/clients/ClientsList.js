@@ -32,7 +32,7 @@ export default function ClientsList({
   const goEstimate = (client) => {
     if (!client?.id) return;
     const params = new URLSearchParams({ clientId: client.id });
-    router.push(`/estimate-builder?${params.toString()}`);
+    router.push(`/estimates/new?${params.toString()}`);
   };
 
   return (

@@ -15,8 +15,8 @@ function formatDate(value) {
 function clientActivityLinks(clientId) {
   const id = encodeURIComponent(clientId);
   return {
-    newEstimate: `/estimate-builder?clientId=${id}`,
-    estimates: `/estimate-builder?clientId=${id}`,
+    newEstimate: `/estimates/new?clientId=${id}`,
+    estimates: `/estimates`,
     newInvoice: `/invoices?clientId=${id}`,
     invoices: `/invoices?clientId=${id}`,
     newJob: `/jobs?action=new&clientId=${id}`,
@@ -265,7 +265,7 @@ export default function ClientDetailsPanel({
                       {formatDate(row.updatedAt)}
                     </p>
                     <Link
-                      href={`/estimate-builder?id=${encodeURIComponent(row.id)}&clientId=${encodeURIComponent(clientId)}`}
+                      href={`/estimates/new?edit=${encodeURIComponent(row.id)}&clientId=${encodeURIComponent(clientId)}`}
                       className={panel.itemLink}
                     >
                       {t("clients.details.viewEstimate")}

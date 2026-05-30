@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { getUsStateTaxRate } from "@/lib/estimate-pricing";
+import {
+  autofillGuardProps,
+  autofillReadonlyUntilFocusProps,
+} from "@/lib/form-autofill-guard";
 
 const CLIENT_PREFIXES = ["", "Mr.", "Mrs.", "Ms.", "Dr."];
 
@@ -102,6 +106,8 @@ function NewEstimatePageInner() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit") || "";
   const aiDraftParam = searchParams.get("aiDraft") || "";
+  const clientIdParam = searchParams.get("clientId") || "";
+  const legacyBuilderId = searchParams.get("legacyBuilderId") || "";
 
   const [clientPrefix, setClientPrefix] = useState("");
   const [clientFirstName, setClientFirstName] = useState("");
@@ -236,6 +242,14 @@ function NewEstimatePageInner() {
     setClientPickerOpen(false);
     setClientQuery(`${client.name || ""}${client.email ? ` <${client.email}>` : ""}`);
   }
+
+  useEffect(() => {
+    if (!clientIdParam || clients.length === 0 || editId) return;
+    const match = clients.find(
+      (c) => String(c.id || c._id || "") === String(clientIdParam),
+    );
+    if (match) applyClient(match);
+  }, [clientIdParam, clients, editId]);
 
   useEffect(() => {
     if (!editId) return;
@@ -632,7 +646,22 @@ function NewEstimatePageInner() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 py-8">
+      <form
+        className="mx-auto max-w-2xl px-4 py-8"
+        autoComplete="off"
+        onSubmit={(event) => event.preventDefault()}
+        data-form-type="other"
+      >
+        {legacyBuilderId ? (
+          <div
+            role="status"
+            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            This estimate editor replaces the older Estimate Builder. Saved catalog
+            estimates from the legacy tool remain in your account history; create new
+            estimates here for the kanban pipeline.
+          </div>
+        ) : null}
         {deliveryNotice ? (
           <div
             role="alert"
@@ -663,7 +692,7 @@ function NewEstimatePageInner() {
           {clients.length > 0 ? (
             <div className="relative mb-3">
               <input
-                type="text"
+                type="search"
                 value={clientQuery}
                 onChange={(e) => {
                   setClientQuery(e.target.value);
@@ -674,6 +703,7 @@ function NewEstimatePageInner() {
                 placeholder="Search existing clients by name, email, or phone…"
                 aria-label="Search existing clients"
                 className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none focus:border-slate-400 focus:bg-white"
+                {...autofillGuardProps("generic")}
               />
               {clientPickerOpen && clientSuggestions.length > 0 ? (
                 <ul
@@ -722,6 +752,8 @@ function NewEstimatePageInner() {
               aria-label="Client first name"
               aria-invalid={showError("clientFirstName") ? "true" : "false"}
               className={`h-12 flex-1 min-w-[120px] rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("clientFirstName") ? "border-rose-400" : "border-slate-300"}`}
+              {...autofillGuardProps("firstName")}
+              {...autofillReadonlyUntilFocusProps()}
             />
             <input
               value={clientLastName}
@@ -729,6 +761,8 @@ function NewEstimatePageInner() {
               placeholder="Last name"
               aria-label="Client last name"
               className="h-12 flex-1 min-w-[120px] rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+              {...autofillGuardProps("lastName")}
+              {...autofillReadonlyUntilFocusProps()}
             />
           </div>
           {showError("clientFirstName") ? (
@@ -743,6 +777,8 @@ function NewEstimatePageInner() {
             aria-label="Client email"
             aria-invalid={showError("clientEmail") ? "true" : "false"}
             className={`mt-2 h-12 w-full rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("clientEmail") ? "border-rose-400" : "border-slate-300"}`}
+            {...autofillGuardProps("email")}
+            {...autofillReadonlyUntilFocusProps()}
           />
           {showError("clientEmail") ? (
             <p className="mt-1 text-xs font-medium text-rose-600">{showError("clientEmail")}</p>
@@ -754,6 +790,8 @@ function NewEstimatePageInner() {
             placeholder="Client phone number"
             aria-label="Client phone"
             className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+            {...autofillGuardProps("tel")}
+            {...autofillReadonlyUntilFocusProps()}
           />
         </div>
 
@@ -782,6 +820,7 @@ function NewEstimatePageInner() {
               placeholder="City"
               aria-label="City"
               className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+              {...autofillGuardProps("city")}
             />
             <input
               value={stateField}
@@ -790,13 +829,16 @@ function NewEstimatePageInner() {
               maxLength={2}
               aria-label="State (2-letter code, e.g. TX). Auto-fills sales tax."
               className="h-12 rounded-xl border border-slate-300 px-3 text-base uppercase outline-none focus:border-slate-500"
+              {...autofillGuardProps("state")}
             />
             <input
               value={zipCode}
               onChange={(e) => setZipCode(e.target.value)}
               placeholder="ZIP"
               aria-label="ZIP code"
+              inputMode="numeric"
               className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+              {...autofillGuardProps("zip")}
             />
           </div>
 
@@ -835,6 +877,7 @@ function NewEstimatePageInner() {
                     placeholder="City"
                     aria-label="Billing city"
                     className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+                    {...autofillGuardProps("billingCity")}
                   />
                   <input
                     value={billingState}
@@ -843,13 +886,16 @@ function NewEstimatePageInner() {
                     maxLength={2}
                     aria-label="Billing state"
                     className="h-12 rounded-xl border border-slate-300 px-3 text-base uppercase outline-none focus:border-slate-500"
+                    {...autofillGuardProps("billingState")}
                   />
                   <input
                     value={billingZip}
                     onChange={(e) => setBillingZip(e.target.value)}
                     placeholder="ZIP"
                     aria-label="Billing ZIP"
+                    inputMode="numeric"
                     className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+                    {...autofillGuardProps("billingZip")}
                   />
                 </div>
               </>
@@ -1047,7 +1093,7 @@ function NewEstimatePageInner() {
             </button>
           </div>
         </div>
-      </div>
+      </form>
 
       {previewOpen ? (
         <EstimatePreviewModal
