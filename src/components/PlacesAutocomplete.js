@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/client-auth";
+import {
+  autofillGuardProps,
+  autofillReadonlyUntilFocusProps,
+} from "@/lib/form-autofill-guard";
 
 /**
  * PlacesAutocomplete
@@ -217,8 +221,8 @@ export default function PlacesAutocomplete({
       <input
         id={id}
         ref={inputRef}
-        type="text"
-        autoComplete="off"
+        type="search"
+        enterKeyHint="search"
         className={inputClass}
         style={inputStyle}
         placeholder={placeholder}
@@ -226,13 +230,16 @@ export default function PlacesAutocomplete({
         disabled={disabled}
         onChange={(e) => onChange?.(e.target.value)}
         onKeyDown={handleKeyDown}
-        onFocus={() => {
+        onFocus={(e) => {
+          e.currentTarget.removeAttribute("readonly");
           if (suggestions.length > 0) setOpen(true);
         }}
         aria-autocomplete="list"
         aria-expanded={open}
         aria-haspopup="listbox"
         role="combobox"
+        {...autofillGuardProps("street")}
+        {...autofillReadonlyUntilFocusProps()}
       />
 
       {/* Loading indicator — tiny spinner inside the right edge */}
