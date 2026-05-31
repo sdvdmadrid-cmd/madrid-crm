@@ -22,8 +22,7 @@ export default function ClientsList({
   clients,
   loading,
   highlightedId = "",
-  listSearch = "",
-  onListSearchChange,
+  isSearchActive = false,
   onSelect,
   onEdit,
   onDelete,
@@ -39,38 +38,15 @@ export default function ClientsList({
 
   return (
     <section className="cf-card" style={{ padding: 22 }}>
-      <h2 style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 800 }}>
-        {t("clients.listTitle")}
-      </h2>
-
-      {onListSearchChange ? (
-        <input
-          type="search"
-          className={list.listSearch}
-          value={listSearch}
-          onChange={(event) => onListSearchChange(event.target.value)}
-          placeholder={t("clients.listSearchPlaceholder", {
-            defaultValue: "Search your client list…",
-          })}
-          aria-label={t("clients.listSearchAria", {
-            defaultValue: "Search client list",
-          })}
-        />
-      ) : null}
-
       {loading ? <p className="cf-muted">{t("clients.loading")}</p> : null}
 
       {!loading && clients.length === 0 ? (
         <div className="fb-empty" style={{ marginTop: 16 }}>
           <p className="fb-empty-title">
-            {listSearch.trim()
-              ? t("clients.listSearchEmpty", {
-                  defaultValue: "No clients match your search.",
-                })
-              : t("clients.empty")}
+            {isSearchActive ? t("clients.searchEmpty") : t("clients.empty")}
           </p>
-          {!listSearch.trim() ? (
-            <p className="fb-empty-desc">{t("clients.description")}</p>
+          {!isSearchActive ? (
+            <p className="fb-empty-desc">{t("clients.emptyHint")}</p>
           ) : null}
         </div>
       ) : null}

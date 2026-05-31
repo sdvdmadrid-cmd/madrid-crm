@@ -1,5 +1,5 @@
 import "server-only";
-import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
+import { getEstimatePdfBranding } from "@/lib/estimate-pdf-branding";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 
 /**
@@ -11,7 +11,7 @@ import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-p
 export async function buildEstimateEmailAttachments(estimate) {
   if (!estimate || !estimate.id) return [];
   try {
-    const branding = await getEstimateBrandingByTenant(estimate.tenantId);
+    const branding = await getEstimatePdfBranding(estimate.tenantId);
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });
     const filename = pdfFilenameForEstimate(estimate);
     return [

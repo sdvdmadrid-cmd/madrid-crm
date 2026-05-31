@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import "@/styles/public-site-premium.css";
 import LeadRequestModal from "@/components/site/LeadRequestModal";
+import {
+  PUBLIC_SITE_SECTIONS,
+  revealSectionElement,
+  scrollToPublicSiteSection,
+} from "@/lib/public-site-navigation";
 
 const OPEN_EVENT = "fieldbase:open-lead-form";
 
 function revealLeadSections() {
-  const section = document.getElementById("request-service");
-  if (section) {
-    section.classList.add("ps-visible");
-    section.querySelectorAll(".ps-reveal").forEach((node) => node.classList.add("ps-visible"));
-  }
+  revealSectionElement(document.getElementById(PUBLIC_SITE_SECTIONS.requestService));
 }
 
 export function openPublicLeadForm(detail = {}) {
@@ -34,34 +35,18 @@ export default function PublicSiteLeadExperience({
     revealLeadSections();
     setInitialService(String(detail.service || "").trim());
     setModalOpen(true);
-    const section = document.getElementById("request-service");
-    if (section && !detail.skipScroll) {
-      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!detail.skipScroll) {
+      scrollToPublicSiteSection(PUBLIC_SITE_SECTIONS.requestService);
     }
   }, []);
 
   useEffect(() => {
     const onOpen = (e) => openForm(e.detail || {});
     window.addEventListener(OPEN_EVENT, onOpen);
-
-    const onClick = (e) => {
-      const anchor = e.target.closest?.('a[href="#request-service"], a[href*="#request-service"]');
-      if (!anchor) return;
-      e.preventDefault();
-      openForm({});
-    };
-
-    document.addEventListener("click", onClick, true);
-
-    if (typeof window !== "undefined" && window.location.hash === "#request-service") {
-      openForm({ skipScroll: true });
-    }
-
     revealLeadSections();
 
     return () => {
       window.removeEventListener(OPEN_EVENT, onOpen);
-      document.removeEventListener("click", onClick, true);
     };
   }, [openForm]);
 

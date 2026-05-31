@@ -7,6 +7,7 @@ export default function PublicSiteEnhancements({ stickyCtaHref, stickyCtaLabel }
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
 
+    document.documentElement.classList.add("ps-public-scroll");
     document.body.classList.add("ps-has-sticky-cta");
 
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -15,6 +16,7 @@ export default function PublicSiteEnhancements({ stickyCtaHref, stickyCtaLabel }
     if (prefersReduced) {
       nodes.forEach((el) => el.classList.add("ps-visible"));
       return () => {
+        document.documentElement.classList.remove("ps-public-scroll");
         document.body.classList.remove("ps-has-sticky-cta");
       };
     }
@@ -35,6 +37,7 @@ export default function PublicSiteEnhancements({ stickyCtaHref, stickyCtaLabel }
 
     return () => {
       observer.disconnect();
+      document.documentElement.classList.remove("ps-public-scroll");
       document.body.classList.remove("ps-has-sticky-cta");
     };
   }, []);

@@ -133,7 +133,7 @@ export default function CompanyLogoPanel({
       setError("");
       try {
         const res = await apiFetch("/api/company-profile", {
-          method: "POST",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...companyProfile,

@@ -8,6 +8,7 @@ import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { formatClientPickerLabel } from "@/lib/client-search";
 import styles from "./estimates-new.module.css";
+import { deriveServiceTitleFromScope } from "@/lib/estimate-pdf-content";
 import { getUsStateTaxRate } from "@/lib/estimate-pricing";
 import {
   autofillGuardProps,
@@ -572,6 +573,7 @@ function NewEstimatePageInner() {
       },
       status: nextStatus,
       notes: jobDescription.trim(),
+      serviceTitle: deriveServiceTitleFromScope(jobDescription.trim()),
       clientUuid: selectedClientId || clientIdParam || "",
     };
 
@@ -963,6 +965,10 @@ function NewEstimatePageInner() {
             rows={6}
             className={styles.textarea}
           />
+          <p className={styles.cardHint} style={{ marginTop: 8 }}>
+            The first line becomes the service name on the customer PDF (instead of
+            &quot;Base Price&quot;). Use bullet lines (- item) for a readable scope list.
+          </p>
         </section>
           </div>
 

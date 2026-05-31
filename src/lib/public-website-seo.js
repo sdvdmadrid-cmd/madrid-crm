@@ -1,5 +1,7 @@
 import "server-only";
 
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
+
 function getAppBaseUrl() {
   return String(
     process.env.APP_BASE_URL || process.env.APP_URL || "https://fieldbaseapp.net",
@@ -14,6 +16,13 @@ export function getPublicSiteUrl(slug) {
 function isHostedHttpUrl(value) {
   const s = String(value || "").trim();
   return /^https?:\/\//i.test(s);
+}
+
+function resolvePublicSiteLogo(site) {
+  return (
+    site?.companyProfile?.resolvedLogoUrl ||
+    resolveCompanyLogoUrl(site?.companyProfile)
+  );
 }
 
 function pickPhotoSrc(photo) {
@@ -38,7 +47,7 @@ export function resolvePublicSiteSocialImage(site) {
     const src = pickPhotoSrc(photo);
     if (isHostedHttpUrl(src)) return src;
   }
-  const logo = site.companyProfile?.logoDataUrl || "";
+  const logo = resolvePublicSiteLogo(site);
   if (isHostedHttpUrl(logo)) return logo;
   return null;
 }
@@ -68,9 +77,11 @@ export function buildLocalBusinessJsonLd(site) {
         }
       : undefined,
     areaServed: site.companyProfile?.businessCity || undefined,
-    image: site.companyProfile?.logoDataUrl?.startsWith("data:image/")
-      ? undefined
-      : site.companyProfile?.logoDataUrl || undefined,
+    image: (() => {
+      const img = resolvePublicSiteLogo(site);
+      if (!img || img.startsWith("data:image/")) return undefined;
+      return img;
+    })(),
   };
 
   if (site.companyProfile?.googleReviewsUrl) {

@@ -2,6 +2,8 @@ const COPY = {
   en: {
     nav: {
       services: "Services",
+      gallery: "Gallery",
+      reviews: "Reviews",
       about: "About",
       contact: "Contact",
       getQuote: "Get a Quote",
@@ -24,17 +26,23 @@ const COPY = {
     },
     services: {
       title: "Our Services",
-      subtitle: "Everything you need — from initial quote to completed project.",
+      subtitle:
+        "Landscaping, lawn care, and hardscape installs — built for lasting curb appeal and outdoor living.",
       getQuote: "Get a quote →",
     },
     about: {
       title: "About {{company}}",
+      fallback:
+        "We are a local team focused on quality work, clear communication, and results you can count on.",
       requestQuote: "Request a quote",
     },
     gallery: {
       title: "Recent Work",
       subtitle: "See real projects completed by {{company}}.",
       caption: "Completed project",
+      emptyTitle: "Project photos coming soon",
+      emptyBody:
+        "Upload portfolio photos in Website Builder to showcase patios, lawns, retaining walls, and more.",
     },
     cta: {
       callToday: "Call us today.",
@@ -67,6 +75,9 @@ const COPY = {
       service: "Service needed *",
       selectService: "Select service",
       other: "Other",
+      serviceOtherLabel: "Describe your service *",
+      serviceOtherPlaceholder: "e.g. pergola, outdoor kitchen, specialty planting…",
+      serviceOtherRequired: "Please describe the service you need",
       message: "Message *",
       messagePlaceholder: "Tell us what you need done",
       photo: "Photo upload (optional)",
@@ -128,6 +139,8 @@ const COPY = {
   es: {
     nav: {
       services: "Servicios",
+      gallery: "Galería",
+      reviews: "Reseñas",
       about: "Nosotros",
       contact: "Contacto",
       getQuote: "Pedir cotización",
@@ -150,17 +163,23 @@ const COPY = {
     },
     services: {
       title: "Nuestros servicios",
-      subtitle: "Todo lo que necesitas — desde la cotización hasta el proyecto terminado.",
+      subtitle:
+        "Paisajismo, césped y hardscape — para un exterior duradero y con estilo.",
       getQuote: "Pedir cotización →",
     },
     about: {
       title: "Sobre {{company}}",
+      fallback:
+        "Somos un equipo local enfocado en trabajo de calidad, comunicación clara y resultados en los que puedes confiar.",
       requestQuote: "Solicitar cotización",
     },
     gallery: {
       title: "Trabajos recientes",
       subtitle: "Proyectos reales completados por {{company}}.",
       caption: "Proyecto completado",
+      emptyTitle: "Fotos de proyectos próximamente",
+      emptyBody:
+        "Sube fotos del portafolio en el constructor web para mostrar patios, césped y muros.",
     },
     cta: {
       callToday: "Llámanos hoy.",
@@ -193,6 +212,9 @@ const COPY = {
       service: "Servicio *",
       selectService: "Selecciona un servicio",
       other: "Otro",
+      serviceOtherLabel: "Describe el servicio *",
+      serviceOtherPlaceholder: "p. ej. pérgola, cocina exterior, siembra especial…",
+      serviceOtherRequired: "Describe el servicio que necesitas",
       message: "Mensaje *",
       messagePlaceholder: "Cuéntanos qué necesitas",
       photo: "Foto (opcional)",

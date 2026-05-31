@@ -16,8 +16,18 @@ test.describe("Dashboard module audit", () => {
   test("layout — metrics, pillars, workspace modules", async ({ page }) => {
     await expect(page.getByTestId("dashboard-metric-active-jobs")).toBeVisible();
     await expect(page.getByTestId("dashboard-metric-inbox")).toBeVisible();
+    await expect(page.getByRole("link", { name: "New Estimate", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add Client", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /Clients/i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Lead inbox/i }).first()).toBeVisible();
+  });
+
+  test("secondary actions live under More actions", async ({ page }) => {
+    await page.getByRole("button", { name: /More actions/i }).click();
+    await expect(page.getByRole("menuitem", { name: /Collect payment/i })).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: /Create job manually/i }),
+    ).toBeVisible();
   });
 
   test("metric links navigate", async ({ page }) => {

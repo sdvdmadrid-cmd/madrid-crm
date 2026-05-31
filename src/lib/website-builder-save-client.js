@@ -1,4 +1,5 @@
 import { mergeGalleryAfterSave, normalizeGalleryPhotos } from "@/lib/website-gallery";
+import { sanitizeWebsiteTestimonials } from "@/lib/website-content-purity";
 
 /** Serialize overlapping website saves (prevents stale responses wiping gallery). */
 export function createSaveQueue() {
@@ -74,9 +75,11 @@ export function mergeFormAfterSave({ serverData, clientForm, mode = "save" }) {
     galleryPhotos,
     heroPhotos,
     services: serverData.services?.length ? serverData.services : clientForm.services,
-    testimonials: serverData.testimonials?.length
-      ? serverData.testimonials
-      : clientForm.testimonials,
+    testimonials: sanitizeWebsiteTestimonials(
+      serverData.testimonials?.length
+        ? serverData.testimonials
+        : clientForm.testimonials,
+    ),
     trustBadges: serverData.trustBadges?.length
       ? serverData.trustBadges
       : clientForm.trustBadges,

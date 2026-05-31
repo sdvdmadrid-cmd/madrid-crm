@@ -4,11 +4,17 @@ import PublicSiteFooter from "@/components/site/PublicSiteFooter";
 import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
 import PremiumGallery from "@/components/site/PremiumGallery";
+import PublicServicesSection from "@/components/site/PublicServicesSection";
+import { filterHomeownerFacingServices } from "@/lib/website-lead-form";
+import { LANDSCAPING_DEFAULT_SERVICES } from "@/lib/website-content-purity";
 import PublicReviewsSection from "@/components/site/PublicReviewsSection";
 import PublicReviewsCta from "@/components/site/PublicReviewsCta";
 import { getPublicReviewsBySlug } from "@/lib/reputation-store";
 import PublicSiteEnhancements from "@/components/site/PublicSiteEnhancements";
+import PublicSiteScrollNav from "@/components/site/PublicSiteScrollNav";
+import { PUBLIC_SITE_SECTIONS } from "@/lib/public-site-navigation";
 import PublicSiteLeadExperience from "@/components/site/PublicSiteLeadExperience";
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
 import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { getIndustryProfile } from "@/lib/industry-profiles";
 import { buildLocalBusinessJsonLd, buildPublicSiteMetadata } from "@/lib/public-website-seo";
@@ -20,41 +26,6 @@ import {
 } from "@/lib/website-builder-industry";
 
 export const revalidate = 120;
-
-// ─── Service SVG Icons (same blue-box style as landing) ────────────────
-const SERVICE_ICON_PATHS = [
-  // tools / wrench
-  "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z",
-  // star
-  "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
-  // home
-  "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",
-  // leaf
-  "M17 8C8 10 5.9 16.17 3.82 22 7 22 9.5 20.5 12 17c3-4 5-7 13-4-1-6-5-9-8-5z",
-  // credit card
-  "M3 9h18 M3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z M7 15h.01M11 15h2",
-  // check-circle
-  "M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3",
-];
-
-function ServiceIcon({ index }) {
-  const path = SERVICE_ICON_PATHS[index % SERVICE_ICON_PATHS.length];
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="white"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ width: 24, height: 24 }}
-    >
-      {path.split(" M").map((d, i) => (
-        <path key={i} d={i === 0 ? d : "M" + d} />
-      ))}
-    </svg>
-  );
-}
 
 // ─── Contractor social proof stats (localized defaults) ───────────────
 function getContractorStats(copy) {
@@ -135,7 +106,9 @@ export default async function PublicContractorSitePage({ params }) {
   const companyName =
     data.companyProfile?.publicDisplayName || data.companyProfile?.companyName || "";
   const phone = data.companyProfile?.phone || "";
-  const logoUrl = data.companyProfile?.logoDataUrl || "";
+  const logoUrl =
+    data.companyProfile?.resolvedLogoUrl ||
+    resolveCompanyLogoUrl(data.companyProfile);
   const industryProfile = getIndustryProfile(data.companyProfile?.businessType || "");
   const industryPack = getWebsiteBuilderPack(
     resolveWebsiteIndustryKey(data.companyProfile?.businessType),
@@ -143,16 +116,22 @@ export default async function PublicContractorSitePage({ params }) {
   const requestServiceOptions = resolveWebsiteRequestServices({
     services: data.services,
     requestServices: data.requestServices,
+    industryKey: data.industryKey,
+    businessType: data.companyProfile?.businessType || "",
   });
   const jsonLd = buildLocalBusinessJsonLd(data);
-  const services =
+  let services = filterHomeownerFacingServices(
     Array.isArray(data.services) && data.services.length > 0
       ? data.services
       : (industryProfile.websiteServices || []).map((name) => ({
           name,
           description: "",
           price: "",
-        }));
+        })),
+  );
+  if (!services.length && data.industryKey === "landscaping_hardscaping") {
+    services = LANDSCAPING_DEFAULT_SERVICES.map((s) => ({ ...s }));
+  }
   const galleryPhotos = Array.isArray(data.galleryPhotos) ? data.galleryPhotos : [];
   const heroDisplayPhotos =
     Array.isArray(data.heroPhotos) && data.heroPhotos.length > 0
@@ -167,8 +146,7 @@ export default async function PublicContractorSitePage({ params }) {
         }))
       : getContractorStats(copy);
 
-  // Pad services to at least 3, max 6
-  const displayServices = services.slice(0, 6);
+  const displayServices = services;
 
   return (
     <PublicSiteLeadExperience
@@ -179,10 +157,15 @@ export default async function PublicContractorSitePage({ params }) {
       companyName={companyName}
     >
       <PublicSiteAnalytics analytics={data.analytics} />
+      <PublicSiteScrollNav />
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0f172a; background: #fff; }
+        #services, #about, #gallery, #reviews, #request-service, #contact {
+          scroll-margin-top: 88px;
+        }
 
         /* ── Navbar (identical to landing) ── */
         .s-nav { position: sticky; top: 0; z-index: 100; background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; gap: 12px; }
@@ -223,37 +206,16 @@ export default async function PublicContractorSitePage({ params }) {
         .s-stat-num { font-size: 2rem; font-weight: 900; color: #fff; margin-bottom: 4px; }
         .s-stat-label { font-size: 13px; color: #64748b; }
 
-        /* ── Features / Services grid (identical to landing) ── */
-        .s-features { background: #fff; padding: 80px 24px; }
-        .s-features-inner { max-width: 1200px; margin: 0 auto; }
         .s-section-eyebrow { text-align: center; font-size: clamp(1.8rem, 3.5vw, 2.75rem); font-weight: 900; color: #1e293b; letter-spacing: -1px; margin-bottom: 14px; }
         .s-section-sub { text-align: center; font-size: 17px; color: #6b7280; max-width: 560px; margin: 0 auto 56px; }
-        .s-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-        .s-feature-card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px 24px; display: flex; flex-direction: column; transition: box-shadow 0.2s, transform 0.2s; }
-        .s-feature-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); transform: translateY(-2px); }
-        .s-feature-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
-        .s-feature-icon { width: 48px; height: 48px; border-radius: 10px; background: var(--theme); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .s-feature-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; }
-        .s-feature-title { font-size: 17px; font-weight: 800; color: #1e293b; margin-bottom: 8px; }
-        .s-feature-desc { font-size: 14px; color: #6b7280; line-height: 1.65; flex: 1; }
-        .s-feature-price { margin-top: 14px; font-weight: 700; color: var(--theme); font-size: 15px; }
-        .s-feature-cta { margin-top: 16px; font-weight: 700; font-size: 14px; color: var(--theme); text-decoration: none; }
-        .s-feature-cta:hover { text-decoration: underline; }
 
         /* ── About (identical to landing's eff6ff bg sections) ── */
-        .s-about { background: #eff6ff; padding: 80px 24px; }
+        .s-about { background: #eff6ff; padding: 64px 24px; }
         .s-about-inner { max-width: 800px; }
         .s-about-inner p { font-size: 18px; line-height: 1.8; color: #334155; }
 
-        .s-gallery { background: #ffffff; padding: 24px 24px 80px; }
-        .s-gallery-inner { max-width: 1200px; margin: 0 auto; }
-        .s-gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-        .s-gallery-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(15,23,42,0.06); }
-        .s-gallery-photo { position: relative; padding-bottom: 78%; background: #e2e8f0; }
-        .s-gallery-caption { padding: 14px 16px; color: #334155; font-size: 14px; font-weight: 600; }
-
         /* ── Testimonials (identical to landing) ── */
-        .s-testimonials { background: #eff6ff; padding: 16px 24px 80px; }
+        .s-testimonials { background: #eff6ff; padding: 16px 24px 64px; }
         .s-test-grid { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
         .s-test-card { background: #fff; border-radius: 20px; padding: 36px 32px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
         .s-test-quote { font-size: 17px; font-weight: 500; color: #1e293b; line-height: 1.6; margin-bottom: 24px; }
@@ -291,8 +253,7 @@ export default async function PublicContractorSitePage({ params }) {
         @media (max-width: 600px) {
           .s-nav-links { display: none; }
           .s-hero { padding: 56px 16px 0; }
-          .s-features-grid { grid-template-columns: 1fr; }
-          .s-gallery-grid { grid-template-columns: 1fr; }
+          .ps-services-grid { grid-template-columns: 1fr; }
           .s-test-grid { grid-template-columns: 1fr; }
           .s-stats-grid { grid-template-columns: 1fr 1fr; }
           .s-cta { padding: 64px 16px; }
@@ -322,7 +283,7 @@ export default async function PublicContractorSitePage({ params }) {
         {/* ── Hero ── */}
         <PublicSiteEnhancements stickyCtaHref={quoteFormHref} stickyCtaLabel={ctaText} />
 
-        <section className="s-hero ps-reveal" id="home">
+        <section className="s-hero ps-reveal ps-visible" id={PUBLIC_SITE_SECTIONS.home}>
           <div className="s-hero-inner">
             <div className="s-hero-left">
               <div className="s-hero-badge">
@@ -393,89 +354,82 @@ export default async function PublicContractorSitePage({ params }) {
 
         <WaveDivider fromColor="#1e293b" toColor="#ffffff" />
 
-        {/* ── Services / Features grid (landing card style) ── */}
-        {displayServices.length > 0 && (
-          <section className="s-features ps-reveal" id="services">
-            <div className="s-features-inner">
-              <h2 className="s-section-eyebrow">{copy.services.title}</h2>
-              <p className="s-section-sub">{copy.services.subtitle}</p>
-              <div className="s-features-grid">
-                {displayServices.map((service, i) => (
-                  <div key={i} className="s-feature-card">
-                    <div className="s-feature-top">
-                      <div className="s-feature-icon">
-                        <ServiceIcon index={i} />
-                      </div>
-                      {service.price && (
-                        <span className="s-feature-badge">{service.price}</span>
-                      )}
-                    </div>
-                    <div className="s-feature-title">{service.name}</div>
-                    {service.description && (
-                      <div className="s-feature-desc">{service.description}</div>
-                    )}
-                    <a href={quoteFormHref} className="s-feature-cta">
-                      {copy.services.getQuote}
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
+        <PublicServicesSection
+          services={displayServices}
+          themeColor={theme}
+          quoteHref={quoteFormHref}
+          title={copy.services.title}
+          subtitle={
+            data.industryKey === "landscaping_hardscaping"
+              ? "From weekly lawn care to custom patios, retaining walls, and drainage — every project starts with a free on-site estimate."
+              : copy.services.subtitle
+          }
+          quoteLabel={
+            data.industryKey === "landscaping_hardscaping"
+              ? "Request Quote"
+              : copy.services.getQuote
+          }
+          galleryPhotos={galleryPhotos}
+        />
 
         <WaveDivider fromColor="#ffffff" toColor="#eff6ff" />
 
-        {/* ── About ── */}
-        {aboutText && (
-          <section className="s-about ps-reveal" id="about">
-            <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-              <div className="s-about-inner">
-                <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.5rem)", fontWeight: 900, color: "#1e293b", letterSpacing: "-1px", marginBottom: 20 }}>
-                  {fillPublicSiteTemplate(copy.about.title, { company: companyName })}
-                </h2>
+        {/* ── About (anchor always present for nav) ── */}
+        <section className="s-about ps-reveal" id={PUBLIC_SITE_SECTIONS.about}>
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            <div className="s-about-inner">
+              <h2 style={{ fontSize: "clamp(1.8rem,3.5vw,2.5rem)", fontWeight: 900, color: "#1e293b", letterSpacing: "-1px", marginBottom: 20 }}>
+                {fillPublicSiteTemplate(copy.about.title, { company: companyName })}
+              </h2>
+              {aboutText ? (
                 <p>{aboutText}</p>
-                <div style={{ marginTop: 28, display: "flex", gap: 14, flexWrap: "wrap" }}>
-                  {phone ? (
-                    <a href={`tel:${phone}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1e293b", color: "#fff", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
-                      📞 {phone}
-                    </a>
-                  ) : null}
-                  <a
-                    href={quoteFormHref}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      background: phone ? "#ffffff" : "#1e293b",
-                      color: phone ? "#1e293b" : "#fff",
-                      border: phone ? "1px solid #cbd5e1" : "none",
-                      padding: "10px 20px",
-                      borderRadius: 8,
-                      fontWeight: 700,
-                      fontSize: 15,
-                      textDecoration: "none",
-                    }}
-                  >
-                    {copy.about.requestQuote}
+              ) : (
+                <p style={{ color: "#64748b" }}>
+                  {fillPublicSiteTemplate(copy.about.fallback, { company: companyName })}
+                </p>
+              )}
+              <div style={{ marginTop: 28, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                {phone ? (
+                  <a href={`tel:${phone}`} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1e293b", color: "#fff", padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+                    📞 {phone}
                   </a>
-                </div>
+                ) : null}
+                <a
+                  href={quoteFormHref}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: phone ? "#ffffff" : "#1e293b",
+                    color: phone ? "#1e293b" : "#fff",
+                    border: phone ? "1px solid #cbd5e1" : "none",
+                    padding: "10px 20px",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: 15,
+                    textDecoration: "none",
+                  }}
+                >
+                  {copy.about.requestQuote}
+                </a>
               </div>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
-        {galleryPhotos.length > 0 || data.portfolio?.projects?.length > 0 ? (
-          <PremiumGallery
-            photos={galleryPhotos}
-            portfolio={data.portfolio}
-            title={copy.gallery.title}
-            subtitle={fillPublicSiteTemplate(copy.gallery.subtitle, {
-              company: companyName || (locale === "es" ? "nuestro equipo" : "our team"),
-            })}
-            useNextImage
-          />
-        ) : null}
+        <PremiumGallery
+          photos={galleryPhotos}
+          portfolio={data.portfolio}
+          title={copy.gallery.title}
+          subtitle={fillPublicSiteTemplate(copy.gallery.subtitle, {
+            company: companyName || (locale === "es" ? "nuestro equipo" : "our team"),
+          })}
+          emptyTitle={copy.gallery.emptyTitle || "Project photos coming soon"}
+          emptyBody={
+            copy.gallery.emptyBody ||
+            "Upload portfolio photos in Website Builder to showcase patios, lawns, and hardscape projects."
+          }
+        />
 
         {publicReviews.length > 0 ? (
           <PublicReviewsSection
@@ -504,7 +458,7 @@ export default async function PublicContractorSitePage({ params }) {
         <WaveDivider fromColor="#eff6ff" toColor="#1e293b" />
 
         {/* ── CTA / Request Service (dark, like landing's pricing section) ── */}
-        <section className="s-cta ps-visible" id="request-service">
+        <section className="s-cta ps-visible" id={PUBLIC_SITE_SECTIONS.requestService}>
           <div className="s-cta-inner">
             <h2>
               {phone ? copy.cta.callToday : copy.cta.getQuote}
@@ -526,7 +480,7 @@ export default async function PublicContractorSitePage({ params }) {
           </div>
 
           {/* Contact details row */}
-          <div id="contact" style={{ marginTop: 48 }}>
+          <div id={PUBLIC_SITE_SECTIONS.contact} style={{ marginTop: 48 }}>
             <div className="s-contact-row" style={{ justifyContent: "center" }}>
               {phone && (
                 <div className="s-contact-chip">
@@ -549,6 +503,7 @@ export default async function PublicContractorSitePage({ params }) {
         <PublicSiteFooter
           slug={data.slug}
           companyName={companyName}
+          logoUrl={logoUrl}
           phone={phone}
           businessAddress={data.companyProfile?.businessAddress || ""}
           socialLinks={data.socialLinks || {}}

@@ -1,4 +1,4 @@
-import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
+import { getEstimatePdfBranding } from "@/lib/estimate-pdf-branding";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 import {
   isValidEstimatePublicToken,
@@ -88,7 +88,7 @@ export async function GET(request, { params }) {
 
     const estimate = serializeEstimateBase(data);
 
-    const branding = await getEstimateBrandingByTenant(estimate.tenantId);
+    const branding = await getEstimatePdfBranding(estimate.tenantId);
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });
     const filename = pdfFilenameForEstimate(estimate);
 

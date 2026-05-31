@@ -10,6 +10,7 @@ function mapsSearchUrl(address) {
 export default function PublicSiteFooter({
   slug,
   companyName,
+  logoUrl = "",
   phone,
   businessAddress,
   socialLinks = {},
@@ -45,8 +46,23 @@ export default function PublicSiteFooter({
           }}
         >
           <div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#fff", marginBottom: 8 }}>
-              {companyName}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt=""
+                  style={{
+                    width: 52,
+                    height: 52,
+                    objectFit: "contain",
+                    borderRadius: 12,
+                    background: "#fff",
+                    padding: 6,
+                    boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+                  }}
+                />
+              ) : null}
+              <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#fff" }}>{companyName}</div>
             </div>
             <p style={{ fontSize: "0.88rem", lineHeight: 1.6, margin: 0, color: "rgba(255,255,255,0.72)" }}>
               {footerCopy.tagline}

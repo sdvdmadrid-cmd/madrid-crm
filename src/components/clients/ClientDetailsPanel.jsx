@@ -196,8 +196,8 @@ export default function ClientDetailsPanel({
                 <Link href={links.newEstimate} className={`${panel.btn} ${panel.btnPrimary}`}>
                   {t("clients.details.newEstimate")}
                 </Link>
-                <Link href={links.newJob} className={panel.btn}>
-                  {t("clients.details.newJob")}
+                <Link href={links.newJob} className={panel.btn} title={t("dashboardControl.actions.manualJobHint")}>
+                  {t("clients.details.manualJob", { defaultValue: "Manual job" })}
                 </Link>
                 <Link href={links.newInvoice} className={panel.btn}>
                   {t("clients.details.newInvoice")}

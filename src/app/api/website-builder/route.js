@@ -20,6 +20,8 @@ import {
   resolveWebsiteIndustryKey,
   listWebsiteIndustryPackOptions,
 } from "@/lib/website-builder-industry";
+import { shouldLockWebsiteIndustry } from "@/lib/website-builder-company";
+import { purifyWebsiteForm, sanitizeWebsiteTestimonials } from "@/lib/website-content-purity";
 import {
   buildPublicWebsitePath,
   buildPublicWebsiteRequestPath,
@@ -85,7 +87,7 @@ function buildDefaultWebsiteContent(companyProfile, siteMeta = null) {
     galleryPhotos: [],
     heroPhotos: defaults.heroPhotos,
     services: defaults.services,
-    testimonials: defaults.testimonials,
+    testimonials: [],
     trustBadges: defaults.trustBadges,
     requestServices: defaults.requestServices,
   };
@@ -93,27 +95,22 @@ function buildDefaultWebsiteContent(companyProfile, siteMeta = null) {
 
 function readSiteMeta(row, pack) {
   const meta = row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : {};
-  const testimonials =
-    Array.isArray(meta.testimonials) && meta.testimonials.length > 0
-      ? meta.testimonials
-      : pack.testimonials;
   const trustBadges =
     Array.isArray(meta.trustBadges) && meta.trustBadges.length > 0
       ? meta.trustBadges
       : pack.trustBadges;
   const heroPhotos = normalizeHeroPhotos(meta.heroPhotos, pack);
   return {
-    testimonials: testimonials.slice(0, 4).map((t) => ({
-      quote: String(t?.quote || "").slice(0, 280),
-      name: String(t?.name || "Customer").slice(0, 60),
-      role: String(t?.role || "Local customer").slice(0, 80),
-    })),
+    testimonials: sanitizeWebsiteTestimonials(meta.testimonials),
     trustBadges: trustBadges.slice(0, 6).map((b) => String(b).slice(0, 80)),
     heroPhotos,
   };
 }
 
-function serializeWebsiteRow(row, profile, request) {
+function serializeWebsiteRow(row, profile, request, options = {}) {
+  const catalogServices = Array.isArray(options.catalogServices)
+    ? options.catalogServices
+    : [];
   const siteMetaRow =
     row?.site_meta && typeof row.site_meta === "object" ? row.site_meta : {};
   const industryKey = resolveWebsiteIndustryForWebsite(profile, siteMetaRow);
@@ -142,7 +139,11 @@ function serializeWebsiteRow(row, profile, request) {
         };
   const normalizedCtaText = normalizeWebsiteCta(row.cta_text, defaults.ctaText);
   const effectiveServices =
-    Array.isArray(row.services) && row.services.length > 0 ? row.services : defaults.services;
+    Array.isArray(row.services) && row.services.length > 0
+      ? row.services
+      : catalogServices.length > 0
+        ? catalogServices
+        : defaults.services;
 
   const savedForMismatch = {
     headline: row.headline || "",
@@ -151,8 +152,27 @@ function serializeWebsiteRow(row, profile, request) {
     services: effectiveServices,
   };
   const industryMismatch =
+    !shouldLockWebsiteIndustry(profile) &&
     Boolean(row.headline || row.subheadline || row.about_text) &&
     detectWebsiteContentMismatch(savedForMismatch, industryKey);
+
+  const companyLocked = shouldLockWebsiteIndustry(profile);
+
+  const purified = purifyWebsiteForm(
+    {
+      headline: row.headline || defaults.headline,
+      subheadline: row.subheadline || defaults.subheadline,
+      aboutText: row.about_text || defaults.aboutText,
+      ctaText: normalizedCtaText,
+      themeColor: row.theme_color || defaults.themeColor,
+      services: effectiveServices,
+      testimonials: meta.testimonials,
+      trustBadges: meta.trustBadges,
+    },
+    profile,
+    industryKey,
+    catalogServices,
+  );
 
   return {
     id: row.id,
@@ -160,20 +180,23 @@ function serializeWebsiteRow(row, profile, request) {
     publicUrl: buildPublicWebsiteUrl(row.slug, request),
     websitePath: buildPublicWebsitePath(row.slug),
     requestPath: buildPublicWebsiteRequestPath(row.slug),
-    industryKeyOverride: String(siteMetaRow.industryKeyOverride || "").trim() || null,
+    industryKeyOverride: companyLocked
+      ? null
+      : String(siteMetaRow.industryKeyOverride || "").trim() || null,
     profileIndustry: profileIndustryKey,
-    industryPackOptions: listWebsiteIndustryPackOptions(),
-    headline: row.headline || defaults.headline,
-    subheadline: row.subheadline || defaults.subheadline,
-    aboutText: row.about_text || defaults.aboutText,
-    ctaText: normalizedCtaText,
-    themeColor: row.theme_color || defaults.themeColor,
+    companyLocked,
+    industryPackOptions: companyLocked ? [] : listWebsiteIndustryPackOptions(),
+    headline: purified.headline,
+    subheadline: purified.subheadline,
+    aboutText: purified.aboutText,
+    ctaText: purified.ctaText,
+    themeColor: purified.themeColor,
     galleryPhotos: normalizeGalleryPhotos(
       Array.isArray(row.gallery_photos) ? row.gallery_photos : defaults.galleryPhotos,
     ),
-    services: effectiveServices,
-    testimonials: meta.testimonials,
-    trustBadges: meta.trustBadges,
+    services: purified.services,
+    testimonials: purified.testimonials,
+    trustBadges: purified.trustBadges,
     heroPhotos: meta.heroPhotos,
     socialLinks,
     analytics: normalizeSiteAnalytics(row?.site_meta?.analytics),
@@ -189,6 +212,9 @@ function serializeWebsiteRow(row, profile, request) {
     requestServices: resolveWebsiteRequestServices({
       services: effectiveServices,
       requestServices: pack.requestServices,
+      industryKey,
+      industry: industryKey,
+      businessType: profile?.business_type || profile?.businessType || "",
     }),
     companyProfile: profile,
     siteMeta: {
@@ -285,6 +311,32 @@ async function findOrCreateWebsite(tenantDbId, companyProfile) {
   return data;
 }
 
+async function loadTenantCatalogServices(tenantId) {
+  try {
+    const { data: catalogRows } = await supabaseAdmin
+      .from("services_catalog")
+      .select("name, description, price_min, price_max")
+      .eq("tenant_id", tenantId)
+      .order("updated_at", { ascending: false })
+      .limit(24);
+
+    return (catalogRows || [])
+      .map((row) => ({
+        name: String(row.name || "").trim(),
+        description: String(row.description || "").trim(),
+        price:
+          row.price_min && row.price_max
+            ? `From $${row.price_min}`
+            : row.price_min
+              ? `From $${row.price_min}`
+              : "",
+      }))
+      .filter((s) => s.name);
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(request) {
   const access = await getAuthenticatedTenantContext(request);
   if (!access.authenticated) return unauthenticatedResponse();
@@ -318,9 +370,13 @@ export async function GET(request) {
 
   const draftSnapshot = readWebsiteDraftSnapshot(row);
   const projected = projectRowForBuilder(row);
+  const catalogServices =
+    !Array.isArray(row.services) || row.services.length === 0
+      ? await loadTenantCatalogServices(access.tenantDbId)
+      : [];
   return Response.json({
     success: true,
-    data: serializeWebsiteRow(projected, profile, request),
+    data: serializeWebsiteRow(projected, profile, request, { catalogServices }),
     meta: buildPublishMeta(row, draftSnapshot),
   });
 }
@@ -410,18 +466,17 @@ export async function POST(request) {
   let metaChanged = false;
 
   if (Array.isArray(body.testimonials)) {
-    nextMeta.testimonials = body.testimonials.slice(0, 4).map((t) => ({
-      quote: String(t?.quote || "").slice(0, 280),
-      name: String(t?.name || "Customer").slice(0, 60),
-      role: String(t?.role || "Local customer").slice(0, 80),
-    }));
+    nextMeta.testimonials = sanitizeWebsiteTestimonials(body.testimonials);
     metaChanged = true;
   }
   if (Array.isArray(body.trustBadges)) {
     nextMeta.trustBadges = body.trustBadges.slice(0, 6).map((b) => String(b).slice(0, 80));
     metaChanged = true;
   }
-  if (typeof body.industryKeyOverride === "string" || body.industryKeyOverride === null) {
+  if (
+    !shouldLockWebsiteIndustry(profile) &&
+    (typeof body.industryKeyOverride === "string" || body.industryKeyOverride === null)
+  ) {
     const rawOverride = body.industryKeyOverride;
     if (rawOverride === null || rawOverride === "") {
       delete nextMeta.industryKeyOverride;

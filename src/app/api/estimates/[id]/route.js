@@ -2,6 +2,7 @@ import {
   buildPublicEstimateLink,
   isPublicEstimateStatus,
 } from "@/lib/estimate-public-access";
+import { deriveServiceTitleFromScope } from "@/lib/estimate-pdf-content";
 import {
   buildAuditForStatusTransition,
   parseEstimateNotes,
@@ -134,13 +135,18 @@ function buildUpdateRow(body = {}) {
         ? body.requestedItems
         : null;
     }
+    const nextNoteText =
+      "notes" in body ? String(body.notes || "") : existingNotes.noteText;
     next.notes = stringifyEstimateNotes({
       address: "address" in body
         ? String(body.address || "").trim()
         : existingNotes.address,
-      noteText: "notes" in body
-        ? String(body.notes || "")
-        : existingNotes.noteText,
+      noteText: nextNoteText,
+      serviceTitle:
+        "serviceTitle" in body
+          ? deriveServiceTitleFromScope(nextNoteText, body.serviceTitle)
+          : existingNotes.serviceTitle ||
+            deriveServiceTitleFromScope(nextNoteText, ""),
       clientUuid:
         "clientUuid" in body || "clientId" in body
           ? String(body.clientUuid || body.clientId || "").trim()

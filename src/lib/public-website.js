@@ -10,11 +10,17 @@ import {
 } from "@/lib/website-builder-industry";
 import { normalizeWebsiteSlug } from "@/lib/public-website-routing";
 import {
-  buildFeaturedGallery,
-  normalizeGalleryPhotos,
   normalizePortfolio,
+  resolvePublicGalleryPhotos,
 } from "@/lib/website-gallery";
-import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
+import {
+  filterHomeownerFacingServices,
+  resolveWebsiteRequestServices,
+} from "@/lib/website-lead-form";
+import {
+  purifyWebsiteForm,
+} from "@/lib/website-content-purity";
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
 
 const PUBLIC_WEBSITE_SELECT = [
   "slug",
@@ -35,6 +41,8 @@ const PUBLIC_COMPANY_PROFILE_SELECT = [
   "public_display_name",
   "phone",
   "logo_data_url",
+  "logo_url",
+  "logo_placement",
   "business_type",
   "business_address",
   "website_url",
@@ -126,16 +134,33 @@ export async function assemblePublicWebsiteFromRow(website) {
     const src = String(p?.src || "").trim();
     return src.startsWith("data:image/") || /^https?:\/\//i.test(src);
   });
-  const testimonials =
-    Array.isArray(meta.testimonials) && meta.testimonials.length > 0
-      ? meta.testimonials
-      : pack.testimonials;
+  const testimonials = [];
   const trustBadges =
     Array.isArray(meta.trustBadges) && meta.trustBadges.length > 0
       ? meta.trustBadges
       : pack.trustBadges;
 
   const socialLinks = normalizeSocialLinks(meta.socialLinks);
+
+  const portfolio = normalizePortfolio(meta.portfolio);
+  const industryKey = resolveWebsiteIndustryForWebsite(profileForIndustry, meta);
+  const purified = purifyWebsiteForm(
+    {
+      headline: website.headline || "",
+      subheadline: website.subheadline || "",
+      aboutText: website.about_text || "",
+      ctaText: website.cta_text || "",
+      themeColor: website.theme_color || pack.defaultThemeColor,
+      services: filterHomeownerFacingServices(
+        Array.isArray(website.services) ? website.services : [],
+      ),
+      trustBadges: trustBadges,
+    },
+    profileForIndustry,
+    industryKey,
+  );
+
+  const galleryPhotos = resolvePublicGalleryPhotos(website.gallery_photos, portfolio);
 
   return {
     slug: website.slug,
@@ -146,36 +171,44 @@ export async function assemblePublicWebsiteFromRow(website) {
     serviceAreas: Array.isArray(meta.serviceAreas)
       ? meta.serviceAreas.map((a) => String(a || "").trim()).filter(Boolean)
       : [],
-    headline: website.headline || "",
-    subheadline: website.subheadline || "",
-    aboutText: website.about_text || "",
-    ctaText: website.cta_text || "",
-    themeColor: website.theme_color || "",
-    services: Array.isArray(website.services) ? website.services : [],
-    galleryPhotos: sanitizeGalleryPhotos(website.gallery_photos, meta.portfolio),
-    portfolio: normalizePortfolio(meta.portfolio),
+    headline: purified.headline,
+    subheadline: purified.subheadline,
+    aboutText: purified.aboutText,
+    ctaText: purified.ctaText,
+    themeColor: purified.themeColor || website.theme_color || "",
+    services: purified.services,
+    galleryPhotos,
+    portfolio,
     heroPhotos,
     testimonials,
-    trustBadges,
+    trustBadges: purified.trustBadges,
     socialLinks,
     analytics: normalizeSiteAnalytics(meta.analytics),
     industryLabel: pack.label,
     industryKey: pack.key,
     requestServices: resolveWebsiteRequestServices({
-      services: Array.isArray(website.services) ? website.services : [],
+      services: purified.services,
       requestServices: pack.requestServices,
+      industryKey: pack.key,
+      businessType: companyProfile?.business_type || "",
     }),
     companyProfile: {
       companyName: companyProfile?.company_name || "",
       publicDisplayName: companyProfile?.public_display_name || "",
       phone: companyProfile?.phone || "",
       logoDataUrl: companyProfile?.logo_data_url || "",
+      logoUrl: companyProfile?.logo_url || "",
+      logoPlacement: companyProfile?.logo_placement || "top-left",
       businessType: companyProfile?.business_type || "",
       businessAddress: companyProfile?.business_address || "",
       businessCity: "",
       websiteUrl: companyProfile?.website_url || "",
       googleReviewsUrl: companyProfile?.google_reviews_url || "",
       documentLanguage: companyProfile?.document_language || "en",
+      resolvedLogoUrl: resolveCompanyLogoUrl({
+        logoUrl: companyProfile?.logo_url,
+        logoDataUrl: companyProfile?.logo_data_url,
+      }),
     },
   };
 }

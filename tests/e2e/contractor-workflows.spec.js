@@ -265,6 +265,7 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
     const clientName = `UX Print Client ${stamp}`;
 
     await page.goto("/clients", { waitUntil: "domcontentloaded" });
+    await page.getByTestId("clients-new-button").click();
     await page.getByRole("textbox", { name: /Name/i }).fill(clientName);
     await page.getByRole("textbox", { name: /Email/i }).fill(`ux.print+${stamp}@example.com`);
     await page.getByRole("button", { name: /^Save$/i }).click();
@@ -272,10 +273,11 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
       timeout: 15_000,
     });
 
-    const search = page.getByRole("combobox", { name: /Search clients/i });
-    await search.fill(clientName);
-    await page.waitForTimeout(400);
-    await page.getByRole("option", { name: new RegExp(clientName) }).click();
+    await page.getByTestId("clients-search").fill(clientName);
+    const card = page.locator("article.cf-client-card").filter({
+      has: page.getByRole("heading", { name: clientName, level: 3 }),
+    });
+    await card.click();
 
     await expect(
       page.getByRole("link", { name: /Print record/i }).first(),

@@ -221,13 +221,16 @@ test.describe("Estimates module audit", () => {
 
     await page.getByRole("button", { name: /Approve/i }).click();
     await page.getByRole("button", { name: /^Confirm$/i }).click();
-    await expect(page.locator("details").filter({ hasText: "More actions" })).toBeHidden({
-      timeout: 10_000,
-    });
-    await openKanbanEstimate(page, clientName);
-    await expect(page.locator('[class*="badgeApproved"]')).toBeVisible({
+    await expect(page.getByTestId("convert-estimate-to-job")).toBeVisible({
       timeout: 15_000,
     });
+
+    await page.getByTestId("convert-estimate-to-job").click();
+    await expect(page).toHaveURL(/\/jobs\?jobId=/, { timeout: 20_000 });
+
+    await page.goto("/estimates", { waitUntil: "domcontentloaded" });
+    await openKanbanEstimate(page, clientName);
+    await expect(page.getByText(/Linked to job/i)).toBeVisible({ timeout: 15_000 });
 
     await expandKanbanMoreActions(page);
     await page.getByRole("button", { name: /Duplicate/i }).click();

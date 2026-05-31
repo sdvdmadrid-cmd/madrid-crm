@@ -102,6 +102,12 @@ export function InlineEditable({
   );
 }
 
+const PREVIEW_ANCHOR_IDS = {
+  hero: "home",
+  gallery: "gallery",
+  trust: "reviews",
+};
+
 export function PreviewSection({
   sectionId,
   label,
@@ -111,12 +117,19 @@ export function PreviewSection({
   children,
   className = "",
 }) {
+  const anchorId = PREVIEW_ANCHOR_IDS[sectionId] || sectionId;
+
   if (!editable) {
-    return <div className={className}>{children}</div>;
+    return (
+      <div id={anchorId} className={className}>
+        {children}
+      </div>
+    );
   }
 
   return (
     <div
+      id={anchorId}
       role="button"
       tabIndex={0}
       className={`${styles.previewSection} ${selected ? styles.previewSectionSelected : ""} ${className}`}

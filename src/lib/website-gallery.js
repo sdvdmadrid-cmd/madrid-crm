@@ -159,3 +159,31 @@ export function buildFeaturedGallery(portfolio, explicitFeaturedIds = null) {
 export function countPortfolioPhotos(portfolio) {
   return flattenPortfolioPhotos(portfolio).length;
 }
+
+function isDisplayableGallerySrc(src) {
+  const value = String(src || "").trim();
+  return (
+    value.startsWith("data:image/") ||
+    /^https?:\/\//i.test(value)
+  );
+}
+
+/**
+ * Gallery photos for public site + builder preview.
+ * Prefers persisted URLs; falls back to portfolio; keeps data URLs for in-builder preview.
+ */
+export function resolvePublicGalleryPhotos(galleryPhotos, portfolio) {
+  const normalized = normalizeGalleryPhotos(galleryPhotos);
+  const persisted = normalized.filter(
+    (p) => p.persisted || /^https?:\/\//i.test(String(p.src || "")),
+  );
+  if (persisted.length) return persisted.slice(0, MAX_FEATURED_GALLERY);
+
+  const fromPortfolio = buildFeaturedGallery(portfolio).filter((p) =>
+    /^https?:\/\//i.test(String(p.src || "")),
+  );
+  if (fromPortfolio.length) return fromPortfolio.slice(0, MAX_FEATURED_GALLERY);
+
+  const previewReady = normalized.filter((p) => isDisplayableGallerySrc(p.src));
+  return previewReady.slice(0, MAX_FEATURED_GALLERY);
+}

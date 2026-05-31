@@ -5,9 +5,13 @@ const INDUSTRY_PROFILES = {
     websiteServices: [
       "Lawn Maintenance",
       "Mulch Installation",
-      "Irrigation Repair",
+      "Sod Installation",
+      "Drainage Solutions",
+      "Hardscaping",
       "Retaining Walls",
-      "Patio & Pavers",
+      "Paver Patios",
+      "Seasonal Cleanup",
+      "Landscape Design",
     ],
     estimateTemplate: [
       { description: "Lawn mowing and edging", quantity: "1", unitPrice: "180" },

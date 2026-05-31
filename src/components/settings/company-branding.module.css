@@ -1,0 +1,164 @@
+.layout {
+  display: grid;
+  gap: 20px;
+  max-width: 820px;
+}
+
+.websiteSyncCard {
+  padding: 18px 22px;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  background: rgba(29, 78, 216, 0.08);
+}
+
+.websiteSyncActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.formCard {
+  padding: 22px;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(28, 33, 43, 0.92);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.sectionHint {
+  margin: 8px 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.fieldNote {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.previewBox {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.previewTitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.previewRow {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.previewLogo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px;
+}
+
+.previewLogoPlaceholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  padding: 6px;
+}
+
+.previewName {
+  display: block;
+  font-size: 16px;
+  color: #f8fafc;
+  margin-bottom: 6px;
+}
+
+.previewLine {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.actions {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.saveSuccess {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6ee7b7;
+}
+
+.saveError {
+  margin: 0;
+  flex: 1 1 100%;
+  font-size: 13px;
+  color: #fca5a5;
+}
+
+.saveBtnSuccess {
+  background: linear-gradient(135deg, #047857 0%, #10b981 100%) !important;
+  border-color: rgba(52, 211, 153, 0.55) !important;
+}
+
+@media (max-width: 640px) {
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+}

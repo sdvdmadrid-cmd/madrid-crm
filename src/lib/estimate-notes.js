@@ -91,6 +91,7 @@ export function parseEstimateNotes(notes) {
     return {
       address: "",
       noteText: "",
+      serviceTitle: "",
       clientUuid: "",
       clientEmail: "",
       clientPhone: "",
@@ -111,6 +112,7 @@ export function parseEstimateNotes(notes) {
         // (likely none, but defensive) still surface their text.
         address: String(parsed.address || ""),
         noteText: String(parsed.noteText ?? parsed.note ?? ""),
+        serviceTitle: String(parsed.serviceTitle || "").trim(),
         clientUuid: String(parsed.clientUuid || ""),
         clientEmail: String(parsed.clientEmail || ""),
         clientPhone: String(parsed.clientPhone || ""),
@@ -133,6 +135,7 @@ export function parseEstimateNotes(notes) {
   return {
     address: "",
     noteText: raw,
+    serviceTitle: "",
     clientUuid: "",
     clientEmail: "",
     clientPhone: "",
@@ -154,6 +157,7 @@ export function parseEstimateNotes(notes) {
 export function stringifyEstimateNotes({
   address = "",
   noteText = "",
+  serviceTitle = "",
   clientUuid = "",
   clientEmail = "",
   clientPhone = "",
@@ -165,6 +169,9 @@ export function stringifyEstimateNotes({
     kind: ESTIMATE_NOTES_KIND,
     address: String(address || ""),
     noteText: String(noteText || ""),
+    ...(String(serviceTitle || "").trim()
+      ? { serviceTitle: String(serviceTitle).trim().slice(0, 120) }
+      : {}),
     ...(String(clientUuid || "").trim()
       ? { clientUuid: String(clientUuid).trim() }
       : {}),

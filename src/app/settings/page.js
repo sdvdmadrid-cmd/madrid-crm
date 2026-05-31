@@ -8,6 +8,14 @@ import styles from "./settings.module.css";
 
 const SETTINGS_LINKS = [
   {
+    href: "/settings/company",
+    titleKey: "settingsHub.companyBranding.title",
+    descKey: "settingsHub.companyBranding.desc",
+    ctaKey: "settingsHub.companyBranding.cta",
+    accent: "violet",
+    testId: "settings-hub-company",
+  },
+  {
     href: "/settings/payments",
     titleKey: "settingsHub.clientPayments.title",
     descKey: "settingsHub.clientPayments.desc",
