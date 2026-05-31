@@ -1,3 +1,51 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 12px;
+}
+
+.toolbarSearch {
+  flex: 1 1 220px;
+  min-width: 180px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.toolbarSearch::placeholder {
+  color: #94a3b8;
+}
+
+.toolbarSelect {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.toolbarCheck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cbd5e1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toolbarMeta {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-left: auto;
+}
+
 .kanbanWrap {
   flex: 1;
   min-height: 0;
@@ -144,7 +192,7 @@
 .cardDate {
   margin-top: 6px;
   font-size: 10px;
-  color: #64748b;
+  color: var(--fb-text-muted, #b4c2d8);
 }
 
 .emptyCol {
@@ -154,7 +202,7 @@
   padding: 12px;
   text-align: center;
   font-size: 12px;
-  color: #64748b;
+  color: var(--fb-text-muted, #b4c2d8);
 }
 
 .detailBackdrop {

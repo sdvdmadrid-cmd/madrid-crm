@@ -16,7 +16,7 @@ function clientActivityLinks(clientId) {
   const id = encodeURIComponent(clientId);
   return {
     newEstimate: `/estimates/new?clientId=${id}`,
-    estimates: `/estimates`,
+    estimates: `/estimates?clientId=${id}`,
     newInvoice: `/invoices?clientId=${id}`,
     invoices: `/invoices?clientId=${id}`,
     newJob: `/jobs?action=new&clientId=${id}`,
@@ -47,6 +47,7 @@ function ActivitySection({
   emptyLabel,
   createHref,
   createLabel,
+  showCreate = true,
   viewAllHref,
   viewAllLabel,
   items,
@@ -60,7 +61,7 @@ function ActivitySection({
           <span className={panel.countBadge}>{count}</span>
         </h3>
         <div className={panel.sectionActions}>
-          {createHref ? (
+          {showCreate && createHref ? (
             <Link href={createHref} className={`${panel.btn} ${panel.btnPrimary}`}>
               {createLabel}
             </Link>
@@ -82,16 +83,7 @@ function ActivitySection({
           ))}
         </ul>
       ) : (
-        <>
-          <p className={panel.empty}>{emptyLabel}</p>
-          {createHref ? (
-            <div className={panel.emptyCta}>
-              <Link href={createHref} className={`${panel.btn} ${panel.btnPrimary}`}>
-                {createLabel}
-              </Link>
-            </div>
-          ) : null}
-        </>
+        <p className={panel.empty}>{emptyLabel}</p>
       )}
 
       {items?.length > 5 && viewAllHref ? (
@@ -264,39 +256,12 @@ export default function ClientDetailsPanel({
                       {row.estimateNumber ? `#${row.estimateNumber} · ` : ""}
                       {formatDate(row.updatedAt)}
                     </p>
-                    {row.isLegacy ? (
-                      <Link href="/estimates" className={panel.itemLink}>
-                        {t("clients.details.viewLegacyEstimate")}
-                      </Link>
-                    ) : (
-                      <Link
-                        href={`/estimates/new?edit=${encodeURIComponent(row.id)}&clientId=${encodeURIComponent(clientId)}`}
-                        className={panel.itemLink}
-                      >
-                        {t("clients.details.viewEstimate")}
-                      </Link>
-                    )}
-                  </>
-                )}
-              />
-
-              <ActivitySection
-                t={t}
-                title={t("clients.details.quotes")}
-                count={details.quotes?.length || 0}
-                emptyLabel={t("clients.details.noQuotes")}
-                createHref={links?.newEstimate}
-                createLabel={t("clients.details.createQuote")}
-                viewAllHref={links?.estimates}
-                viewAllLabel={t("clients.details.viewAllQuotes")}
-                items={details.quotes}
-                renderItem={(row) => (
-                  <>
-                    <p className={panel.itemTitle}>{row.title || row.quoteNumber || "—"}</p>
-                    <p className={panel.itemMeta}>
-                      {row.quoteNumber ? `#${row.quoteNumber} · ` : ""}
-                      {row.status || "—"} · {formatDate(row.updatedAt)}
-                    </p>
+                    <Link
+                      href={`/estimates/new?edit=${encodeURIComponent(row.id)}&clientId=${encodeURIComponent(clientId)}`}
+                      className={panel.itemLink}
+                    >
+                      {t("clients.details.viewEstimate")}
+                    </Link>
                   </>
                 )}
               />
@@ -306,8 +271,7 @@ export default function ClientDetailsPanel({
                 title={t("clients.details.invoices")}
                 count={details.invoices?.length || 0}
                 emptyLabel={t("clients.details.noInvoices")}
-                createHref={links?.newInvoice}
-                createLabel={t("clients.details.createInvoice")}
+                showCreate={false}
                 viewAllHref={links?.invoices}
                 viewAllLabel={t("clients.details.viewAllInvoices")}
                 items={details.invoices}
@@ -336,8 +300,7 @@ export default function ClientDetailsPanel({
                 title={t("clients.details.jobs")}
                 count={details.jobs?.length || 0}
                 emptyLabel={t("clients.details.noJobs")}
-                createHref={links?.newJob}
-                createLabel={t("clients.details.createJob")}
+                showCreate={false}
                 viewAllHref={links?.jobs}
                 viewAllLabel={t("clients.details.viewAllJobs")}
                 items={details.jobs}

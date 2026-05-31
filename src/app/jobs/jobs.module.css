@@ -212,7 +212,7 @@
 }
 
 .statLabel {
-  color: var(--fb-text-subtle);
+  color: var(--fb-text-label, #d4deee);
   font-size: 12px;
 }
 

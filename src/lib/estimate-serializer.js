@@ -77,6 +77,7 @@ export function serializeEstimateBase(row) {
     userId: row?.user_id || null,
     createdBy: row?.created_by || null,
     clientName: row?.client_name || "",
+    clientUuid: String(parsedNotes.clientUuid || "").trim(),
     clientEmail: parsedNotes.clientEmail || "",
     clientPhone: parsedNotes.clientPhone || "",
     address: parsedNotes.address,

@@ -1,3 +1,8 @@
+import { stringifyEstimateNotes } from "@/lib/estimate-notes";
+import {
+  formatEstimateNumber,
+  pickMaxEstimateSequence,
+} from "@/lib/estimate-number";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
@@ -181,35 +186,52 @@ export async function POST(request) {
       if (jobError) throw new Error("Unable to save job");
       job = insertedJob;
     } else {
-      const estimateLines = [
-        {
-          description: serviceNeeded,
-          quantity: 1,
-          unitPrice: 0,
-          total: 0,
-        },
-      ];
+      const { data: numberRows } = await supabaseAdmin
+        .from("estimates")
+        .select("estimate_number, created_at")
+        .eq("tenant_id", tenantDbId)
+        .ilike("estimate_number", "EST-%")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      const estimateNumber = formatEstimateNumber(
+        pickMaxEstimateSequence(numberRows || []) + 1,
+      );
+      const clientName =
+        clean(body.title, 160) || `Lead estimate - ${name || "New client"}`;
 
       const { data: insertedEstimate, error: estimateError } = await supabaseAdmin
-        .from("estimate_builder")
+        .from("estimates")
         .insert({
           tenant_id: tenantDbId,
           user_id: userId || null,
           created_by: userId || null,
-          name: clean(body.title, 160) || `Lead estimate - ${name || "New client"}`,
-          description: description,
-          notes: `Converted from lead inbox\nService needed: ${serviceNeeded}`,
-          lines: estimateLines,
-          total_low: 0,
-          total_high: 0,
-          total_mid: 0,
-          total_final: 0,
-          client_id: client.id,
-          "clientId": client.id,
+          client_name: clientName,
+          estimate_number: estimateNumber,
+          status: "draft",
+          currency: "USD",
+          items: [
+            {
+              id: "lead-line-1",
+              name: serviceNeeded || "Service",
+              qty: 1,
+              unitPrice: 0,
+              price: 0,
+            },
+          ],
+          subtotal: 0,
+          tax: 0,
+          total: 0,
+          notes: stringifyEstimateNotes({
+            noteText: `Converted from lead inbox\n\n${description}`,
+            clientUuid: client.id,
+            clientEmail: email || "",
+            clientPhone: phone || "",
+          }),
           created_at: nowIso,
           updated_at: nowIso,
         })
-        .select("id, name, client_id")
+        .select("id, client_name")
         .single();
 
       if (estimateError) throw new Error("Unable to save estimate");
@@ -238,7 +260,7 @@ export async function POST(request) {
       data: {
         target,
         estimateId: estimate?.id || null,
-        estimateTitle: estimate?.name || null,
+        estimateTitle: estimate?.client_name || estimate?.name || null,
         jobId: job?.id || null,
         jobTitle: job?.title || null,
         clientId: client.id,

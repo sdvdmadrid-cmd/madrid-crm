@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
@@ -15,6 +16,7 @@ import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import ws from "@/styles/workspace-dark.module.css";
 
 export default function ClientsPageClient() {
+  const router = useRouter();
   const { t } = useTranslation();
   const { capabilities } = useCurrentUserAccess();
   const [clients, setClients] = useState([]);
@@ -188,8 +190,10 @@ export default function ClientsPageClient() {
     loadClientDetails(client.id);
   };
 
-  const selectClient = (client) => {
-    openClientDetails(client);
+  /** Search pick → canonical estimate workflow (not the CRM side panel). */
+  const startEstimateForClient = (client) => {
+    if (!client?.id) return;
+    router.push(`/estimates/new?clientId=${encodeURIComponent(client.id)}`);
   };
 
   const removeDuplicateClients = async () => {
@@ -289,7 +293,13 @@ export default function ClientsPageClient() {
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
       <section style={{ marginTop: 20, maxWidth: 720 }}>
-        <ClientSearchAutocomplete onSelect={selectClient} />
+        <ClientSearchAutocomplete
+          onSelect={openClientDetails}
+          secondaryActionLabel={t("clients.search.newEstimate", {
+            defaultValue: "New estimate",
+          })}
+          onSecondaryAction={startEstimateForClient}
+        />
       </section>
 
       <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>

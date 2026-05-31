@@ -1,10 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { filterAndRankRecords } from "@/lib/record-search";
 import ws from "@/styles/workspace-dark.module.css";
 import est from "./estimates.module.css";
+
+function isTestEstimate(estimate) {
+  const name = String(estimate?.clientName || "");
+  const email = String(estimate?.clientEmail || "");
+  return (
+    /^(E2E|EB Lock)\b/i.test(name) ||
+    /\be2e\b/i.test(name) ||
+    /e2e\.client\+/i.test(email)
+  );
+}
+
+function estimateMatchesClient(estimate, clientId) {
+  const id = String(clientId || "").trim();
+  if (!id) return true;
+  return String(estimate?.clientUuid || "").trim() === id;
+}
 
 const STATUS_BADGE_STYLES = {
   draft: ws.badgeDraft,
@@ -46,6 +63,11 @@ function formatDateTime(value) {
 
 export default function EstimatesPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const filterClientId = String(searchParams.get("clientId") || "").trim();
+  const [filterQuery, setFilterQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [hideTestData, setHideTestData] = useState(true);
   const [estimates, setEstimates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState("");
@@ -157,9 +179,39 @@ export default function EstimatesPage() {
     };
   }, [selectedEstimate?.id]);
 
+  const filteredEstimates = useMemo(() => {
+    let list = estimates;
+
+    if (filterClientId) {
+      list = list.filter((row) => estimateMatchesClient(row, filterClientId));
+    }
+
+    if (hideTestData) {
+      list = list.filter((row) => !isTestEstimate(row));
+    }
+
+    if (statusFilter !== "all") {
+      list = list.filter(
+        (row) => String(row.status || "draft").toLowerCase() === statusFilter,
+      );
+    }
+
+    if (filterQuery.trim()) {
+      list = filterAndRankRecords(list, filterQuery, (row) => [
+        row.clientName,
+        row.estimateNumber,
+        row.address,
+        row.clientEmail,
+        row.clientPhone,
+      ]);
+    }
+
+    return list;
+  }, [estimates, filterClientId, filterQuery, hideTestData, statusFilter]);
+
   const kanbanColumns = useMemo(() => {
     const cols = { draft: [], sent: [], changes_requested: [], approved: [], declined: [] };
-    for (const estimate of estimates) {
+    for (const estimate of filteredEstimates) {
       const s = String(estimate.status || "draft").toLowerCase();
       if (s in cols) cols[s].push(estimate);
     }
@@ -171,7 +223,12 @@ export default function EstimatesPage() {
       );
     }
     return cols;
-  }, [estimates]);
+  }, [filteredEstimates]);
+
+  const totalVisible = useMemo(
+    () => Object.values(kanbanColumns).reduce((sum, col) => sum + col.length, 0),
+    [kanbanColumns],
+  );
 
   async function loadEstimates() {
     setLoading(true);
@@ -331,6 +388,57 @@ export default function EstimatesPage() {
       {!selectedEstimate && statusMessage ? (
         <div className={ws.noticeInfo} style={{ margin: "12px 24px 0" }}>
           {statusMessage}
+        </div>
+      ) : null}
+
+      <div className={est.toolbar}>
+        <input
+          type="search"
+          className={est.toolbarSearch}
+          placeholder="Search client, estimate #, address, email…"
+          value={filterQuery}
+          onChange={(event) => setFilterQuery(event.target.value)}
+          aria-label="Search estimates"
+        />
+        <select
+          className={est.toolbarSelect}
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          aria-label="Filter by status"
+        >
+          <option value="all">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="changes_requested">Changes requested</option>
+          <option value="approved">Approved</option>
+          <option value="declined">Declined</option>
+        </select>
+        <label className={est.toolbarCheck}>
+          <input
+            type="checkbox"
+            checked={hideTestData}
+            onChange={(event) => setHideTestData(event.target.checked)}
+          />
+          Hide test data
+        </label>
+        {filterClientId ? (
+          <button
+            type="button"
+            className={ws.btnSecondary}
+            onClick={() => router.push("/estimates")}
+          >
+            Clear client filter
+          </button>
+        ) : null}
+        <span className={est.toolbarMeta}>
+          {loading ? "Loading…" : `${totalVisible} shown`}
+          {filterClientId ? " · filtered by client" : ""}
+        </span>
+      </div>
+
+      {filterClientId ? (
+        <div className={ws.noticeInfo} style={{ margin: "0 16px 8px" }}>
+          Showing estimates linked to this client only.
         </div>
       ) : null}
 

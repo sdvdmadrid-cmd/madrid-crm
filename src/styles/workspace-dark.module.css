@@ -8,8 +8,8 @@
   --bg-input: var(--fb-surface-input, rgba(44, 54, 74, 0.95));
   --bg-muted: rgba(52, 62, 82, 0.65);
   --border: var(--fb-border, rgba(148, 163, 184, 0.1));
-  --text: var(--fb-text, #c8d2e6);
-  --text-muted: var(--fb-text-muted, #8b9bb8);
+  --text: var(--fb-text, #e2e9f6);
+  --text-muted: var(--fb-text-muted, #b4c2d8);
   --text-heading: var(--fb-text-heading, #f4f7fc);
   --accent: var(--fb-accent-emerald, #2dd4a8);
   --accent-blue: var(--fb-accent-blue, #4f8cff);
@@ -284,6 +284,18 @@
 
 .page :global(p) {
   color: var(--text-muted);
+}
+
+.page :global(label) {
+  color: var(--fb-form-label, var(--fb-text-label, #d4deee));
+  font-weight: 600;
+}
+
+.input::placeholder,
+.page :global(input::placeholder),
+.page :global(textarea::placeholder) {
+  color: var(--fb-text-placeholder, #9eb2cc);
+  opacity: 1;
 }
 
 .badge {

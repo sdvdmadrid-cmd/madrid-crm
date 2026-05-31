@@ -22,33 +22,7 @@ function serializePipelineEstimate(row = {}) {
     total: Number(row.total ?? row.subtotal ?? 0),
     updatedAt: row.updated_at || null,
     createdAt: row.created_at || null,
-    isLegacy: false,
-  };
-}
-
-function serializeLegacyBuilderEstimate(row = {}) {
-  return {
-    id: row.id,
-    name: row.name || row.estimate_number || "",
-    estimateNumber: row.estimate_number || "",
-    quoteId: row.quote_id || null,
-    status: "",
-    total: Number(row.total_final ?? row.total_mid ?? 0),
-    updatedAt: row.updated_at || null,
-    createdAt: row.created_at || null,
-    isLegacy: true,
-  };
-}
-
-function serializeQuote(row = {}) {
-  return {
-    id: row.id,
-    quoteNumber: row.quote_number || "",
-    title: row.title || "",
-    status: row.status || "",
-    estimateId: row.estimate_id || null,
-    updatedAt: row.updated_at || null,
-    createdAt: row.created_at || null,
+    isLegacy: Boolean(row.legacy_builder_id),
   };
 }
 
@@ -152,15 +126,8 @@ export async function loadClientDetailsBundle({
     return query;
   };
 
-  const scopeQuotes = (query) => {
-    if (!isSuperAdmin) return query.eq("tenant_id", String(tenantDbId));
-    return query;
-  };
-
   const [
-    pipelineEstimatesResult,
-    legacyEstimatesResult,
-    quotesResult,
+    estimatesResult,
     invoicesResult,
     jobsResult,
     propertiesResult,
@@ -173,39 +140,14 @@ export async function loadClientDetailsBundle({
         supabaseAdmin
           .from("estimates")
           .select(
-            "id, client_name, estimate_number, status, total, subtotal, updated_at, created_at",
+            "id, client_name, estimate_number, status, total, subtotal, legacy_builder_id, updated_at, created_at",
           )
-          .eq("client_id", clientId)
+          // Production estimates.client_id is bigint; clients use uuid — match migrated rows via notes.clientUuid.
+          .ilike("notes", `%${clientId}%`)
           .order("updated_at", { ascending: false })
           .limit(50),
       ),
-      "pipelineEstimates",
-    ),
-    safeSelect(
-      scope(
-        supabaseAdmin
-          .from("estimate_builder")
-          .select(
-            "id, name, estimate_number, quote_id, total_final, total_mid, updated_at, created_at",
-          )
-          .eq("client_id", clientId)
-          .order("updated_at", { ascending: false })
-          .limit(50),
-      ),
-      "legacyEstimates",
-    ),
-    safeSelect(
-      scopeQuotes(
-        supabaseAdmin
-          .from("quotes")
-          .select(
-            "id, quote_number, title, status, updated_at, created_at",
-          )
-          .eq("client_id", clientId)
-          .order("updated_at", { ascending: false })
-          .limit(50),
-      ),
-      "quotes",
+      "estimates",
     ),
     safeSelect(
       scope(
@@ -281,7 +223,6 @@ export async function loadClientDetailsBundle({
 
   const sectionLabels = {
     estimates: "estimates",
-    quotes: "quotes",
     invoices: "invoices",
     jobs: "jobs",
     properties: "properties",
@@ -291,9 +232,7 @@ export async function loadClientDetailsBundle({
   };
 
   const sectionResults = [
-    ["pipelineEstimates", pipelineEstimatesResult],
-    ["legacyEstimates", legacyEstimatesResult],
-    ["quotes", quotesResult],
+    ["estimates", estimatesResult],
     ["invoices", invoicesResult],
     ["jobs", jobsResult],
     ["properties", propertiesResult],
@@ -310,15 +249,7 @@ export async function loadClientDetailsBundle({
 
   return {
     client: serializeClient(clientRow),
-    estimates: [
-      ...pipelineEstimatesResult.rows.map(serializePipelineEstimate),
-      ...legacyEstimatesResult.rows.map(serializeLegacyBuilderEstimate),
-    ].sort((a, b) => {
-      const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-      const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-      return bTime - aTime;
-    }),
-    quotes: quotesResult.rows.map(serializeQuote),
+    estimates: estimatesResult.rows.map(serializePipelineEstimate),
     invoices: invoicesResult.rows.map(serializeInvoice),
     jobs: jobsResult.rows.map(serializeJob),
     properties: propertiesResult.rows.map(serializeProperty),

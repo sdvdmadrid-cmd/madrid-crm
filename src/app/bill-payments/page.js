@@ -23,6 +23,7 @@ import {
   CATEGORIES_WITH_MIN_PAYMENT,
 } from "@/lib/bill-payments-catalog";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { filterAndRankRecords } from "@/lib/record-search";
 import {
   BILL_ACCOUNT_NUMBER_MAX_LENGTH,
   getBillAccountNumberError,
@@ -702,24 +703,25 @@ export default function BillPaymentsPage() {
   }, [bills]);
 
   const filteredBills = useMemo(() => {
-    const query = deferredFilterQuery.trim().toLowerCase();
-    return bills.filter((bill) => {
+    let list = bills.filter((bill) => {
       if (statusFilter !== "all" && bill.status !== statusFilter) return false;
       if (tagFilter !== "all" && !(bill.tags || []).includes(tagFilter))
         return false;
       if (categoryFilter !== "all" && bill.category !== categoryFilter)
         return false;
-      if (!query) return true;
-      return [
+      return true;
+    });
+
+    if (deferredFilterQuery.trim()) {
+      list = filterAndRankRecords(list, deferredFilterQuery, (bill) => [
         bill.providerName,
         bill.accountLabel,
         bill.accountReferenceMasked,
         ...(bill.tags || []),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
+      ]);
+    }
+
+    return list;
   }, [bills, deferredFilterQuery, statusFilter, tagFilter, categoryFilter]);
 
   const loadProviders = useCallback(async (query = "", category = "") => {
@@ -1931,10 +1933,10 @@ export default function BillPaymentsPage() {
                   : `${paymentMethods.length} saved method${paymentMethods.length === 1 ? "" : "s"} ready to use.`}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => goToHubTab("wallet")}
+            <Link
+              href="/bill-payments?tab=wallet"
               style={{
+                display: "inline-block",
                 border: 0,
                 borderRadius: 999,
                 background: "linear-gradient(135deg, #0f766e, #14b8a6)",
@@ -1942,10 +1944,11 @@ export default function BillPaymentsPage() {
                 padding: "10px 18px",
                 fontWeight: 700,
                 cursor: "pointer",
+                textDecoration: "none",
               }}
             >
               Manage cards & banks
-            </button>
+            </Link>
           </section>
 
             </>

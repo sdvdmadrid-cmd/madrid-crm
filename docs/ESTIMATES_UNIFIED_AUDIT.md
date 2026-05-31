@@ -18,12 +18,22 @@
 | Component | `NewEstimateForm.js` (STEP 1/2/3 UI) | **Deleted** |
 | Records helper | `estimate-builder-records.js` | **Deleted** |
 
+## Legacy data migration
+
+- Column `estimates.legacy_builder_id` links rows migrated from `estimate_builder`.
+- Run once (after `npm run db:migrate`):
+  - `npm run estimates:migrate-legacy` — dry-run counts
+  - `npm run estimates:migrate-legacy:apply` — writes to `estimates`
+- Kanban (`/estimates`) and client details read **only** `estimates` after migration.
+- Client details panel does **not** show legacy Jobber `quotes`; active work is under Estimates only. The `quotes` table remains for import/history and invoice FKs only.
+- Migrated rows store `clientUuid` in `estimates.notes` when production `client_id` is bigint (legacy builder used uuid text).
+
 ## Preserved for data safety (read-only / integrations)
 
 | Asset | Why kept |
 |--------|----------|
 | Table `estimate_builder` | Historical rows, Jobber sync, invoice FK (`invoices.estimate_id`) |
-| `estimate-builder-linking.js` | Invoice number lookup: `estimates` first, legacy table fallback |
+| `estimate-invoice-linking.js` | Invoice number lookup: `estimates` table only (archived builder rows not used in live UI) |
 | Client details | Merges pipeline `estimates` + archived legacy rows (`isLegacy: true`) |
 
 ## Redirects & guards

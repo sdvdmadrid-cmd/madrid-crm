@@ -4,6 +4,7 @@
 @import "./theme/design-tokens.css";
 @import "../styles/premium-design.css";
 @import "../styles/premium-components.css";
+@import "../styles/form-accessibility.css";
 
 :root {
   /* Backgrounds */

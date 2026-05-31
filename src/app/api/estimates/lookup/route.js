@@ -6,7 +6,7 @@ import {
 
 /**
  * GET /api/estimates/lookup?q=<number>
- * Searches estimates (and estimate_builder) by number.
+ * Searches pipeline estimates by number.
  * Accepts: "2", "#2", "EST-0002", "EST-2"
  * Returns the best match for the current tenant.
  */
@@ -64,33 +64,6 @@ export async function GET(request) {
             total: row.total || 0,
             status: row.status || "",
             source: "estimates",
-          },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    }
-
-    // Search estimate_builder table
-    const { data: builderRows } = await supabaseAdmin
-      .from("estimate_builder")
-      .select("id, estimate_number, client_name, name, total_final")
-      .eq("tenant_id", tenantDbId)
-      .in("estimate_number", candidateList)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (builderRows && builderRows.length > 0) {
-      const row = builderRows[0];
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            id: row.id,
-            estimateNumber: row.estimate_number,
-            clientName: row.client_name || row.name || "",
-            total: row.total_final || 0,
-            status: "",
-            source: "estimate_builder",
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },

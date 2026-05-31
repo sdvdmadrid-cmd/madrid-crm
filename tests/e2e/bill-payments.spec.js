@@ -12,7 +12,7 @@ test.describe('bill payments', () => {
 
   test('wallet section links to payment method management', async ({ page }) => {
     await expect(page.getByText(/^Wallet$/)).toBeVisible({ timeout: 15_000 });
-    const manageWallet = page.getByRole('button', { name: /Manage cards & banks/i });
+    const manageWallet = page.getByRole('link', { name: /Manage cards & banks/i });
     await expect(manageWallet).toBeVisible();
     await manageWallet.click();
     await expect(page).toHaveURL(/tab=wallet/, { timeout: 15_000 });

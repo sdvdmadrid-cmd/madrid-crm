@@ -141,6 +141,10 @@ function buildUpdateRow(body = {}) {
       noteText: "notes" in body
         ? String(body.notes || "")
         : existingNotes.noteText,
+      clientUuid:
+        "clientUuid" in body || "clientId" in body
+          ? String(body.clientUuid || body.clientId || "").trim()
+          : existingNotes.clientUuid,
       clientEmail: "clientEmail" in body
         ? String(body.clientEmail || "").trim().toLowerCase()
         : existingNotes.clientEmail,

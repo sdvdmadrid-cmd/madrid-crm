@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientPickerField from "@/components/clients/ClientPickerField";
 import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
@@ -149,6 +149,28 @@ export default function InvoicesPage() {
   const [error, setError] = useState("");
   const [quoteLookup, setQuoteLookup] = useState(null);
   const [quoteLookupLoading, setQuoteLookupLoading] = useState(false);
+  const [listSearch, setListSearch] = useState("");
+
+  const filterClientId = String(searchParams.get("clientId") || "").trim();
+
+  const visibleInvoices = useMemo(() => {
+    let list = invoices;
+    if (filterClientId) {
+      list = list.filter(
+        (invoice) => String(invoice.clientId || "") === filterClientId,
+      );
+    }
+    if (listSearch.trim()) {
+      list = filterAndRankRecords(list, listSearch, (invoice) => [
+        invoice.invoiceNumber,
+        invoice.clientName,
+        invoice.invoiceTitle,
+        invoice.quoteNumber,
+        invoice.status,
+      ]);
+    }
+    return list;
+  }, [invoices, filterClientId, listSearch]);
 
   const mapUiError = (err, fallbackText) => {
     const raw = String(err?.message || "").trim();
@@ -759,8 +781,39 @@ export default function InvoicesPage() {
 
       <section className={styles.listSection}>
         <h2 className={styles.listTitle}>{t("invoices.listTitle")}</h2>
+        <input
+          type="search"
+          value={listSearch}
+          onChange={(event) => setListSearch(event.target.value)}
+          placeholder={t("invoices.searchPlaceholder", {
+            defaultValue: "Search by invoice #, client, title, or status…",
+          })}
+          aria-label={t("invoices.searchLabel", { defaultValue: "Search invoices" })}
+          className={styles.listSearch}
+        />
+        {filterClientId ? (
+          <p className={styles.muted} style={{ marginBottom: 12 }}>
+            {t("invoices.filteredByClient", {
+              defaultValue: "Showing invoices for the selected client only.",
+            })}{" "}
+            <button
+              type="button"
+              className={styles.btnGhost}
+              onClick={() => router.push("/invoices")}
+            >
+              {t("invoices.clearClientFilter", { defaultValue: "Show all" })}
+            </button>
+          </p>
+        ) : null}
         <div className={styles.listGrid}>
-          {invoices.map((invoice) => (
+          {visibleInvoices.length === 0 && !loading ? (
+            <p className={styles.muted}>
+              {t("invoices.noSearchResults", {
+                defaultValue: "No invoices match your search.",
+              })}
+            </p>
+          ) : null}
+          {visibleInvoices.map((invoice) => (
             <div key={invoice._id} className={styles.invoiceCard}>
               <div className={styles.invoiceCardHeader}>
                 <div>

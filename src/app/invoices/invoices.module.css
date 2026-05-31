@@ -4,7 +4,7 @@
   --bg-input: var(--fb-surface-input, rgba(22, 28, 40, 0.95));
   --border: var(--fb-border-strong, rgba(148, 163, 184, 0.2));
   --text: var(--fb-text, #e8ecf4);
-  --text-muted: var(--fb-text-muted, #94a3b8);
+  --text-muted: var(--fb-text-muted, #b4c2d8);
   --text-heading: var(--fb-text-heading, #f4f6fb);
   --accent: var(--fb-accent-emerald, #2dd4a8);
   --accent-blue: var(--fb-accent-blue, #60a5fa);
@@ -78,6 +78,18 @@
 .cardTitle {
   margin-top: 0;
   color: var(--text-heading);
+}
+
+.listSearch {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
 }
 
 .listSection {
@@ -159,7 +171,8 @@
 }
 
 .field::placeholder {
-  color: #64748b;
+  color: var(--fb-text-placeholder, #9eb2cc);
+  opacity: 1;
 }
 
 .field option {
