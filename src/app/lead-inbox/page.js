@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { filterAndRankRecords } from "@/lib/record-search";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import PlatformZoneBanner from "@/components/workspace/PlatformZoneBanner";
 import ws from "@/styles/workspace-dark.module.css";
@@ -329,24 +330,24 @@ export default function LeadInboxPage() {
   );
 
   const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return activeItems.filter((item) => {
-      if (statusFilter && String(item.status || "").toLowerCase() !== statusFilter) {
-        return false;
-      }
-      if (!q) return true;
-      const haystack = [
+    let list = activeItems;
+    if (statusFilter && String(statusFilter).toLowerCase()) {
+      list = list.filter(
+        (item) =>
+          String(item.status || "").toLowerCase() === statusFilter.toLowerCase(),
+      );
+    }
+    if (search.trim()) {
+      list = filterAndRankRecords(list, search, (item) => [
         item.name,
         item.email,
         item.phone,
         item.address,
         item.description,
         item.serviceNeeded,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
+      ]);
+    }
+    return list;
   }, [activeItems, search, statusFilter]);
 
   const updateLeadStatus = async (item, status) => {

@@ -1,0 +1,126 @@
+/**
+ * Form readability — WCAG 2.1 AA contrast on dark workspace surfaces.
+ * Targets Estimates, Clients, Leads, Jobs, Invoices, Settings inside .fb-workspace.
+ */
+
+:root {
+  --fb-text-label: #d4deee;
+  --fb-text-placeholder: #9eb2cc;
+  --fb-text-helper: #b0bdd4;
+  --fb-input-surface: rgba(52, 64, 86, 0.98);
+  --fb-input-text: #f1f5fc;
+}
+
+/* ─── Global form controls in workspace ───────────────────── */
+.fb-workspace input::placeholder,
+.fb-workspace textarea::placeholder,
+.fb-page input::placeholder,
+.fb-page textarea::placeholder {
+  color: var(--fb-text-placeholder) !important;
+  opacity: 1 !important;
+}
+
+.fb-workspace label,
+.fb-page label,
+.fb-workspace .formLabel,
+.fb-page .formLabel {
+  color: var(--fb-form-label, var(--fb-text-label)) !important;
+  font-weight: 600;
+}
+
+.fb-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.fb-workspace textarea,
+.fb-workspace select,
+.fb-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.fb-page textarea,
+.fb-page select {
+  color: var(--fb-input-text) !important;
+  caret-color: var(--fb-accent-blue, #4f8cff);
+}
+
+.fb-workspace .helperText,
+.fb-workspace .hint,
+.fb-workspace .formHint,
+.fb-page .helperText,
+.fb-page .hint {
+  color: var(--fb-text-helper) !important;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Tailwind form pages (estimates/new, etc.) remapped inside dark shell */
+.fb-workspace .text-slate-900,
+.fb-workspace .text-slate-800 {
+  color: var(--fb-text-heading) !important;
+}
+
+.fb-workspace .text-slate-700,
+.fb-workspace .text-slate-600 {
+  color: var(--fb-text) !important;
+}
+
+.fb-workspace .text-slate-500,
+.fb-workspace .text-slate-400 {
+  color: var(--fb-text-label) !important;
+}
+
+.fb-workspace .bg-white {
+  background: var(--fb-bg-elevated) !important;
+  border-color: var(--fb-border-strong) !important;
+}
+
+.fb-workspace .bg-slate-50 {
+  background: var(--fb-input-surface) !important;
+}
+
+.fb-workspace .border-slate-200,
+.fb-workspace .border-slate-300 {
+  border-color: var(--fb-border-strong) !important;
+}
+
+.fb-workspace input.bg-slate-50:focus,
+.fb-workspace textarea.bg-slate-50:focus,
+.fb-workspace .fb-estimate-form input:focus,
+.fb-workspace .fb-estimate-form textarea:focus {
+  background: rgba(62, 74, 98, 1) !important;
+  border-color: rgba(79, 140, 255, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+}
+
+/* Estimate builder (canonical form) */
+.fb-workspace .fb-estimate-form {
+  color: var(--fb-text);
+}
+
+.fb-workspace .fb-estimate-form h1,
+.fb-workspace .fb-estimate-form h2 {
+  color: var(--fb-text-heading) !important;
+  -webkit-text-fill-color: unset;
+}
+
+.fb-workspace .fb-estimate-form .sticky {
+  background: var(--fb-bg-glass-strong) !important;
+  border-color: var(--fb-border-strong) !important;
+  backdrop-filter: blur(16px);
+}
+
+.fb-workspace .fb-estimate-form button.text-slate-700 {
+  color: var(--fb-text) !important;
+}
+
+/* Module cards using hardcoded slate hex */
+.fb-workspace .cf-card label {
+  color: var(--fb-text-label) !important;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .fb-workspace input,
+  .fb-workspace textarea,
+  .fb-workspace select {
+    font-size: 16px !important;
+  }
+}

@@ -2,8 +2,11 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { formatClientPickerLabel } from "@/lib/client-search";
+import styles from "./estimates-new.module.css";
 import { getUsStateTaxRate } from "@/lib/estimate-pricing";
 import {
   autofillGuardProps,
@@ -152,11 +155,8 @@ function NewEstimatePageInner() {
   // The user typed a tax rate manually — stop auto-filling from state.
   const taxRateManualRef = useRef(false);
 
-  // Existing-client picker. The picker is purely additive: contractors
-  // can still type a fresh client by hand and ignore the suggestions.
-  const [clients, setClients] = useState([]);
-  const [clientQuery, setClientQuery] = useState("");
-  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientSearchLabel, setClientSearchLabel] = useState("");
 
   // Preview-before-send: pause the "Save & Send" flow on a modal that
   // mirrors the customer-facing email. The contractor confirms before the
@@ -182,37 +182,10 @@ function NewEstimatePageInner() {
   }, [subtotal, taxRate]);
   const estimateTotal = useMemo(() => Number((subtotal + taxAmount).toFixed(2)), [subtotal, taxAmount]);
 
-  // Load the contractor's clients once for the picker. Failures here are
-  // non-fatal — the form still works without suggestions.
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch("/api/clients")
-      .then((r) => r.json())
-      .then((payload) => {
-        if (cancelled) return;
-        const list = Array.isArray(payload) ? payload : payload?.data || [];
-        setClients(list);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const clientSuggestions = useMemo(() => {
-    const q = clientQuery.trim().toLowerCase();
-    if (!q) return clients.slice(0, 6);
-    return clients
-      .filter((c) => {
-        const hay = `${c.name || ""} ${c.email || ""} ${c.phone || ""} ${c.address || ""}`
-          .toLowerCase();
-        return hay.includes(q);
-      })
-      .slice(0, 8);
-  }, [clientQuery, clients]);
-
   function applyClient(client) {
     if (!client) return;
+    if (!hydratingRef.current) setIsDirty(true);
+    setSelectedClientId(String(client.id || client._id || "").trim());
     const nameParts = String(client.name || "").trim().split(/\s+/);
     setClientFirstName(nameParts[0] || "");
     setClientLastName(nameParts.slice(1).join(" "));
@@ -238,17 +211,24 @@ function NewEstimatePageInner() {
       setBillingZip(String(client.billing_zip || "").trim());
     }
 
-    setClientPickerOpen(false);
-    setClientQuery(`${client.name || ""}${client.email ? ` <${client.email}>` : ""}`);
+    setClientSearchLabel(formatClientPickerLabel(client));
   }
 
   useEffect(() => {
-    if (!clientIdParam || clients.length === 0 || editId) return;
-    const match = clients.find(
-      (c) => String(c.id || c._id || "") === String(clientIdParam),
-    );
-    if (match) applyClient(match);
-  }, [clientIdParam, clients, editId]);
+    if (!clientIdParam || editId) return;
+    let cancelled = false;
+    apiFetch(`/api/clients/${encodeURIComponent(clientIdParam)}`)
+      .then((res) => getJsonOrThrow(res, "Unable to load client."))
+      .then((json) => {
+        if (cancelled) return;
+        const row = json?.data || json;
+        if (row?.id) applyClient(row);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [clientIdParam, editId]);
 
   useEffect(() => {
     if (!editId) return;
@@ -551,6 +531,7 @@ function NewEstimatePageInner() {
       },
       status: nextStatus,
       notes: jobDescription.trim(),
+      clientUuid: selectedClientId || clientIdParam || "",
     };
 
     setSaving(true);
@@ -603,33 +584,33 @@ function NewEstimatePageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 shadow-sm">
+    <div className={`fb-estimate-form ${styles.shell}`}>
+      <header className={styles.header}>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => router.push("/estimates")}
             aria-label="Back to estimates list"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className={styles.btnSecondary}
           >
             Back
           </button>
           <div>
-            <h1 className="text-base font-bold text-slate-900">
+            <h1 className={styles.headerTitle}>
               {editId ? "Edit Estimate" : "New Estimate"}
             </h1>
             {editId && editingStatus === "changes_requested" ? (
-              <span className="text-xs font-semibold text-amber-600">Changes requested by client</span>
+              <span className={styles.cardHint}>Changes requested by client</span>
             ) : null}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className={styles.headerActions}>
           <button
             type="button"
             onClick={() => handleSaveClick("draft")}
             disabled={saving}
             aria-label="Save as draft"
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className={styles.btnSecondary}
           >
             Save Estimate
           </button>
@@ -638,96 +619,60 @@ function NewEstimatePageInner() {
             onClick={() => handleSaveClick("sent")}
             disabled={saving}
             aria-label={editId && editingStatus === "changes_requested" ? "Save and resend to client" : "Save and send to client"}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+            className={styles.btnPrimary}
           >
             {saving ? "Saving..." : editId && editingStatus === "changes_requested" ? "Save & Resend" : "Save & Send"}
           </button>
         </div>
-      </div>
+      </header>
 
       <form
-        className="mx-auto max-w-2xl px-4 py-8"
+        className={styles.main}
         autoComplete="off"
         onSubmit={(event) => event.preventDefault()}
         data-form-type="other"
       >
         {deliveryNotice ? (
-          <div
-            role="alert"
-            className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
-          >
+          <div role="alert" className={`${styles.alert} ${styles.alertWarn}`}>
             {deliveryNotice}
           </div>
         ) : null}
         {statusMessage ? (
-          <div
-            role="alert"
-            className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700"
-          >
+          <div role="alert" className={`${styles.alert} ${styles.alertInfo}`}>
             {statusMessage}
           </div>
         ) : null}
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Client</h2>
-            {clients.length > 0 ? (
-              <span className="text-xs text-slate-400">
-                {clients.length} saved client{clients.length === 1 ? "" : "s"}
-              </span>
-            ) : null}
+        <div className={styles.grid}>
+          <div className={styles.colStack}>
+        <section className={styles.card}>
+          <div className={styles.cardHead}>
+            <h2 className={styles.cardTitle}>Client</h2>
+            <span className={styles.cardHint}>Search to auto-fill contact &amp; address</span>
           </div>
 
-          {clients.length > 0 ? (
-            <div className="relative mb-3">
-              <input
-                type="search"
-                value={clientQuery}
-                onChange={(e) => {
-                  setClientQuery(e.target.value);
-                  setClientPickerOpen(true);
-                }}
-                onFocus={() => setClientPickerOpen(true)}
-                onBlur={() => setTimeout(() => setClientPickerOpen(false), 150)}
-                placeholder="Search existing clients by name, email, or phone…"
-                aria-label="Search existing clients"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none focus:border-slate-400 focus:bg-white"
-                {...autofillGuardProps("generic")}
-              />
-              {clientPickerOpen && clientSuggestions.length > 0 ? (
-                <ul
-                  role="listbox"
-                  aria-label="Existing client suggestions"
-                  className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
-                >
-                  {clientSuggestions.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          applyClient(c);
-                        }}
-                        className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50"
-                      >
-                        <div className="font-semibold text-slate-800">{c.name || "(no name)"}</div>
-                        <div className="text-xs text-slate-500">
-                          {[c.email, c.phone, c.address].filter(Boolean).join(" · ") || "—"}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
+          <div className={styles.searchWrap}>
+            <ClientSearchAutocomplete
+              limit={25}
+              clearOnSelect={false}
+              showHint={false}
+              value={clientSearchLabel}
+              onValueChange={setClientSearchLabel}
+              onClear={() => {
+                setSelectedClientId("");
+                setClientSearchLabel("");
+              }}
+              onSelect={applyClient}
+              placeholder="Search clients by name, email, phone, or address…"
+            />
+          </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className={styles.fieldRow}>
             <select
               value={clientPrefix}
               onChange={(e) => setClientPrefix(e.target.value)}
               aria-label="Client prefix"
-              className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+              className={styles.select}
             >
               {CLIENT_PREFIXES.map((p) => (
                 <option key={p} value={p}>{p || "-"}</option>
@@ -740,7 +685,7 @@ function NewEstimatePageInner() {
               placeholder="First name"
               aria-label="Client first name"
               aria-invalid={showError("clientFirstName") ? "true" : "false"}
-              className={`h-12 flex-1 min-w-[120px] rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("clientFirstName") ? "border-rose-400" : "border-slate-300"}`}
+              className={`${styles.input} ${styles.inputGrow}`}
               {...autofillGuardProps("firstName")}
               {...autofillReadonlyUntilFocusProps()}
             />
@@ -749,43 +694,49 @@ function NewEstimatePageInner() {
               onChange={(e) => setClientLastName(e.target.value)}
               placeholder="Last name"
               aria-label="Client last name"
-              className="h-12 flex-1 min-w-[120px] rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+              className={`${styles.input} ${styles.inputGrow}`}
               {...autofillGuardProps("lastName")}
               {...autofillReadonlyUntilFocusProps()}
             />
           </div>
           {showError("clientFirstName") ? (
-            <p className="mt-1 text-xs font-medium text-rose-600">{showError("clientFirstName")}</p>
+            <p className={styles.errorText}>{showError("clientFirstName")}</p>
           ) : null}
-          <input
-            type="email"
-            value={clientEmail}
-            onChange={(e) => setClientEmail(e.target.value)}
-            onBlur={() => touchField("clientEmail")}
-            placeholder="Client email - to send the estimate link"
-            aria-label="Client email"
-            aria-invalid={showError("clientEmail") ? "true" : "false"}
-            className={`mt-2 h-12 w-full rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("clientEmail") ? "border-rose-400" : "border-slate-300"}`}
-            {...autofillGuardProps("email")}
-            {...autofillReadonlyUntilFocusProps()}
-          />
+          <label className={styles.field}>
+            Email
+            <input
+              type="email"
+              value={clientEmail}
+              onChange={(e) => setClientEmail(e.target.value)}
+              onBlur={() => touchField("clientEmail")}
+              placeholder="Email to send the estimate link"
+              aria-label="Client email"
+              aria-invalid={showError("clientEmail") ? "true" : "false"}
+              className={styles.input}
+              {...autofillGuardProps("email")}
+              {...autofillReadonlyUntilFocusProps()}
+            />
+          </label>
           {showError("clientEmail") ? (
-            <p className="mt-1 text-xs font-medium text-rose-600">{showError("clientEmail")}</p>
+            <p className={styles.errorText}>{showError("clientEmail")}</p>
           ) : null}
-          <input
-            type="tel"
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-            placeholder="Client phone number"
-            aria-label="Client phone"
-            className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
-            {...autofillGuardProps("tel")}
-            {...autofillReadonlyUntilFocusProps()}
-          />
-        </div>
+          <label className={styles.field}>
+            Phone
+            <input
+              type="tel"
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              placeholder="Mobile or office number"
+              aria-label="Client phone"
+              className={styles.input}
+              {...autofillGuardProps("tel")}
+              {...autofillReadonlyUntilFocusProps()}
+            />
+          </label>
+        </section>
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-500">Service Address</h2>
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Service Address</h2>
           <PlacesAutocomplete
             id="service-address"
             value={streetName}
@@ -797,27 +748,27 @@ function NewEstimatePageInner() {
               if (place.zip) setZipCode(place.zip);
             }}
             placeholder="Start typing address..."
-            inputClass={`h-12 w-full rounded-xl border px-4 text-base outline-none focus:border-slate-500 ${showError("streetName") ? "border-rose-400" : "border-slate-300"}`}
+            inputClass={styles.input}
           />
           {showError("streetName") ? (
-            <p className="mt-1 text-xs font-medium text-rose-600">{showError("streetName")}</p>
+            <p className={styles.errorText}>{showError("streetName")}</p>
           ) : null}
-          <div className="mt-2 grid grid-cols-[1fr_72px_90px] gap-2">
+          <div className={styles.addressGrid}>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="City"
               aria-label="City"
-              className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+              className={styles.input}
               {...autofillGuardProps("city")}
             />
             <input
               value={stateField}
               onChange={(e) => setStateField(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="State"
+              placeholder="ST"
               maxLength={2}
               aria-label="State (2-letter code, e.g. TX). Auto-fills sales tax."
-              className="h-12 rounded-xl border border-slate-300 px-3 text-base uppercase outline-none focus:border-slate-500"
+              className={styles.input}
               {...autofillGuardProps("state")}
             />
             <input
@@ -826,15 +777,17 @@ function NewEstimatePageInner() {
               placeholder="ZIP"
               aria-label="ZIP code"
               inputMode="numeric"
-              className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+              className={styles.input}
               {...autofillGuardProps("zip")}
             />
           </div>
 
           <div className="mt-4">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-700">Billing Address</div>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+            <div className={styles.cardHead}>
+              <div className={styles.cardTitle} style={{ textTransform: "none", letterSpacing: 0, fontSize: "14px" }}>
+                Billing Address
+              </div>
+              <label className={styles.checkboxLabel}>
                 <input
                   type="checkbox"
                   checked={sameAsBilling}
@@ -857,24 +810,24 @@ function NewEstimatePageInner() {
                     if (place.zip) setBillingZip(place.zip);
                   }}
                   placeholder="Start typing billing address..."
-                  inputClass="h-12 w-full rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+                  inputClass={styles.input}
                 />
-                <div className="mt-2 grid grid-cols-[1fr_72px_90px] gap-2">
+                <div className={styles.addressGrid}>
                   <input
                     value={billingCity}
                     onChange={(e) => setBillingCity(e.target.value)}
                     placeholder="City"
                     aria-label="Billing city"
-                    className="h-12 rounded-xl border border-slate-300 px-4 text-base outline-none focus:border-slate-500"
+                    className={styles.input}
                     {...autofillGuardProps("billingCity")}
                   />
                   <input
                     value={billingState}
                     onChange={(e) => setBillingState(e.target.value.toUpperCase().slice(0, 2))}
-                    placeholder="State"
+                    placeholder="ST"
                     maxLength={2}
                     aria-label="Billing state"
-                    className="h-12 rounded-xl border border-slate-300 px-3 text-base uppercase outline-none focus:border-slate-500"
+                    className={styles.input}
                     {...autofillGuardProps("billingState")}
                   />
                   <input
@@ -883,25 +836,26 @@ function NewEstimatePageInner() {
                     placeholder="ZIP"
                     aria-label="Billing ZIP"
                     inputMode="numeric"
-                    className="h-12 rounded-xl border border-slate-300 px-3 text-base outline-none focus:border-slate-500"
+                    className={styles.input}
                     {...autofillGuardProps("billingZip")}
                   />
                 </div>
               </>
             ) : (
-              <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">Using service address as billing address.</p>
+              <p className={styles.billingNote}>Using service address as billing address.</p>
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
-              Job Description <span className="normal-case font-normal text-slate-400">(optional)</span>
+        <section className={styles.card}>
+          <div className={styles.aiRow}>
+            <h2 className={styles.cardTitle}>
+              Job Description <span className={styles.cardHint}>(optional)</span>
             </h2>
             <button
               type="button"
               disabled={aiDescLoading}
+              className={styles.btnAi}
               onClick={async () => {
                 const raw = jobDescription.trim();
                 if (!raw) {
@@ -924,7 +878,6 @@ function NewEstimatePageInner() {
                   setAiDescLoading(false);
                 }
               }}
-              className="flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-60"
             >
               {aiDescLoading ? "Polishing..." : "Optimize with AI"}
             </button>
@@ -932,42 +885,40 @@ function NewEstimatePageInner() {
           <textarea
             value={jobDescription}
             onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Describe the work to be done - scope, materials, special instructions..."
-            rows={5}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-slate-500"
+            placeholder="Describe the work — scope, materials, special instructions..."
+            rows={6}
+            className={styles.textarea}
           />
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">Pricing</h2>
-
-          <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Send Channels</div>
-            <div className="flex flex-wrap gap-4 text-sm text-slate-700">
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={sendViaEmail}
-                  onChange={(e) => setSendViaEmail(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
-                />
-                Email
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={sendViaText}
-                  onChange={(e) => setSendViaText(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
-                />
-                Text Message
-              </label>
-            </div>
+        </section>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-            <label className="text-sm text-slate-700">
-              Base Price
+          <div className={`${styles.colStack} ${styles.asideSticky}`}>
+        <section className={styles.card}>
+          <h2 className={styles.cardTitle}>Pricing (USD)</h2>
+
+          <div className={styles.channels}>
+            <span className={styles.cardHint} style={{ margin: 0 }}>Send via</span>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={sendViaEmail}
+                onChange={(e) => setSendViaEmail(e.target.checked)}
+              />
+              Email
+            </label>
+            <label className={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={sendViaText}
+                onChange={(e) => setSendViaText(e.target.checked)}
+              />
+              Text message
+            </label>
+          </div>
+
+          <div className={styles.pricingGrid}>
+            <label className={styles.field}>
+              Base price ($)
               <input
                 type="number"
                 min="0"
@@ -975,29 +926,30 @@ function NewEstimatePageInner() {
                 value={basePrice}
                 onChange={(e) => setBasePrice(e.target.value)}
                 onBlur={() => touchField("basePrice")}
-                placeholder="0"
+                placeholder="0.00"
                 aria-invalid={showError("basePrice") ? "true" : "false"}
-                className={`mt-1 h-11 w-full rounded-lg border px-3 outline-none focus:border-slate-500 ${showError("basePrice") ? "border-rose-400" : "border-slate-300"}`}
+                className={styles.input}
               />
               {showError("basePrice") ? (
-                <span className="mt-1 block text-xs font-medium text-rose-600">{showError("basePrice")}</span>
+                <span className={styles.errorText}>{showError("basePrice")}</span>
               ) : null}
             </label>
 
-            <label className="text-sm text-slate-700">
-              Discount Type
+            <label className={styles.field}>
+              Discount type
               <select
                 value={discountType}
                 onChange={(e) => setDiscountType(e.target.value === "percent" ? "percent" : "amount")}
-                className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 outline-none focus:border-slate-500"
+                className={styles.select}
+                style={{ width: "100%", marginTop: 6 }}
               >
                 <option value="amount">Fixed ($)</option>
                 <option value="percent">Percent (%)</option>
               </select>
             </label>
 
-            <label className="text-sm text-slate-700">
-              Discount {discountType === "percent" ? "%" : "$"}
+            <label className={styles.field}>
+              Discount {discountType === "percent" ? "(%)" : "($)"}
               <input
                 type="number"
                 min="0"
@@ -1007,16 +959,15 @@ function NewEstimatePageInner() {
                 onChange={(e) => setDiscount(e.target.value)}
                 onBlur={() => touchField("discount")}
                 placeholder="0"
-                aria-invalid={showError("discount") ? "true" : "false"}
-                className={`mt-1 h-11 w-full rounded-lg border px-3 outline-none focus:border-slate-500 ${showError("discount") ? "border-rose-400" : "border-slate-300"}`}
+                className={styles.input}
               />
               {showError("discount") ? (
-                <span className="mt-1 block text-xs font-medium text-rose-600">{showError("discount")}</span>
+                <span className={styles.errorText}>{showError("discount")}</span>
               ) : null}
             </label>
 
-            <label className="text-sm text-slate-700">
-              Tax %
+            <label className={styles.field}>
+              Tax (%)
               <input
                 type="number"
                 min="0"
@@ -1028,58 +979,36 @@ function NewEstimatePageInner() {
                   setTaxRate(e.target.value);
                 }}
                 placeholder="0"
-                aria-label={`Tax percent${stateField ? ` (${stateField} default ${getUsStateTaxRate(stateField)}%)` : ""}`}
-                className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-slate-500"
+                className={styles.input}
               />
               {stateField && !taxRateManualRef.current ? (
-                <span className="mt-1 block text-[11px] text-slate-400">Auto-filled from {stateField}</span>
+                <span className={styles.cardHint}>Auto-filled from {stateField}</span>
               ) : null}
             </label>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Subtotal</div>
-              <div className="text-lg font-bold text-slate-900">{formatMoney(subtotal)}</div>
+          <div className={styles.totalsGrid}>
+            <div className={styles.totalBox}>
+              <div className={styles.totalLabel}>Subtotal</div>
+              <div className={styles.totalValue}>{formatMoney(subtotal)}</div>
             </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Discount Applied</div>
-              <div className="text-lg font-bold text-slate-900">-{formatMoney(discountAmount)}</div>
+            <div className={styles.totalBox}>
+              <div className={styles.totalLabel}>Discount</div>
+              <div className={styles.totalValue}>-{formatMoney(discountAmount)}</div>
             </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <div className="text-xs uppercase tracking-wide text-slate-500">Tax</div>
-              <div className="text-lg font-bold text-slate-900">{formatMoney(taxAmount)}</div>
-            </div>
-            <div className="rounded-lg bg-emerald-50 px-3 py-2">
-              <div className="text-xs uppercase tracking-wide text-emerald-700">Total</div>
-              <div className="text-xl font-bold text-emerald-700">{formatMoney(estimateTotal)}</div>
+            <div className={styles.totalBox}>
+              <div className={styles.totalLabel}>Tax</div>
+              <div className={styles.totalValue}>{formatMoney(taxAmount)}</div>
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => handleSaveClick("draft")}
-              disabled={saving}
-              className="h-12 rounded-xl border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              Save Estimate
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSaveClick("sent")}
-              disabled={saving}
-              className="h-12 rounded-xl bg-emerald-600 px-6 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
-            >
-              {saving ? "Saving..." : editId && editingStatus === "changes_requested" ? "Save & Resend" : "Save & Send"}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/estimates")}
-              className="h-12 rounded-xl border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Cancel
-            </button>
+          <div className={`${styles.totalBox} mt-4`}>
+            <div className={styles.totalLabel}>Estimate total (USD)</div>
+            <div className={`${styles.totalValue} ${styles.totalValueAccent}`}>
+              {formatMoney(estimateTotal)}
+            </div>
+          </div>
+        </section>
           </div>
         </div>
       </form>

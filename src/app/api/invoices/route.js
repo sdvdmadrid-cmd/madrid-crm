@@ -1,4 +1,4 @@
-import { findEstimateBuilderForNumber } from "@/lib/estimate-builder-linking";
+import { findEstimateForNumber } from "@/lib/estimate-invoice-linking";
 import {
   INVOICE_LOOKUP_LIMIT,
   formatInvoiceNumber,
@@ -234,7 +234,7 @@ export async function POST(request) {
 
     const estimateLookupNumber = quoteNumber || invoiceNumber;
     if (estimateLookupNumber) {
-      const est = await findEstimateBuilderForNumber(
+      const est = await findEstimateForNumber(
         supabaseAdmin,
         tenantDbId,
         estimateLookupNumber,

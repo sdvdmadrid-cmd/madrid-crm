@@ -6,7 +6,9 @@ import {
   dedupeClientSearchResults,
   formatClientPickerLabel,
   formatClientSearchOption,
+  rankClientSearchResults,
   sanitizeClientSearchQuery,
+  scoreClientSearchMatch,
 } from "../../src/lib/client-search.js";
 
 test("sanitizeClientSearchQuery strips PostgREST-breaking characters", () => {
@@ -22,6 +24,36 @@ test("buildClientSearchOrFilter includes core fields and phone digits", () => {
 
 test("buildClientSearchOrFilter returns empty for blank query", () => {
   assert.equal(buildClientSearchOrFilter("   "), "");
+});
+
+test("buildClientSearchOrFilter limits short queries to name and company", () => {
+  const filter = buildClientSearchOrFilter("h");
+  assert.match(filter, /name\.ilike\.%h%/);
+  assert.match(filter, /company\.ilike\.%h%/);
+  assert.doesNotMatch(filter, /email\.ilike/);
+  assert.doesNotMatch(filter, /address\.ilike/);
+});
+
+test("scoreClientSearchMatch prioritizes name prefix over address substring", () => {
+  const henry = scoreClientSearchMatch(
+    { name: "Henry Smith", address: "1 Main St" },
+    "h",
+  );
+  const highway = scoreClientSearchMatch(
+    { name: "4940 Egandale LLC", address: "123 Highway Rd" },
+    "h",
+  );
+  assert.ok(henry > highway);
+});
+
+test("rankClientSearchResults orders best matches first", () => {
+  const ranked = rankClientSearchResults("h", [
+    { id: "1", name: "4940 Egandale LLC", address: "Highland Park" },
+    { id: "2", name: "Henry Jones", phone: "" },
+    { id: "3", name: "Zack Homes", company: "HVAC Pros" },
+  ]);
+  assert.equal(ranked[0].name, "Henry Jones");
+  assert.ok(ranked.some((c) => c.name === "Zack Homes"));
 });
 
 test("formatClientSearchOption builds display meta", () => {

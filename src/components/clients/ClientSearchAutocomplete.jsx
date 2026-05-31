@@ -9,7 +9,7 @@ import {
 } from "@/lib/client-search";
 import css from "./client-search.module.css";
 
-const DEBOUNCE_MS = 180;
+const DEBOUNCE_MS = 150;
 const MIN_QUERY_LENGTH = 1;
 
 function SearchIcon() {
@@ -49,13 +49,18 @@ function SearchIcon() {
  * @param {() => void} [props.onClear]
  * @param {"dark"|"light"} [props.variant="dark"]
  * @param {boolean} [props.showHint=true]
+ * @param {string} [props.listClassName] extra class for dropdown list (e.g. large panel)
+ * @param {string} [props.secondaryActionLabel] optional action shown on each result row
+ * @param {(client: object) => void} [props.onSecondaryAction]
  */
 export default function ClientSearchAutocomplete({
   onSelect,
+  secondaryActionLabel,
+  onSecondaryAction,
   placeholder,
   autoFocus = false,
   clearOnSelect = true,
-  limit = 12,
+  limit = 20,
   className = "",
   inputClassName = "",
   disabled = false,
@@ -64,11 +69,13 @@ export default function ClientSearchAutocomplete({
   onClear,
   variant = "dark",
   showHint = true,
+  listClassName = "",
 }) {
   const { t } = useTranslation();
   const listId = useId();
   const inputRef = useRef(null);
   const containerRef = useRef(null);
+  const listRef = useRef(null);
   const debounceRef = useRef(null);
   const requestSeq = useRef(0);
 
@@ -131,8 +138,8 @@ export default function ClientSearchAutocomplete({
         const rows = Array.isArray(json.data) ? json.data : [];
         const formatted = rows.map((client) => formatClientSearchOption(client));
         setOptions(formatted);
-        setOpen(formatted.length > 0 || trimmed.length > 0);
-        setActiveIndex(-1);
+        setOpen(true);
+        setActiveIndex(formatted.length > 0 ? 0 : -1);
       } catch (err) {
         if (seq !== requestSeq.current) return;
         setOptions([]);
@@ -181,6 +188,14 @@ export default function ClientSearchAutocomplete({
       document.removeEventListener("touchstart", handlePointerDown);
     };
   }, [closeList]);
+
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    const option = listRef.current.querySelector(
+      `#${CSS.escape(`${listId}-option-${activeIndex}`)}`,
+    );
+    option?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeIndex, listId]);
 
   const pickOption = useCallback(
     (option) => {
@@ -301,7 +316,12 @@ export default function ClientSearchAutocomplete({
       ) : null}
 
       {showList ? (
-        <ul id={listId} className={css.list} role="listbox">
+        <ul
+          id={listId}
+          ref={listRef}
+          className={`${css.list} ${listClassName}`.trim()}
+          role="listbox"
+        >
           {loading && options.length === 0 ? (
             <li className={css.empty} role="presentation">
               {t("clients.search.searching")}
@@ -322,30 +342,48 @@ export default function ClientSearchAutocomplete({
 
           {options.map((option, index) => (
             <li key={option.id} role="presentation">
-              <button
-                type="button"
-                id={`${listId}-option-${index}`}
-                role="option"
-                aria-selected={index === activeIndex}
-                className={`${css.option} ${index === activeIndex ? css.optionActive : ""}`}
+              <div
+                className={`${css.optionRow} ${index === activeIndex ? css.optionActive : ""}`}
                 onMouseEnter={() => setActiveIndex(index)}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  pickOption(option);
-                }}
               >
-                <div className={css.optionName}>{option.name}</div>
-                {option.subtitle ? (
-                  <div className={css.optionMeta}>{option.subtitle}</div>
+                <button
+                  type="button"
+                  id={`${listId}-option-${index}`}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  className={css.optionMain}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    pickOption(option);
+                  }}
+                >
+                  <div className={css.optionName}>{option.name}</div>
+                  {option.subtitle ? (
+                    <div className={css.optionMeta}>{option.subtitle}</div>
+                  ) : null}
+                  {option.location &&
+                  option.location !== option.subtitle &&
+                  !String(option.subtitle || "").includes(option.location) ? (
+                    <div className={css.optionLocation}>{option.location}</div>
+                  ) : null}
+                </button>
+                {secondaryActionLabel && onSecondaryAction ? (
+                  <button
+                    type="button"
+                    className={css.optionSecondary}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSecondaryAction(option.client);
+                      setQuery("");
+                      setOptions([]);
+                      closeList();
+                    }}
+                  >
+                    {secondaryActionLabel}
+                  </button>
                 ) : null}
-                {option.location &&
-                option.location !== option.subtitle &&
-                !String(option.name || "")
-                  .toLowerCase()
-                  .includes(option.location.toLowerCase().slice(0, 24)) ? (
-                  <div className={css.optionMeta}>{option.location}</div>
-                ) : null}
-              </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -37,11 +37,17 @@
   --fb-glow-violet: rgba(139, 92, 246, 0.28);
   --fb-glow-gold: rgba(245, 158, 11, 0.24);
 
-  /* Typography — higher contrast for sunlight */
-  --fb-text: #dce4f4;
-  --fb-text-muted: #9aaac4;
-  --fb-text-subtle: #7a8ba8;
+  /* Typography — WCAG AA on charcoal surfaces (contractor all-day use) */
+  --fb-text: #e2e9f6;
+  --fb-text-muted: #b4c2d8;
+  --fb-text-subtle: #9aaac4;
   --fb-text-heading: #f8fafc;
+  --fb-text-label: #d4deee;
+  --fb-text-placeholder: #9eb2cc;
+  --fb-text-helper: #b0bdd4;
+  --fb-form-label: var(--fb-text-label);
+  --fb-input-surface: rgba(52, 64, 86, 0.98);
+  --fb-input-text: #f1f5fc;
 
   /* Refined accents */
   --fb-accent-blue: #4f8cff;
@@ -336,7 +342,7 @@
 .fb-workspace .text-gray-400,
 .fb-workspace .text-slate-500,
 .fb-workspace .text-slate-400 {
-  color: var(--fb-text-muted) !important;
+  color: var(--fb-text-label) !important;
 }
 
 .fb-workspace .border-gray-200,
@@ -414,10 +420,10 @@
 }
 
 .fb-workspace .cf-card label {
-  color: var(--fb-text-muted);
+  color: var(--fb-form-label);
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 

@@ -6,6 +6,7 @@ import {
   CLIENT_SEARCH_MAX_LIMIT,
   CLIENT_SEARCH_MIN_QUERY_LENGTH,
   dedupeClientSearchResults,
+  rankClientSearchResults,
   sanitizeClientSearchQuery,
 } from "@/lib/client-search";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -45,13 +46,14 @@ export async function GET(request) {
       return privateJson({ success: true, data: [], query });
     }
 
+    const poolLimit = Math.min(Math.max(limit * 8, 24), 80);
+
     let dbQuery = scopeByTenant(
       supabaseAdmin
         .from(TABLE)
         .select(CLIENT_SELECT_COLUMNS)
         .or(orFilter)
-        .order("name", { ascending: true })
-        .limit(Math.min(limit * 4, 48)),
+        .limit(poolLimit),
       { tenantDbId: auth.ctx.tenantDbId, role: auth.ctx.role },
     );
 
@@ -64,10 +66,11 @@ export async function GET(request) {
       throw new Error(error.message);
     }
 
-    const results = dedupeClientSearchResults((data || []).map(serializeClient)).slice(
-      0,
-      limit,
+    const ranked = rankClientSearchResults(
+      query,
+      (data || []).map(serializeClient),
     );
+    const results = dedupeClientSearchResults(ranked).slice(0, limit);
 
     return privateJson({
       success: true,

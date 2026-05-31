@@ -176,7 +176,7 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--fb-text-subtle);
+  color: var(--fb-text-label, #d4deee);
 }
 
 .contactLine {

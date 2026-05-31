@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { filterAndRankRecords } from "@/lib/record-search";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import {
   getJobFileValidationError,
@@ -534,13 +535,26 @@ export default function JobsPage() {
     }
   };
 
+  const [listSearch, setListSearch] = useState("");
   const filterClientId = String(searchParams.get("clientId") || "").trim();
   const visibleJobs = useMemo(() => {
-    if (!filterClientId) return jobs;
-    return jobs.filter(
-      (job) => String(job.clientId || "") === filterClientId,
-    );
-  }, [jobs, filterClientId]);
+    let list = jobs;
+    if (filterClientId) {
+      list = list.filter(
+        (job) => String(job.clientId || "") === filterClientId,
+      );
+    }
+    if (listSearch.trim()) {
+      list = filterAndRankRecords(list, listSearch, (job) => [
+        job.title,
+        job.clientName,
+        job.service,
+        job.status,
+        job.scopeDetails,
+      ]);
+    }
+    return list;
+  }, [jobs, filterClientId, listSearch]);
 
   return (
     <main className={`${ws.page} ${jobStyles.jobsPage}`}>
@@ -877,7 +891,32 @@ export default function JobsPage() {
 
       <section>
         <h2>{t("jobs.listTitle")}</h2>
+        <input
+          type="search"
+          value={listSearch}
+          onChange={(event) => setListSearch(event.target.value)}
+          placeholder={t("jobs.searchPlaceholder", {
+            defaultValue: "Search jobs by title, client, service, or status…",
+          })}
+          aria-label={t("jobs.searchLabel", { defaultValue: "Search jobs" })}
+          className={jobStyles.listSearch}
+          style={{ marginBottom: 12, width: "100%", maxWidth: 480 }}
+        />
+        {filterClientId ? (
+          <p className={ws.subtitle} style={{ marginBottom: 12 }}>
+            {t("jobs.filteredByClient", {
+              defaultValue: "Showing jobs for the selected client only.",
+            })}
+          </p>
+        ) : null}
         <div className={jobStyles.jobList}>
+          {visibleJobs.length === 0 && !loading ? (
+            <p className={ws.subtitle}>
+              {t("jobs.noSearchResults", {
+                defaultValue: "No jobs match your search.",
+              })}
+            </p>
+          ) : null}
           {visibleJobs.map((job) => (
             <div key={job._id} className={jobStyles.jobCard}>
               {(() => {

@@ -1,9 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  resolveEstimateLinkedNumber,
-} from "../../src/lib/estimate-builder-linking.js";
+import { resolveEstimateLinkedNumber } from "../../src/lib/estimate-invoice-linking.js";
 
 test("resolveEstimateLinkedNumber prefers estimate_number", () => {
   assert.equal(
@@ -16,8 +14,5 @@ test("resolveEstimateLinkedNumber prefers estimate_number", () => {
 });
 
 test("resolveEstimateLinkedNumber falls back to legacy quote_number field in memory", () => {
-  assert.equal(
-    resolveEstimateLinkedNumber({ quote_number: "42" }),
-    "42",
-  );
+  assert.equal(resolveEstimateLinkedNumber({ quote_number: "42" }), "42");
 });

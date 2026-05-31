@@ -1,0 +1,337 @@
+.shell {
+  min-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  background: var(--fb-bg-base, #1e2433);
+  color: var(--fb-text, #e2e9f6);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.34));
+  background: var(--fb-bg-glass-strong, rgba(48, 58, 78, 0.94));
+  backdrop-filter: blur(16px);
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--fb-text-heading, #f8fafc);
+  letter-spacing: -0.02em;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btnSecondary {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--fb-border-strong);
+  background: rgba(52, 62, 82, 0.92);
+  color: var(--fb-text-heading);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: var(--fb-accent-blue-soft);
+}
+
+.btnPrimary {
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(45, 212, 168, 0.45);
+  background: linear-gradient(135deg, #0d9668, #2dd4a8);
+  color: #042f23;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnPrimary:disabled,
+.btnSecondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 24px 28px 48px;
+  box-sizing: border-box;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.colStack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  border-radius: 16px;
+  border: 1px solid var(--fb-border-strong);
+  background: var(--fb-bg-elevated, #2a3347);
+  padding: 22px 24px;
+  box-shadow: var(--fb-shadow-sm);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fb-text-label, #d4deee);
+}
+
+.cardHint {
+  font-size: 12px;
+  color: var(--fb-text-helper, #b0bdd4);
+}
+
+.searchWrap {
+  margin-bottom: 16px;
+}
+
+.field {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fb-text-label);
+}
+
+.fieldRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--fb-border-strong);
+  background: var(--fb-input-surface, rgba(52, 64, 86, 0.98));
+  color: var(--fb-input-text, #f1f5fc);
+  font-size: 15px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: rgba(79, 140, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--fb-text-placeholder, #9eb2cc);
+  opacity: 1;
+}
+
+.select {
+  width: auto;
+  min-width: 72px;
+}
+
+.inputGrow {
+  flex: 1;
+  min-width: 140px;
+}
+
+.addressGrid {
+  display: grid;
+  grid-template-columns: 1fr 72px 96px;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.alert {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.alertWarn {
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+}
+
+.alertInfo {
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: rgba(79, 140, 255, 0.12);
+  color: #bfdbfe;
+}
+
+.errorText {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fda4af;
+}
+
+.asideSticky {
+  position: sticky;
+  top: 88px;
+}
+
+.pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.totalsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.totalBox {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(38, 48, 66, 0.85);
+  border: 1px solid var(--fb-border);
+}
+
+.totalLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fb-text-helper);
+}
+
+.totalValue {
+  margin-top: 4px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--fb-text-heading);
+}
+
+.totalValueAccent {
+  color: #6ee7b7;
+}
+
+.channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--fb-text);
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.aiRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.btnAi {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  background: rgba(167, 139, 250, 0.14);
+  color: #ddd6fe;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnAi:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.billingNote {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(38, 48, 66, 0.6);
+  font-size: 13px;
+  color: var(--fb-text-helper);
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .asideSticky {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: 16px;
+  }
+
+  .header {
+    padding: 12px 16px;
+  }
+
+  .addressGrid,
+  .pricingGrid,
+  .totalsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .input,
+  .textarea,
+  .select {
+    font-size: 16px;
+  }
+}

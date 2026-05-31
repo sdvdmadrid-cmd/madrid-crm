@@ -24,7 +24,7 @@
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fb-text-subtle);
+  color: var(--fb-text-label, #d4deee);
   background: rgba(48, 58, 78, 0.92);
   border-bottom: 1px solid var(--fb-border-strong);
 }

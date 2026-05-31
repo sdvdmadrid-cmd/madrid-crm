@@ -108,6 +108,7 @@ function buildEstimateRow(body = {}, nowIso) {
     notes: stringifyEstimateNotes({
       address: String(body.address || "").trim(),
       noteText: String(body.notes || ""),
+      clientUuid: String(body.clientUuid || body.clientId || "").trim(),
       clientEmail: String(body.clientEmail || "").trim().toLowerCase(),
       clientPhone: String(body.clientPhone || "").trim(),
       audit: buildAuditForCreate(normalizedStatus, nowIso),
