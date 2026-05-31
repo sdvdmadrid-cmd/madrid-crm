@@ -79,21 +79,23 @@ function tokenizeClientSearchQuery(query) {
  * @param {string} query sanitized plain-text query
  */
 export function buildClientSearchOrFilter(query) {
-  const safe = sanitizeClientSearchQuery(query);
-  if (!safe) return "";
+  const tokens = tokenizeClientSearchQuery(query);
+  if (!tokens.length) return "";
 
-  const pattern = `%${safe}%`;
-  const parts = [`name.ilike.${pattern}`, `company.ilike.${pattern}`];
+  const parts = [];
+  const shortQuery = tokens.every((token) => token.length <= 2);
 
-  if (safe.length <= 2) {
-    return parts.join(",");
-  }
+  for (const token of tokens) {
+    const pattern = `%${token}%`;
+    parts.push(`name.ilike.${pattern}`, `company.ilike.${pattern}`);
 
-  parts.push(`email.ilike.${pattern}`, `address.ilike.${pattern}`);
-
-  const phoneDigits = digitsOnly(safe);
-  if (phoneDigits.length >= 3) {
-    parts.push(`phone.ilike.%${phoneDigits}%`);
+    if (!shortQuery) {
+      parts.push(`email.ilike.${pattern}`, `address.ilike.${pattern}`);
+      const phoneDigits = digitsOnly(token);
+      if (phoneDigits.length >= 3) {
+        parts.push(`phone.ilike.%${phoneDigits}%`);
+      }
+    }
   }
 
   return parts.join(",");

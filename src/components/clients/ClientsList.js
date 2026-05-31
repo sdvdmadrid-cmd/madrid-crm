@@ -22,6 +22,8 @@ export default function ClientsList({
   clients,
   loading,
   highlightedId = "",
+  listSearch = "",
+  onListSearchChange,
   onSelect,
   onEdit,
   onDelete,
@@ -41,12 +43,35 @@ export default function ClientsList({
         {t("clients.listTitle")}
       </h2>
 
+      {onListSearchChange ? (
+        <input
+          type="search"
+          className={list.listSearch}
+          value={listSearch}
+          onChange={(event) => onListSearchChange(event.target.value)}
+          placeholder={t("clients.listSearchPlaceholder", {
+            defaultValue: "Search your client list…",
+          })}
+          aria-label={t("clients.listSearchAria", {
+            defaultValue: "Search client list",
+          })}
+        />
+      ) : null}
+
       {loading ? <p className="cf-muted">{t("clients.loading")}</p> : null}
 
       {!loading && clients.length === 0 ? (
         <div className="fb-empty" style={{ marginTop: 16 }}>
-          <p className="fb-empty-title">{t("clients.empty")}</p>
-          <p className="fb-empty-desc">{t("clients.description")}</p>
+          <p className="fb-empty-title">
+            {listSearch.trim()
+              ? t("clients.listSearchEmpty", {
+                  defaultValue: "No clients match your search.",
+                })
+              : t("clients.empty")}
+          </p>
+          {!listSearch.trim() ? (
+            <p className="fb-empty-desc">{t("clients.description")}</p>
+          ) : null}
         </div>
       ) : null}
 

@@ -273,3 +273,170 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+.listSearch {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.listSearch::placeholder {
+  color: #94a3b8;
+}
+
+.listSearch:focus {
+  outline: 2px solid rgba(56, 189, 248, 0.45);
+  outline-offset: 1px;
+}
+
+.formInput,
+.formSelect,
+.formTextarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.formInput::placeholder,
+.formTextarea::placeholder {
+  color: #94a3b8;
+}
+
+.formTextarea {
+  min-height: 90px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.jobCardTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.jobCardMeta {
+  margin: 8px 0 0;
+  color: var(--fb-text-muted, #b4c2d8);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.jobCardMetaAccent {
+  margin: 8px 0 0;
+  color: #6ee7b7;
+  font-size: 13px;
+}
+
+.estimatorPanel {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(22, 32, 48, 0.85);
+  border: 1px solid rgba(45, 212, 168, 0.28);
+}
+
+.estimatorPanel p {
+  margin: 6px 0 0;
+  color: var(--fb-text-muted, #b4c2d8);
+  font-size: 13px;
+}
+
+.estimatorPanel strong {
+  color: #e2e8f0;
+}
+
+.filesPanel {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.75);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.filesPanelHeading {
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+}
+
+.filesPanelMuted {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.fileThumbName {
+  font-size: 12px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileDocRow {
+  background: rgba(30, 41, 59, 0.65);
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fileDocName {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.fileDocMeta {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.btnFileDanger {
+  border-radius: 8px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.btnFileLink {
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 10px;
+  text-decoration: none;
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}

@@ -41,24 +41,28 @@ export default function ClientForm({
         <input
           className="cf-input"
           placeholder={t("clients.placeholders.name")}
+          aria-label={t("clients.placeholders.name")}
           value={form.name}
           onChange={(e) => onChange({ ...form, name: e.target.value })}
         />
         <input
           className="cf-input"
           placeholder={t("clients.placeholders.company")}
+          aria-label={t("clients.placeholders.company")}
           value={form.company}
           onChange={(e) => onChange({ ...form, company: e.target.value })}
         />
         <input
           className="cf-input"
           placeholder={t("clients.placeholders.phone")}
+          aria-label={t("clients.placeholders.phone")}
           value={form.phone}
           onChange={(e) => onChange({ ...form, phone: e.target.value })}
         />
         <input
           className="cf-input"
           placeholder={t("clients.placeholders.email")}
+          aria-label={t("clients.placeholders.email")}
           value={form.email}
           onChange={(e) => onChange({ ...form, email: e.target.value })}
         />
@@ -131,8 +135,8 @@ export default function ClientForm({
         </div>
 
         {/* Billing address */}
-        <div style={{ marginTop: 4, padding: "12px 14px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#f9fafb" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", marginBottom: 8 }}>
+        <div className="cf-panel" style={{ marginTop: 4, padding: "12px 14px" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", marginBottom: 8 }}>
             {t("clients.labels.billingAddress")}
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: form.billingSameAsService !== false ? 0 : 10 }}>
@@ -150,7 +154,7 @@ export default function ClientForm({
                 })
               }
             />
-            <span style={{ fontSize: 13, color: "#374151" }}>{t("clients.labels.billingSameAsService")}</span>
+            <span className="cf-muted" style={{ fontSize: 13 }}>{t("clients.labels.billingSameAsService")}</span>
           </label>
 
           {form.billingSameAsService === false && (

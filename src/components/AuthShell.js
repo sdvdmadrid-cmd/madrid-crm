@@ -1202,6 +1202,11 @@ export default function AuthShell({ children }) {
             iconKey: "estimates",
             exact: true,
           },
+          {
+            href: "/contracts",
+            label: t("sidebar.contracts"),
+            iconKey: "estimates",
+          },
           { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
           {
             href: "/invoices",
@@ -1221,6 +1226,11 @@ export default function AuthShell({ children }) {
           label: t("sidebar.estimates"),
           iconKey: "estimates",
           exact: true,
+        },
+        {
+          href: "/contracts",
+          label: t("sidebar.contracts"),
+          iconKey: "estimates",
         },
         { href: "/jobs", label: t("sidebar.jobs"), iconKey: "jobs" },
         {

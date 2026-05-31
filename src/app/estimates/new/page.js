@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
+import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { formatClientPickerLabel } from "@/lib/client-search";
@@ -10,7 +11,6 @@ import styles from "./estimates-new.module.css";
 import { getUsStateTaxRate } from "@/lib/estimate-pricing";
 import {
   autofillGuardProps,
-  autofillReadonlyUntilFocusProps,
 } from "@/lib/form-autofill-guard";
 
 const CLIENT_PREFIXES = ["", "Mr.", "Mrs.", "Ms.", "Dr."];
@@ -151,6 +151,7 @@ function NewEstimatePageInner() {
   // warning after they actually edit something.
   const [isDirty, setIsDirty] = useState(false);
   const hydratingRef = useRef(false);
+  const editHydrationTokenRef = useRef(0);
 
   // The user typed a tax rate manually — stop auto-filling from state.
   const taxRateManualRef = useRef(false);
@@ -162,6 +163,10 @@ function NewEstimatePageInner() {
   // mirrors the customer-facing email. The contractor confirms before the
   // email actually leaves. Setting this to true never bypasses validation.
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [clientPrefillLoading, setClientPrefillLoading] = useState(
+    Boolean(clientIdParam && !editId),
+  );
+  const [editHydrating, setEditHydrating] = useState(Boolean(editId));
 
   const basePriceNumber = useMemo(() => Math.max(0, toNumber(basePrice, 0)), [basePrice]);
   const discountNumber = useMemo(() => Math.max(0, toNumber(discount, 0)), [discount]);
@@ -215,8 +220,12 @@ function NewEstimatePageInner() {
   }
 
   useEffect(() => {
-    if (!clientIdParam || editId) return;
+    if (!clientIdParam || editId) {
+      setClientPrefillLoading(false);
+      return;
+    }
     let cancelled = false;
+    setClientPrefillLoading(true);
     apiFetch(`/api/clients/${encodeURIComponent(clientIdParam)}`)
       .then((res) => getJsonOrThrow(res, "Unable to load client."))
       .then((json) => {
@@ -224,19 +233,35 @@ function NewEstimatePageInner() {
         const row = json?.data || json;
         if (row?.id) applyClient(row);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) {
+          setStatusMessage("Unable to load client for this estimate. Search or enter details manually.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setClientPrefillLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [clientIdParam, editId]);
 
   useEffect(() => {
-    if (!editId) return;
+    if (!editId) {
+      setEditHydrating(false);
+      return;
+    }
 
+    const loadToken = editHydrationTokenRef.current + 1;
+    editHydrationTokenRef.current = loadToken;
+    let cancelled = false;
+
+    setEditHydrating(true);
     hydratingRef.current = true;
     apiFetch(`/api/estimates/${editId}`)
       .then((r) => r.json())
       .then((json) => {
+        if (cancelled || loadToken !== editHydrationTokenRef.current) return;
         if (!json.success) return;
 
         const e = json.data;
@@ -268,12 +293,19 @@ function NewEstimatePageInner() {
       })
       .catch(() => {})
       .finally(() => {
+        if (cancelled || loadToken !== editHydrationTokenRef.current) return;
         // Reset dirty flag on the next tick once all state writes have flushed.
         setTimeout(() => {
+          if (cancelled || loadToken !== editHydrationTokenRef.current) return;
           hydratingRef.current = false;
           setIsDirty(false);
+          setEditHydrating(false);
         }, 0);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [editId]);
 
   // Hydrate the form from an AI-drafted estimate when the bubble hands one
@@ -430,8 +462,17 @@ function NewEstimatePageInner() {
    */
   function validateForSave(nextStatus) {
     setSubmitAttempted(true);
-    if (Object.keys(liveErrors).length > 0) {
-      setStatusMessage("Please fix the highlighted fields before saving.");
+    const blocking = Object.entries(liveErrors).filter(([, message]) => message);
+    if (blocking.length > 0) {
+      setStatusMessage(
+        blocking.length === 1
+          ? blocking[0][1]
+          : "Please fix the highlighted fields before saving.",
+      );
+      return false;
+    }
+    if (clientPrefillLoading || editHydrating) {
+      setStatusMessage("Still loading estimate details… try again in a moment.");
       return false;
     }
     if (nextStatus === "sent" && !sendViaEmail && !sendViaText) {
@@ -575,6 +616,26 @@ function NewEstimatePageInner() {
       }
 
       setIsDirty(false);
+      const savedId = String(json?.data?.id || editId || "").trim();
+      const serialized = json?.data || {};
+
+      if (!editId && savedId) {
+        router.push(`/estimates/new?edit=${encodeURIComponent(savedId)}`);
+        setStatusMessage("Estimate saved. You can keep editing or return to the list.");
+        return;
+      }
+
+      if (editId && savedId) {
+        // Invalidate any in-flight edit hydration so a slow GET cannot
+        // overwrite fields we just persisted.
+        editHydrationTokenRef.current += 1;
+        const savedNotes = String(serialized.notes || payload.notes || "").trim();
+        setJobDescription(savedNotes);
+        setEditingStatus(serialized.status || editingStatus);
+        setStatusMessage("Estimate saved.");
+        return;
+      }
+
       router.push("/estimates");
     } catch (err) {
       setStatusMessage(err.message || "Unable to save.");
@@ -605,19 +666,30 @@ function NewEstimatePageInner() {
           </div>
         </div>
         <div className={styles.headerActions}>
+          {editId ? (
+            <DocumentPdfActions
+              pdfUrl={`/api/estimates/${editId}/pdf`}
+              printLabel="Print estimate"
+              downloadLabel="Download PDF"
+            />
+          ) : null}
           <button
             type="button"
             onClick={() => handleSaveClick("draft")}
-            disabled={saving}
+            disabled={saving || clientPrefillLoading || editHydrating}
             aria-label="Save as draft"
             className={styles.btnSecondary}
           >
-            Save Estimate
+            {clientPrefillLoading || editHydrating
+              ? "Loading…"
+              : saving
+                ? "Saving…"
+                : "Save as draft"}
           </button>
           <button
             type="button"
             onClick={() => handleSaveClick("sent")}
-            disabled={saving}
+            disabled={saving || clientPrefillLoading || editHydrating}
             aria-label={editId && editingStatus === "changes_requested" ? "Save and resend to client" : "Save and send to client"}
             className={styles.btnPrimary}
           >
@@ -631,10 +703,16 @@ function NewEstimatePageInner() {
         autoComplete="off"
         onSubmit={(event) => event.preventDefault()}
         data-form-type="other"
+        aria-busy={editHydrating || clientPrefillLoading}
       >
         {deliveryNotice ? (
           <div role="alert" className={`${styles.alert} ${styles.alertWarn}`}>
             {deliveryNotice}
+          </div>
+        ) : null}
+        {editHydrating ? (
+          <div role="status" className={`${styles.alert} ${styles.alertInfo}`}>
+            Loading estimate…
           </div>
         ) : null}
         {statusMessage ? (
@@ -687,7 +765,6 @@ function NewEstimatePageInner() {
               aria-invalid={showError("clientFirstName") ? "true" : "false"}
               className={`${styles.input} ${styles.inputGrow}`}
               {...autofillGuardProps("firstName")}
-              {...autofillReadonlyUntilFocusProps()}
             />
             <input
               value={clientLastName}
@@ -696,7 +773,6 @@ function NewEstimatePageInner() {
               aria-label="Client last name"
               className={`${styles.input} ${styles.inputGrow}`}
               {...autofillGuardProps("lastName")}
-              {...autofillReadonlyUntilFocusProps()}
             />
           </div>
           {showError("clientFirstName") ? (
@@ -714,7 +790,6 @@ function NewEstimatePageInner() {
               aria-invalid={showError("clientEmail") ? "true" : "false"}
               className={styles.input}
               {...autofillGuardProps("email")}
-              {...autofillReadonlyUntilFocusProps()}
             />
           </label>
           {showError("clientEmail") ? (
@@ -730,7 +805,6 @@ function NewEstimatePageInner() {
               aria-label="Client phone"
               className={styles.input}
               {...autofillGuardProps("tel")}
-              {...autofillReadonlyUntilFocusProps()}
             />
           </label>
         </section>

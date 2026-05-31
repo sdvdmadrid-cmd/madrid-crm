@@ -91,3 +91,23 @@
   gap: 8px;
   align-items: flex-start;
 }
+
+.listSearch {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.listSearch::placeholder {
+  color: #94a3b8;
+}
+
+.listSearch:focus {
+  outline: 2px solid rgba(56, 189, 248, 0.45);
+  outline-offset: 1px;
+}

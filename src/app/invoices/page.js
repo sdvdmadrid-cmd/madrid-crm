@@ -8,6 +8,12 @@ import UniversalShareButton from "@/components/UniversalShareButton";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
+import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import {
+  escapeHtml,
+  openPrintableHtmlDocument,
+} from "@/lib/print-html-document";
+import { filterAndRankRecords } from "@/lib/record-search";
 import "@/i18n";
 
 const initialInvoice = {
@@ -184,45 +190,60 @@ export default function InvoicesPage() {
     return raw;
   };
 
-  const escapeHtml = (value) =>
-    String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+  const openPrintableInvoice = (invoice) => {
+    const lineRows = (invoice.lineItems || [])
+      .map(
+        (line) =>
+          `<tr><td>${escapeHtml(line.description || line.name || "")}</td><td>$${Number(line.amount ?? line.price ?? 0).toFixed(2)}</td></tr>`,
+      )
+      .join("");
+    const lineTable = lineRows
+      ? `<table><thead><tr><th>${escapeHtml(t("invoices.labels.lineItems", { defaultValue: "Line items" }))}</th><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th></tr></thead><tbody>${lineRows}</tbody></table>`
+      : "";
+    const bodyHtml = `
+      <h1>${escapeHtml(t("invoices.listTitle", { defaultValue: "Invoice" }))}</h1>
+      <p class="meta">${escapeHtml(invoice.invoiceNumber || "")} · ${escapeHtml(invoice.clientName || "")}</p>
+      <table><tbody>
+        <tr><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th><td>$${Number(invoice.amount || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.paid", { defaultValue: "Paid" }))}</th><td>$${Number(invoice.paidAmount || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.balance", { defaultValue: "Balance" }))}</th><td>$${Number(invoice.balanceDue || invoice.amount || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.dueDate", { defaultValue: "Due date" }))}</th><td>${escapeHtml(invoice.dueDate || "—")}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.status", { defaultValue: "Status" }))}</th><td>${escapeHtml(invoice.status || "")}</td></tr>
+      </tbody></table>
+      ${lineTable}
+      ${invoice.notes ? `<p><strong>${escapeHtml(t("invoices.placeholders.notes", { defaultValue: "Notes" }))}</strong><br/>${escapeHtml(invoice.notes)}</p>` : ""}`;
+    const opened = openPrintableHtmlDocument({
+      title: `Invoice ${invoice.invoiceNumber || ""}`,
+      bodyHtml,
+    });
+    if (!opened) {
+      setError(
+        t("invoices.errors.printBlocked", {
+          defaultValue: "Allow pop-ups to print this invoice.",
+        }),
+      );
+    }
+  };
 
   const openPrintableReceipt = (invoice, payment) => {
-    if (typeof window === "undefined") return;
-    const popup = window.open(
-      "",
-      "_blank",
-      "noopener,noreferrer,width=840,height=960",
-    );
-    if (!popup) return;
-
-    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>${t("invoices.receipt.title")}</title>
-      <style>body{font-family:Arial,sans-serif;padding:28px;color:#222}h1{margin:0 0 6px}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border:1px solid #ddd;padding:10px;text-align:left}th{background:#f5f5f5;width:35%}</style>
-      </head><body>
-      <h1>${t("invoices.receipt.title")}</h1>
-      <p>${t("invoices.receipt.invoice")} ${escapeHtml(invoice.invoiceNumber || t("invoices.receipt.notAvailable"))}</p>
+    const bodyHtml = `
+      <h1>${escapeHtml(t("invoices.receipt.title"))}</h1>
+      <p class="meta">${escapeHtml(t("invoices.receipt.invoice"))} ${escapeHtml(invoice.invoiceNumber || t("invoices.receipt.notAvailable"))}</p>
       <table><tbody>
-      <tr><th>${t("invoices.receipt.client")}</th><td>${escapeHtml(invoice.clientName || t("invoices.receipt.notAvailable"))}</td></tr>
-      <tr><th>${t("invoices.receipt.invoiceTitle")}</th><td>${escapeHtml(invoice.invoiceTitle || t("invoices.receipt.notAvailable"))}</td></tr>
-      <tr><th>${t("invoices.receipt.paymentAmount")}</th><td>$${Number(payment.amount || 0).toFixed(2)}</td></tr>
-      <tr><th>${t("invoices.receipt.method")}</th><td>${escapeHtml(paymentMethodLabel(payment.method, t))}</td></tr>
-      <tr><th>${t("invoices.receipt.date")}</th><td>${escapeHtml(payment.date || t("invoices.receipt.notAvailable"))}</td></tr>
-      <tr><th>${t("invoices.receipt.reference")}</th><td>${escapeHtml(payment.reference || t("invoices.receipt.notAvailable"))}</td></tr>
-      <tr><th>${t("invoices.receipt.notes")}</th><td>${escapeHtml(payment.notes || t("invoices.receipt.notAvailable"))}</td></tr>
-      <tr><th>${t("invoices.receipt.paidTotal")}</th><td>$${Number(invoice.paidAmount || 0).toFixed(2)}</td></tr>
-      <tr><th>${t("invoices.receipt.balanceDue")}</th><td>$${Number(invoice.balanceDue || 0).toFixed(2)}</td></tr>
-      </tbody></table></body></html>`;
-
-    popup.document.open();
-    popup.document.write(html);
-    popup.document.close();
-    popup.focus();
-    popup.print();
+      <tr><th>${escapeHtml(t("invoices.receipt.client"))}</th><td>${escapeHtml(invoice.clientName || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.invoiceTitle"))}</th><td>${escapeHtml(invoice.invoiceTitle || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.paymentAmount"))}</th><td>$${Number(payment.amount || 0).toFixed(2)}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.method"))}</th><td>${escapeHtml(paymentMethodLabel(payment.method, t))}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.date"))}</th><td>${escapeHtml(payment.date || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.reference"))}</th><td>${escapeHtml(payment.reference || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.notes"))}</th><td>${escapeHtml(payment.notes || t("invoices.receipt.notAvailable"))}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.paidTotal"))}</th><td>$${Number(invoice.paidAmount || 0).toFixed(2)}</td></tr>
+      <tr><th>${escapeHtml(t("invoices.receipt.balanceDue"))}</th><td>$${Number(invoice.balanceDue || 0).toFixed(2)}</td></tr>
+      </tbody></table>`;
+    openPrintableHtmlDocument({
+      title: t("invoices.receipt.title"),
+      bodyHtml,
+    });
   };
 
   const validatePaymentDraft = (draft, invoice) => {
@@ -814,7 +835,7 @@ export default function InvoicesPage() {
             </p>
           ) : null}
           {visibleInvoices.map((invoice) => (
-            <div key={invoice._id} className={styles.invoiceCard}>
+            <div key={invoice._id} data-testid="invoice-card" className={styles.invoiceCard}>
               <div className={styles.invoiceCardHeader}>
                 <div>
                   <h3 className={styles.invoiceTitle}>
@@ -869,6 +890,27 @@ export default function InvoicesPage() {
                     : null}
                 </div>
                 <div className={styles.actions}>
+                  <DocumentPdfActions
+                    pdfUrl={`/api/invoices/${invoice._id}/pdf`}
+                    printLabel={t("invoices.buttons.printInvoice", {
+                      defaultValue: "Print invoice",
+                    })}
+                    downloadLabel={t("invoices.buttons.downloadPdf", {
+                      defaultValue: "Download PDF",
+                    })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => openPrintableInvoice(invoice)}
+                    className={styles.btnIcon}
+                    aria-label={t("invoices.buttons.printBrowser", {
+                      defaultValue: "Print in browser",
+                    })}
+                  >
+                    {t("invoices.buttons.printBrowser", {
+                      defaultValue: "Print (browser)",
+                    })}
+                  </button>
                   {capabilities.canSendExternalCommunications
                     ? <button
                         type="button"

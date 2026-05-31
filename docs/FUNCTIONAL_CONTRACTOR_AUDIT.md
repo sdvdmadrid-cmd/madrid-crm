@@ -1,8 +1,8 @@
 # Functional contractor audit (local dev)
 
-**Date:** 2026-05-30  
+**Date:** 2026-05-28 (updated)  
 **Environment:** `http://localhost:3000` (dev-login admin), Supabase dev tenant  
-**Methods:** Live browser walkthrough (Cursor browser), API spot-checks, Playwright E2E (`tests/e2e/`, 33 tests)
+**Methods:** Contractor-focused Playwright (`tests/e2e/contractor-usability.spec.js`), existing E2E suite, API spot-checks
 
 This audit targets **real workflows** (click, save, search, complete flows)—not build/TypeScript health alone.
 
@@ -12,13 +12,23 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 
 | Area | Verdict |
 |------|---------|
-| Core estimate → approve → invoice APIs | **Pass** (E2E + manual kanban detail panel) |
-| Unified `/estimates/new` workflow | **Pass** (layout, client autocomplete, save buttons present) |
-| Client panel + migrated estimate linkage | **Pass** (23 estimates/invoices for test client via `notes.clientUuid`) |
-| Search UX platform-wide | **Mixed** — ranking fixes work for API; several modules still have **no list search** |
-| Production polish at contractor scale | **Not ready** — estimates kanban overload, test-data noise, coverage gaps |
+| Core CRM usability (clients, estimates, jobs/invoices search) | **Pass** — `contractor-usability.spec.js` (8 tests) |
+| Estimate draft → kanban → edit scope note | **Pass** (was failing: edit hydration race; fixed) |
+| Core estimate → approve → invoice APIs | **Pass** (existing E2E) |
+| Client panel + migrated estimate linkage | **Pass** (`notes.clientUuid`, filtered “View all estimates”) |
+| Search UX platform-wide | **Improved** — kanban + jobs + invoices + tokenized client search |
+| Production polish at contractor scale | **Not ready** — many modules still lack full workflow E2E (send PDF, lead convert, jobs create, reputation sync, website publish) |
 
-**Playwright:** 31 passed, 1 skipped (published lead site), 1 flaky (bill-payments wallet link timeout on first run, passed on retry).
+**Contractor E2E (local, no `CI=1`):**
+
+| Suite | Tests | Coverage |
+|-------|-------|----------|
+| `contractor-usability.spec.js` | 8 | CRM create/search/save, catalog |
+| `contractor-workflows.spec.js` | 9 | Send, PDF, contract, duplicate, jobs, invoices, website, reputation, print |
+
+**Print/PDF audit:** see `docs/PRINT_PDF_AUDIT.md`.
+
+**Broader E2E:** run `tests/e2e/` for API-heavy flows (approve/respond, bill-payments, website-builder).
 
 ---
 
@@ -38,9 +48,9 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 | Duplicate | Not clicked | E2E covers duplicate API path |
 | Client link / Download PDF | Not clicked | PDF route exists |
 | Generate contract | Not clicked | UI panel present |
-| **List search / filter** | Code review | **Missing** — no search by client name, estimate #, or date |
+| **List search / filter** | Yes (E2E) | Search by client name; status filter; “Hide test data”; `?clientId=` |
 
-**Contractor impact (P0):** Kanban shows **100+ E2E/EB Lock test cards** with no search, filter, or archive. Daily use is impractical until search exists or test rows are purged/archived.
+**Contractor impact:** Dev DB still has many E2E rows — use **Hide test data** (default on) + search. Date-range filter still missing.
 
 **Detail panel actions (when card selected):** Send, Approve, Decline, Request changes, Edit, Duplicate, Client link, PDF, Generate contract — present in UI; full email send not verified without SMTP.
 
@@ -51,9 +61,9 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 | Control | Tested | Result |
 |---------|--------|--------|
 | Back / breadcrumb | Yes | Works |
-| Save as draft / Save and send | Present | Not full save+reload in this pass |
+| Save as draft / Save and send | Yes (E2E) | Draft save with `?clientId=`; scope note persists after kanban edit |
 | Client search autocomplete | Yes | API returns matches; dropdown appears after ~150ms debounce |
-| Client fields (name, email, phone, address) | Yes | Readonly until client selected (correct guard) |
+| Client fields (name, email, phone, address) | Yes | Prefill from `?clientId=`; save blocked until client loaded |
 | Pricing USD, discount, tax | Present | — |
 | Optimize with AI | Present | Not exercised |
 | Email / Text checkboxes | Yes | **Readonly** — contractor cannot turn off channels on form |
@@ -67,13 +77,13 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 | Control | Tested | Result |
 |---------|--------|--------|
 | Top search autocomplete | Yes | `E2E` → 1 match after debounce; `h` → no matches (correct for this tenant’s data) |
-| Search select action | Code | **Navigates to `/estimates/new?clientId=`** — not client profile |
+| Search select action | Yes (E2E) | Option opens profile; **New estimate** button on each result |
 | List row click | Yes | Opens details panel |
 | Save / Clear / CSV menu | Partial | Panel + list load |
 | Client details: estimates/invoices | Yes | 23 estimates, 23 invoices, 0 jobs |
 | Create estimate / New job / New invoice quick links | Yes | Present |
 | Edit estimate per row | Yes | Links to unified editor |
-| View all estimates | Yes | Goes to **`/estimates` unfiltered** — not scoped to client |
+| View all estimates | Yes | **`/estimates?clientId=`** scoped filter |
 | Quotes section | Yes | **Removed** (expected) |
 
 **Contractor impact (P1):** Search-on-Clients is optimized for “start estimate,” not “open client.” List click is the path to profile—document in UI or offer a “View profile” in autocomplete.
@@ -87,7 +97,7 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 | Control | Tested | Result |
 |---------|--------|--------|
 | Page load | Partial | Loads |
-| **List text search** | Code | **None** — filter only via `?clientId=` URL |
+| **List text search** | Yes (E2E) | Search jobs by title/client; empty state when no match |
 | Create / edit / files / delete | E2E | File type validation + DELETE modal pass |
 
 **Contractor impact (P1):** Cannot find a job by title/client from the jobs page without URL params.
@@ -99,7 +109,7 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 | Control | Tested | Result |
 |---------|--------|--------|
 | Page | Not fully walked | — |
-| **List text search** | Code | **None** — `?clientId=` filter only |
+| **List text search** | Yes (E2E) | Search + `?clientId=` filter with “Show all” clear |
 | Send / payment flows | E2E (related) | Partial via estimate→invoice flow |
 
 ---
@@ -155,7 +165,10 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 
 ### Service catalog (`/services-catalog`)
 
-| Search | Code | **No search bar** |
+| Workflow | Result |
+|----------|--------|
+| Add / edit / list | **Pass** (E2E: create + update persists) |
+| Search | Code | **No search bar** (fine until catalog is large) |
 
 ---
 
@@ -192,17 +205,16 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 
 | Module | E2E spec | Gap |
 |--------|----------|-----|
-| Estimates approve/respond/duplicate | `estimate-quote-invoice-flow`, `estimate-public-respond` | No UI test for kanban Send/PDF/contract |
+| **Contractor usability (UI)** | `contractor-usability.spec.js` | Kanban Send/PDF/contract; jobs create; lead convert |
+| Estimates approve/respond/duplicate | `estimate-quote-invoice-flow`, `estimate-public-respond` | API-first; complements usability spec |
 | Calendar | `calendar.spec.js` | Good |
 | Jobs files/delete | `jobs-files.spec.js` | No create-job UI flow |
-| Bill payments | `bill-payments*.spec.js` | Wallet link flaky |
+| Bill payments | `bill-payments*.spec.js` | Processing center covered |
 | Website | `website-builder-saas`, `website-funnel` | Good |
 | Tenant isolation | `tenant-isolation.spec.js` | Good |
-| **Clients CRUD/search** | — | **None** |
-| **Lead inbox convert** | — | **None** |
-| **Invoices send/UI** | — | **None** |
-| **Dashboard** | — | **None** |
-| **Reputation / catalog / settings** | — | **None** |
+| Lead inbox convert | — | **None** (needs staging lead) |
+| Invoices send/UI | — | List search only in usability spec |
+| Reputation sync | — | Page load only |
 
 ---
 
@@ -210,26 +222,31 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 
 ### P0 — Blocks daily contractor use
 
-1. **Estimates kanban: add search/filter** (client name, estimate #, status, date range).
-2. **Estimates kanban: paginate or collapse archived/test data** — dev DB is dominated by E2E rows.
-3. **Client “View all estimates”** should link to filtered view (`/estimates?clientId=` or in-app filter), not unfiltered kanban.
+1. **Estimates kanban: date range / estimate # search** (client name search done).
+2. **Full-module workflow E2E** still missing: kanban Send, PDF download, contract generate, invoice send, lead convert, job create+save UI.
 
 ### P1 — Confusing or incomplete UX
 
-4. **Jobs list: add search** (title, client, address).
-5. **Invoices list: add search** (number, client, status).
-6. **Clients search:** optional “Open client profile” vs always “New estimate” (or split actions in dropdown).
-7. **New estimate:** allow toggling Email/Text delivery off (remove readonly on checkboxes when appropriate).
-8. **Bill payments:** fix wallet link flake (loading state / selector / timeout).
-9. **Migrated estimates:** `client_id` bigint vs UUID — panel uses `notes ilike %uuid%`; ensure new saves always set `clientUuid` in notes (already on create API).
+3. **New estimate:** Email/Text toggles still readonly on form (draft path OK; send path may confuse).
+4. **Service catalog + reputation:** add list search when catalogs grow.
+5. **Jobs:** E2E for create job + scope persist (files flow exists separately).
 
 ### P2 — Polish / coverage
 
-10. E2E: clients search select, client panel, lead convert, invoice send.
-11. Lead inbox empty state copy is fine; test convert on staging.
-12. Service catalog + reputation: search when lists grow.
-13. Jobber history UI for archived `quotes` / `estimate_builder` (optional).
-14. Admin list pages: upgrade simple `includes()` to `record-search` (per `SEARCH_BEHAVIOR.md`).
+6. Lead inbox convert on staging with real leads.
+7. Jobber history UI for archived `quotes` / `estimate_builder` (optional).
+8. Admin list pages: upgrade simple `includes()` to `record-search` (per `SEARCH_BEHAVIOR.md`).
+
+### Done (2026-05-28 usability pass)
+
+- Estimates kanban search/filter/hide-test-data/`?clientId=`
+- Client panel filtered estimates link; clients search profile + new estimate
+- Jobs + invoices list search
+- Client search tokenization (middle words)
+- Estimate edit hydration race (scope note wiped after save)
+- `contractor-usability.spec.js` + `contractor-workflows.spec.js`
+- **Print/PDF:** estimate kanban “Print / Save PDF”; invoice “Print / Save PDF”; job “Print work order”; client “Print record”; contract “Print contract” after generate
+- **Bug fix:** contract save from estimate (`client_id` null / wrong types broke insert)
 
 ---
 
@@ -246,14 +263,14 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 
 ---
 
-## Fixes applied (2026-05-30)
+## Fixes applied (2026-05-28 usability pass)
 
-- **Estimates kanban:** search bar, status filter, “Hide test data” (default on), `?clientId=` filter from client panel.
-- **Client panel:** “View all estimates” → `/estimates?clientId=…`.
-- **Clients search:** row opens profile; **New estimate** secondary action on each result.
-- **Jobs / Invoices:** list search inputs; invoices respect `?clientId=`.
-- **API:** `clientUuid` on serialized estimates for client-scoped filtering.
-- **Bill payments:** wallet CTA is a direct link (fixes flaky Playwright navigation).
+- **`tests/e2e/contractor-usability.spec.js`:** 8 UI workflows (dashboard, clients, estimates draft/edit, kanban filters, jobs/invoices search, service catalog CRUD, module smoke).
+- **Estimate editor:** cancel stale `?edit=` hydration (fixes scope note disappearing after save); loading gate on save buttons; post-save notes from API payload.
+- **`src/lib/client-search.js`:** tokenized SQL filter so “UX Audit Client” matches names with extra words.
+- **`PlacesAutocomplete`:** no Google dropdown on programmatic address fill.
+- **Estimates kanban / clients / jobs / invoices:** search and filters (see prior PR #79 items).
+- **Client form:** distinct `aria-label`s; clients page “Find a client” heading.
 
 ---
 
@@ -270,9 +287,12 @@ This audit targets **real workflows** (click, save, search, complete flows)—no
 ## How to re-run
 
 ```bash
-# E2E (dev server must be on :3000; do not set CI=1 locally)
+# Contractor audits (dev server on :3000; do not set CI=1 locally)
 Remove-Item Env:CI -ErrorAction SilentlyContinue
 $env:E2E_BYPASS_RATE_LIMIT='1'
+npx playwright test tests/e2e/contractor-usability.spec.js tests/e2e/contractor-workflows.spec.js --reporter=list
+
+# Full E2E suite
 npx playwright test tests/e2e/ --reporter=list
 
 # Unified estimates guard

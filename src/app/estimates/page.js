@@ -1,9 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { filterAndRankRecords } from "@/lib/record-search";
+import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import {
+  escapeHtml,
+  openPrintableHtmlDocument,
+} from "@/lib/print-html-document";
 import ws from "@/styles/workspace-dark.module.css";
 import est from "./estimates.module.css";
 
@@ -84,6 +90,8 @@ export default function EstimatesPage() {
   const [contractOption, setContractOption] = useState("");
   const [contractLanguage, setContractLanguage] = useState("en");
   const [contractBusy, setContractBusy] = useState(false);
+  const [contractPrintBody, setContractPrintBody] = useState("");
+  const [contractSavedId, setContractSavedId] = useState("");
   const [contractMessage, setContractMessage] = useState("");
   // Ref-tracked auto-dismiss timer so we can clear it on unmount and on
   // re-open. Previously a bare `setTimeout` would fire after the panel
@@ -120,18 +128,22 @@ export default function EstimatesPage() {
       });
       const payload = await getJsonOrThrow(res, "Unable to generate contract.");
       const contractId = payload?.data?.contract?.id;
+      const bodyText = String(payload?.data?.body || "").trim();
+      setContractPrintBody(bodyText);
+      setContractSavedId(contractId ? String(contractId) : "");
       setContractMessage(
         contractId
-          ? `Contract saved (#${String(contractId).slice(0, 8)}). Open it from the Contracts page.`
+          ? `Contract saved (${String(contractId).slice(0, 8)}). Print below or open Contracts in the menu.`
           : "Contract draft saved.",
       );
-      // Auto-dismiss after 6s so the panel doesn't stay stuck open. Stored
-      // in a ref so cleanup on unmount can cancel it.
-      contractDismissTimer.current = setTimeout(() => {
-        setContractEstimate(null);
-        setContractMessage("");
-        contractDismissTimer.current = null;
-      }, 6000);
+      // Auto-dismiss only when no persisted contract id (draft preview).
+      if (!contractId) {
+        contractDismissTimer.current = setTimeout(() => {
+          setContractEstimate(null);
+          setContractMessage("");
+          contractDismissTimer.current = null;
+        }, 6000);
+      }
     } catch (err) {
       setContractMessage(err?.message || "Unable to generate contract.");
     } finally {
@@ -418,6 +430,7 @@ export default function EstimatesPage() {
             type="checkbox"
             checked={hideTestData}
             onChange={(event) => setHideTestData(event.target.checked)}
+            aria-label="Hide test data"
           />
           Hide test data
         </label>
@@ -464,7 +477,13 @@ export default function EstimatesPage() {
                       <button
                         key={estimate.id}
                         type="button"
-                        onClick={() => setSelectedEstimate(estimate)}
+                        onClick={() => {
+                          setContractEstimate(null);
+                          setContractPrintBody("");
+                          setContractSavedId("");
+                          setContractMessage("");
+                          setSelectedEstimate(estimate);
+                        }}
                         className={est.estimateCard}
                       >
                         <div className={est.cardClient}>
@@ -519,7 +538,12 @@ export default function EstimatesPage() {
                   </div>
                   <div className={ws.subtitle}>{selectedEstimate.address || "No address"}</div>
                 </div>
-                <button type="button" onClick={() => setSelectedEstimate(null)} className={ws.btnSecondary}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEstimate(null)}
+                  className={ws.btnSecondary}
+                  aria-label="Close estimate details"
+                >
                   ✕
                 </button>
               </div>
@@ -795,15 +819,11 @@ export default function EstimatesPage() {
                   >
                     Client link
                   </a>
-                  <a
-                    href={`/api/estimates/${selectedEstimate.id}/pdf`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={ws.btnSecondary}
-                    style={{ flex: "1 1 110px", textAlign: "center", textDecoration: "none" }}
-                  >
-                    Download PDF
-                  </a>
+                  <DocumentPdfActions
+                    pdfUrl={`/api/estimates/${selectedEstimate.id}/pdf`}
+                    printLabel="Print estimate"
+                    downloadLabel="Download PDF"
+                  />
                   <button
                     type="button"
                     onClick={() => {
@@ -876,6 +896,7 @@ export default function EstimatesPage() {
                       <select
                         value={contractLanguage}
                         onChange={(e) => setContractLanguage(e.target.value)}
+                        aria-label="Contract language"
                         style={{
                           width: 140,
                           marginTop: 4,
@@ -906,12 +927,36 @@ export default function EstimatesPage() {
                         onClick={() => {
                           setContractEstimate(null);
                           setContractMessage("");
+                          setContractPrintBody("");
+                          setContractSavedId("");
                         }}
                         disabled={contractBusy}
                         className={ws.btnSecondary}
                       >
                         Cancel
                       </button>
+                      {contractPrintBody ? (
+                        <button
+                          type="button"
+                          className={ws.btnSecondary}
+                          onClick={() => {
+                            const title = `Contract — ${selectedEstimate.clientName || "Client"}`;
+                            openPrintableHtmlDocument({
+                              title,
+                              bodyHtml: `<h1>${escapeHtml(title)}</h1><pre>${escapeHtml(contractPrintBody)}</pre>`,
+                            });
+                          }}
+                        >
+                          Print (browser)
+                        </button>
+                      ) : null}
+                      {contractSavedId ? (
+                        <DocumentPdfActions
+                          pdfUrl={`/api/contracts/${contractSavedId}/pdf`}
+                          printLabel="Print contract"
+                          downloadLabel="Download contract PDF"
+                        />
+                      ) : null}
                     </div>
                     {contractMessage ? (
                       <div
@@ -922,8 +967,34 @@ export default function EstimatesPage() {
                         }}
                       >
                         {contractMessage}
+                        {contractSavedId ? (
+                          <>
+                            {" "}
+                            <Link href="/contracts" style={{ color: "#93c5fd", fontWeight: 600 }}>
+                              View all contracts
+                            </Link>
+                          </>
+                        ) : null}
                       </div>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {contractSavedId &&
+                contractEstimate?.id !== selectedEstimate.id ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: "1px solid rgba(148,163,184,0.12)",
+                    }}
+                  >
+                    <div className={est.detailLabel}>Saved contract</div>
+                    <DocumentPdfActions
+                      pdfUrl={`/api/contracts/${contractSavedId}/pdf`}
+                      printLabel="Print contract"
+                      downloadLabel="Download contract PDF"
+                    />
                   </div>
                 ) : null}
               </div>
