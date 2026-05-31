@@ -21,6 +21,8 @@ function normalizeContractsPayload(raw) {
   return [];
 }
 
+const CONTRACT_STATUS_OPTIONS = ["Draft", "Signed", "Sent", "Completed", "Archived"];
+
 function formatShortId(id) {
   const text = String(id || "").trim();
   if (!text) return "";
@@ -87,8 +89,16 @@ export default function ContractsPage() {
   }, [contracts, filterClientId, listSearch, statusFilter]);
 
   const statusOptions = useMemo(() => {
-    const set = new Set(contracts.map((c) => String(c.status || "Draft").trim()));
-    return ["all", ...Array.from(set).sort()];
+    const options = [...CONTRACT_STATUS_OPTIONS];
+    const seen = new Set(options.map((s) => s.toLowerCase()));
+    for (const row of contracts) {
+      const status = String(row.status || "Draft").trim();
+      if (status && !seen.has(status.toLowerCase())) {
+        seen.add(status.toLowerCase());
+        options.push(status);
+      }
+    }
+    return ["all", ...options];
   }, [contracts]);
 
   return (
@@ -225,13 +235,23 @@ export default function ContractsPage() {
                     >
                       {t("contracts.buttons.printBrowser")}
                     </button>
-                    <Link
-                      href="/estimates"
-                      className={ws.btnSecondary}
-                      style={{ textDecoration: "none", textAlign: "center" }}
-                    >
-                      {t("contracts.buttons.openEstimates")}
-                    </Link>
+                    {contract.estimateId ? (
+                      <Link
+                        href={`/estimates/new?edit=${contract.estimateId}`}
+                        className={ws.btnSecondary}
+                        style={{ textDecoration: "none", textAlign: "center" }}
+                      >
+                        {t("contracts.buttons.openEstimate")}
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/estimates"
+                        className={ws.btnSecondary}
+                        style={{ textDecoration: "none", textAlign: "center" }}
+                      >
+                        {t("contracts.buttons.openEstimates")}
+                      </Link>
+                    )}
                   </div>
                 </div>
                 {contract.body ? (

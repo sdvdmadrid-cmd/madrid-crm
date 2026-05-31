@@ -106,10 +106,12 @@ test.describe("Clients module audit", () => {
       timeout: 15_000,
     });
 
-    const combobox = page.getByRole("combobox", { name: /Search clients/i });
-    await combobox.fill(clientName);
-    await page.waitForTimeout(400);
-    await page.getByRole("option", { name: new RegExp(clientName) }).click();
+    await page.getByRole("searchbox", { name: /Search client list/i }).fill(clientName);
+    const card = page.locator("article.cf-client-card").filter({
+      has: page.getByRole("heading", { name: clientName, level: 3 }),
+    });
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await card.click();
 
     await expect(page.getByRole("heading", { name: clientName, level: 2 })).toBeVisible({
       timeout: 15_000,

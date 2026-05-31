@@ -34,6 +34,14 @@
   border-color: rgba(96, 165, 250, 0.45);
 }
 
+.card_amber:hover {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.card_violet:hover {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
 .cardTitle {
   margin: 0;
   font-size: 1.2rem;

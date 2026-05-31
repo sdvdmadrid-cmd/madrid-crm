@@ -13,6 +13,7 @@ const SETTINGS_LINKS = [
     descKey: "settingsHub.clientPayments.desc",
     ctaKey: "settingsHub.clientPayments.cta",
     accent: "emerald",
+    testId: "settings-hub-payments",
   },
   {
     href: "/subscriptions",
@@ -20,6 +21,23 @@ const SETTINGS_LINKS = [
     descKey: "settingsHub.subscription.desc",
     ctaKey: "settingsHub.subscription.cta",
     accent: "blue",
+    testId: "settings-hub-subscription",
+  },
+  {
+    href: "/services-catalog",
+    titleKey: "settingsHub.serviceCatalog.title",
+    descKey: "settingsHub.serviceCatalog.desc",
+    ctaKey: "settingsHub.serviceCatalog.cta",
+    accent: "amber",
+    testId: "settings-hub-catalog",
+  },
+  {
+    href: "/website",
+    titleKey: "settingsHub.website.title",
+    descKey: "settingsHub.website.desc",
+    ctaKey: "settingsHub.website.cta",
+    accent: "violet",
+    testId: "settings-hub-website",
   },
 ];
 
@@ -32,11 +50,12 @@ export default function SettingsHubPage() {
       subtitle={t("settingsHub.subtitle")}
     >
       <ContractorTrustStrip />
-      <div className={styles.grid}>
+      <div className={styles.grid} data-testid="settings-hub">
         {SETTINGS_LINKS.map((item) => (
           <Link
             key={item.href}
             href={item.href}
+            data-testid={item.testId}
             className={`${styles.card} ${styles[`card_${item.accent}`]}`}
           >
             <h2 className={styles.cardTitle}>{t(item.titleKey)}</h2>

@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import styles from "./subscriptions.module.css";
 
 export default function SubscriptionsPage() {
-  const router = useRouter();
   const [subscription, setSubscription] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,13 +14,12 @@ export default function SubscriptionsPage() {
   const [creatingSubscription, setCreatingSubscription] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
-  const goBackPath = "/dashboard";
   const planDisplay = {
-    title: "Suscripción",
-    price: "$35 al mes",
-    trial: "mes gratis como período de prueba",
-    cta: "Comenzar período de prueba",
-    creating: "Creando suscripción...",
+    title: "FieldBase subscription",
+    price: "$35/month",
+    trial: "one free month trial",
+    cta: "Start free trial",
+    creating: "Creating subscription…",
   };
 
   useEffect(() => {
@@ -33,16 +32,12 @@ export default function SubscriptionsPage() {
       setError(null);
 
       const [subRes, invRes] = await Promise.all([
-        fetch("/api/subscriptions/current"),
-        fetch("/api/subscriptions/invoices"),
+        apiFetch("/api/subscriptions/current"),
+        apiFetch("/api/subscriptions/invoices"),
       ]);
 
-      if (!subRes.ok || !invRes.ok) {
-        throw new Error("Failed to fetch subscription data");
-      }
-
-      const subData = await subRes.json();
-      const invData = await invRes.json();
+      const subData = await getJsonOrThrow(subRes, "Failed to fetch subscription");
+      const invData = await getJsonOrThrow(invRes, "Failed to fetch billing history");
 
       setSubscription(subData.subscription);
       setInvoices(invData.invoices || []);
@@ -59,18 +54,12 @@ export default function SubscriptionsPage() {
       setCreatingSubscription(true);
       setError(null);
 
-      const res = await fetch("/api/subscriptions/create", {
+      const res = await apiFetch("/api/subscriptions/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "app",
-        }),
+        body: JSON.stringify({ source: "app" }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create subscription");
-      }
+      await getJsonOrThrow(res, "Failed to create subscription");
 
       await fetchSubscriptionData();
     } catch (err) {
@@ -90,15 +79,11 @@ export default function SubscriptionsPage() {
       setCancellingSubscription(true);
       setError(null);
 
-      const res = await fetch("/api/subscriptions/cancel", {
+      const res = await apiFetch("/api/subscriptions/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to cancel subscription");
-      }
+      await getJsonOrThrow(res, "Failed to cancel subscription");
 
       await fetchSubscriptionData();
     } catch (err) {
@@ -114,18 +99,12 @@ export default function SubscriptionsPage() {
       setOpeningBillingPortal(true);
       setError(null);
 
-      const res = await fetch("/api/subscriptions/portal", {
+      const res = await apiFetch("/api/subscriptions/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "app",
-        }),
+        body: JSON.stringify({ source: "app" }),
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to open billing setup");
-      }
+      const data = await getJsonOrThrow(res, "Failed to open billing setup");
 
       const redirectUrl = String(data.url || "").trim();
       if (!redirectUrl) {
@@ -143,7 +122,7 @@ export default function SubscriptionsPage() {
 
   function formatDate(dateStr) {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("es-ES", {
+    return new Date(dateStr).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -152,7 +131,7 @@ export default function SubscriptionsPage() {
 
   function formatCurrency(amount) {
     if (amount === null || amount === undefined) return "-";
-    return new Intl.NumberFormat("es-ES", {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).format(amount);
@@ -160,11 +139,11 @@ export default function SubscriptionsPage() {
 
   function getStatusBadge(status) {
     const statusMap = {
-      trialing: { label: "En período de prueba", color: "info" },
-      active: { label: "Activo", color: "success" },
-      paused: { label: "Pausado", color: "warning" },
-      past_due: { label: "Vencido", color: "danger" },
-      cancelled: { label: "Cancelado", color: "secondary" },
+      trialing: { label: "Trial", color: "info" },
+      active: { label: "Active", color: "success" },
+      paused: { label: "Paused", color: "warning" },
+      past_due: { label: "Past due", color: "danger" },
+      cancelled: { label: "Cancelled", color: "secondary" },
     };
     const info = statusMap[status] || { label: status, color: "secondary" };
     return info;
@@ -172,8 +151,10 @@ export default function SubscriptionsPage() {
 
   if (loading) {
     return (
-      <PremiumPageShell title={planDisplay.title} subtitle="Cargando suscripción…">
-        <div className={`fb-shimmer ${styles.loadingCard}`}>Cargando suscripción...</div>
+      <PremiumPageShell title={planDisplay.title} subtitle="Loading subscription…">
+        <div className={`fb-shimmer ${styles.loadingCard}`} data-testid="subscriptions-loading">
+          Loading subscription…
+        </div>
       </PremiumPageShell>
     );
   }
@@ -193,17 +174,14 @@ export default function SubscriptionsPage() {
   return (
     <PremiumPageShell
       title={planDisplay.title}
-      subtitle="Gestiona tu suscripción a la plataforma"
+      subtitle="Manage your FieldBase plan, trial, and billing history."
       actions={
-        <button
-          type="button"
-          className={styles.backButton}
-          onClick={() => router.push(goBackPath)}
-        >
-          ← Volver
-        </button>
+        <Link href="/settings" className={styles.backButton} data-testid="subscriptions-back-settings">
+          ← All settings
+        </Link>
       }
     >
+        <div data-testid="subscriptions-page">
         {error && <div className={styles.errorBanner}>{error}</div>}
 
         {isComplimentary && (
@@ -380,6 +358,7 @@ export default function SubscriptionsPage() {
             </div>
           </div>
         )}
+        </div>
     </PremiumPageShell>
   );
 }

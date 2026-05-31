@@ -894,7 +894,13 @@ export default function WebsiteBuilderClient() {
       setPublished(payload?.data?.published === true);
       setHasUnpublishedChanges(false);
       setLastPublishedAt(payload?.data?.lastPublishedAt || null);
-      showNotice(goPublish ? t.publishedBadge : t.draftBadge);
+      showNotice(
+        goPublish && payload?.data?.published === true
+          ? `${t.publishedBadge} — ${t.publishLeadsHint}`
+          : goPublish
+            ? t.publishedBadge
+            : t.draftBadge,
+      );
     } catch (err) {
       showNotice(err.message || t.errorSave, true);
     } finally {
@@ -1205,7 +1211,7 @@ export default function WebsiteBuilderClient() {
 
   return (
     <WebsiteBuilderEditProvider editingRef={isEditingRef}>
-    <div className={styles.shell} style={{ "--wb-theme": theme }}>
+    <div className={styles.shell} style={{ "--wb-theme": theme }} data-testid="website-builder-shell">
       <div style={{ padding: "0 16px 12px", maxWidth: 1200, margin: "0 auto" }}>
         <PlatformZoneBanner zone="private" />
       </div>
@@ -1277,9 +1283,20 @@ export default function WebsiteBuilderClient() {
               target="_blank"
               rel="noopener noreferrer"
               className={`${styles.btn} ${styles.btnGhost}`}
+              data-testid="website-view-live"
             >
               {t.viewSite} ↗
             </a>
+          ) : null}
+          {published ? (
+            <Link
+              href="/lead-inbox"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              data-testid="website-view-leads"
+              style={{ textDecoration: "none" }}
+            >
+              {t.viewLeads}
+            </Link>
           ) : null}
           {builderStep === 2 && featureAiDescription ? (
             <button

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import PlatformZoneBanner from "@/components/workspace/PlatformZoneBanner";
@@ -40,6 +41,7 @@ export default function ReviewsReputationClient() {
   const [importText, setImportText] = useState("");
   const [importAuthor, setImportAuthor] = useState("");
   const [importRating, setImportRating] = useState("5");
+  const [reviewSearch, setReviewSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -191,6 +193,20 @@ export default function ReviewsReputationClient() {
   };
 
   const syncedReviews = reviews.filter((r) => r.metadata?.syncSource === "api");
+  const filteredSyncedReviews = useMemo(() => {
+    const q = reviewSearch.trim().toLowerCase();
+    if (!q) return syncedReviews;
+    return syncedReviews.filter((r) => {
+      const hay = [
+        r.authorName,
+        r.reviewText,
+        r.platform,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [syncedReviews, reviewSearch]);
   const lastSync = sources?.lastSyncAt
     ? new Date(sources.lastSyncAt).toLocaleString()
     : "Never";
@@ -207,6 +223,7 @@ export default function ReviewsReputationClient() {
       <div className={rep.tabs}>
         <button
           type="button"
+          data-testid="reputation-tab-connect"
           className={tab === "connect" ? rep.tabActive : rep.tab}
           onClick={() => setTab("connect")}
         >
@@ -214,6 +231,7 @@ export default function ReviewsReputationClient() {
         </button>
         <button
           type="button"
+          data-testid="reputation-tab-reviews"
           className={tab === "reviews" ? rep.tabActive : rep.tab}
           onClick={() => setTab("reviews")}
         >
@@ -221,6 +239,7 @@ export default function ReviewsReputationClient() {
         </button>
         <button
           type="button"
+          data-testid="reputation-tab-social"
           className={tab === "social" ? rep.tabActive : rep.tab}
           onClick={() => setTab("social")}
         >
@@ -316,47 +335,18 @@ export default function ReviewsReputationClient() {
 
       {!loading && tab === "reviews" ? (
         <>
-          <div className={rep.importCard}>
-            <h3>Archive import (private only)</h3>
-            <p className={rep.muted}>
-              Paste a review for your own records. It will not appear on your public site unless
-              synced from Google or Yelp above.
-            </p>
+          <div className={rep.reviewsToolbar}>
             <input
+              type="search"
               className={rep.input}
-              placeholder="Review URL (optional)"
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="Search synced reviews…"
+              aria-label="Search synced reviews"
+              value={reviewSearch}
+              onChange={(e) => setReviewSearch(e.target.value)}
             />
-            <div className={rep.row}>
-              <input
-                className={rep.input}
-                placeholder="Customer name"
-                value={importAuthor}
-                onChange={(e) => setImportAuthor(e.target.value)}
-              />
-              <select
-                className={rep.input}
-                value={importRating}
-                onChange={(e) => setImportRating(e.target.value)}
-              >
-                {[5, 4, 3, 2, 1].map((n) => (
-                  <option key={n} value={n}>
-                    {n} stars
-                  </option>
-                ))}
-              </select>
-            </div>
-            <textarea
-              className={rep.textarea}
-              rows={4}
-              placeholder="Paste review text here…"
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-            />
-            <button type="button" className={ws.btnPrimary} onClick={handleImport}>
-              Save to archive
-            </button>
+            <Link href="/website" className={`${ws.btnSecondary} ${rep.websiteLink}`}>
+              Website builder
+            </Link>
           </div>
 
           <div className={rep.list}>
@@ -364,9 +354,11 @@ export default function ReviewsReputationClient() {
               <p className={rep.muted}>
                 No synced reviews yet. Connect Google or Yelp and run Sync.
               </p>
+            ) : filteredSyncedReviews.length === 0 ? (
+              <p className={rep.muted}>No reviews match your search.</p>
             ) : (
-              syncedReviews.map((review) => (
-                <article key={review.id} className={rep.reviewCard}>
+              filteredSyncedReviews.map((review) => (
+                <article key={review.id} className={rep.reviewCard} data-testid="review-card">
                   <div className={rep.reviewHead}>
                     <strong>{review.authorName}</strong>
                     <span className={rep.badge}>{review.platform}</span>
@@ -401,6 +393,51 @@ export default function ReviewsReputationClient() {
               ))
             )}
           </div>
+
+          <details className={rep.archiveImport}>
+            <summary>Import review to private archive</summary>
+            <div className={rep.importCard}>
+              <p className={rep.muted}>
+                Paste a review for your records only. It will not appear on your public site unless
+                synced from Google or Yelp.
+              </p>
+              <input
+                className={rep.input}
+                placeholder="Review URL (optional)"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+              />
+              <div className={rep.row}>
+                <input
+                  className={rep.input}
+                  placeholder="Customer name"
+                  value={importAuthor}
+                  onChange={(e) => setImportAuthor(e.target.value)}
+                />
+                <select
+                  className={rep.input}
+                  value={importRating}
+                  onChange={(e) => setImportRating(e.target.value)}
+                >
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n} stars
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <textarea
+                className={rep.textarea}
+                rows={4}
+                placeholder="Paste review text here…"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+              />
+              <button type="button" className={ws.btnPrimary} onClick={handleImport}>
+                Save to archive
+              </button>
+            </div>
+          </details>
         </>
       ) : null}
 

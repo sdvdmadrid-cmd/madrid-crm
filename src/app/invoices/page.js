@@ -289,6 +289,14 @@ export default function InvoicesPage() {
   }, [fetchInvoices]);
 
   useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchInvoices();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchInvoices]);
+
+  useEffect(() => {
     const clientId = String(searchParams.get("clientId") || "").trim();
     if (!clientId) return;
 

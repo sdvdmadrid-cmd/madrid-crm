@@ -28,6 +28,40 @@
   line-height: 1.5;
 }
 
+.reviewsToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.reviewsToolbar .input {
+  flex: 1 1 220px;
+  margin-bottom: 0;
+}
+
+.websiteLink {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.archiveImport {
+  margin-top: 20px;
+}
+
+.archiveImport summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #93c5fd;
+  margin-bottom: 12px;
+  list-style: none;
+}
+
+.archiveImport summary::-webkit-details-marker {
+  display: none;
+}
+
 .importCard {
   padding: 20px;
   border-radius: 16px;

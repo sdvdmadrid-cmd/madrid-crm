@@ -88,6 +88,14 @@ async function openKanbanEstimate(page, clientName) {
   await card.click();
 }
 
+/** F-004: secondary actions live under collapsed "More actions". */
+async function expandKanbanMoreActions(page) {
+  const edit = page.getByRole("button", { name: /Edit estimate/i });
+  if (await edit.isVisible().catch(() => false)) return;
+  await page.locator("details").filter({ hasText: "More actions" }).click();
+  await expect(edit).toBeVisible({ timeout: 10_000 });
+}
+
 test.describe("Estimates module audit", () => {
   test.beforeEach(async ({ page }) => {
     await devLogin(page, { profile: "admin", redirect: "/estimates" });
@@ -213,7 +221,7 @@ test.describe("Estimates module audit", () => {
 
     await page.getByRole("button", { name: /Approve/i }).click();
     await page.getByRole("button", { name: /^Confirm$/i }).click();
-    await expect(page.getByRole("button", { name: /Edit estimate/i })).toBeHidden({
+    await expect(page.locator("details").filter({ hasText: "More actions" })).toBeHidden({
       timeout: 10_000,
     });
     await openKanbanEstimate(page, clientName);
@@ -221,6 +229,7 @@ test.describe("Estimates module audit", () => {
       timeout: 15_000,
     });
 
+    await expandKanbanMoreActions(page);
     await page.getByRole("button", { name: /Duplicate/i }).click();
     await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
     expect(page.url()).not.toContain(String(estimate.id));
@@ -232,6 +241,7 @@ test.describe("Estimates module audit", () => {
     const { estimate } = await createClientAndEstimate(page.request, stamp, { clientName });
 
     await openKanbanEstimate(page, clientName);
+    await expandKanbanMoreActions(page);
     await page.getByRole("button", { name: /Edit estimate/i }).click();
     await expect(page).toHaveURL(new RegExp(`/estimates/new\\?edit=${estimate.id}`), {
       timeout: 15_000,
@@ -243,9 +253,10 @@ test.describe("Estimates module audit", () => {
     const clientName = `Est Close ${stamp}`;
     await createClientAndEstimate(page.request, stamp, { clientName });
     await openKanbanEstimate(page, clientName);
+    await expandKanbanMoreActions(page);
     await expect(page.getByRole("button", { name: /Edit estimate/i })).toBeVisible();
     await page.getByRole("button", { name: /Close estimate details/i }).click();
-    await expect(page.getByRole("button", { name: /Edit estimate/i })).toBeHidden({
+    await expect(page.locator("details").filter({ hasText: "More actions" })).toBeHidden({
       timeout: 10_000,
     });
   });
