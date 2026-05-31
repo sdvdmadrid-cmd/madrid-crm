@@ -584,6 +584,16 @@
       "title": "FieldBase subscription",
       "desc": "Your plan, trial, and billing for using FieldBase.",
       "cta": "Manage subscription"
+    },
+    "serviceCatalog": {
+      "title": "Service catalog",
+      "desc": "Reusable services and price ranges for estimates and your public site.",
+      "cta": "Manage services"
+    },
+    "website": {
+      "title": "Website & branding",
+      "desc": "Company profile, logo, and published site that feeds your lead inbox.",
+      "cta": "Open website builder"
     }
   },
   "settingsPayments": {
@@ -1183,7 +1193,8 @@
       "print": "Print contract",
       "downloadPdf": "Download PDF",
       "printBrowser": "Print (browser)",
-      "openEstimates": "Estimates"
+      "openEstimates": "Estimates",
+      "openEstimate": "Open estimate"
     },
     "errors": {
       "load": "Unable to load contracts"

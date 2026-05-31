@@ -750,64 +750,70 @@ export default function EstimatesPage() {
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => sendEstimateEmail(selectedEstimate)}
-                      disabled={sendingEmailId === selectedEstimate.id}
-                      className={ws.btnPrimary}
-                      style={{ gridColumn: "1 / -1", opacity: sendingEmailId === selectedEstimate.id ? 0.6 : 1 }}
-                    >
-                      {sendingEmailId === selectedEstimate.id
-                        ? "Sending…"
-                        : selectedEstimate.audit?.sentAt
-                          ? "✉ Resend to client"
-                          : "✉ Send to client"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => queueStatusAction(selectedEstimate, "approved")}
-                      disabled={pipelineBusyId === selectedEstimate.id}
-                      className={ws.btnPrimary}
-                    >
-                      Approve
-                    </button>
-                    <button type="button" onClick={() => queueStatusAction(selectedEstimate, "declined")} className={ws.btnDanger}>
-                      Decline
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => queueStatusAction(selectedEstimate, "changes_requested")}
-                      className={ws.btnSecondary}
-                      style={{ gridColumn: "1 / -1" }}
-                    >
-                      Request changes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        router.push(`/estimates/new?edit=${selectedEstimate.id}`);
-                        setSelectedEstimate(null);
-                      }}
-                      className={ws.btnSecondary}
-                      style={{ gridColumn: "1 / -1" }}
-                    >
-                      Edit estimate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => duplicateEstimate(selectedEstimate)}
-                      disabled={duplicatingId === selectedEstimate.id}
-                      aria-label="Duplicate this estimate as a new draft"
-                      className={ws.btnSecondary}
-                      style={{
-                        gridColumn: "1 / -1",
-                        opacity: duplicatingId === selectedEstimate.id ? 0.6 : 1,
-                      }}
-                    >
-                      {duplicatingId === selectedEstimate.id ? "Duplicating…" : "⎘ Duplicate"}
-                    </button>
-                  </div>
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => sendEstimateEmail(selectedEstimate)}
+                        disabled={sendingEmailId === selectedEstimate.id}
+                        className={ws.btnPrimary}
+                        style={{ gridColumn: "1 / -1", opacity: sendingEmailId === selectedEstimate.id ? 0.6 : 1 }}
+                      >
+                        {sendingEmailId === selectedEstimate.id
+                          ? "Sending…"
+                          : selectedEstimate.audit?.sentAt
+                            ? "✉ Resend to client"
+                            : "✉ Send to client"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => queueStatusAction(selectedEstimate, "approved")}
+                        disabled={pipelineBusyId === selectedEstimate.id}
+                        className={ws.btnPrimary}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => queueStatusAction(selectedEstimate, "declined")}
+                        className={ws.btnDanger}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                    <details className={est.moreActions}>
+                      <summary>More actions</summary>
+                      <div className={est.moreActionsBody}>
+                        <button
+                          type="button"
+                          onClick={() => queueStatusAction(selectedEstimate, "changes_requested")}
+                          className={ws.btnSecondary}
+                        >
+                          Request changes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            router.push(`/estimates/new?edit=${selectedEstimate.id}`);
+                            setSelectedEstimate(null);
+                          }}
+                          className={ws.btnSecondary}
+                        >
+                          Edit estimate
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateEstimate(selectedEstimate)}
+                          disabled={duplicatingId === selectedEstimate.id}
+                          aria-label="Duplicate this estimate as a new draft"
+                          className={ws.btnSecondary}
+                          style={{ opacity: duplicatingId === selectedEstimate.id ? 0.6 : 1 }}
+                        >
+                          {duplicatingId === selectedEstimate.id ? "Duplicating…" : "⎘ Duplicate"}
+                        </button>
+                      </div>
+                    </details>
+                  </>
                 )}
                 <div style={{ marginTop: 12, display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid rgba(148,163,184,0.12)", flexWrap: "wrap" }}>
                   <a

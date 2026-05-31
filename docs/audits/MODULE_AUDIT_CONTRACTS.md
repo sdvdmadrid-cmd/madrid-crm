@@ -93,7 +93,7 @@
 
 | Friction | Severity | Notes |
 |----------|----------|-------|
-| **No direct “open source estimate”** | **High** | Card links to generic `/estimates`, not `?edit=` or kanban selection |
+| ~~**No direct “open source estimate”**~~ | — | ✅ **Fix now (F-002):** `estimate_id` + `est-ref:` fallback + **Open estimate** link |
 | **Create path always via Estimates** | Medium | By design, but two hops (menu → estimates → card → generate) |
 | **No inline status change on library** | Medium | Must use API or future UI; filter-only today |
 | **Refresh manual** | Low | No auto-refresh after save from another tab |
@@ -102,7 +102,7 @@
 
 | Gap | Severity | Notes |
 |-----|----------|-------|
-| Status filter only lists values **present in loaded data** | Medium | “Signed” absent until at least one Signed row — confusing for new tenants |
+| ~~Status filter only lists values **present in loaded data**~~ | — | ✅ **Fix now (F-003):** fixed Draft/Signed/Sent/… options |
 | No date range / category / language filters | Medium | Search tokens help; no dropdowns |
 | No “linked job” filter | Low | `jobId` on row but not exposed in UI |
 

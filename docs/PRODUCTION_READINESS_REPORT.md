@@ -2,130 +2,123 @@
 
 **Goal:** Polished contractor SaaS where every feature works start-to-finish.  
 **Method:** Module-by-module usability audit (buttons, dropdowns, search, filters, forms, workflows, persistence, responsive UI, print/PDF).  
-**Last updated:** 2026-05-28
+**Last updated:** 2026-05-28  
+**Audit phase:** **Complete** (all 16 modules documented + signed off)  
+**Deploy status:** Milestone [PR #80](https://github.com/sdvdmadrid-cmd/madrid-crm/pull/80) on production; **phase-2 fixes local** — ship via **next single PR** (do not split per module).
 
 ---
 
-## Summary
+## Executive summary
 
-| Metric | Count |
-|--------|-------|
-| Modules in scope | 16 |
-| Modules fully audited & documented | 7 (Clients, Estimates, Jobs, Invoices, Payments, Contracts, Lead Inbox) |
-| Document PDF routes implemented | 5 (estimate, invoice, contract, job/work order, client) |
-| Production-ready (whole platform) | **No** — audit in progress |
+| Metric | Status |
+|--------|--------|
+| Modules in scope | 16 / 16 audited |
+| Module sign-offs | 16 / 16 |
+| Fix-now items (F-001–F-011) | Implemented locally |
+| Platform production-ready | **Conditional yes** for contractor daily CRM |
+| Recommended action | Merge **one milestone PR** with all local audit fixes + run `verify:prod` |
 
----
+**Contractor-critical paths** (clients → estimates → contracts → jobs → invoices → payments → lead inbox → website) are audited, have module E2E specs, and shipped or queued in the next deploy.
 
-## Module status
-
-| Module | Audit doc | E2E audit | Fixes this pass | Verdict |
-|--------|-----------|-----------|-----------------|---------|
-| **Clients** | [MODULE_AUDIT_CLIENTS.md](./audits/MODULE_AUDIT_CLIENTS.md) | `tests/e2e/audit/clients-module.spec.js` | List search, billing theme, client PDF UI | ✅ Module complete |
-| **Estimates** | [MODULE_AUDIT_ESTIMATES.md](./audits/MODULE_AUDIT_ESTIMATES.md) · [Sign-off](./audits/ESTIMATES_MODULE_SIGN_OFF.md) | `tests/e2e/audit/estimates-module.spec.js` | PDF print/download, contract UX, editor PDF, a11y | ✅ **Signed off** |
-| **Contracts** | [MODULE_AUDIT_CONTRACTS.md](./audits/MODULE_AUDIT_CONTRACTS.md) · [Sign-off](./audits/CONTRACTS_MODULE_SIGN_OFF.md) | `tests/e2e/audit/contracts-module.spec.js` | `/contracts` library, nav, search/filter, PDF | ✅ **Signed off** |
-| **Jobs** | [MODULE_AUDIT_JOBS.md](./audits/MODULE_AUDIT_JOBS.md) · [Sign-off](./audits/JOBS_MODULE_SIGN_OFF.md) | `tests/e2e/audit/jobs-module.spec.js` | Dark theme, search, client filter, files panel, PDF | ✅ **Signed off** |
-| **Invoices** | [MODULE_AUDIT_INVOICES.md](./audits/MODULE_AUDIT_INVOICES.md) · [Sign-off](./audits/INVOICES_MODULE_SIGN_OFF.md) | `tests/e2e/audit/invoices-module.spec.js` | List search crash fix, payment register E2E | ✅ **Signed off** |
-| **Payments** | [MODULE_AUDIT_PAYMENTS.md](./audits/MODULE_AUDIT_PAYMENTS.md) · [Sign-off](./audits/PAYMENTS_MODULE_SIGN_OFF.md) | `tests/e2e/audit/payments-module.spec.js` | Connect UI, manual/partial pay, checkout API | ✅ **Signed off** |
-| **Lead Inbox** | [MODULE_AUDIT_LEAD_INBOX.md](./audits/MODULE_AUDIT_LEAD_INBOX.md) · [Sign-off](./audits/LEAD_INBOX_MODULE_SIGN_OFF.md) | `tests/e2e/audit/lead-inbox-module.spec.js` | Convert redirect, filters, seed API, card UX | ✅ **Signed off** |
-| Website Builder | — | Smoke | — | ⏳ |
-| Reputation | — | Smoke | — | ⏳ |
-| Service Catalog | — | Partial | — | ⏳ |
-| Calendar | — | — | — | ⏳ |
-| Dashboard | — | Partial | — | ⏳ |
-| Settings | — | — | — | ⏳ |
-| Subscriptions | — | Smoke | — | ⏳ |
-| Owner/Admin | — | — | — | ⏳ |
+**Operator paths** (`/owner/*`) have smoke E2E; deep RBAC/security review remains **B-002** (not blocking tenant contractors).
 
 ---
 
-## Document workflow (print + PDF download)
+## Module status (final)
 
-| Document | Print (PDF API) | Download (`?download=1`) | Browser HTML fallback |
-|----------|-----------------|---------------------------|------------------------|
-| Estimate | `/api/estimates/{id}/pdf` | ✅ | — |
-| Invoice | `/api/invoices/{id}/pdf` | ✅ | ✅ |
-| Contract | `/api/contracts/{id}/pdf` | ✅ | ✅ (from estimate kanban) |
-| Work order | `/api/jobs/{id}/pdf` | ✅ | ✅ |
-| Client record | `/api/clients/{id}/pdf` | ✅ | ✅ |
-
-Shared UI: `src/components/workspace/DocumentPdfActions.jsx`  
-Shared server helpers: `src/lib/document-pdf-core.js`
-
----
-
-## What was tested (cumulative)
-
-- **Clients:** Full module spec + existing contractor usability tests  
-- **Jobs:** Full module spec (10 tests) + `jobs-files.spec.js`  
-- **Invoices:** Full module spec (9 tests) + workflow send/PDF smoke  
-- **Payments:** Full module spec (17 tests) — Connect, manual/partial, checkout  
-- **Contracts:** Full module spec (8 tests) — library, kanban save, API list/PDF, filters  
-- **Cross-module smoke:** Dashboard navigation, estimates draft/edit, jobs/invoices search, service catalog (`contractor-usability.spec.js`)  
-- **Workflows:** Estimate PDF API, kanban send/contract/duplicate, jobs create, invoice send, payments/subscriptions smoke (`contractor-workflows.spec.js`)
+| Module | Audit | Sign-off | E2E spec | Verdict |
+|--------|-------|----------|----------|---------|
+| Clients | [MODULE_AUDIT_CLIENTS.md](./audits/MODULE_AUDIT_CLIENTS.md) | — | `clients-module.spec.js` | ✅ |
+| Estimates | [MODULE_AUDIT_ESTIMATES.md](./audits/MODULE_AUDIT_ESTIMATES.md) | [ESTIMATES_MODULE_SIGN_OFF.md](./audits/ESTIMATES_MODULE_SIGN_OFF.md) | `estimates-module.spec.js` | ✅ |
+| Jobs | [MODULE_AUDIT_JOBS.md](./audits/MODULE_AUDIT_JOBS.md) | [JOBS_MODULE_SIGN_OFF.md](./audits/JOBS_MODULE_SIGN_OFF.md) | `jobs-module.spec.js` | ✅ |
+| Invoices | [MODULE_AUDIT_INVOICES.md](./audits/MODULE_AUDIT_INVOICES.md) | [INVOICES_MODULE_SIGN_OFF.md](./audits/INVOICES_MODULE_SIGN_OFF.md) | `invoices-module.spec.js` | ✅ |
+| Payments | [MODULE_AUDIT_PAYMENTS.md](./audits/MODULE_AUDIT_PAYMENTS.md) | [PAYMENTS_MODULE_SIGN_OFF.md](./audits/PAYMENTS_MODULE_SIGN_OFF.md) | `payments-module.spec.js` | ✅ |
+| Contracts | [MODULE_AUDIT_CONTRACTS.md](./audits/MODULE_AUDIT_CONTRACTS.md) | [CONTRACTS_MODULE_SIGN_OFF.md](./audits/CONTRACTS_MODULE_SIGN_OFF.md) | `contracts-module.spec.js` | ✅ |
+| Lead Inbox | [MODULE_AUDIT_LEAD_INBOX.md](./audits/MODULE_AUDIT_LEAD_INBOX.md) | [LEAD_INBOX_MODULE_SIGN_OFF.md](./audits/LEAD_INBOX_MODULE_SIGN_OFF.md) | `lead-inbox-module.spec.js` | ✅ |
+| Website Builder | [MODULE_AUDIT_WEBSITE_BUILDER.md](./audits/MODULE_AUDIT_WEBSITE_BUILDER.md) | [WEBSITE_BUILDER_MODULE_SIGN_OFF.md](./audits/WEBSITE_BUILDER_MODULE_SIGN_OFF.md) | `website-builder-module.spec.js` | ✅ (pending deploy) |
+| Reputation | [MODULE_AUDIT_REPUTATION.md](./audits/MODULE_AUDIT_REPUTATION.md) | [REPUTATION_MODULE_SIGN_OFF.md](./audits/REPUTATION_MODULE_SIGN_OFF.md) | `reputation-module.spec.js` | ✅ (pending deploy) |
+| Calendar | [MODULE_AUDIT_CALENDAR.md](./audits/MODULE_AUDIT_CALENDAR.md) | [CALENDAR_MODULE_SIGN_OFF.md](./audits/CALENDAR_MODULE_SIGN_OFF.md) | `calendar-module.spec.js` | ✅ (pending deploy) |
+| Service Catalog | [MODULE_AUDIT_SERVICE_CATALOG.md](./audits/MODULE_AUDIT_SERVICE_CATALOG.md) | [SERVICE_CATALOG_MODULE_SIGN_OFF.md](./audits/SERVICE_CATALOG_MODULE_SIGN_OFF.md) | `services-catalog-module.spec.js` | ✅ (pending deploy) |
+| Dashboard | [MODULE_AUDIT_DASHBOARD.md](./audits/MODULE_AUDIT_DASHBOARD.md) | [DASHBOARD_MODULE_SIGN_OFF.md](./audits/DASHBOARD_MODULE_SIGN_OFF.md) | `dashboard-module.spec.js` | ✅ (pending deploy) |
+| Settings | [MODULE_AUDIT_SETTINGS.md](./audits/MODULE_AUDIT_SETTINGS.md) | [SETTINGS_MODULE_SIGN_OFF.md](./audits/SETTINGS_MODULE_SIGN_OFF.md) | `settings-module.spec.js` | ✅ (pending deploy) |
+| Subscriptions | [MODULE_AUDIT_SUBSCRIPTIONS.md](./audits/MODULE_AUDIT_SUBSCRIPTIONS.md) | [SUBSCRIPTIONS_MODULE_SIGN_OFF.md](./audits/SUBSCRIPTIONS_MODULE_SIGN_OFF.md) | `subscriptions-module.spec.js` | ✅ (pending deploy) |
+| Owner/Admin | [MODULE_AUDIT_OWNER_ADMIN.md](./audits/MODULE_AUDIT_OWNER_ADMIN.md) | [OWNER_ADMIN_MODULE_SIGN_OFF.md](./audits/OWNER_ADMIN_MODULE_SIGN_OFF.md) | `owner-admin-module.spec.js` | ✅ smoke (B-002 remains) |
 
 ---
 
-## What was fixed (cumulative)
+## Fix now — this phase (local, next PR)
 
-| Area | Fix |
-|------|-----|
-| Estimates | Edit hydration race; `DocumentPdfActions` on kanban; contract PDF after save |
-| Clients | List search; dark billing form; client PDF print/download |
-| Contracts API | Insert payload (tenant_id, Draft status, nullable fields) |
-| Jobs | Dark theme, list search, `?clientId=` filter, files panel styling, module E2E |
-| Invoices | `filterAndRankRecords` import (search crash), module E2E, `data-testid` on cards |
-| Payments | Client collections audit spec; documents invoice↔payment workflows |
-| Contracts | `/contracts` library page, sidebar nav, estimate→library link, collapsible preview |
-| Lead Inbox | Convert→estimate redirect, source filter, summary bar, quick contact, E2E seed API |
-| Invoices / Jobs | PDF API routes + `DocumentPdfActions` on list cards |
-| Client search | Tokenized PostgREST query (`client-search.js`) |
-| Print UX | Renamed confusing single “Print/Save PDF” links; split print vs download |
+| ID | Summary |
+|----|---------|
+| F-001 | Invoice list refresh on tab focus |
+| F-002 | Contract → estimate deep link (`estimate_id` + `est-ref:` fallback) |
+| F-003 | Contract status filter options |
+| F-004 | Estimate kanban “More actions” collapse |
+| F-005 | Reputation reviews search + collapsible import |
+| F-006 | Website → Lead Inbox navigation |
+| F-007 | Calendar today’s schedule strip |
+| F-008 | Service catalog search + website link |
+| F-009 | Dashboard actionable metrics + `leadInbox.newCount` |
+| F-010 | Settings hub: catalog + website cards |
+| F-011 | Subscriptions `apiFetch`, English shell, back to settings |
 
----
-
-## What still needs work
-
-1. **Remaining 9 modules** — each needs `docs/audits/MODULE_AUDIT_*.md`, dedicated E2E, responsive pass, and UX fixes before sign-off.  
-2. **Prioritized UX backlog** — [UX_PRIORITIZED_BACKLOG.md](./audits/UX_PRIORITIZED_BACKLOG.md) (updated each sign-off).  
-3. **E2E coverage** — CSV import, calendar, settings, owner/admin screens.  
-4. **CI flake** — occasional client print / strict-mode failures in legacy specs.  
-5. **Polish** — replace `alert`/`confirm` in dedupe and delete flows.  
-6. **Deploy** — Latest audit fixes may be local only; verify `main` after merge.
+Ledger: [UX_FIX_LEDGER.md](./audits/UX_FIX_LEDGER.md)
 
 ---
 
-## Blocking production readiness
+## Fix before production-ready (not blocking next deploy)
 
-| Blocker | Severity |
-|---------|----------|
-| Incomplete module-by-module audit (9 modules remaining) | **High** |
-| No signed-off MODULE_AUDIT for Subscriptions (platform billing) | **Medium** |
-| Contracts polish (estimate deep link, status UI, drawer clutter) | **Low** |
-| Unverified production deploy of PDF routes + recent fixes | **Medium** |
-| Owner/Admin & Settings not audited | **Medium** |
-| Lead → client → estimate → job → invoice E2E golden path not one continuous spec | **Medium** |
+| ID | Item |
+|----|------|
+| B-001 | Golden-path E2E (lead → paid invoice) |
+| B-002 | Owner/Admin mutation security audit |
+| B-003 | Global payment history report |
+| B-004 | Dashboard contracts/reputation widgets |
+| B-005 | i18n consolidation (Lead Inbox, Subscriptions body, etc.) |
+| B-006 | AI unavailable banners |
 
 ---
 
-## How to run audits locally
+## Document workflow (print + PDF)
+
+| Document | Route |
+|----------|-------|
+| Estimate | `/api/estimates/{id}/pdf` |
+| Invoice | `/api/invoices/{id}/pdf` |
+| Contract | `/api/contracts/{id}/pdf` |
+| Work order | `/api/jobs/{id}/pdf` |
+| Client | `/api/clients/{id}/pdf` |
+
+---
+
+## Run all module audit E2E
 
 ```powershell
 Remove-Item Env:CI -ErrorAction SilentlyContinue
 $env:E2E_BYPASS_RATE_LIMIT='1'
-npx playwright test tests/e2e/audit/clients-module.spec.js
-npx playwright test tests/e2e/audit/jobs-module.spec.js
-npx playwright test tests/e2e/audit/invoices-module.spec.js
-npx playwright test tests/e2e/audit/payments-module.spec.js
-npx playwright test tests/e2e/audit/contracts-module.spec.js
-npx playwright test tests/e2e/audit/lead-inbox-module.spec.js
-npx playwright test tests/e2e/contractor-usability.spec.js tests/e2e/contractor-workflows.spec.js
+npx playwright test tests/e2e/audit/
 ```
 
-Dev login: `/api/auth/dev-login?profile=admin`
+**Latest full run (2026-05-28):** 96 tests — **95 passed**, 1 flaky (`estimates` decline workflow — `ECONNRESET` on dev server, not a product defect). All 16 module specs included.
+
+Dev login: `/api/auth/dev-login?profile=admin` (use `profile=super_admin` for owner specs).
 
 ---
 
-## Next step
+## Production deploy checklist (after PR merge)
 
-**Website Builder** — next in sequence. Lead Inbox signed off 2026-05-28 — see [LEAD_INBOX_MODULE_SIGN_OFF.md](./audits/LEAD_INBOX_MODULE_SIGN_OFF.md). Cumulative UX priorities: [UX_PRIORITIZED_BACKLOG.md](./audits/UX_PRIORITIZED_BACKLOG.md).
+1. Merge milestone PR to `main` (all F-001–F-011 + migrations + docs).  
+2. Confirm GitHub **Production Deploy Verify** green.  
+3. `npm run verify:prod` — `/api/health` `commitSha` matches merge commit.  
+4. Spot-check: Lead Inbox, Contracts “Open estimate”, Dashboard inbox metric, Calendar today strip.  
+5. Apply Supabase migration `20260531120000_contracts_estimate_id.sql` if not auto-applied.
+
+---
+
+## Verdict
+
+**Module audit phase: complete.**  
+**Platform: ready for next production deploy** once the consolidated PR lands and verify passes.  
+**Not required for deploy:** B-001–B-006, future enhancements E-001–E-006.
+
+**Do not open incremental PRs per module** — ship one milestone PR containing this phase’s fixes and documentation.

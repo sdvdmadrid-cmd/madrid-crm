@@ -354,6 +354,17 @@
   box-shadow: var(--fb-shadow-sm);
 }
 
+.metricLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.healthRow:hover {
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
 .metricRevenue {
   border-color: rgba(16, 185, 129, 0.25);
   background: linear-gradient(

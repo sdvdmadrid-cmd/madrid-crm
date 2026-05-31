@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
@@ -21,6 +22,7 @@ export default function ServicesCatalogPage() {
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const categories = useMemo(() => {
     const set = new Set();
@@ -30,6 +32,21 @@ export default function ServicesCatalogPage() {
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [services]);
+
+  const filteredServices = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return services;
+    return services.filter((service) => {
+      const haystack = [
+        service.name,
+        service.category,
+        service.description,
+      ]
+        .map((part) => String(part || "").toLowerCase())
+        .join(" ");
+      return haystack.includes(q);
+    });
+  }, [services, searchQuery]);
 
   async function loadServices() {
     setLoading(true);
@@ -116,9 +133,14 @@ export default function ServicesCatalogPage() {
   }
 
   const headerActions = (
-    <button type="button" onClick={loadServices} disabled={loading} className={ws.btnSecondary}>
-      Refresh
-    </button>
+    <>
+      <Link href="/website" className={ws.btnSecondary}>
+        Website builder
+      </Link>
+      <button type="button" onClick={loadServices} disabled={loading} className={ws.btnSecondary}>
+        Refresh
+      </button>
+    </>
   );
 
   return (
@@ -127,9 +149,10 @@ export default function ServicesCatalogPage() {
       subtitle="Manage reusable services and pricing for estimates and your website."
       actions={headerActions}
     >
+      <div data-testid="services-catalog-shell">
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
-      <section className={sc.formCard}>
+      <section className={sc.formCard} data-testid="services-catalog-form">
         <h2 className={sc.formTitle}>{selectedId ? "Edit service" : "Add service"}</h2>
         <div className={sc.formGrid}>
           <input
@@ -174,10 +197,21 @@ export default function ServicesCatalogPage() {
         </div>
       </section>
 
-      <section>
-        <p className={sc.categories}>
-          Categories: {categories.length > 0 ? categories.join(", ") : "No categories yet"}
-        </p>
+      <section data-testid="services-catalog-list">
+        <div className={sc.listToolbar}>
+          <input
+            type="search"
+            className={sc.field}
+            placeholder="Search services…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search services"
+            data-testid="services-catalog-search"
+          />
+          <p className={sc.categories}>
+            Categories: {categories.length > 0 ? categories.join(", ") : "No categories yet"}
+          </p>
+        </div>
         {loading ? (
           <p style={{ color: "var(--fb-text-muted)" }}>Loading services...</p>
         ) : services.length === 0 ? (
@@ -185,10 +219,19 @@ export default function ServicesCatalogPage() {
             <p className="fb-empty-title">No services yet</p>
             <p className="fb-empty-desc">Add your first service above to use it in estimates.</p>
           </div>
+        ) : filteredServices.length === 0 ? (
+          <div className="fb-empty">
+            <p className="fb-empty-title">No matches</p>
+            <p className="fb-empty-desc">Try a different search term.</p>
+          </div>
         ) : (
           <div className={sc.list}>
-            {services.map((service) => (
-              <article key={service.id || service._id} className={sc.serviceCard}>
+            {filteredServices.map((service) => (
+              <article
+                key={service.id || service._id}
+                className={sc.serviceCard}
+                data-testid={`service-card-${service.id || service._id}`}
+              >
                 <div className={sc.serviceRow}>
                   <div>
                     <div className={sc.serviceName}>{service.name}</div>
@@ -222,6 +265,7 @@ export default function ServicesCatalogPage() {
           </div>
         )}
       </section>
+      </div>
     </PremiumPageShell>
   );
 }

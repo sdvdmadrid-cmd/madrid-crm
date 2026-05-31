@@ -479,6 +479,13 @@ export default function Calendar() {
     }
   };
 
+  const todayKey = formatLocalDate(new Date());
+  const todaysAppointments = useMemo(() => {
+    return appointments
+      .filter((row) => String(row?.date || "") === todayKey)
+      .sort((a, b) => String(a?.time || "").localeCompare(String(b?.time || "")));
+  }, [appointments, todayKey]);
+
   const generateSchedulingAdvice = async () => {
     setScheduleLoading(true);
     setScheduleError("");
@@ -526,7 +533,10 @@ export default function Calendar() {
   };
 
   return (
-    <div className="fb-calendar-page min-h-screen min-w-0 overflow-x-hidden flex flex-col">
+    <div
+      className="fb-calendar-page min-h-screen min-w-0 overflow-x-hidden flex flex-col"
+      data-testid="calendar-shell"
+    >
       {/* Header */}
       <CalendarHeader
         currentDate={currentDate}
@@ -541,6 +551,55 @@ export default function Calendar() {
           <p className="text-sm text-red-700">{appointmentError}</p>
         </div>
       )}
+
+      {!loading ? (
+        <div
+          className="relative z-10 px-3 sm:px-6 md:px-8 pt-2 flex-none"
+          data-testid="calendar-today-strip"
+        >
+          <div className="rounded-xl border border-slate-200/80 bg-white/95 px-4 py-3 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                {t("calendar.todaySchedule", { defaultValue: "Today's schedule" })}
+              </p>
+              <button
+                type="button"
+                onClick={() => handleDayClick(new Date())}
+                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+              >
+                {t("calendar.addToday", { defaultValue: "Add appointment" })}
+              </button>
+            </div>
+            {todaysAppointments.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-600">
+                {t("calendar.noAppointmentsToday", {
+                  defaultValue: "No appointments today — click a day on the grid to schedule.",
+                })}
+              </p>
+            ) : (
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {todaysAppointments.map((row) => (
+                  <li key={row._id || row.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleEventClick(row)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-left text-sm hover:border-blue-300 hover:bg-blue-50/60"
+                    >
+                      <span className="font-medium text-slate-900">
+                        {row.title || row.clientName || t("calendar.untitled", { defaultValue: "Appointment" })}
+                      </span>
+                      <span className="shrink-0 text-xs text-slate-600">
+                        {row.time || "—"}
+                        {row.location ? ` · ${row.location}` : ""}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Always-visible 15-day weather forecast */}
       <div className="relative z-0 px-3 sm:px-6 md:px-8 pt-3 flex-none">

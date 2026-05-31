@@ -114,6 +114,7 @@ export async function GET(request) {
       contractsActive,
       estimateRequestsTotal,
       estimateRequestsNew,
+      websiteLeadsNew,
       invoicesOverdue,
       jobRows,
       invoiceRows,
@@ -145,6 +146,9 @@ export async function GET(request) {
       ]),
       safeCount("estimate_requests", tenantDbId, role),
       safeCount("estimate_requests", tenantDbId, role, [
+        { type: "eq", column: "status", value: "new" },
+      ]),
+      safeCount("contractor_website_leads", tenantDbId, role, [
         { type: "eq", column: "status", value: "new" },
       ]),
       safeCount("invoices", tenantDbId, role, [
@@ -201,6 +205,9 @@ export async function GET(request) {
       estimateRequests: {
         total: estimateRequestsTotal,
         newCount: estimateRequestsNew,
+      },
+      leadInbox: {
+        newCount: websiteLeadsNew,
       },
       conversion: {
         totalLeads: clientsTotal,

@@ -9,6 +9,10 @@ import {
   resolveInsertTenant,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import {
+  estimateRefInvoiceNumber,
+  isMissingEstimateIdColumnError,
+} from "@/lib/contract-estimate-link";
 
 const ESTIMATES_TABLE = "estimates";
 const CONTRACTS_TABLE = "contracts";
@@ -164,6 +168,7 @@ export async function POST(request, { params }) {
       client_name: estimate.client_name || "",
       job_id: String(estimate.job_id || "").trim(),
       job_title: contractAssistantInput.jobTitle,
+      estimate_id: String(id || "").trim(),
       invoice_id: "",
       invoice_number: "",
       amount: Number.isFinite(total) ? String(total) : "0",
@@ -174,11 +179,22 @@ export async function POST(request, { params }) {
       body: contractBody,
     };
 
-    const { data: inserted, error: insertError } = await supabaseAdmin
+    let { data: inserted, error: insertError } = await supabaseAdmin
       .from(CONTRACTS_TABLE)
       .insert([insertPayload])
       .select("*")
       .maybeSingle();
+
+    if (insertError && isMissingEstimateIdColumnError(insertError)) {
+      const fallbackPayload = { ...insertPayload };
+      delete fallbackPayload.estimate_id;
+      fallbackPayload.invoice_number = estimateRefInvoiceNumber(id);
+      ({ data: inserted, error: insertError } = await supabaseAdmin
+        .from(CONTRACTS_TABLE)
+        .insert([fallbackPayload])
+        .select("*")
+        .maybeSingle());
+    }
 
     if (insertError) {
       console.error(

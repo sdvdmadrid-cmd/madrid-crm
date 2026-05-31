@@ -164,6 +164,8 @@ export default function RevenueDashboardPage() {
 
   const activeJobs = metrics?.jobs?.active ?? 0;
   const pendingEstimates = metrics?.estimateRequests?.newCount ?? 0;
+  const newWebsiteLeads = metrics?.leadInbox?.newCount ?? 0;
+  const inboxAttention = pendingEstimates + newWebsiteLeads;
   const outstandingAmount = metrics?.invoices?.outstanding ?? 0;
   const unpaidInvoices = metrics?.invoices?.unpaidCount ?? 0;
   const paidInvoices = Math.max(
@@ -269,7 +271,7 @@ export default function RevenueDashboardPage() {
   ];
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-testid="dashboard-shell">
       <header className={styles.topBar}>
         <div>
           <p className={styles.eyebrow}>{t("dashboardControl.operationsLabel")}</p>
@@ -290,6 +292,14 @@ export default function RevenueDashboardPage() {
           </Link>
           <Link href="/jobs?action=new" className={styles.secondaryAction}>{t("dashboardControl.actions.newJob")}</Link>
           <Link href="/clients" className={styles.secondaryAction}>{t("dashboardControl.actions.addClient")}</Link>
+          {inboxAttention > 0 ? (
+            <Link href="/lead-inbox" className={styles.secondaryAction} data-testid="dashboard-lead-inbox-cta">
+              {t("dashboardControl.actions.openLeadInbox", {
+                count: inboxAttention,
+                defaultValue: `Lead inbox (${inboxAttention})`,
+              })}
+            </Link>
+          ) : null}
         </div>
       </header>
 
@@ -340,23 +350,35 @@ export default function RevenueDashboardPage() {
                 <p className={styles.metricHint}>{t("dashboardControl.metrics.revenueHint")}</p>
               </article>
 
-              <article className={styles.metricHero}>
+              <Link href="/jobs" className={`${styles.metricHero} ${styles.metricLink}`} data-testid="dashboard-metric-active-jobs">
                 <div className={styles.metricHead}>
                   <BriefcaseIcon />
                   <p className={styles.metricLabel}>{t("dashboardControl.metrics.activeJobs")}</p>
                 </div>
                 <p className={styles.metricValue}>{formatNumber(activeJobs)}</p>
                 <p className={styles.metricHint}>{t("dashboardControl.metrics.activeJobsHint")}</p>
-              </article>
+              </Link>
 
-              <article className={styles.metricHero}>
+              <Link
+                href="/lead-inbox"
+                className={`${styles.metricHero} ${styles.metricLink}`}
+                data-testid="dashboard-metric-inbox"
+              >
                 <div className={styles.metricHead}>
                   <ClockIcon />
                   <p className={styles.metricLabel}>{t("dashboardControl.metrics.pendingEstimates")}</p>
                 </div>
-                <p className={styles.metricValue}>{formatNumber(pendingEstimates)}</p>
-                <p className={styles.metricHint}>{t("dashboardControl.metrics.pendingEstimatesHint")}</p>
-              </article>
+                <p className={styles.metricValue}>{formatNumber(inboxAttention)}</p>
+                <p className={styles.metricHint}>
+                  {newWebsiteLeads > 0
+                    ? t("dashboardControl.metrics.inboxHintWithLeads", {
+                        leads: formatNumber(newWebsiteLeads),
+                        requests: formatNumber(pendingEstimates),
+                        defaultValue: `${formatNumber(newWebsiteLeads)} website · ${formatNumber(pendingEstimates)} requests`,
+                      })
+                    : t("dashboardControl.metrics.pendingEstimatesHint")}
+                </p>
+              </Link>
             </div>
           )}
         </section>
@@ -436,14 +458,14 @@ export default function RevenueDashboardPage() {
               <span className={`${styles.statusPill} ${styles.status_paid}`}>{t("dashboardControl.statuses.paid")}</span>
               <strong>{formatNumber(paidInvoices)}</strong>
             </div>
-            <div className={styles.healthRow}>
+            <Link href="/invoices" className={styles.healthRow}>
               <span className={`${styles.statusPill} ${styles.status_pending}`}>{t("dashboardControl.statuses.pending")}</span>
               <strong>{formatNumber(unpaidInvoices)}</strong>
-            </div>
-            <div className={styles.healthRow}>
+            </Link>
+            <Link href="/invoices" className={styles.healthRow}>
               <span className={`${styles.statusPill} ${styles.status_overdue}`}>{t("dashboardControl.statuses.overdue")}</span>
               <strong>{formatNumber(overdueInvoices)}</strong>
-            </div>
+            </Link>
           </div>
         </section>
       </div>

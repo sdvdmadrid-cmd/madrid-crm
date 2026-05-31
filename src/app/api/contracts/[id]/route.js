@@ -6,6 +6,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { resolveContractEstimateId } from "@/lib/contract-estimate-link";
 
 const CONTRACTS = "contracts";
 
@@ -16,6 +17,7 @@ const serialize = (doc) => ({
   clientName: doc.client_name || "",
   jobId: doc.job_id || "",
   jobTitle: doc.job_title || "",
+  estimateId: resolveContractEstimateId(doc),
   amount: doc.amount || "",
   status: doc.status || "Draft",
   contractLanguage: doc.contract_language || "en",

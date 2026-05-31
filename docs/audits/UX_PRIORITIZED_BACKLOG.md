@@ -1,77 +1,53 @@
-# UX prioritized backlog — contractor platform audit
+# UX release backlog (capped)
 
-**Purpose:** Living list of production blockers and usability work, updated as each module is audited.  
-**Last updated:** 2026-05-28  
-**Modules signed off:** Clients, Estimates, Jobs, Invoices, Payments, Contracts, Lead Inbox (7/16)
+**Do not add items here without a ledger ID and decision.**  
+Full triage: [UX_FIX_LEDGER.md](./UX_FIX_LEDGER.md)
 
----
-
-## Critical production blockers
-
-| Item | Module | Notes |
-|------|--------|-------|
-| Incomplete module-by-module audit (9 modules remaining) | Platform | Website Builder, Reputation, Service Catalog, Calendar, Dashboard, Settings, Subscriptions, Owner/Admin, etc. |
-| Production deploy verification | Platform | Recent PDF routes, `/contracts`, lead-inbox UX may be local-only until merge |
-| Owner/Admin & Settings not audited | Admin | RBAC, tenant config, Stripe platform |
-| Golden path E2E (lead → client → estimate → job → invoice) | Cross-module | Single continuous spec not yet wired |
+**Last updated:** 2026-05-28
 
 ---
 
-## High-impact UX improvements
+## Fix now — active / just shipped
 
-| Item | Module | Status |
-|------|--------|--------|
-| ~~No contract library / misleading save copy~~ | Contracts | ✅ Shipped `/contracts` + nav |
-| ~~Convert lead then hunt for estimate~~ | Lead Inbox | ✅ Redirect to `/estimates/new?edit=` |
-| Estimate kanban drawer action overload | Estimates | Open — group secondary actions |
-| ~~Contract card body wastes viewport~~ | Contracts | ✅ Collapsible preview |
-| Invoice list stale after external payment | Invoices / Payments | Open — refresh on focus |
-| No global payment history report | Payments | Open |
-| No “open source estimate” from contract card | Contracts | Open — needs `estimate_id` on save |
-| Lead Inbox strings in page-local UI object | Lead Inbox | Open — migrate to i18n files |
-| Dashboard contracts/leads summary widgets | Dashboard | Open |
+| Ledger | Item | Status |
+|--------|------|--------|
+| F-001 | Invoice refresh on tab focus | ✅ |
+| F-002 | Contract → estimate deep link | ✅ |
+| F-003 | Contract status filter options | ✅ |
+| F-004 | Estimate drawer “More actions” | ✅ |
+| F-005 | Reputation reviews UX | ✅ |
 
 ---
 
-## Medium-priority usability improvements
+## Fix before production-ready (platform gate)
 
-| Item | Module | Notes |
-|------|--------|-------|
-| Status filter shows only statuses present in data | Contracts | Confusing until Signed row exists |
-| Category / date filters on contract library | Contracts | Search tokens only today |
-| Lead funnel report (new → contacted → converted) | Lead Inbox | Summary chips are interim |
-| es/pl incomplete copy on Lead Inbox | Lead Inbox | es search still English in places |
-| Many actions per invoice card | Invoices | Wraps on mobile |
-| Partial payment UX refresh without reload | Payments | API path works; list stale |
-| Jobs list status dropdown filter | Jobs | Search covers status |
-| Bill Payments vs Client payments naming | Payments | Guide clarifies; nav still similar |
-| AI features without clear “unavailable” state | Multiple | Lead reply, estimators |
+| Ledger | Item |
+|--------|------|
+| B-001 | End-to-end golden path E2E |
+| B-002 | Settings + Owner/Admin audit |
+| B-003 | Payment history report (optional gate) |
+| B-004 | Dashboard operational widgets |
+| B-006 | AI feature unavailable messaging |
+
+**Remaining module audits:** Reputation (in progress), Calendar, Service Catalog, Dashboard, Settings, Subscriptions, Owner/Admin.
 
 ---
 
-## Nice-to-have enhancements
+## Future enhancement (explicitly deferred)
 
-| Item | Module | Notes |
-|------|--------|-------|
-| Batch print contracts | Contracts | Per-row PDF today |
-| SMS deep link on leads | Lead Inbox | `sms:` URI |
-| Export leads CSV | Lead Inbox | |
-| Collapsible financial blocks on job cards | Jobs | Mobile polish |
-| Search match highlighting | Multiple | Consistent enhancement |
-| Stripe webhook smoke in CI | Payments | Stripe CLI job |
-| Full delete-job in jobs module spec | Jobs | Covered in `jobs-files` |
+See ledger IDs **E-001** through **E-006** — not scheduled until platform v1 sign-off.
 
 ---
 
-## How this list is maintained
+## Production blockers (non-UX)
 
-1. Each `MODULE_AUDIT_*.md` records module-specific friction.  
-2. Shipped fixes move to sign-off docs with strikethrough here.  
-3. At platform sign-off, review **Critical** and **High** for release gating.
+| Item | Status |
+|------|--------|
+| Module audits incomplete | In progress (8+/16) |
+| ~~Deploy verify df9e7c5~~ | ✅ |
 
 ---
 
 ## Related
 
-- [PRODUCTION_READINESS_REPORT.md](../PRODUCTION_READINESS_REPORT.md)  
-- Per-module audits in this folder
+[PRODUCTION_READINESS_REPORT.md](../PRODUCTION_READINESS_REPORT.md)
