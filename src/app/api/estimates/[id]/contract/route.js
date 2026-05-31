@@ -159,18 +159,18 @@ export async function POST(request, { params }) {
     });
 
     const insertPayload = {
-      tenant_id: insertTenantId,
-      client_id: estimate.client_id || null,
+      tenant_id: String(insertTenantId || ""),
+      client_id: String(parsedNotes.clientUuid || estimate.client_id || "").trim(),
       client_name: estimate.client_name || "",
-      job_id: estimate.job_id || null,
+      job_id: String(estimate.job_id || "").trim(),
       job_title: contractAssistantInput.jobTitle,
-      invoice_id: null,
-      invoice_number: null,
-      amount: Number.isFinite(total) ? total : 0,
-      status: "draft",
+      invoice_id: "",
+      invoice_number: "",
+      amount: Number.isFinite(total) ? String(total) : "0",
+      status: "Draft",
       contract_language: language,
       contract_category: category,
-      contract_option: option || null,
+      contract_option: option || "",
       body: contractBody,
     };
 

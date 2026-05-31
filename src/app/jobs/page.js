@@ -1,8 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import {
+  escapeHtml,
+  openPrintableHtmlDocument,
+} from "@/lib/print-html-document";
 import { filterAndRankRecords } from "@/lib/record-search";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import {
@@ -121,6 +126,7 @@ function IconTrash() {
 
 export default function JobsPage() {
   const { t } = useTranslation();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { capabilities } = useCurrentUserAccess();
   const [jobs, setJobs] = useState([]);
@@ -355,6 +361,30 @@ export default function JobsPage() {
     setJobFilesState(jobId, { deleting: false, success: "File deleted." });
   }, [deleteFileModal, loadJobFiles, setJobFilesState]);
 
+  const printJobSummary = (job) => {
+    const financials = computeEstimateFinancials({
+      baseAmount: job.price,
+      taxState: job.taxState,
+      downPaymentPercent: job.downPaymentPercent,
+    });
+    const bodyHtml = `
+      <h1>${escapeHtml(t("jobs.print.title", { defaultValue: "Work order" }))}</h1>
+      <p class="meta">${escapeHtml(job.title || "")}</p>
+      <table><tbody>
+        <tr><th>${escapeHtml(t("jobs.labels.client", { defaultValue: "Client" }))}</th><td>${escapeHtml(job.clientName || "")}</td></tr>
+        <tr><th>${escapeHtml(t("jobs.labels.service", { defaultValue: "Service" }))}</th><td>${escapeHtml(job.service || "")}</td></tr>
+        <tr><th>${escapeHtml(t("jobs.labels.status", { defaultValue: "Status" }))}</th><td>${escapeHtml(job.status || "")}</td></tr>
+        <tr><th>${escapeHtml(t("jobs.labels.date", { defaultValue: "Due date" }))}</th><td>${escapeHtml(job.dueDate || t("jobs.labels.noDate"))}</td></tr>
+        <tr><th>${escapeHtml(t("jobs.labels.price", { defaultValue: "Price" }))}</th><td>$${Number(job.price || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("jobs.labels.estimateTotal", { defaultValue: "Total" }))}</th><td>$${financials.total.toFixed(2)}</td></tr>
+      </tbody></table>
+      ${job.scopeDetails ? `<h2 style="font-size:16px;margin-top:20px;">${escapeHtml(t("jobs.print.scope", { defaultValue: "Scope" }))}</h2><pre>${escapeHtml(job.scopeDetails)}</pre>` : ""}`;
+    openPrintableHtmlDocument({
+      title: job.title || t("jobs.print.title", { defaultValue: "Work order" }),
+      bodyHtml,
+    });
+  };
+
   const saveJob = async () => {
     try {
       const method = selectedId ? "PATCH" : "POST";
@@ -572,86 +602,74 @@ export default function JobsPage() {
         <h2>{selectedId ? t("jobs.formTitleEdit") : t("jobs.formTitleNew")}</h2>
         <div className={jobStyles.formGrid}>
           <input
+            className={jobStyles.formInput}
             placeholder={t("jobs.placeholders.title")}
+            aria-label={t("jobs.placeholders.title")}
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
           <input
+            className={jobStyles.formInput}
             placeholder={t("jobs.placeholders.client")}
+            aria-label={t("jobs.placeholders.client")}
             value={form.clientName}
             onChange={(e) => setForm({ ...form, clientName: e.target.value })}
           />
           <input
+            className={jobStyles.formInput}
             placeholder={t("jobs.placeholders.service")}
+            aria-label={t("jobs.placeholders.service")}
             value={form.service}
             onChange={(e) => setForm({ ...form, service: e.target.value })}
           />
           <textarea
+            className={`${jobStyles.formInput} ${jobStyles.formTextarea}`}
             placeholder={t("jobs.placeholders.scopeDetails")}
+            aria-label={t("jobs.placeholders.scopeDetails")}
             value={form.scopeDetails}
             onChange={(e) => setForm({ ...form, scopeDetails: e.target.value })}
-            style={{ minHeight: "90px" }}
           />
           <div className={jobStyles.formGridSplit}>
             <input
+              className={jobStyles.formInput}
               placeholder={t("jobs.placeholders.squareMeters")}
+              aria-label={t("jobs.placeholders.squareMeters")}
               value={form.squareMeters}
               onChange={(e) =>
                 setForm({ ...form, squareMeters: e.target.value })
               }
-              style={{
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #ccc",
-              }}
             />
             <input
+              className={jobStyles.formInput}
               placeholder={t("jobs.placeholders.travelMinutes")}
+              aria-label={t("jobs.placeholders.travelMinutes")}
               value={form.travelMinutes}
               onChange={(e) =>
                 setForm({ ...form, travelMinutes: e.target.value })
               }
-              style={{
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #ccc",
-              }}
             />
             <select
+              className={jobStyles.formSelect}
+              aria-label={t("jobs.labels.complexity", { defaultValue: "Complexity" })}
               value={form.complexity}
               onChange={(e) => setForm({ ...form, complexity: e.target.value })}
-              style={{
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #ccc",
-              }}
             >
               <option value="low">{t("jobs.complexity.low")}</option>
               <option value="standard">{t("jobs.complexity.standard")}</option>
               <option value="high">{t("jobs.complexity.high")}</option>
             </select>
             <select
+              className={jobStyles.formSelect}
+              aria-label={t("jobs.labels.urgency", { defaultValue: "Urgency" })}
               value={form.urgency}
               onChange={(e) => setForm({ ...form, urgency: e.target.value })}
-              style={{
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #ccc",
-              }}
             >
               <option value="flexible">{t("jobs.urgency.flexible")}</option>
               <option value="week">{t("jobs.urgency.week")}</option>
               <option value="urgent">{t("jobs.urgency.urgent")}</option>
             </select>
           </div>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              color: "#333",
-            }}
-          >
+          <label className={jobStyles.checkboxLabel}>
             <input
               type="checkbox"
               checked={form.materialsIncluded}
@@ -662,36 +680,27 @@ export default function JobsPage() {
             {t("jobs.materialsIncluded")}
           </label>
           <select
+            className={jobStyles.formSelect}
+            aria-label={t("jobs.labels.status")}
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           >
             <option>Pending</option>
             <option>In progress</option>
             <option>Completed</option>
           </select>
           <input
+            className={jobStyles.formInput}
             placeholder={t("jobs.placeholders.price")}
+            aria-label={t("jobs.placeholders.price")}
             value={form.price}
             onChange={(e) => setForm({ ...form, price: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           />
           <select
+            className={jobStyles.formSelect}
+            aria-label={t("jobs.labels.tax")}
             value={form.taxState}
             onChange={(e) => setForm({ ...form, taxState: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           >
             {US_STATE_OPTIONS.map((state) => (
               <option key={state.code} value={state.code}>
@@ -700,35 +709,22 @@ export default function JobsPage() {
             ))}
           </select>
           <input
+            className={jobStyles.formInput}
             placeholder={t("jobs.placeholders.downPayment")}
+            aria-label={t("jobs.placeholders.downPayment")}
             value={form.downPaymentPercent}
             onChange={(e) =>
               setForm({ ...form, downPaymentPercent: e.target.value })
             }
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           />
           <input
             type="date"
+            className={jobStyles.formInput}
+            aria-label={t("jobs.labels.date")}
             value={form.dueDate}
             onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            style={{
-              padding: "12px",
-              borderRadius: "10px",
-              border: "1px solid #ccc",
-            }}
           />
-          <div
-            style={{
-              padding: "16px",
-              borderRadius: "12px",
-              background: "#f4f8f4",
-              border: "1px solid #d6e5d6",
-            }}
-          >
+          <div className={jobStyles.estimatorPanel}>
             <div
               style={{
                 display: "flex",
@@ -740,9 +736,7 @@ export default function JobsPage() {
             >
               <div>
                 <strong>{t("jobs.estimator.title")}</strong>
-                <p style={{ margin: "6px 0 0 0", color: "#58705d" }}>
-                  {t("jobs.estimator.description")}
-                </p>
+                <p>{t("jobs.estimator.description")}</p>
               </div>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 <button
@@ -850,7 +844,7 @@ export default function JobsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <strong>Proposal Generator</strong>
-                <p style={{ margin: "6px 0 0 0", color: "#5b4d8c" }}>
+                <p style={{ margin: "6px 0 0 0", color: "var(--fb-text-muted)" }}>
                   Generate a client-ready proposal using the current job scope.
                 </p>
               </div>
@@ -891,17 +885,28 @@ export default function JobsPage() {
 
       <section>
         <h2>{t("jobs.listTitle")}</h2>
-        <input
-          type="search"
-          value={listSearch}
-          onChange={(event) => setListSearch(event.target.value)}
-          placeholder={t("jobs.searchPlaceholder", {
-            defaultValue: "Search jobs by title, client, service, or status…",
-          })}
-          aria-label={t("jobs.searchLabel", { defaultValue: "Search jobs" })}
-          className={jobStyles.listSearch}
-          style={{ marginBottom: 12, width: "100%", maxWidth: 480 }}
-        />
+        <div className={jobStyles.filterBar}>
+          <input
+            type="search"
+            value={listSearch}
+            onChange={(event) => setListSearch(event.target.value)}
+            placeholder={t("jobs.searchPlaceholder", {
+              defaultValue: "Search jobs by title, client, service, or status…",
+            })}
+            aria-label={t("jobs.searchLabel", { defaultValue: "Search jobs" })}
+            className={jobStyles.listSearch}
+            style={{ flex: "1 1 220px", maxWidth: 480 }}
+          />
+          {filterClientId ? (
+            <button
+              type="button"
+              className={ws.btnSecondary}
+              onClick={() => router.push("/jobs")}
+            >
+              {t("jobs.clearClientFilter", { defaultValue: "Clear client filter" })}
+            </button>
+          ) : null}
+        </div>
         {filterClientId ? (
           <p className={ws.subtitle} style={{ marginBottom: 12 }}>
             {t("jobs.filteredByClient", {
@@ -940,38 +945,38 @@ export default function JobsPage() {
                       }}
                     >
                       <div>
-                      <h3 style={{ margin: 0 }}>{job.title}</h3>
-                      <p style={{ margin: "8px 0 0 0", color: "#555" }}>
+                      <h3 className={jobStyles.jobCardTitle}>{job.title}</h3>
+                      <p className={jobStyles.jobCardMeta}>
                         {job.clientName} | {job.service}
                       </p>
-                      <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                      <p className={jobStyles.jobCardMeta}>
                         {t("jobs.labels.status")}:{" "}
                         {t(`jobs.statusOptions.${job.status}`) || job.status} |{" "}
                         {t("jobs.labels.price")}: ${job.price}
                       </p>
-                      <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                      <p className={jobStyles.jobCardMeta}>
                         {t("jobs.labels.tax")}: {financials.taxState} (
                         {financials.taxRate.toFixed(3)}%) |{" "}
                         {t("jobs.labels.taxAmount")}: $
                         {financials.taxAmount.toFixed(2)}
                       </p>
-                      <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                      <p className={jobStyles.jobCardMeta}>
                         {t("jobs.labels.estimateTotal")}: $
                         {financials.total.toFixed(2)} |
                         {t("jobs.labels.downPayment")}:{" "}
                         {financials.downPaymentPercent.toFixed(2)}% ($
                         {financials.downPaymentAmount.toFixed(2)})
                       </p>
-                      <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                      <p className={jobStyles.jobCardMeta}>
                         {t("jobs.labels.balanceAfterDownPayment")}: $
                         {financials.balanceAfterDownPayment.toFixed(2)}
                       </p>
-                      <p style={{ margin: "8px 0 0 0", color: "#777" }}>
+                      <p className={jobStyles.jobCardMeta}>
                         {t("jobs.labels.date")}:{" "}
                         {job.dueDate || t("jobs.labels.noDate")}
                       </p>
                       {job.estimateSnapshot
-                        ? <p style={{ margin: "8px 0 0 0", color: "#1d6f42" }}>
+                        ? <p className={jobStyles.jobCardMetaAccent}>
                             {t("jobs.labels.ai")}: $
                             {job.estimateSnapshot.recommendedPrice} |{" "}
                             {job.estimateSnapshot.estimatedHours} h |{" "}
@@ -989,6 +994,24 @@ export default function JobsPage() {
                           className={jobStyles.iconBtn}
                         >
                           {filesOpen ? "Hide files" : "Manage files"}
+                        </button>
+                        <DocumentPdfActions
+                          pdfUrl={`/api/jobs/${job._id}/pdf`}
+                          printLabel={t("jobs.buttons.print", {
+                            defaultValue: "Print work order",
+                          })}
+                          downloadLabel={t("jobs.buttons.downloadPdf", {
+                            defaultValue: "Download PDF",
+                          })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => printJobSummary(job)}
+                          className={jobStyles.iconBtn}
+                        >
+                          {t("jobs.buttons.printBrowser", {
+                            defaultValue: "Print (browser)",
+                          })}
                         </button>
                         <button
                           type="button"
@@ -1012,17 +1035,7 @@ export default function JobsPage() {
                     </div>
 
                     {filesOpen
-                      ? <div
-                          data-testid="job-files-panel"
-                          style={{
-                            borderRadius: 12,
-                            border: "1px solid #e2e8f0",
-                            background: "#f8fafc",
-                            padding: 14,
-                            display: "grid",
-                            gap: 12,
-                          }}
-                        >
+                      ? <div data-testid="job-files-panel" className={jobStyles.filesPanel}>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <input
                               ref={(el) => {
@@ -1091,16 +1104,16 @@ export default function JobsPage() {
                             <div style={{ color: "#b91c1c" }}>{filesState.error}</div>
                           )}
                           {filesState.success && (
-                            <div style={{ color: "#047857" }}>{filesState.success}</div>
+                            <div style={{ color: "#6ee7b7" }}>{filesState.success}</div>
                           )}
 
                           <div style={{ display: "grid", gap: 12 }}>
                             <div>
-                              <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>
+                              <div className={jobStyles.filesPanelHeading}>
                                 Photos ({photoItems.length})
                               </div>
                               {photoItems.length === 0
-                                ? <div style={{ color: "#64748b" }}>No photos yet.</div>
+                                ? <div className={jobStyles.filesPanelMuted}>No photos yet.</div>
                                 : <div
                                     style={{
                                       display: "grid",
@@ -1112,10 +1125,10 @@ export default function JobsPage() {
                                       <div
                                         key={file.id}
                                         style={{
-                                          border: "1px solid #dbe2ea",
+                                          border: "1px solid rgba(148,163,184,0.22)",
                                           borderRadius: 10,
                                           overflow: "hidden",
-                                          background: "#fff",
+                                          background: "rgba(30,41,59,0.65)",
                                         }}
                                       >
                                         {file.signedUrl
@@ -1141,31 +1154,14 @@ export default function JobsPage() {
                                               Preview unavailable
                                             </div>}
                                         <div style={{ padding: 8, display: "grid", gap: 6 }}>
-                                          <div
-                                            style={{
-                                              fontSize: 12,
-                                              color: "#334155",
-                                              whiteSpace: "nowrap",
-                                              overflow: "hidden",
-                                              textOverflow: "ellipsis",
-                                            }}
-                                          >
+                                          <div className={jobStyles.fileThumbName}>
                                             {file.name}
                                           </div>
                                           <button
                                             type="button"
+                                            className={jobStyles.btnFileDanger}
                                             onClick={() => requestFileDelete(job._id, file)}
                                             disabled={filesState.deleting}
-                                            style={{
-                                              borderRadius: 8,
-                                              border: "1px solid #fecaca",
-                                              background: "#fff1f2",
-                                              color: "#b91c1c",
-                                              fontSize: 12,
-                                              fontWeight: 700,
-                                              padding: "6px 8px",
-                                              cursor: "pointer",
-                                            }}
                                           >
                                             Delete
                                           </button>
@@ -1176,30 +1172,17 @@ export default function JobsPage() {
                             </div>
 
                             <div>
-                              <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>
+                              <div className={jobStyles.filesPanelHeading}>
                                 Documents ({documentItems.length})
                               </div>
                               {documentItems.length === 0
-                                ? <div style={{ color: "#64748b" }}>No documents yet.</div>
+                                ? <div className={jobStyles.filesPanelMuted}>No documents yet.</div>
                                 : <div style={{ display: "grid", gap: 8 }}>
                                     {documentItems.map((file) => (
-                                      <div
-                                        key={file.id}
-                                        style={{
-                                          background: "#fff",
-                                          borderRadius: 10,
-                                          border: "1px solid #dbe2ea",
-                                          padding: 10,
-                                          display: "flex",
-                                          justifyContent: "space-between",
-                                          alignItems: "center",
-                                          gap: 10,
-                                          flexWrap: "wrap",
-                                        }}
-                                      >
+                                      <div key={file.id} className={jobStyles.fileDocRow}>
                                         <div style={{ display: "grid", gap: 3 }}>
-                                          <strong style={{ color: "#0f172a" }}>{file.name}</strong>
-                                          <span style={{ color: "#64748b", fontSize: 12 }}>
+                                          <strong className={jobStyles.fileDocName}>{file.name}</strong>
+                                          <span className={jobStyles.fileDocMeta}>
                                             {formatFileSize(file.size)}
                                           </span>
                                         </div>
@@ -1209,34 +1192,16 @@ export default function JobsPage() {
                                               href={file.signedUrl}
                                               target="_blank"
                                               rel="noreferrer"
-                                              style={{
-                                                borderRadius: 8,
-                                                border: "1px solid #cbd5e1",
-                                                background: "#fff",
-                                                color: "#0f172a",
-                                                fontSize: 12,
-                                                fontWeight: 700,
-                                                padding: "7px 10px",
-                                                textDecoration: "none",
-                                              }}
+                                              className={jobStyles.btnFileLink}
                                             >
                                               Download
                                             </a>
                                           )}
                                           <button
                                             type="button"
+                                            className={jobStyles.btnFileDanger}
                                             onClick={() => requestFileDelete(job._id, file)}
                                             disabled={filesState.deleting}
-                                            style={{
-                                              borderRadius: 8,
-                                              border: "1px solid #fecaca",
-                                              background: "#fff1f2",
-                                              color: "#b91c1c",
-                                              fontSize: 12,
-                                              fontWeight: 700,
-                                              padding: "7px 10px",
-                                              cursor: "pointer",
-                                            }}
                                           >
                                             Delete
                                           </button>
@@ -1250,21 +1215,11 @@ export default function JobsPage() {
                           {filesState.hasMore && (
                             <button
                               type="button"
+                              className={jobStyles.iconBtn}
                               onClick={() =>
                                 loadJobFiles(job._id, filesState.page + 1, true)
                               }
                               disabled={filesState.loading}
-                              style={{
-                                width: "fit-content",
-                                borderRadius: 8,
-                                border: "1px solid #cbd5e1",
-                                background: "#fff",
-                                color: "#0f172a",
-                                fontSize: 12,
-                                fontWeight: 700,
-                                padding: "8px 10px",
-                                cursor: "pointer",
-                              }}
                             >
                               {filesState.loading ? "Loading..." : "Load more"}
                             </button>

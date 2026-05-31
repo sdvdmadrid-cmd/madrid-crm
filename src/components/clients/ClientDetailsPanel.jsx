@@ -4,6 +4,11 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import panel from "./client-details-panel.module.css";
+import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import {
+  escapeHtml,
+  openPrintableHtmlDocument,
+} from "@/lib/print-html-document";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -128,6 +133,28 @@ export default function ClientDetailsPanel({
         .join(", ")
     : "";
 
+  const printClientRecord = () => {
+    if (!client) return;
+    const estimateCount = details?.estimates?.length ?? 0;
+    const invoiceCount = details?.invoices?.length ?? 0;
+    const jobCount = details?.jobs?.length ?? 0;
+    const bodyHtml = `
+      <h1>${escapeHtml(client.name || t("clients.details.loadingName"))}</h1>
+      <p class="meta">${escapeHtml(t("clients.details.title"))}</p>
+      <table><tbody>
+        <tr><th>${escapeHtml(t("clients.form.email", { defaultValue: "Email" }))}</th><td>${escapeHtml(client.email || "—")}</td></tr>
+        <tr><th>${escapeHtml(t("clients.form.phone", { defaultValue: "Phone" }))}</th><td>${escapeHtml(client.phone || "—")}</td></tr>
+        <tr><th>${escapeHtml(t("clients.form.address", { defaultValue: "Address" }))}</th><td>${escapeHtml(serviceAddress || "—")}</td></tr>
+        <tr><th>${escapeHtml(t("clients.details.estimates", { defaultValue: "Estimates" }))}</th><td>${estimateCount}</td></tr>
+        <tr><th>${escapeHtml(t("clients.details.invoices", { defaultValue: "Invoices" }))}</th><td>${invoiceCount}</td></tr>
+        <tr><th>${escapeHtml(t("clients.details.jobs", { defaultValue: "Jobs" }))}</th><td>${jobCount}</td></tr>
+      </tbody></table>`;
+    openPrintableHtmlDocument({
+      title: client.name || "Client",
+      bodyHtml,
+    });
+  };
+
   const dialog = (
     <div
       className={panel.overlay}
@@ -175,6 +202,22 @@ export default function ClientDetailsPanel({
                 <Link href={links.newInvoice} className={panel.btn}>
                   {t("clients.details.newInvoice")}
                 </Link>
+                {clientId ? (
+                  <DocumentPdfActions
+                    pdfUrl={`/api/clients/${clientId}/pdf`}
+                    printLabel={t("clients.details.printRecord", {
+                      defaultValue: "Print record",
+                    })}
+                    downloadLabel={t("clients.details.downloadPdf", {
+                      defaultValue: "Download PDF",
+                    })}
+                  />
+                ) : null}
+                <button type="button" className={panel.btn} onClick={printClientRecord}>
+                  {t("clients.details.printBrowser", {
+                    defaultValue: "Print (browser)",
+                  })}
+                </button>
                 <button
                   type="button"
                   className={panel.btn}

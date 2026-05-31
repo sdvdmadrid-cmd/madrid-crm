@@ -1,4 +1,5 @@
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
+import { pdfResponse } from "@/lib/document-pdf-core";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 import { serializeEstimateBase } from "@/lib/estimate-serializer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -62,16 +63,9 @@ export async function GET(request, { params }) {
 
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });
     const filename = pdfFilenameForEstimate(estimate);
+    const download = new URL(request.url).searchParams.get("download") === "1";
 
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${filename}"`,
-        "Content-Length": String(buffer.byteLength),
-        "Cache-Control": "private, no-store",
-      },
-    });
+    return pdfResponse(buffer, filename, { download });
   } catch (err) {
     console.error("[api/estimates/:id/pdf] error", err);
     return jsonResponse(

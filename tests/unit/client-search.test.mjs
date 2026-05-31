@@ -22,6 +22,14 @@ test("buildClientSearchOrFilter includes core fields and phone digits", () => {
   assert.match(filter, /phone\.ilike\.%3125551212%/);
 });
 
+test("rankClientSearchResults matches when query skips middle words", () => {
+  const ranked = rankClientSearchResults("UX Audit 999", [
+    { id: "1", name: "UX Audit Client 999", email: "x@test.com" },
+    { id: "2", name: "Other Person", email: "y@test.com" },
+  ]);
+  assert.equal(ranked[0]?.name, "UX Audit Client 999");
+});
+
 test("buildClientSearchOrFilter returns empty for blank query", () => {
   assert.equal(buildClientSearchOrFilter("   "), "");
 });

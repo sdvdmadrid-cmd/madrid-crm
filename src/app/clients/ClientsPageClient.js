@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { filterAndRankRecords } from "@/lib/record-search";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
@@ -32,6 +33,23 @@ export default function ClientsPageClient() {
   const [detailsError, setDetailsError] = useState("");
   const [clientDetails, setClientDetails] = useState(null);
   const [detailsWarnings, setDetailsWarnings] = useState([]);
+  const [listSearch, setListSearch] = useState("");
+
+  const displayedClients = useMemo(() => {
+    if (!listSearch.trim()) return clients;
+    return filterAndRankRecords(clients, listSearch, (client) => [
+      client.name,
+      client.company,
+      client.companyName,
+      client.email,
+      client.phone,
+      client.address,
+      client.city,
+      client.state,
+      client.zip,
+      client.notes,
+    ]);
+  }, [clients, listSearch]);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -293,6 +311,9 @@ export default function ClientsPageClient() {
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
       <section style={{ marginTop: 20, maxWidth: 720 }}>
+        <h2 style={{ margin: "0 0 10px", fontSize: "1rem", fontWeight: 700, color: "#e2e8f0" }}>
+          {t("clients.search.sectionTitle", { defaultValue: "Find a client" })}
+        </h2>
         <ClientSearchAutocomplete
           onSelect={openClientDetails}
           secondaryActionLabel={t("clients.search.newEstimate", {
@@ -315,9 +336,11 @@ export default function ClientsPageClient() {
 
         <ClientsList
           t={t}
-          clients={clients}
+          clients={displayedClients}
           loading={loading}
-          highlightedId={selectedId}
+          highlightedId={highlightedClientId || selectedId}
+          listSearch={listSearch}
+          onListSearchChange={setListSearch}
           onSelect={openClientDetails}
           onEdit={editClient}
           onDelete={deleteClient}

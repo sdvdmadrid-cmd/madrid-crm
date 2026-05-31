@@ -1,0 +1,123 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 8px 40px;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.listSearch {
+  flex: 1 1 220px;
+  max-width: 480px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.65);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.listSearch::placeholder {
+  color: #94a3b8;
+}
+
+.statusFilter {
+  min-width: 160px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.listGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.contractCard {
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 1rem;
+  background: rgba(28, 35, 50, 0.88);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.contractCardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.contractTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.contractMeta {
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.bodyDetails {
+  margin-top: 12px;
+}
+
+.bodySummary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #93c5fd;
+  list-style: none;
+}
+
+.bodySummary::-webkit-details-marker {
+  display: none;
+}
+
+.bodyPreview {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.shownCount {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #94a3b8;
+}

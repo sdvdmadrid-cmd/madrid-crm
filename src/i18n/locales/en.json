@@ -486,6 +486,7 @@
     "revenueOverview": "Revenue overview",
     "clients": "Clients",
     "estimates": "Estimates",
+    "contracts": "Contracts",
     "jobs": "Jobs",
     "invoices": "Invoices",
     "billPayments": "Bill Payments",
@@ -1156,6 +1157,38 @@
       "deleteFallback": "Error deleting job"
     }
   },
+  "contracts": {
+    "title": "Contracts",
+    "description": "Service agreements saved from approved estimates. Search, print, and download PDFs.",
+    "loading": "Loading contracts…",
+    "listTitle": "Contract library",
+    "listHint": "New contracts are created from an estimate in the pipeline — open Estimates, select a card, then Generate contract.",
+    "searchPlaceholder": "Search by client, job, category, or status…",
+    "searchLabel": "Search contracts",
+    "statusFilterLabel": "Filter by status",
+    "statusFilterAll": "All statuses",
+    "clearClientFilter": "Show all contracts",
+    "filteredByClient": "Showing contracts for the selected client only.",
+    "shownCount": "{{count}} shown",
+    "empty": "No contracts match your filters. Create one from an estimate.",
+    "untitled": "Untitled contract",
+    "noClient": "No client",
+    "printTitle": "Contract",
+    "actions": {
+      "fromEstimate": "Create from estimate",
+      "refresh": "Refresh list"
+    },
+    "previewToggle": "Preview agreement text",
+    "buttons": {
+      "print": "Print contract",
+      "downloadPdf": "Download PDF",
+      "printBrowser": "Print (browser)",
+      "openEstimates": "Estimates"
+    },
+    "errors": {
+      "load": "Unable to load contracts"
+    }
+  },
   "invoices": {
     "title": "Invoices",
     "description": "Create, edit, and manage invoices.",
@@ -1229,6 +1262,7 @@
       "save": "Save",
       "update": "Update",
       "clear": "Clear",
+      "printInvoice": "Print / Save PDF",
       "sendInvoiceEmail": "Send by email",
       "sendInvoiceText": "Send by text",
       "shareInvoice": "Share payment link",

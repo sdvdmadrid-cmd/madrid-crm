@@ -49,10 +49,18 @@ export default function PlacesAutocomplete({
   const inputRef = useRef(null);
   // Tracks the last fetched query so stale responses are dropped
   const lastQueryRef = useRef("");
+  // Only fetch Google suggestions after the contractor types — not when CRM pre-fills.
+  const userTypedRef = useRef(false);
 
   // ── Fetch suggestions (debounced) ────────────────────────────────────────
   useEffect(() => {
     clearTimeout(debounceRef.current);
+
+    if (!userTypedRef.current) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
 
     if (!value || value.length < 3) {
       setSuggestions([]);
@@ -228,7 +236,10 @@ export default function PlacesAutocomplete({
         placeholder={placeholder}
         value={value}
         disabled={disabled}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={(e) => {
+          userTypedRef.current = true;
+          onChange?.(e.target.value);
+        }}
         onKeyDown={handleKeyDown}
         onFocus={(e) => {
           e.currentTarget.removeAttribute("readonly");
