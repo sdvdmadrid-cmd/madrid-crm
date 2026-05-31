@@ -33,13 +33,21 @@
   "dashboardControl": {
     "operationsLabel": "Run · Get paid · Grow",
     "title": "Command Center",
-    "subtitle": "Everything in one place — clear, secure, and built to get you paid.",
-    "subtitleWithName": "Hi {{name}}. Your jobs, clients, and payments — without the busywork.",
+    "subtitle": "Quotes, field work, and payments — start with a client or a new estimate.",
+    "subtitleWithName": "Hi {{name}}. Quotes, field work, and payments — start with a client or a new estimate.",
+    "workflowGuide": "Clients · Estimates · Jobs · Invoices · Payments",
     "actions": {
       "collectPayment": "Collect payment",
       "newEstimate": "New Estimate",
       "newJob": "New Job",
-      "addClient": "Add Client"
+      "manualJob": "Manual job",
+      "manualJobHint": "For maintenance, warranty, emergency, or work without an estimate",
+      "createJobManually": "Create job manually",
+      "createJobManuallyHint": "For maintenance, warranty, emergency, or work without an estimate",
+      "moreActions": "More actions",
+      "moreActionsWithCount": "More actions ({{count}})",
+      "addClient": "Add Client",
+      "openLeadInbox": "Lead inbox ({{count}})"
     },
     "pillars": {
       "ariaLabel": "Run, get paid, and grow"
@@ -575,6 +583,11 @@
   "settingsHub": {
     "title": "Settings",
     "subtitle": "Manage your FieldBase account, billing, and how you get paid by clients.",
+    "companyBranding": {
+      "title": "Company & logo",
+      "desc": "Upload your logo and business details for estimates, invoices, and PDFs.",
+      "cta": "Edit company profile"
+    },
     "clientPayments": {
       "title": "Client payments",
       "desc": "Connect Stripe so customers can pay invoices online. Money goes to your business.",
@@ -594,6 +607,44 @@
       "title": "Website & branding",
       "desc": "Company profile, logo, and published site that feeds your lead inbox.",
       "cta": "Open website builder"
+    }
+  },
+  "companyBranding": {
+    "title": "Company & logo",
+    "subtitle": "One profile for estimate PDFs, your public website, and client emails.",
+    "backToSettings": "All settings",
+    "loading": "Loading company profile…",
+    "saved": "Company profile saved.",
+    "savedButton": "Saved ✓",
+    "sections": {
+      "contact": "Business details",
+      "contactHint": "Saved here automatically. Used on estimate PDFs, your website header/footer, and client emails."
+    },
+    "websiteSync": {
+      "title": "Public website",
+      "body": "Name, phone, address, and logo sync to your website preview and live site (after you publish in Website builder).",
+      "openBuilder": "Open website builder",
+      "viewLive": "View live site"
+    },
+    "labels": {
+      "displayName": "Name on documents",
+      "website": "Website (optional)",
+      "websiteHint": "Leave blank to use your FieldBase business site automatically."
+    },
+    "placeholders": {
+      "companyName": "Your company LLC",
+      "displayName": "How clients see your business",
+      "address": "Street, city, state ZIP"
+    },
+    "preview": {
+      "title": "Estimate PDF header preview",
+      "noLogo": "No logo",
+      "unnamed": "Your company",
+      "defaultSite": "https://fieldbaseapp.net"
+    },
+    "errors": {
+      "load": "Unable to load company profile",
+      "save": "Unable to save company profile"
     }
   },
   "settingsPayments": {
@@ -844,7 +895,12 @@
   },
   "clients": {
     "title": "Clients",
-    "description": "Manage clients, edit information, and delete records.",
+    "description": "Your customer directory — search, add clients, and open profiles to start estimates and jobs.",
+    "searchPlaceholder": "Search by name, company, phone, email, or address…",
+    "searchAria": "Search clients",
+    "searchEmpty": "No clients match your search.",
+    "resultsCount": "{{count}} clients",
+    "emptyHint": "Add your first client to start sending estimates.",
     "loading": "Loading clients...",
     "formTitleNew": "New client",
     "formTitleEdit": "Edit client",
@@ -895,6 +951,7 @@
       "total": "Total"
     },
     "buttons": {
+      "newClient": "New client",
       "saving": "Saving...",
       "save": "Save",
       "update": "Update",
@@ -931,6 +988,7 @@
       "quickActions": "Quick actions",
       "newEstimate": "New estimate",
       "newJob": "New job",
+      "manualJob": "Manual job",
       "newInvoice": "New invoice",
       "createEstimate": "Create estimate",
       "createQuote": "Create quote",
@@ -1089,9 +1147,32 @@
       }
     }
   },
+  "estimatesPage": {
+    "title": "Estimates",
+    "subtitle": "Create, send, and manage professional estimates for your clients. Track approvals, revisions, and project opportunities in one place."
+  },
+  "contractorWorkflow": {
+    "label": "Contractor workflow",
+    "steps": {
+      "lead": "Lead",
+      "client": "Client",
+      "estimate": "Estimate",
+      "sent": "Sent",
+      "approved": "Approved",
+      "job": "Job",
+      "schedule": "Schedule",
+      "complete": "Complete",
+      "invoice": "Invoice",
+      "paid": "Paid"
+    }
+  },
   "jobs": {
     "title": "Jobs",
     "description": "Create, edit, and delete service jobs.",
+    "workflowHint": "Most jobs start from an approved estimate (Convert to Job). Use manual job only when no estimate is needed.",
+    "openEstimates": "Estimates pipeline",
+    "manualJobSummary": "Manual job (no estimate)",
+    "manualJobHint": "For recurring maintenance, warranty callbacks, emergency service, or jobs that skip quoting.",
     "loading": "Loading jobs...",
     "formTitleNew": "New job",
     "formTitleEdit": "Edit job",

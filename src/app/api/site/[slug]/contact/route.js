@@ -17,6 +17,7 @@ import {
   buildFullAddress,
   isAllowedRequestService,
   normalizeLeadPayload,
+  resolveLeadServiceNeeded,
   resolveWebsiteRequestServices,
 } from "@/lib/website-lead-form";
 import { insertWebsiteLeadRow } from "@/lib/website-lead-persist";
@@ -231,7 +232,10 @@ export async function POST(request, { params }) {
     const cleanCity = payload.city;
     const cleanState = payload.state;
     const cleanZipCode = payload.zipCode;
-    const cleanServiceNeeded = payload.serviceNeeded;
+    const cleanServiceNeeded = resolveLeadServiceNeeded(
+      payload.serviceNeeded,
+      payload.serviceOther,
+    );
     const cleanDescription = payload.description;
     const cleanBudgetRange = payload.budgetRange;
     const cleanTimeline = payload.timeline;

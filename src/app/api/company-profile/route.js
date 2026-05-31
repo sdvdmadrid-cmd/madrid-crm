@@ -3,9 +3,13 @@ import {
   getCompanyProfileByTenant,
   upsertCompanyProfileForTenant,
 } from "@/lib/company-profile-store";
+import {
+  getTenantPublishedWebsiteUrl,
+  resolveDocumentWebsiteUrl,
+} from "@/lib/company-public-website-url";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
-  canManageSensitive,
+  canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -149,6 +153,71 @@ function normalizeInvoiceDueDays(value) {
   return Math.max(1, Math.min(120, parsed));
 }
 
+function fieldFromBody(body, key, existingValue, transform) {
+  if (Object.prototype.hasOwnProperty.call(body, key)) {
+    return transform(body[key]);
+  }
+  return existingValue;
+}
+
+function buildProfilePatch(body, existing = {}) {
+  const base = { ...DEFAULT_COMPANY_PROFILE, ...existing };
+  return {
+    companyName: fieldFromBody(body, "companyName", base.companyName, (v) =>
+      toLimitedText(v, 120),
+    ),
+    publicDisplayName: fieldFromBody(
+      body,
+      "publicDisplayName",
+      base.publicDisplayName || base.companyName,
+      (v) => toLimitedText(v || body.publicName, 120),
+    ),
+    businessType: fieldFromBody(body, "businessType", base.businessType, (v) =>
+      toLimitedText(v || body.industry, 80),
+    ),
+    logoDataUrl: fieldFromBody(body, "logoDataUrl", base.logoDataUrl, sanitizeLogo),
+    logoUrl: fieldFromBody(body, "logoUrl", base.logoUrl, sanitizeLogoUrl),
+    logoPlacement: fieldFromBody(body, "logoPlacement", base.logoPlacement, sanitizeLogoPlacement),
+    websiteUrl: fieldFromBody(body, "websiteUrl", base.websiteUrl, normalizeUrl),
+    googleReviewsUrl: fieldFromBody(
+      body,
+      "googleReviewsUrl",
+      base.googleReviewsUrl,
+      normalizeUrl,
+    ),
+    phone: fieldFromBody(body, "phone", base.phone, (v) => toLimitedText(v, 60)),
+    businessAddress: fieldFromBody(body, "businessAddress", base.businessAddress, (v) =>
+      toLimitedText(v, 280),
+    ),
+    poBoxAddress: fieldFromBody(body, "poBoxAddress", base.poBoxAddress, (v) =>
+      toLimitedText(v, 280),
+    ),
+    legalFooter: fieldFromBody(body, "legalFooter", base.legalFooter, (v) =>
+      toLimitedText(v, 500),
+    ),
+    documentLanguage: fieldFromBody(body, "documentLanguage", base.documentLanguage, normalizeLanguage),
+    forceEnglishTranslation: fieldFromBody(
+      body,
+      "forceEnglishTranslation",
+      base.forceEnglishTranslation,
+      toBoolean,
+    ),
+    defaultTaxState: fieldFromBody(body, "defaultTaxState", base.defaultTaxState, normalizeTaxState),
+    defaultInvoiceDueDays: fieldFromBody(
+      body,
+      "defaultInvoiceDueDays",
+      base.defaultInvoiceDueDays,
+      normalizeInvoiceDueDays,
+    ),
+    signatureRequiredAboveAmount: fieldFromBody(
+      body,
+      "signatureRequiredAboveAmount",
+      base.signatureRequiredAboveAmount,
+      normalizeSignatureThreshold,
+    ),
+  };
+}
+
 export async function GET(request) {
   try {
     const { tenantDbId, authenticated } =
@@ -157,14 +226,26 @@ export async function GET(request) {
       return unauthenticatedResponse();
     }
 
-    const data = await getCompanyProfileByTenant({ tenantId: tenantDbId });
+    const [data, publishedSiteUrl] = await Promise.all([
+      getCompanyProfileByTenant({ tenantId: tenantDbId }),
+      getTenantPublishedWebsiteUrl(tenantDbId),
+    ]);
+
+    const profile = data
+      ? data
+      : { ...DEFAULT_COMPANY_PROFILE, tenantId: tenantDbId };
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: data
-          ? data
-          : { ...DEFAULT_COMPANY_PROFILE, tenantId: tenantDbId },
+        data: {
+          ...profile,
+          publishedSiteUrl,
+          documentWebsiteUrl: resolveDocumentWebsiteUrl({
+            profileWebsiteUrl: profile.websiteUrl,
+            publishedSiteUrl,
+          }),
+        },
       }),
       {
         status: 200,
@@ -193,41 +274,17 @@ export async function PATCH(request) {
       return unauthenticatedResponse();
     }
 
-    if (!canManageSensitive(role)) {
+    if (!canWrite(role)) {
       return forbiddenResponse();
     }
 
     const body = await request.json();
-    const now = new Date();
-
-    const update = {
-      companyName: toLimitedText(body.companyName, 120),
-      publicDisplayName: toLimitedText(
-        body.publicDisplayName || body.publicName,
-        120,
-      ),
-      businessType: toLimitedText(body.businessType || body.industry, 80),
-      logoDataUrl: sanitizeLogo(body.logoDataUrl),
-      logoUrl: sanitizeLogoUrl(body.logoUrl),
-      logoPlacement: sanitizeLogoPlacement(body.logoPlacement),
-      websiteUrl: normalizeUrl(body.websiteUrl),
-      googleReviewsUrl: normalizeUrl(body.googleReviewsUrl),
-      phone: toLimitedText(body.phone, 60),
-      businessAddress: toLimitedText(body.businessAddress, 280),
-      poBoxAddress: toLimitedText(body.poBoxAddress, 280),
-      legalFooter: toLimitedText(body.legalFooter, 500),
-      documentLanguage: normalizeLanguage(body.documentLanguage),
-      forceEnglishTranslation: toBoolean(body.forceEnglishTranslation),
-      defaultTaxState: normalizeTaxState(body.defaultTaxState),
-      defaultInvoiceDueDays: normalizeInvoiceDueDays(
-        body.defaultInvoiceDueDays,
-      ),
-      signatureRequiredAboveAmount: normalizeSignatureThreshold(
-        body.signatureRequiredAboveAmount,
-      ),
-      updatedAt: now,
-      updatedBy: userId,
-    };
+    const existing =
+      (await getCompanyProfileByTenant({ tenantId: tenantDbId })) || {
+        ...DEFAULT_COMPANY_PROFILE,
+        tenantId: tenantDbId,
+      };
+    const update = buildProfilePatch(body, existing);
 
     const saved = await upsertCompanyProfileForTenant({
       tenantId: tenantDbId,
@@ -235,7 +292,20 @@ export async function PATCH(request) {
       userId,
     });
 
-    return new Response(JSON.stringify({ success: true, data: saved }), {
+    const publishedSiteUrl = await getTenantPublishedWebsiteUrl(tenantDbId);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          ...saved,
+          publishedSiteUrl,
+          documentWebsiteUrl: resolveDocumentWebsiteUrl({
+            profileWebsiteUrl: saved.websiteUrl,
+            publishedSiteUrl,
+          }),
+        },
+      }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

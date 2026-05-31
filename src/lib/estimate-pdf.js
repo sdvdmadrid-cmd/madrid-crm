@@ -319,10 +319,14 @@ function renderEstimateFooter(doc, branding, pageWidth) {
   const companyName = String(branding.companyName || "").trim();
   const footerY = doc.page.height - doc.page.margins.bottom - 20;
   doc.font("Helvetica").fontSize(8).fillColor(SLATE_400);
+  const website = branding.websiteUrl
+    ? String(branding.websiteUrl).replace(/^https?:\/\//i, "")
+    : "";
   const parts = [
     companyName || null,
     branding.phone || null,
     branding.email || null,
+    website || null,
   ].filter(Boolean);
   doc.text(parts.join("  ·  "), doc.page.margins.left, footerY, {
     width: pageWidth,

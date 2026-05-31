@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { filterAndRankRecords } from "@/lib/record-search";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import "@/i18n";
 import {
   escapeHtml,
   openPrintableHtmlDocument,
@@ -68,6 +70,7 @@ function formatDateTime(value) {
 }
 
 export default function EstimatesPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterClientId = String(searchParams.get("clientId") || "").trim();
@@ -82,6 +85,7 @@ export default function EstimatesPage() {
   const [selectedEstimate, setSelectedEstimate] = useState(null);
   const [sendingEmailId, setSendingEmailId] = useState("");
   const [duplicatingId, setDuplicatingId] = useState("");
+  const [convertingId, setConvertingId] = useState("");
 
   // Contract generation modal state. Surfaces a small inline form so the
   // contractor can pick a category before we POST to the contract endpoint.
@@ -310,6 +314,34 @@ export default function EstimatesPage() {
     setPendingStatusAction(null);
   }
 
+  async function convertEstimateToJob(estimate) {
+    if (!estimate?.id) return;
+    setConvertingId(estimate.id);
+    setStatusMessage("");
+    try {
+      const response = await apiFetch(
+        `/api/estimates/${estimate.id}/convert-to-job`,
+        { method: "POST" },
+      );
+      const payload = await getJsonOrThrow(
+        response,
+        "Unable to convert estimate to a job.",
+      );
+      const jobId = payload?.data?.jobId;
+      await loadEstimates();
+      setSelectedEstimate(null);
+      if (jobId) {
+        router.push(`/jobs?jobId=${encodeURIComponent(jobId)}`);
+      } else {
+        setStatusMessage("Job created. Open Jobs to schedule and complete the work.");
+      }
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to convert estimate to a job.");
+    } finally {
+      setConvertingId("");
+    }
+  }
+
   async function duplicateEstimate(estimate) {
     if (!estimate?.id) return;
     setDuplicatingId(estimate.id);
@@ -380,8 +412,8 @@ export default function EstimatesPage() {
     <div className={`${ws.page} ${ws.pageFullBleed}`}>
       <div className={ws.topBar}>
         <div>
-          <h1 className={ws.title}>Estimates</h1>
-          <p className={ws.subtitle}>Kanban pipeline — click a card for details and actions</p>
+          <h1 className={ws.title}>{t("estimatesPage.title")}</h1>
+          <p className={ws.subtitle}>{t("estimatesPage.subtitle")}</p>
         </div>
         <div className={ws.actions}>
           <button type="button" onClick={loadEstimates} className={ws.btnSecondary}>
@@ -722,6 +754,17 @@ export default function EstimatesPage() {
 
               <div className={est.detailFooter}>
                 {statusMessage ? <div className={ws.noticeInfo} style={{ marginBottom: 10 }}>{statusMessage}</div> : null}
+                {selectedEstimate.status === "approved" && selectedEstimate.jobId ? (
+                  <div className={est.linkedJobRow}>
+                    Linked to job.{" "}
+                    <Link
+                      href={`/jobs?jobId=${encodeURIComponent(selectedEstimate.jobId)}`}
+                      style={{ color: "#6ee7b7", fontWeight: 600 }}
+                    >
+                      Open job →
+                    </Link>
+                  </div>
+                ) : null}
                 {pendingStatusAction && pendingStatusAction.estimateId === selectedEstimate.id ? (
                   <div className={est.detailBox}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>
@@ -732,7 +775,6 @@ export default function EstimatesPage() {
                         type="button"
                         onClick={async () => {
                           await confirmPendingStatusAction();
-                          setSelectedEstimate(null);
                         }}
                         className={ws.btnPrimary}
                         style={{ flex: 1 }}
@@ -751,6 +793,19 @@ export default function EstimatesPage() {
                   </div>
                 ) : (
                   <>
+                    {selectedEstimate.status === "approved" && !selectedEstimate.jobId ? (
+                      <button
+                        type="button"
+                        onClick={() => convertEstimateToJob(selectedEstimate)}
+                        disabled={convertingId === selectedEstimate.id}
+                        className={`${ws.btnPrimary} ${est.convertJobBtn}`}
+                        data-testid="convert-estimate-to-job"
+                      >
+                        {convertingId === selectedEstimate.id
+                          ? "Creating job…"
+                          : "Convert to Job"}
+                      </button>
+                    ) : null}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <button
                         type="button"

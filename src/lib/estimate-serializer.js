@@ -90,6 +90,8 @@ export function serializeEstimateBase(row) {
     serviceTitle: parsedNotes.serviceTitle || "",
     audit: parsedNotes.audit,
     estimateNumber: row?.estimate_number || "",
+    jobId: row?.job_id || null,
+    clientId: row?.client_id || null,
     createdAt: row?.created_at || null,
     updatedAt: row?.updated_at || null,
   };

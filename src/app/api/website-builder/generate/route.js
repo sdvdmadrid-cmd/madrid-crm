@@ -59,11 +59,8 @@ Up to 6 services. Only ${pack.label} services.
   if (section === "trust") {
     return `
 Industry: ${pack.label}
-Return JSON: {
-  "testimonials": [{ "quote": "", "name": "First L.", "role": "" }],
-  "trustBadges": [""]
-}
-2 testimonials, 4 badges. ${pack.label} customers only.
+Return JSON: { "trustBadges": [""] }
+Up to 4 trust badges only. Do NOT generate customer reviews, testimonials, names, or ratings.
 `.trim();
   }
 
@@ -87,10 +84,9 @@ Generate website content. JSON only:
   "aboutText": "max 90 words",
   "ctaText": "max 5 words",
   "services": [{ "name": "", "description": "", "price": "" }],
-  "testimonials": [{ "quote": "", "name": "", "role": "" }],
   "trustBadges": [""]
 }
-Up to 6 services, 2 testimonials, 4 badges.
+Up to 6 services and 4 trust badges. Do NOT generate testimonials or fictional customer names.
 First person plural (We/Our). ${pack.label} ONLY — never landscaping for cleaning, never cleaning for roofing, etc.
 `.trim();
 }
@@ -213,7 +209,7 @@ export async function POST(request) {
         aboutText: parsed.aboutText || defaults.aboutText,
         ctaText: parsed.ctaText || defaults.ctaText,
         services: defaults.services,
-        testimonials: defaults.testimonials,
+        testimonials: [],
         trustBadges: defaults.trustBadges,
       },
       pack,
@@ -246,7 +242,7 @@ export async function POST(request) {
   if (section === "trust") {
     content = sanitizeIndustryWebsiteContent(
       {
-        testimonials: parsed.testimonials,
+        testimonials: [],
         trustBadges: parsed.trustBadges,
         headline: defaults.headline,
         subheadline: defaults.subheadline,
@@ -257,7 +253,7 @@ export async function POST(request) {
     return Response.json({
       success: true,
       data: {
-        testimonials: content.testimonials,
+        testimonials: [],
         trustBadges: content.trustBadges,
       },
     });
@@ -269,6 +265,7 @@ export async function POST(request) {
     success: true,
     data: {
       ...content,
+      testimonials: [],
       themeColor: pack.defaultThemeColor,
     },
   });

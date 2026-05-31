@@ -43,7 +43,12 @@ import WebsiteBuilderPortfolio from "./WebsiteBuilderPortfolio";
 import WebsiteMobileUploads from "./WebsiteMobileUploads";
 import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
 import HeroImageEditor from "./HeroImageEditor";
-import WebsiteBuilderLaunch from "./WebsiteBuilderLaunch";
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
+import {
+  getCompanyDisplayName,
+  shouldLockWebsiteIndustry,
+} from "@/lib/website-builder-company";
+import { purifyWebsiteForm, sanitizeWebsiteTestimonials } from "@/lib/website-content-purity";
 import WebsiteBuilderFloatingBar from "./WebsiteBuilderFloatingBar";
 import WebsiteBuilderPreview, { SECTION_REGEN_MAP } from "./WebsiteBuilderPreview";
 import { WEBSITE_BUILDER_UI } from "./website-builder-ui";
@@ -73,7 +78,7 @@ const SECTION_FILTERS = {
   content: ["hero", "brand", "services"],
   images: ["heroImages", "gallery"],
   trust: ["trust"],
-  advanced: ["social", "analytics", "domain"],
+  advanced: ["social", "analytics", "domain", "seo"],
 };
 
 const AUTOSAVE_MS = 2200;
@@ -136,6 +141,8 @@ export default function WebsiteBuilderClient() {
   const saveQueueRef = useRef(null);
   if (!saveQueueRef.current) saveQueueRef.current = createSaveQueue();
   const generationAbortRef = useRef(null);
+  const galleryUploadInputRef = useRef(null);
+  const galleryPanelRef = useRef(null);
   const generatingLockRef = useRef(false);
   const imageEnhanceAbortRef = useRef(null);
   const [imageEnhancing, setImageEnhancing] = useState(false);
@@ -156,6 +163,7 @@ export default function WebsiteBuilderClient() {
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
   const [lastPublishedAt, setLastPublishedAt] = useState(null);
   const [companyProfile, setCompanyProfile] = useState(null);
+  const [companyLocked, setCompanyLocked] = useState(false);
   const [industryKey, setIndustryKey] = useState("general");
   const [profileIndustry, setProfileIndustry] = useState("general");
   const [industryKeyOverride, setIndustryKeyOverride] = useState(null);
@@ -220,6 +228,9 @@ export default function WebsiteBuilderClient() {
       setLastPublishedAt(meta.lastPublishedAt || null);
     }
     setCompanyProfile(data.companyProfile || null);
+    setCompanyLocked(
+      data.companyLocked === true || shouldLockWebsiteIndustry(data.companyProfile),
+    );
     setIndustryKey(data.industry || "general");
     setProfileIndustry(data.profileIndustry || data.industry || "general");
     setIndustryKeyOverride(data.industryKeyOverride || null);
@@ -234,7 +245,8 @@ export default function WebsiteBuilderClient() {
       Array.isArray(data.requestServices) ? data.requestServices : [],
     );
     setCtaOptions(Array.isArray(data.ctaOptions) ? data.ctaOptions : []);
-    setForm({
+    const sm = data.siteMeta || {};
+    const rawForm = {
       headline: data.headline || "",
       subheadline: data.subheadline || "",
       aboutText: data.aboutText || "",
@@ -243,7 +255,7 @@ export default function WebsiteBuilderClient() {
       galleryPhotos: normalizeGalleryPhotos(data.galleryPhotos),
       heroPhotos: Array.isArray(data.heroPhotos) ? data.heroPhotos : [],
       services: Array.isArray(data.services) ? data.services : [],
-      testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
+      testimonials: sanitizeWebsiteTestimonials(data.testimonials),
       trustBadges: Array.isArray(data.trustBadges) ? data.trustBadges : [],
       socialLinks: data.socialLinks || {
         facebook: "",
@@ -259,9 +271,13 @@ export default function WebsiteBuilderClient() {
         metaPixelId: "",
         gtmContainerId: "",
       },
-    });
+    };
+    const purified = purifyWebsiteForm(
+      rawForm,
+      data.companyProfile,
+      data.industry || "general",
+    );
     setIndustryMismatch(data.industryMismatch === true);
-    const sm = data.siteMeta || {};
     setSiteMeta({
       seoTitle: sm.seoTitle || "",
       seoDescription: sm.seoDescription || "",
@@ -271,26 +287,28 @@ export default function WebsiteBuilderClient() {
     });
     const completeness = analyzeWebsiteCompleteness(
       {
-        headline: data.headline || "",
-        subheadline: data.subheadline || "",
-        aboutText: data.aboutText || "",
-        ctaText: data.ctaText || "",
-        services: Array.isArray(data.services) ? data.services : [],
-        heroPhotos: Array.isArray(data.heroPhotos) ? data.heroPhotos : [],
-        galleryPhotos: normalizeGalleryPhotos(data.galleryPhotos),
-        testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
-        trustBadges: Array.isArray(data.trustBadges) ? data.trustBadges : [],
+        headline: purified.headline,
+        subheadline: purified.subheadline,
+        aboutText: purified.aboutText,
+        ctaText: purified.ctaText,
+        services: purified.services,
+        heroPhotos: purified.heroPhotos,
+        galleryPhotos: purified.galleryPhotos,
+        testimonials: purified.testimonials,
+        trustBadges: purified.trustBadges,
       },
       sm,
     );
     setCompletenessScore(completeness.score);
     const hasContent =
       completeness.score >= 40 ||
-      Boolean(String(data.headline || "").trim()) ||
-      (Array.isArray(data.services) && data.services.length > 0);
+      Boolean(String(purified.headline || "").trim()) ||
+      (Array.isArray(purified.services) && purified.services.length > 0);
     setEditorMode(hasContent ? "edit" : "launch");
     setBuilderStep(hasContent ? 3 : 1);
     skipAutosave.current = true;
+    formRef.current = purified;
+    setForm(purified);
   }, []);
 
   useEffect(() => {
@@ -298,8 +316,15 @@ export default function WebsiteBuilderClient() {
   }, [form]);
 
   const liveRequestServices = useMemo(
-    () => resolveWebsiteRequestServices({ services: form.services, requestServices }),
-    [form.services, requestServices],
+    () =>
+      resolveWebsiteRequestServices({
+        services: form.services,
+        requestServices,
+        industryKey,
+        industry: industryKey,
+        businessType: companyProfile?.business_type || companyProfile?.businessType || "",
+      }),
+    [form.services, requestServices, industryKey, companyProfile],
   );
 
   const previewForm = useMemo(() => {
@@ -367,13 +392,20 @@ export default function WebsiteBuilderClient() {
       return saveQueueRef.current.run(async (saveId) => {
         setSaving(true);
         if (!silent) setError("");
-        const clientSnapshot = {
-          ...(formRef.current || form),
-          ...data,
-          galleryPhotos: normalizeGalleryPhotos(
-            data.galleryPhotos ?? formRef.current?.galleryPhotos,
-          ),
-        };
+        const clientSnapshot = purifyWebsiteForm(
+          {
+            ...(formRef.current || form),
+            ...data,
+            testimonials: sanitizeWebsiteTestimonials(
+              data.testimonials ?? formRef.current?.testimonials,
+            ),
+            galleryPhotos: normalizeGalleryPhotos(
+              data.galleryPhotos ?? formRef.current?.galleryPhotos,
+            ),
+          },
+          companyProfile || {},
+          industryKey,
+        );
         try {
           const pack = getWebsiteBuilderPack(industryKey);
           const meta = data.siteMeta ?? siteMeta;
@@ -388,6 +420,7 @@ export default function WebsiteBuilderClient() {
             body: JSON.stringify({
               ...clientSnapshot,
               ...sanitized,
+              testimonials: [],
               heroPhotos: clientSnapshot.heroPhotos,
               galleryPhotos: clientSnapshot.galleryPhotos,
               siteMeta: meta,
@@ -456,6 +489,27 @@ export default function WebsiteBuilderClient() {
     [t, showNotice, applyApiPayload, industryKey, companyProfile, siteMeta, slug],
   );
 
+  const handlePreviewSectionSelect = useCallback((sectionId) => {
+    setSelectedPreviewSection(sectionId);
+    if (sectionId === "gallery") {
+      setShowAdvancedPanel(true);
+      setActiveSection("images");
+      setOpenSections((prev) => ({ ...prev, gallery: true }));
+      window.setTimeout(() => {
+        galleryPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 120);
+    }
+  }, []);
+
+  const triggerGalleryUpload = useCallback(() => {
+    setShowAdvancedPanel(true);
+    setActiveSection("images");
+    setOpenSections((prev) => ({ ...prev, gallery: true }));
+    window.setTimeout(() => {
+      galleryUploadInputRef.current?.click();
+    }, 80);
+  }, []);
+
   const sectionVisible = useCallback(
     (sectionKey) => {
       const allowed = SECTION_FILTERS[activeSection];
@@ -497,7 +551,7 @@ export default function WebsiteBuilderClient() {
         existingServices.length > 0
           ? existingServices.map((s) => ({ ...s }))
           : defaults.services.map((s) => ({ ...s })),
-      testimonials: defaults.testimonials.map((x) => ({ ...x })),
+      testimonials: [],
       trustBadges: [...defaults.trustBadges],
       heroPhotos: defaults.heroPhotos.map((h) => ({ ...h })),
       galleryPhotos: formRef.current?.galleryPhotos || [],
@@ -587,7 +641,6 @@ export default function WebsiteBuilderClient() {
           ...(d.ctaText ? { ctaText: d.ctaText } : {}),
           ...(d.themeColor ? { themeColor: d.themeColor } : {}),
           ...(d.services?.length ? { services: d.services } : {}),
-          ...(d.testimonials?.length ? { testimonials: d.testimonials } : {}),
           ...(d.trustBadges?.length ? { trustBadges: d.trustBadges } : {}),
         }));
         setIndustryMismatch(false);
@@ -624,7 +677,7 @@ export default function WebsiteBuilderClient() {
         ctaText: d.ctaText || prev.ctaText,
         themeColor: d.themeColor || prev.themeColor,
         services: d.services?.length ? d.services : prev.services,
-        testimonials: d.testimonials?.length ? d.testimonials : prev.testimonials,
+        testimonials: sanitizeWebsiteTestimonials(d.testimonials),
         trustBadges: d.trustBadges?.length ? d.trustBadges : prev.trustBadges,
       }));
       setIndustryMismatch(false);
@@ -809,11 +862,35 @@ export default function WebsiteBuilderClient() {
       }),
       applyPatches: (patches) => {
         if (!patches || typeof patches !== "object") return;
+        const {
+          siteMeta: siteMetaPatch,
+          removeServicePricing,
+          services: servicesPatch,
+          ...formPatch
+        } = patches;
+
         setForm((prev) => {
-          const next = { ...prev, ...patches };
+          let next = { ...prev, ...formPatch };
+          if (Array.isArray(servicesPatch)) {
+            next.services = servicesPatch;
+          }
+          if (removeServicePricing) {
+            next.services = (next.services || []).map((s) => ({
+              name: String(s?.name || "").trim(),
+              description: String(s?.description || "").trim(),
+            }));
+          }
           formRef.current = next;
           return next;
         });
+
+        if (siteMetaPatch && typeof siteMetaPatch === "object") {
+          setSiteMeta((prev) => {
+            const merged = { ...prev, ...siteMetaPatch };
+            return merged;
+          });
+        }
+
         showNotice(t.aiPatchesApplied);
       },
       runGenerateFull: () => handleGenerateFullSite(),
@@ -1206,13 +1283,16 @@ export default function WebsiteBuilderClient() {
             ? t.stepPreviewSub
             : t.stepPublishSub;
 
-  const logoUrl =
-    companyProfile?.logoUrl || companyProfile?.logoDataUrl || "";
+  const logoUrl = resolveCompanyLogoUrl(companyProfile);
+  const companyName = getCompanyDisplayName(companyProfile);
+  const companyLockedEffective =
+    companyLocked || shouldLockWebsiteIndustry(companyProfile);
 
   return (
     <WebsiteBuilderEditProvider editingRef={isEditingRef}>
     <div className={styles.shell} style={{ "--wb-theme": theme }} data-testid="website-builder-shell">
-      <div style={{ padding: "0 16px 12px", maxWidth: 1200, margin: "0 auto" }}>
+      <div className={styles.shellChrome}>
+      <div className={styles.shellBannerWrap}>
         <PlatformZoneBanner zone="private" />
       </div>
       <div className={`${styles.topBar} ${styles.topBarCompact}`}>
@@ -1224,7 +1304,23 @@ export default function WebsiteBuilderClient() {
             {" / "}
             {t.title}
           </div>
-          <h1>{t.title}</h1>
+          {companyName ? (
+            <div className={styles.workspaceBrandRow}>
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className={styles.workspaceBrandLogo} />
+              ) : (
+                <div className={styles.workspaceBrandLogoFallback}>
+                  {companyName.charAt(0)}
+                </div>
+              )}
+              <div>
+                <p className={styles.workspaceBrandEyebrow}>{t.editingCompanyWebsite}</p>
+                <h1 className={styles.workspaceBrandTitle}>{companyName}</h1>
+              </div>
+            </div>
+          ) : (
+            <h1>{t.title}</h1>
+          )}
           <p style={{ margin: "6px 0 0", fontSize: "0.82rem", color: "#94a3b8", maxWidth: 520 }}>
             {stepSubtitle}
           </p>
@@ -1298,16 +1394,6 @@ export default function WebsiteBuilderClient() {
               {t.viewLeads}
             </Link>
           ) : null}
-          {builderStep === 2 && featureAiDescription ? (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnAi}`}
-              disabled={generating}
-              onClick={handleGenerateFullSite}
-            >
-              {generating ? genProgress || t.generatingFull : t.generateFull}
-            </button>
-          ) : null}
           {builderStep === 5 ? (
             <button
               type="button"
@@ -1332,27 +1418,10 @@ export default function WebsiteBuilderClient() {
       </div>
 
       <BuilderWorkflowStepper activeStep={builderStep} onStepClick={handleWorkflowStep} />
-
-      {builderStep === 3 ? (
-        <div className={styles.industryBannerCompact}>
-          <span>
-            {industryIcon} {industryLabel}
-            {industryKeyOverride ? ` · ${t.industryOverrideOn}` : ` · ${t.industryFromProfile}`}
-            {completenessScore > 0 ? ` · ${completenessScore}%` : ""}
-          </span>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnGhost}`}
-            onClick={handleApplyIndustryPreset}
-            disabled={saving}
-          >
-            {t.applyPreset}
-          </button>
-        </div>
-      ) : null}
+      </div>
 
       <div className={styles.workspaceVisual}>
-        <div className={styles.visualStage}>
+        <div className={styles.visualStage} aria-label="Website preview">
           {(notice || error || autoSaved) && (
             <div className={styles.visualToast}>
               {notice ? <div className={styles.notice}>{notice}</div> : null}
@@ -1393,17 +1462,20 @@ export default function WebsiteBuilderClient() {
                 form={previewForm}
                 companyProfile={companyProfile}
                 industryLabel={industryLabel}
+                industryKey={industryKey}
                 requestServices={liveRequestServices}
                 slug={slug}
                 locale={siteLocale}
                 onQuoteClick={handleOpenQuoteForm}
                 editable={builderStep === 3}
                 selectedSection={selectedPreviewSection}
-                onSelectSection={setSelectedPreviewSection}
+                onSelectSection={handlePreviewSectionSelect}
+                onGalleryUploadClick={triggerGalleryUpload}
                 onFieldChange={handlePreviewFieldChange}
                 onServiceChange={handleServiceFieldChange}
-                onGenerateHeroSlot={handleGenerateHeroSlot}
-                generatingSlotId={generatingSlotId}
+                reviewsEmptyTitle={t.reviewsEmptyTitle}
+                reviewsEmptyBody={t.reviewsEmptyBody}
+                portfolio={siteMeta.portfolio}
               />
             </div>
           </div>
@@ -1421,92 +1493,50 @@ export default function WebsiteBuilderClient() {
             themeColor={form.themeColor}
             onThemeChange={(c) => setField("themeColor", c)}
           />
-          {builderStep === 2 ? (
-            <div className={styles.generateDock}>
-              <WebsiteBuilderLaunch
-                t={t}
-                companyProfile={companyProfile}
-                industryLabel={industryLabel}
-                industryIcon={industryIcon}
-                industryPackOptions={industryPackOptions}
-                industryKeyOverride={industryKeyOverride}
-                onIndustryChange={handleIndustryOverrideChange}
-                onGenerate={handleGenerateFullSite}
-                onCancel={handleCancelGeneration}
-                generating={generating}
-                genProgress={genProgress}
-                completenessScore={completenessScore}
-              />
-            </div>
-          ) : null}
         </div>
 
         {showAdvancedPanel && builderStep !== 4 ? (
           <aside className={styles.advancedDrawer}>
-              {builderStep === 1 ? (
+            {builderStep === 1 ? (
+              <div className={styles.editorPanelBody}>
                 <WebsiteBuilderSetupPanel
                   t={t}
                   companyProfile={companyProfile}
                   serviceCount={(form.services || []).length}
                   galleryCount={(form.galleryPhotos || []).length}
                   logoUrl={logoUrl}
-                  onContinue={() => handleWorkflowStep(2)}
+                  onContinue={() => handleWorkflowStep(3)}
                   onCompanyProfileChange={(nextProfile) =>
                     setCompanyProfile(nextProfile)
                   }
                 />
-              ) : null}
-              {builderStep !== 1 ? (
+              </div>
+            ) : (
               <>
-              <div className={styles.sectionNav}>
-                {[
-                  ["all", t.sectionNavAll],
-                  ["content", t.sectionNavContent],
-                  ["images", t.sectionNavImages],
-                  ["trust", t.sectionNavTrust],
-                  ["advanced", t.sectionNavAdvanced],
-                ].map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`${styles.sectionNavBtn} ${
-                      activeSection === key ? styles.sectionNavBtnActive : ""
-                    }`}
-                    onClick={() => setActiveSection(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-          {industryMismatch ? (
-            <div className={styles.mismatchBanner}>
-              {t.industryMismatch}
-              <div>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnAi}`}
-                  disabled={generating}
-                  onClick={siteHasDraft ? handleRegenerateWithConfirm : handleGenerateFullSite}
-                >
-                  {generating
-                    ? t.generatingFull
-                    : siteHasDraft
-                      ? t.regenerateCopy
-                      : t.generateFull}
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnGhost}`}
-                  style={{ marginLeft: 8 }}
-                  onClick={handleApplyIndustryPreset}
-                >
-                  {t.fixMismatch}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
+                <div className={styles.editorPanelHeader}>
+                  <p className={styles.editorPanelTitle}>{t.editLabel}</p>
+                  <div className={styles.sectionNav}>
+                    {[
+                      ["all", t.sectionNavAll],
+                      ["content", t.sectionNavContent],
+                      ["images", t.sectionNavImages],
+                      ["trust", t.sectionNavTrust],
+                      ["advanced", t.sectionNavAdvanced],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`${styles.sectionNavBtn} ${
+                          activeSection === key ? styles.sectionNavBtnActive : ""
+                        }`}
+                        onClick={() => setActiveSection(key)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.editorPanelBody}>
           {slug ? (
             <div className={styles.slugRow}>
               <div>
@@ -1554,54 +1584,32 @@ export default function WebsiteBuilderClient() {
             <div className={styles.hintBox}>{t.draftPrivateHint}</div>
           ) : null}
 
-          {editorMode === "edit" && featureAiDescription && activeSection !== "advanced" ? (
-            <div className={styles.aiCard}>
-              <div className={styles.aiCardTitle}>✨ {t.launchEyebrow}</div>
-              <div className={styles.aiCardHint}>{t.generateHint}</div>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnAi}`}
-                disabled={generating}
-                onClick={siteHasDraft ? handleRegenerateWithConfirm : handleGenerateFullSite}
-              >
-                {generating
-                  ? genProgress || t.generatingFull
-                  : siteHasDraft
-                    ? t.regenerateCopy
-                    : t.generateFull}
-              </button>
-            </div>
-          ) : null}
-
           {sectionVisible("heroImages") ? (
           <CollapsibleSection
             title={t.sectionHeroImages}
             open={openSections.heroImages}
             onToggle={() => toggleSection("heroImages")}
           >
-            {featureAiDescription ? (
-              <HeroImageEditor
-                slots={form.heroPhotos || []}
-                imagePresets={imagePresets}
-                imageStyle={imageStyle}
-                onImageStyleChange={setImageStyle}
-                onSlotsChange={(heroPhotos) => setField("heroPhotos", heroPhotos)}
-                onGenerateSlot={handleGenerateHeroSlot}
-                generatingSlotId={generatingSlotId}
-                labels={{
-                  imageStyleLabel: t.imageStyleLabel,
-                  dropHint: t.dropHint,
-                  promptPlaceholder: t.promptPlaceholder,
-                  regenerate: t.regenerate,
-                  upload: t.upload,
-                  remove: t.remove,
-                  usePreset: t.usePreset,
-                  generating: t.generatingImage,
-                }}
-              />
-            ) : (
-              <p className={styles.hintBox}>{t.galleryHint}</p>
-            )}
+            <HeroImageEditor
+              slots={form.heroPhotos || []}
+              imagePresets={imagePresets}
+              imageStyle={imageStyle}
+              onImageStyleChange={setImageStyle}
+              onSlotsChange={(heroPhotos) => setField("heroPhotos", heroPhotos)}
+              onGenerateSlot={handleGenerateHeroSlot}
+              generatingSlotId={generatingSlotId}
+              showGenerateActions={false}
+              labels={{
+                imageStyleLabel: t.imageStyleLabel,
+                dropHint: t.dropHint,
+                promptPlaceholder: t.promptPlaceholder,
+                regenerate: t.regenerate,
+                upload: t.upload,
+                remove: t.remove,
+                usePreset: t.usePreset,
+                generating: t.generatingImage,
+              }}
+            />
           </CollapsibleSection>
           ) : null}
 
@@ -1611,16 +1619,6 @@ export default function WebsiteBuilderClient() {
             open={openSections.hero}
             onToggle={() => toggleSection("hero")}
           >
-            <div className={styles.aiRow} style={{ marginBottom: 12 }}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnAi}`}
-                disabled={regeneratingSection === "hero"}
-                onClick={() => handleGenerateSection("hero")}
-              >
-                {regeneratingSection === "hero" ? t.generating : t.regenerateHero}
-              </button>
-            </div>
             <div className={styles.field}>
               <label className={styles.label}>{t.sectionHeadline}</label>
               <input
@@ -1632,8 +1630,9 @@ export default function WebsiteBuilderClient() {
             </div>
             <div className={styles.field}>
               <label className={styles.label}>{t.sectionSub}</label>
-              <input
-                className={styles.input}
+              <textarea
+                className={`${styles.textarea} ${styles.textareaMedium}`}
+                rows={3}
                 value={form.subheadline}
                 maxLength={300}
                 onChange={(e) => setField("subheadline", e.target.value)}
@@ -1642,8 +1641,8 @@ export default function WebsiteBuilderClient() {
             <div className={styles.field}>
               <label className={styles.label}>{t.sectionAbout}</label>
               <textarea
-                className={styles.textarea}
-                rows={4}
+                className={`${styles.textarea} ${styles.textareaTall}`}
+                rows={8}
                 value={form.aboutText}
                 maxLength={2000}
                 onChange={(e) => setField("aboutText", e.target.value)}
@@ -1703,16 +1702,6 @@ export default function WebsiteBuilderClient() {
             open={openSections.services}
             onToggle={() => toggleSection("services")}
           >
-            <div className={styles.aiRow} style={{ marginBottom: 12 }}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnAi}`}
-                disabled={regeneratingSection === "services"}
-                onClick={() => handleGenerateSection("services")}
-              >
-                {regeneratingSection === "services" ? t.generating : t.regenerateServices}
-              </button>
-            </div>
             {form.services.map((service, i) => (
               <div key={i} className={styles.serviceRow}>
                 <div className={styles.serviceHead}>
@@ -1735,8 +1724,9 @@ export default function WebsiteBuilderClient() {
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>{t.serviceDescLabel}</label>
-                  <input
-                    className={styles.input}
+                  <textarea
+                    className={`${styles.textarea} ${styles.textareaMedium}`}
+                    rows={3}
                     value={service.description}
                     onChange={(e) => setServiceField(i, "description", e.target.value)}
                   />
@@ -1760,78 +1750,12 @@ export default function WebsiteBuilderClient() {
           ) : null}
 
           {sectionVisible("gallery") ? (
+          <div ref={galleryPanelRef}>
           <CollapsibleSection
             title={t.sectionGallery}
             open={openSections.gallery}
             onToggle={() => toggleSection("gallery")}
           >
-            {featureAiDescription ? (
-              <>
-                <div className={styles.label}>{t.aiImagePresetsLabel}</div>
-                <div className={styles.presetRow}>
-                  {imagePresets.map((preset) => (
-                    <div key={preset} className={styles.presetItem}>
-                      <div className={styles.presetText}>{preset}</div>
-                      <div className={styles.presetActions}>
-                        <button
-                          type="button"
-                          className={styles.chip}
-                          onClick={() => setImagePrompt(preset.slice(0, 320))}
-                        >
-                          {t.aiImageUseOnly}
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.chipGen}
-                          disabled={generatingImage}
-                          onClick={() => {
-                            setImagePrompt(preset.slice(0, 320));
-                            handleGenerateImage(preset);
-                          }}
-                        >
-                          {generatingImage ? t.generatingImage : t.aiImageUseAndGenerate}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>{t.imageStyleLabel}</label>
-                  <select
-                    className={styles.select}
-                    value={imageStyle}
-                    onChange={(e) => setImageStyle(e.target.value)}
-                  >
-                    {IMAGE_STYLES.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>{t.aiImagePromptLabel}</label>
-                  <input
-                    className={styles.input}
-                    value={imagePrompt}
-                    maxLength={320}
-                    placeholder={t.aiImagePromptPlaceholder}
-                    onChange={(e) => setImagePrompt(e.target.value)}
-                  />
-                  <p style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 6 }}>
-                    {t.aiImageHint}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnAi}`}
-                  disabled={generatingImage}
-                  onClick={() => handleGenerateImage()}
-                >
-                  {generatingImage ? t.generatingImage : t.generateImage}
-                </button>
-              </>
-            ) : null}
             <WebsiteBuilderPortfolio
               t={t}
               portfolio={siteMeta.portfolio}
@@ -1851,6 +1775,7 @@ export default function WebsiteBuilderClient() {
             <label className={styles.addBtn} style={{ display: "block", cursor: "pointer" }}>
               {t.addGalleryPhotos}
               <input
+                ref={galleryUploadInputRef}
                 type="file"
                 accept="image/*"
                 multiple
@@ -1892,6 +1817,7 @@ export default function WebsiteBuilderClient() {
 
             <WebsiteMobileUploads />
           </CollapsibleSection>
+          </div>
           ) : null}
 
           {sectionVisible("social") ? (
@@ -1957,6 +1883,50 @@ export default function WebsiteBuilderClient() {
           </CollapsibleSection>
           ) : null}
 
+          {sectionVisible("seo") ? (
+          <CollapsibleSection
+            title="SEO & metadata"
+            open={openSections.seo !== false}
+            onToggle={() => toggleSection("seo")}
+          >
+            <div className={styles.field}>
+              <label className={styles.label}>SEO title</label>
+              <input
+                className={styles.input}
+                value={siteMeta.seoTitle || ""}
+                maxLength={120}
+                onChange={(e) =>
+                  setSiteMeta((prev) => ({ ...prev, seoTitle: e.target.value }))
+                }
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>SEO description</label>
+              <textarea
+                className={`${styles.textarea} ${styles.textareaMedium}`}
+                rows={4}
+                value={siteMeta.seoDescription || ""}
+                maxLength={320}
+                onChange={(e) =>
+                  setSiteMeta((prev) => ({ ...prev, seoDescription: e.target.value }))
+                }
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Footer tagline</label>
+              <textarea
+                className={`${styles.textarea} ${styles.textareaMedium}`}
+                rows={2}
+                value={siteMeta.footerTagline || ""}
+                maxLength={200}
+                onChange={(e) =>
+                  setSiteMeta((prev) => ({ ...prev, footerTagline: e.target.value }))
+                }
+              />
+            </div>
+          </CollapsibleSection>
+          ) : null}
+
           {sectionVisible("domain") ? (
           <CollapsibleSection
             title="Custom domain"
@@ -2019,16 +1989,6 @@ export default function WebsiteBuilderClient() {
             open={openSections.trust}
             onToggle={() => toggleSection("trust")}
           >
-            <div className={styles.aiRow} style={{ marginBottom: 12 }}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnAi}`}
-                disabled={regeneratingSection === "trust"}
-                onClick={() => handleGenerateSection("trust")}
-              >
-                {regeneratingSection === "trust" ? t.generating : t.regenerateTrust}
-              </button>
-            </div>
             <div className={styles.trustList}>
               {(form.trustBadges || []).map((badge) => (
                 <span key={badge} className={styles.trustChip}>
@@ -2036,37 +1996,17 @@ export default function WebsiteBuilderClient() {
                 </span>
               ))}
             </div>
-            {(form.testimonials || []).map((item, index) => (
-              <div key={index} className={styles.serviceRow}>
-                <textarea
-                  className={styles.textarea}
-                  rows={2}
-                  value={item.quote}
-                  placeholder="Review quote"
-                  onChange={(e) => {
-                    const next = [...form.testimonials];
-                    next[index] = { ...next[index], quote: e.target.value };
-                    setField("testimonials", next);
-                  }}
-                />
-                <input
-                  className={styles.input}
-                  style={{ marginTop: 8 }}
-                  value={item.name}
-                  placeholder="Name"
-                  onChange={(e) => {
-                    const next = [...form.testimonials];
-                    next[index] = { ...next[index], name: e.target.value };
-                    setField("testimonials", next);
-                  }}
-                />
-              </div>
-            ))}
+            <p className={styles.hintBox}>{t.trustBadgesHint}</p>
+            <div className={styles.reviewsEmptyState} style={{ marginTop: 12 }}>
+              <p className={styles.reviewsEmptyTitle}>{t.reviewsEmptyTitle}</p>
+              <p className={styles.reviewsEmptyBody}>{t.reviewsEmptyBody}</p>
+            </div>
           </CollapsibleSection>
           ) : null}
 
+                </div>
               </>
-              ) : null}
+            )}
           </aside>
         ) : null}
       </div>

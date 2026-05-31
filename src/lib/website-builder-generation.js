@@ -43,7 +43,6 @@ export function analyzeWebsiteCompleteness(form = {}, meta = {}) {
     aboutText: Boolean(String(form.aboutText || "").trim()),
     ctaText: Boolean(String(form.ctaText || "").trim()),
     services: services.length >= 3,
-    testimonials: testimonials.length >= 1,
     trustBadges: trustBadges.length >= 2,
     heroImages: heroImagesFilled >= 1,
     heroImagesFull: heroImagesFilled >= Math.min(4, heroPhotos.length || 4),
@@ -59,7 +58,6 @@ export function analyzeWebsiteCompleteness(form = {}, meta = {}) {
   if (!checks.aboutText) missing.push("about section");
   if (!checks.ctaText) missing.push("call-to-action");
   if (!checks.services) missing.push("services list");
-  if (!checks.testimonials) missing.push("testimonials");
   if (!checks.trustBadges) missing.push("trust badges");
   if (!checks.heroImages) missing.push("hero images");
   if (!checks.gallery) missing.push("gallery photos");
@@ -92,7 +90,6 @@ export function buildInstantSiteFromIndustry(pack, profile, existingForm = {}) {
       aboutText: defaults.aboutText,
       ctaText: defaults.ctaText,
       services: defaults.services,
-      testimonials: defaults.testimonials,
       trustBadges: defaults.trustBadges,
     },
     pack,
@@ -177,10 +174,9 @@ JSON only:
   "seoDescription": "max 155 chars",
   "serviceAreas": ["up to 6"],
   "services": [{ "name": "", "description": "", "price": "From $X" }],
-  "testimonials": [{ "quote": "", "name": "First L.", "role": "Homeowner" }],
   "trustBadges": [""]
 }
-Rules: 2 testimonials, 4 trust badges. ${pack.label} only.
+Rules: 4 trust badges. ${pack.label} only. Do NOT invent customer reviews or testimonials.
 ${
   ctx.topServices
     ? "Services: use ONLY the services catalog lines above — same names, do not add irrigation or other services not listed."
@@ -216,14 +212,14 @@ Generate a COMPLETE contractor landing page. JSON only:
   "seoDescription": "max 155 chars for Google",
   "serviceAreas": ["City or neighborhood", "up to 6 areas"],
   "services": [{ "name": "", "description": "", "price": "From $X or quote" }],
-  "testimonials": [{ "quote": "", "name": "First L.", "role": "Homeowner" }],
   "trustBadges": [""],
   "heroImagePrompts": ["4 distinct ${pack.label} photo prompts, photorealistic, no text/logos"],
   "galleryImagePrompts": ["2 ${pack.label} project gallery prompts"]
 }
 
 Rules:
-- 4 to 6 services, 2 testimonials, 4 trust badges
+- 4 to 6 services, 4 trust badges
+- Do NOT generate testimonials, reviews, star ratings, or fictional customer names
 - heroImagePrompts: exactly 4 items
 - galleryImagePrompts: exactly 2 items
 - ${pack.label} ONLY — never mix industries
@@ -239,7 +235,6 @@ export function buildFullSiteFromAi(parsed, pack, profile, existingForm = {}) {
       aboutText: parsed.aboutText,
       ctaText: parsed.ctaText,
       services: parsed.services,
-      testimonials: parsed.testimonials,
       trustBadges: parsed.trustBadges,
     },
     pack,

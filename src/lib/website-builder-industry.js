@@ -3,6 +3,11 @@
  */
 
 import { normalizeContractorServices, scrubHomeownerFacingCopy } from "@/lib/website-lead-form";
+import { sanitizeWebsiteTestimonials } from "@/lib/website-content-purity";
+import {
+  buildLandscapingDefaultServices,
+  getLandscapingRequestServiceOptions,
+} from "@/lib/landscaping-services-catalog";
 
 const PACKS = {
   cleaning: {
@@ -55,20 +60,14 @@ const PACKS = {
       { label: "Sunset Amber", value: "#d97706" },
     ],
     ctaOptions: ["Request Landscape Quote", "Book Site Visit", "Start Your Project"],
-    trustBadges: ["Licensed & Insured", "Local Crew", "Design + Install", "Free Consultations"],
-    testimonials: [
-      { quote: "They transformed our backyard into an outdoor living space we use every weekend.", name: "Chris P.", role: "Homeowner" },
-      { quote: "Professional team, fair pricing, and the lawn has never looked better.", name: "Linda R.", role: "Property Manager" },
-    ],
+    trustBadges: ["Licensed & Insured", "Free Estimates", "Satisfaction Guaranteed"],
+    testimonials: [],
     defaultHeadline: "Outdoor spaces that wow.",
-    defaultSubheadline: "Landscaping, hardscaping, and lawn care designed for curb appeal and lasting value.",
-    defaultAbout: "We design and build beautiful outdoor environments — from fresh sod and seasonal cleanups to patios, retaining walls, and irrigation. Your property deserves a team that plans ahead and executes flawlessly.",
-    defaultServices: [
-      { name: "Lawn Maintenance", description: "Mowing, edging, fertilization, and seasonal care.", price: "From $89/visit" },
-      { name: "Patio & Hardscape", description: "Pavers, stone pathways, fire pits, and outdoor kitchens.", price: "Custom quote" },
-      { name: "Landscape Design", description: "Planting plans, beds, and lighting for year-round impact.", price: "Free consult" },
-      { name: "Irrigation & Drainage", description: "Efficient systems that protect your investment.", price: "Custom quote" },
-    ],
+    defaultSubheadline:
+      "Professional landscaping, lawn care, and hardscaping for lasting curb appeal.",
+    defaultAbout:
+      "We design and maintain outdoor spaces — from lawn care and seasonal cleanups to paver patios, retaining walls, mulch, sod, grading, and drainage. Your property gets a crew that plans ahead and delivers quality work.",
+    defaultServices: buildLandscapingDefaultServices().slice(0, 12),
     imagePresets: [
       "luxury backyard patio at sunset with outdoor fire pit and landscaping",
       "fresh sod installation on suburban lawn, professional crew at work",
@@ -76,7 +75,7 @@ const PACKS = {
       "modern outdoor kitchen and paver patio, upscale residential",
     ],
     imagePromptPrefix: "Professional landscaping and hardscaping project photo",
-    requestServices: ["Lawn Maintenance", "Mulch / Rock", "Irrigation", "Hardscape Install", "Yard Cleanup"],
+    requestServices: getLandscapingRequestServiceOptions(),
   },
 
   roofing: {
@@ -493,6 +492,8 @@ const CROSS_INDUSTRY_FORBIDDEN = {
   landscaping_hardscaping: [
     "maid service", "deep clean", "disinfect", "janitorial", "housekeeping", "carpet clean",
     "roof replace", "shingle", "hvac tune", "pipe leak", "electrical panel", "junk haul",
+    "remodel", "renovation", "construction", "kitchen remodel", "bathroom renovation",
+    "general contractor", "home addition", "build-out",
   ],
   roofing: [
     "maid", "housekeeping", "lawn mowing", "mulch", "kitchen remodel", "cabinet refin",
@@ -580,6 +581,10 @@ export function resolveWebsiteIndustryKey(raw, companyProfile = null) {
 }
 
 export function resolveWebsiteIndustryFromProfile(companyProfile = {}) {
+  const fromName = inferIndustryKeyFromCompanyName(
+    companyProfile?.publicDisplayName || companyProfile?.companyName || "",
+  );
+  if (fromName) return fromName;
   return resolveWebsiteIndustryKey(companyProfile?.businessType, companyProfile);
 }
 
@@ -652,17 +657,7 @@ export function sanitizeIndustryWebsiteContent(content, pack, companyProfile = {
 
   if (!services.length) services = defaults.services.map((s) => ({ ...s }));
 
-  let testimonials = Array.isArray(content?.testimonials) ? content.testimonials : [];
-  testimonials = testimonials
-    .filter((t) => !textViolatesIndustryPack(t?.quote, packKey))
-    .slice(0, 4)
-    .map((t) => ({
-      quote: pick(t?.quote, "", 280),
-      name: String(t?.name || "Customer").slice(0, 60),
-      role: String(t?.role || "Local customer").slice(0, 80),
-    }))
-    .filter((t) => t.quote);
-  if (!testimonials.length) testimonials = defaults.testimonials.map((t) => ({ ...t }));
+  const testimonials = sanitizeWebsiteTestimonials(content?.testimonials);
 
   let trustBadges = Array.isArray(content?.trustBadges) ? content.trustBadges : [];
   trustBadges = trustBadges
@@ -733,15 +728,22 @@ export function buildIndustryWebsiteDefaults(pack, companyProfile = {}) {
     "Our Company";
   const city = String(companyProfile?.businessCity || companyProfile?.city || "").trim();
   const locationSuffix = city ? ` serving ${city} and nearby areas` : "";
+  const hasBrand = companyName && companyName !== "Our Company";
+
+  const headline = pack.defaultHeadline;
+  const subheadline = `${pack.defaultSubheadline}${locationSuffix}`;
+  const aboutText = hasBrand
+    ? `${pack.defaultAbout} Proudly serving you as ${companyName}.`
+    : pack.defaultAbout;
 
   return {
-    headline: pack.defaultHeadline,
-    subheadline: `${pack.defaultSubheadline}${locationSuffix}`,
-    aboutText: pack.defaultAbout,
+    headline,
+    subheadline,
+    aboutText,
     ctaText: pack.ctaOptions[0] || "Request Estimate",
     themeColor: pack.defaultThemeColor,
     services: pack.defaultServices.map((s) => ({ ...s })),
-    testimonials: pack.testimonials.map((t) => ({ ...t })),
+    testimonials: [],
     trustBadges: [...pack.trustBadges],
     imagePresets: [...pack.imagePresets],
     requestServices: [...pack.requestServices],

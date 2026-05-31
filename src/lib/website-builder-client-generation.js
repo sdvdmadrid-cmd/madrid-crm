@@ -16,7 +16,7 @@ export function mergeFullSiteIntoDraft({ form, siteMeta, data }) {
     ctaText: d.ctaText || form.ctaText || "",
     themeColor: d.themeColor || form.themeColor,
     services: d.services?.length ? d.services : form.services,
-    testimonials: d.testimonials?.length ? d.testimonials : form.testimonials,
+    testimonials: [],
     trustBadges: d.trustBadges?.length ? d.trustBadges : form.trustBadges,
     heroPhotos: d.heroPhotos?.length ? d.heroPhotos : form.heroPhotos,
     galleryPhotos: d.galleryPhotos?.length ? d.galleryPhotos : form.galleryPhotos,

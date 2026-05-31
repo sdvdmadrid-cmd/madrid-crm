@@ -2,6 +2,20 @@
  * Website lead form — shared validation and service resolution.
  */
 
+import {
+  getRequestServiceOptionsForIndustry,
+  isLandscapingIndustryKey,
+  LANDSCAPING_INDUSTRY_KEY,
+} from "./landscaping-services-catalog.js";
+
+export const LEAD_SERVICE_OTHER = "Other";
+
+const BUSINESS_TYPE_LANDSCAPING_RE =
+  /\b(landscap|lawn\s*care|hardscap|lawn\s*service|outdoor\s*living)\b/i;
+
+const PUBLIC_PRICE_RE =
+  /^(from\s*\$|custom\s+quote|free\s+consult|request\s+quote|free\s+estimate|contact\s+us)/i;
+
 export const LEAD_BUDGET_OPTIONS = [
   { id: "under-1k", label: "Under $1,000" },
   { id: "1k-5k", label: "$1,000 – $5,000" },
@@ -33,6 +47,9 @@ const HOMEOWNER_BANNED_COPY = [
   /automated\s+scheduling/i,
   /scheduling\s+assistant/i,
   /powered\s+by\s+ai/i,
+  /\bestimates?\s*(?:&|and)\s*scheduling\b/i,
+  /smart\s+estimator/i,
+  /fieldbase/i,
 ];
 
 export function scrubHomeownerFacingCopy(text) {
@@ -42,15 +59,36 @@ export function scrubHomeownerFacingCopy(text) {
   return value;
 }
 
+export function isHomeownerFacingService(service) {
+  const name = scrubHomeownerFacingCopy(String(service?.name || "").trim());
+  return Boolean(name);
+}
+
+export function stripPublicServicePrice(price) {
+  const value = String(price || "").trim();
+  if (!value) return "";
+  if (PUBLIC_PRICE_RE.test(value) || /\$\d/.test(value) || /\/visit/i.test(value)) {
+    return "";
+  }
+  return "";
+}
+
 export function normalizeContractorServices(list = []) {
   return (Array.isArray(list) ? list : [])
     .map((s) => ({
-      name: String(s?.name || "").trim(),
-      description: String(s?.description || "").trim().slice(0, 400),
-      price: String(s?.price || "").slice(0, 50),
+      name: scrubHomeownerFacingCopy(String(s?.name || "").trim()),
+      description: scrubHomeownerFacingCopy(String(s?.description || "").trim()).slice(0, 400),
+      price: stripPublicServicePrice(s?.price),
     }))
     .filter((s) => s.name)
-    .slice(0, 8);
+    .slice(0, 24);
+}
+
+/** Drop platform/AI offerings — only real customer-facing trade services on public sites. */
+export function filterHomeownerFacingServices(list = []) {
+  return normalizeContractorServices(list)
+    .filter((s) => isHomeownerFacingService(s))
+    .map(({ name, description }) => ({ name, description }));
 }
 
 export function mergeAiServicesWithContractorCatalog(aiServices = [], contractorServices = []) {
@@ -62,33 +100,84 @@ export function mergeAiServicesWithContractorCatalog(aiServices = [], contractor
     return {
       name: c.name,
       description: (match?.description || c.description || "").slice(0, 400),
-      price: match?.price || c.price || "",
+      price: stripPublicServicePrice(match?.price || c.price || ""),
     };
   });
 }
 
+function ensureOtherServiceOption(list = []) {
+  const options = [...list];
+  if (!options.some((s) => s.toLowerCase() === LEAD_SERVICE_OTHER.toLowerCase())) {
+    options.push(LEAD_SERVICE_OTHER);
+  }
+  return options;
+}
+
+function resolveRequestIndustryKey(website = {}) {
+  let industryKey = String(website.industryKey || website.industry || "").trim();
+  const businessType = String(
+    website.businessType ||
+      website.companyProfile?.business_type ||
+      website.companyProfile?.businessType ||
+      "",
+  ).trim();
+  if (
+    businessType &&
+    BUSINESS_TYPE_LANDSCAPING_RE.test(businessType) &&
+    (!industryKey || industryKey === "general")
+  ) {
+    industryKey = LANDSCAPING_INDUSTRY_KEY;
+  }
+  if (isLandscapingIndustryKey(industryKey)) {
+    industryKey = LANDSCAPING_INDUSTRY_KEY;
+  }
+  return industryKey;
+}
+
 export function resolveWebsiteRequestServices(website = {}) {
+  const industryKey = resolveRequestIndustryKey(website);
+  const industryCatalog = getRequestServiceOptionsForIndustry(industryKey);
+  if (industryCatalog?.length) {
+    return ensureOtherServiceOption(industryCatalog);
+  }
+
   const fromServices = Array.isArray(website.services)
     ? website.services
         .map((s) => String(s?.name || "").trim())
         .filter(Boolean)
     : [];
   if (fromServices.length) {
-    return [...new Set(fromServices)].slice(0, 24);
+    return ensureOtherServiceOption([...new Set(fromServices)].slice(0, 48));
   }
 
   const fromPack = Array.isArray(website.requestServices)
     ? website.requestServices.map((s) => String(s || "").trim()).filter(Boolean)
     : [];
 
-  return [...new Set(fromPack)].slice(0, 24);
+  return ensureOtherServiceOption([...new Set(fromPack)].slice(0, 48));
+}
+
+/** Map "Other" + custom text to the value stored on the lead. */
+export function resolveLeadServiceNeeded(serviceNeeded, serviceOther = "") {
+  const selected = String(serviceNeeded || "").trim();
+  const custom = String(serviceOther || "").trim();
+  if (selected.toLowerCase() === LEAD_SERVICE_OTHER.toLowerCase()) {
+    return custom.slice(0, 160);
+  }
+  return selected.slice(0, 160);
 }
 
 export function isAllowedRequestService(serviceNeeded, allowedList = []) {
   const value = String(serviceNeeded || "").trim();
   if (!value) return false;
   if (!allowedList.length) return true;
-  return allowedList.some((s) => s.toLowerCase() === value.toLowerCase());
+  if (allowedList.some((s) => s.toLowerCase() === value.toLowerCase())) {
+    return true;
+  }
+  const allowsOther = allowedList.some(
+    (s) => s.toLowerCase() === LEAD_SERVICE_OTHER.toLowerCase(),
+  );
+  return allowsOther && value.length >= 2;
 }
 
 export function normalizeLeadPayload(body = {}) {
@@ -101,6 +190,7 @@ export function normalizeLeadPayload(body = {}) {
     state: String(body.state || "").trim().slice(0, 40),
     zipCode: String(body.zipCode || "").trim().slice(0, 20),
     serviceNeeded: String(body.serviceNeeded || "").trim().slice(0, 160),
+    serviceOther: String(body.serviceOther || "").trim().slice(0, 160),
     description: String(body.description || "").trim().slice(0, 2000),
     budgetRange: String(body.budgetRange || "").trim().slice(0, 40),
     timeline: String(body.timeline || "").trim().slice(0, 40),

@@ -1,9 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
+import { getCompanyDisplayName } from "@/lib/website-builder-company";
+import {
+  LANDSCAPING_TRUST_BADGES,
+  resolveMarketingHeadline,
+  sanitizeWebsiteTestimonials,
+} from "@/lib/website-content-purity";
+import {
+  PUBLIC_SITE_SECTIONS,
+  handlePublicSiteNavClick,
+  scrollToPublicSiteSection,
+} from "@/lib/public-site-navigation";
 import styles from "./website-builder.module.css";
+import CompanyBrandMark from "./CompanyBrandMark";
 import LeadRequestModal from "@/components/site/LeadRequestModal";
 import PremiumGallery from "@/components/site/PremiumGallery";
+import PublicServicesSection from "@/components/site/PublicServicesSection";
+import {
+  normalizeGalleryPhotos,
+  resolvePublicGalleryPhotos,
+} from "@/lib/website-gallery";
 import PremiumLeadForm from "@/components/site/PremiumLeadForm";
 import PreviewPremiumStyles from "@/components/site/PreviewPremiumStyles";
 import {
@@ -19,6 +37,8 @@ const SECTION_REGEN_MAP = {
   stats: "trust",
   gallery: "services",
 };
+
+const DEFAULT_TRUST_BADGES = LANDSCAPING_TRUST_BADGES;
 
 function QuoteCtaButton({ children, className, onQuoteClick, onOpenQuote }) {
   const handler = onOpenQuote || onQuoteClick;
@@ -42,6 +62,7 @@ export default function WebsiteBuilderPreview({
   form,
   companyProfile,
   industryLabel,
+  industryKey = "",
   requestServices,
   slug = "",
   locale = "en",
@@ -49,23 +70,54 @@ export default function WebsiteBuilderPreview({
   editable = false,
   selectedSection = null,
   onSelectSection,
+  onGalleryUploadClick,
   onFieldChange,
   onServiceChange,
   onGenerateHeroSlot,
   generatingSlotId = "",
+  portfolio = null,
+  reviewsEmptyTitle = "No reviews published yet.",
+  reviewsEmptyBody = "Connect Google, Facebook, or another review source to show verified customer testimonials on your live site.",
 }) {
-  const companyName =
-    companyProfile?.publicDisplayName || companyProfile?.companyName || "Your Company";
-  const logoUrl = String(companyProfile?.logoDataUrl || "").trim();
-  const trustBadges = form.trustBadges || [];
-  const testimonials = form.testimonials || [];
+  const companyName = getCompanyDisplayName(companyProfile) || "Your Company";
+  const logoUrl = resolveCompanyLogoUrl(companyProfile);
+  const phone = String(companyProfile?.phone || "").trim();
+
+  const displayHeadline = useMemo(
+    () =>
+      resolveMarketingHeadline(
+        form.headline,
+        companyName,
+        "Outdoor spaces that wow.",
+      ),
+    [form.headline, companyName],
+  );
+
+  const trustBadges = useMemo(() => {
+    const fromForm = (form.trustBadges || [])
+      .map((b) => String(b || "").trim())
+      .filter(Boolean);
+    return fromForm.length >= 2 ? fromForm.slice(0, 4) : DEFAULT_TRUST_BADGES;
+  }, [form.trustBadges]);
+
+  const verifiedTestimonials = useMemo(
+    () => sanitizeWebsiteTestimonials(form.testimonials),
+    [form.testimonials],
+  );
+
   const heroSlots = Array.isArray(form.heroPhotos) ? form.heroPhotos : [];
   const heroWithSrc = heroSlots.filter((p) => p?.src);
+  const galleryPhotos = useMemo(() => {
+    if (editable) {
+      return normalizeGalleryPhotos(form.galleryPhotos);
+    }
+    return resolvePublicGalleryPhotos(form.galleryPhotos, portfolio);
+  }, [form.galleryPhotos, portfolio, editable]);
   const heroPhotos =
     heroWithSrc.length > 0
       ? heroWithSrc
-      : form.galleryPhotos?.length > 0
-        ? form.galleryPhotos.slice(0, 4)
+      : galleryPhotos.length > 0
+        ? galleryPhotos.slice(0, 4)
         : [];
 
   const patch = onFieldChange || (() => {});
@@ -83,41 +135,90 @@ export default function WebsiteBuilderPreview({
     onQuoteClick?.();
   }, [onQuoteClick]);
 
+  const resolvePreviewAnchorId = useCallback((sectionId) => {
+    const id = String(sectionId || "").replace(/^#/, "");
+    if (id === PUBLIC_SITE_SECTIONS.requestService || id === PUBLIC_SITE_SECTIONS.contact) {
+      return "preview-request-form";
+    }
+    return id;
+  }, []);
+
+  const scrollToSection = useCallback(
+    (sectionId) => {
+      scrollToPublicSiteSection(resolvePreviewAnchorId(sectionId), {
+        offset: 96,
+      });
+    },
+    [resolvePreviewAnchorId],
+  );
+
   useEffect(() => {
     const root = document.querySelector("[data-preview-root]");
     root?.querySelectorAll(".ps-reveal").forEach((node) => node.classList.add("ps-visible"));
 
     const onOpen = () => openQuoteForm();
     window.addEventListener("fieldbase:open-lead-form", onOpen);
-    return () => window.removeEventListener("fieldbase:open-lead-form", onOpen);
-  }, [openQuoteForm]);
+
+    const onNavClick = (event) => {
+      const anchor = event.target.closest?.("a[href^='#']");
+      if (anchor) {
+        const hash = anchor.getAttribute("href")?.replace(/^#/, "") || "";
+        const targetId = resolvePreviewAnchorId(hash);
+        if (document.getElementById(targetId)) {
+          event.preventDefault();
+          event.stopPropagation();
+          scrollToSection(targetId);
+          if (
+            targetId === "preview-request-form" ||
+            hash === PUBLIC_SITE_SECTIONS.requestService
+          ) {
+            openQuoteForm({ skipScroll: true });
+          }
+          return;
+        }
+      }
+
+      const btn = event.target.closest?.("[data-preview-nav]");
+      if (!btn) return;
+      const section = btn.getAttribute("data-preview-nav");
+      if (!section) return;
+      event.preventDefault();
+      if (section === "preview-request-form") {
+        scrollToSection(section);
+        openQuoteForm({ skipScroll: true });
+        return;
+      }
+      scrollToSection(section);
+    };
+
+    const rootEl = document.querySelector("[data-preview-root]");
+    rootEl?.addEventListener("click", onNavClick, true);
+
+    return () => {
+      window.removeEventListener("fieldbase:open-lead-form", onOpen);
+      rootEl?.removeEventListener("click", onNavClick, true);
+    };
+  }, [openQuoteForm, scrollToSection]);
 
   return (
     <div
       data-preview-root
+      data-builder-preview=""
       className={`${styles.previewRoot} ${editable ? styles.previewRootEditable : ""}`}
       style={{ "--theme": theme }}
       onClick={() => editable && onSelectSection?.(null)}
     >
       <PreviewPremiumStyles />
       <div className="preview-nav">
-        <div className="preview-logo">
-          <div className="preview-logo-icon">
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className={styles.previewLogoImg} />
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" style={{ width: 14, height: 14 }}>
-                <path
-                  d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-                  stroke="#fff"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </div>
-          {companyName}
-        </div>
+        <CompanyBrandMark
+          logoUrl={logoUrl}
+          companyName={companyName}
+          themeColor={theme}
+          variant="nav"
+          animate
+          showName={false}
+          logoFill
+        />
         <div className="preview-nav-links">
           <button type="button" className={styles.previewNavLinkBtn} onClick={() => openQuoteForm()}>
             Services
@@ -139,67 +240,65 @@ export default function WebsiteBuilderPreview({
         onSelect={onSelectSection}
         className="preview-hero-wrap"
       >
-        <div className="preview-hero">
-          <div className="preview-hero-inner">
-            <div className="preview-hero-left">
-              <div className="preview-badge">
-                {trustBadges[0] || `⭐ Licensed ${industryLabel || "contractor"}`}
-              </div>
-              <h1>
-                <InlineEditable
-                  asHeading
-                  value={form.headline}
-                  onChange={editable ? (v) => patch("headline", v) : null}
-                  placeholder="Your headline"
-                  maxLength={200}
-                  className={styles.inlineOnDark}
-                />
-              </h1>
-              <p className="preview-hero-sub">
-                <InlineEditable
-                  multiline
-                  value={form.subheadline}
-                  onChange={editable ? (v) => patch("subheadline", v) : null}
-                  placeholder="Your subheadline"
-                  maxLength={300}
-                  className={styles.inlineOnDark}
-                />
-              </p>
-              {trustBadges.length > 1 ? (
-                <div className="preview-trust-row">
-                  {trustBadges.slice(1, 5).map((badge) => (
-                    <span key={badge} className="preview-trust-pill">
-                      {badge}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <p className="preview-hero-pill">🎉 Free estimates — same-day response</p>
-              <div className="preview-hero-actions">
-                <QuoteCtaButton className="preview-btn-primary" onOpenQuote={openQuoteForm}>
-                  {ctaLabel}
-                </QuoteCtaButton>
-                <button
-                  type="button"
-                  className="preview-btn-secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    document.getElementById("preview-services")?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
-                  }}
-                >
-                  Our Services
-                </button>
-              </div>
-              {editable ? (
-                <p className={styles.previewCtaEditHint}>
-                  CTA button text: edit in Advanced → Brand & CTA
-                </p>
-              ) : null}
+        <div className={`preview-hero ${styles.previewHeroPremium}`}>
+          <div className={styles.previewHeroStack}>
+            <CompanyBrandMark
+              logoUrl={logoUrl}
+              companyName={companyName}
+              themeColor={theme}
+              variant="heroCenter"
+              animate
+              showName
+              logoFill
+            />
+            <h1 className={styles.previewHeroHeadline}>
+              <InlineEditable
+                asHeading
+                value={displayHeadline}
+                onChange={
+                  editable
+                    ? (v) => patch("headline", v)
+                    : null
+                }
+                placeholder="Your headline"
+                maxLength={200}
+                className={styles.inlineOnDark}
+              />
+            </h1>
+            <p className={`preview-hero-sub ${styles.previewHeroSubCentered}`}>
+              <InlineEditable
+                multiline
+                value={form.subheadline}
+                onChange={editable ? (v) => patch("subheadline", v) : null}
+                placeholder="Your subheadline"
+                maxLength={300}
+                className={styles.inlineOnDark}
+              />
+            </p>
+            <div className={`preview-trust-row ${styles.previewTrustRowHero}`}>
+              {trustBadges.map((badge) => (
+                <span key={badge} className="preview-trust-pill">
+                  {badge}
+                </span>
+              ))}
             </div>
-            <div className="preview-hero-right">
+            <div className={`preview-hero-actions ${styles.previewHeroActionsCentered}`}>
+              <QuoteCtaButton className="preview-btn-primary" onOpenQuote={openQuoteForm}>
+                {ctaLabel}
+              </QuoteCtaButton>
+              <a
+                href={`#${PUBLIC_SITE_SECTIONS.services}`}
+                className="preview-btn-secondary"
+                data-preview-nav={PUBLIC_SITE_SECTIONS.services}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Our Services
+              </a>
+            </div>
+          </div>
+
+          {heroPhotos.length > 0 ? (
+            <div className={styles.previewHeroMedia}>
               {heroSlots.length > 0
                 ? heroSlots.map((photo, index) => (
                     <div
@@ -210,7 +309,6 @@ export default function WebsiteBuilderPreview({
                           ? (e) => {
                               e.stopPropagation();
                               onSelectSection?.("gallery");
-                              if (!photo?.src && onGenerateHeroSlot) onGenerateHeroSlot(index);
                             }
                           : undefined
                       }
@@ -218,79 +316,56 @@ export default function WebsiteBuilderPreview({
                       {photo?.src ? (
                         <img src={photo.src} alt={photo.alt || "Project photo"} />
                       ) : (
-                        <div className={styles.photoPlaceholder}>
-                          {generatingSlotId === photo?.id
-                            ? "Generating…"
-                            : editable
-                              ? "Click to generate"
-                              : "Photo"}
-                        </div>
+                        <div className={styles.photoPlaceholder}>Photo</div>
                       )}
                     </div>
                   ))
-                : null}
+                : heroPhotos.map((photo, index) => (
+                    <div key={`hero-g-${index}`} className="preview-photo-card">
+                      <img
+                        src={photo.thumbnail || photo.src}
+                        alt={photo.alt || "Project photo"}
+                      />
+                    </div>
+                  ))}
             </div>
-          </div>
+          ) : null}
         </div>
       </PreviewSection>
 
-      <div className="preview-features" id="preview-services">
-        <div className="preview-features-title">Our Services</div>
-        <div className="preview-features-grid">
-          {(form.services || []).slice(0, 6).map((service, index) => (
-            <div key={`${service.name}-${index}`} className="preview-feature-card">
-              <div className="preview-feature-title">
-                <InlineEditable
-                  value={service.name}
-                  onChange={editable ? (v) => onServiceChange?.(index, "name", v) : null}
-                  placeholder="Service name"
-                  maxLength={100}
-                />
-              </div>
-              <p className="preview-feature-desc">
-                <InlineEditable
-                  multiline
-                  value={service.description}
-                  onChange={editable ? (v) => onServiceChange?.(index, "description", v) : null}
-                  placeholder="Service description"
-                  maxLength={400}
-                />
-              </p>
-              <button
-                type="button"
-                className="preview-feat-link"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openQuoteForm();
-                }}
-              >
-                Get a quote →
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <PreviewSection
-        sectionId="about"
-        label="About"
+      <PublicServicesSection
+        services={form.services || []}
+        themeColor={theme}
+        quoteHref="#preview-request-form"
+        title="Our Services"
+        subtitle={
+          industryKey === "landscaping_hardscaping"
+            ? "From weekly lawn care to custom patios, retaining walls, and drainage — every project starts with a free on-site estimate."
+            : "Professional services tailored to your property — request a free estimate to get started."
+        }
+        quoteLabel={
+          industryKey === "landscaping_hardscaping" ? "Request Quote" : ctaLabel
+        }
+        galleryPhotos={galleryPhotos}
         editable={editable}
-        selected={selectedSection === "about"}
-        onSelect={onSelectSection}
-      >
-        <div className="preview-about">
-          <h2>About {companyName}</h2>
-          <p>
-            <InlineEditable
-              multiline
-              value={form.aboutText}
-              onChange={editable ? (v) => patch("aboutText", v) : null}
-              placeholder="Tell customers about your company…"
-              maxLength={2000}
-            />
-          </p>
-        </div>
-      </PreviewSection>
+        renderTitle={(service, index) => (
+          <InlineEditable
+            value={service.name}
+            onChange={editable ? (v) => onServiceChange?.(index, "name", v) : null}
+            placeholder="Service name"
+            maxLength={100}
+          />
+        )}
+        renderDescription={(service, index) => (
+          <InlineEditable
+            multiline
+            value={service.description}
+            onChange={editable ? (v) => onServiceChange?.(index, "description", v) : null}
+            placeholder="Short description"
+            maxLength={400}
+          />
+        )}
+      />
 
       <PreviewSection
         sectionId="gallery"
@@ -299,43 +374,49 @@ export default function WebsiteBuilderPreview({
         selected={selectedSection === "gallery"}
         onSelect={onSelectSection}
       >
-        {form.galleryPhotos.length > 0 ? (
-          <div className="preview-gallery" onClick={(e) => e.stopPropagation()}>
-            <PremiumGallery
-              photos={form.galleryPhotos}
-              title="Recent Work"
-              subtitle="Tap any photo to preview fullscreen — same as your live site."
-              useNextImage={false}
-            />
-          </div>
-        ) : (
-          <div className={styles.galleryEmptyVisual}>
-            {editable ? "Select Gallery in advanced panel or regenerate site for photos." : null}
-          </div>
-        )}
+        <div className="preview-gallery" onClick={(e) => e.stopPropagation()}>
+          <PremiumGallery
+            photos={galleryPhotos}
+            portfolio={portfolio}
+            title="Recent Work"
+            subtitle="Photos sync from your portfolio and featured gallery."
+            emptyTitle="No project photos yet"
+            emptyBody="Upload real photos of your completed projects so homeowners trust your work."
+            builderEditable={editable}
+            onUploadClick={editable ? onGalleryUploadClick : null}
+            uploadLabel="Upload project photos"
+          />
+        </div>
       </PreviewSection>
 
-      {testimonials.length > 0 ? (
-        <PreviewSection
-          sectionId="trust"
-          label="Reviews"
-          editable={editable}
-          selected={selectedSection === "trust"}
-          onSelect={onSelectSection}
-        >
+      <PreviewSection
+        sectionId="trust"
+        label="Reviews"
+        editable={editable}
+        selected={selectedSection === "trust"}
+        onSelect={onSelectSection}
+      >
+        {verifiedTestimonials.length > 0 ? (
           <div className="preview-testimonials">
             <div className="preview-test-grid">
-              {testimonials.slice(0, 2).map((item, index) => (
+              {verifiedTestimonials.slice(0, 2).map((item, index) => (
                 <div key={`${item.name}-${index}`} className="preview-test-card">
                   <p className="preview-test-quote">&ldquo;{item.quote}&rdquo;</p>
                   <strong style={{ fontSize: 12, color: "#1e293b" }}>{item.name}</strong>
-                  <div style={{ fontSize: 11, color: "#6b7280" }}>{item.role}</div>
+                  {item.platform ? (
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>via {item.platform}</div>
+                  ) : null}
                 </div>
               ))}
             </div>
           </div>
-        </PreviewSection>
-      ) : null}
+        ) : (
+          <div className={styles.reviewsEmptyState}>
+            <p className={styles.reviewsEmptyTitle}>{reviewsEmptyTitle}</p>
+            <p className={styles.reviewsEmptyBody}>{reviewsEmptyBody}</p>
+          </div>
+        )}
+      </PreviewSection>
 
       <div className="preview-cta-section">
         <h2>Ready for your free quote?</h2>
@@ -374,7 +455,18 @@ export default function WebsiteBuilderPreview({
       </div>
 
       <div className="preview-footer">
-        &copy; {new Date().getFullYear()} {companyName}. Powered by FieldBase
+        <CompanyBrandMark
+          logoUrl={logoUrl}
+          companyName={companyName}
+          themeColor={theme}
+          variant="footer"
+          showName={false}
+          logoFill
+          phone={phone}
+        />
+        <p className={styles.previewFooterLegal}>
+          &copy; {new Date().getFullYear()} {companyName}. Powered by FieldBase
+        </p>
       </div>
 
       <LeadRequestModal

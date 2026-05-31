@@ -18,6 +18,28 @@
   margin-top: 0;
 }
 
+.manualJobDetails {
+  border: none;
+  padding: 0;
+}
+
+.manualJobDetails summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+  list-style: none;
+}
+
+.manualJobDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.manualJobDetails[open] summary {
+  margin-bottom: 12px;
+}
+
 .jobCard {
   padding: 18px;
   border: 1px solid var(--fb-border, rgba(148, 163, 184, 0.12));

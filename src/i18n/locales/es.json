@@ -33,13 +33,21 @@
   "dashboardControl": {
     "operationsLabel": "Operar · Cobrar · Crecer",
     "title": "Centro de mando",
-    "subtitle": "Todo en un solo lugar — claro, seguro y listo para cobrar como los grandes.",
-    "subtitleWithName": "Hola {{name}}. Tu negocio, tus cobros y tu calendario — sin complicarte la vida.",
+    "subtitle": "Cotizaciones, trabajo en campo y cobros — empieza con un cliente o un estimado nuevo.",
+    "subtitleWithName": "Hola {{name}}. Cotizaciones, trabajo en campo y cobros — empieza con un cliente o un estimado nuevo.",
+    "workflowGuide": "Clientes · Estimados · Trabajos · Facturas · Pagos",
     "actions": {
       "collectPayment": "Cobrar pago",
       "newEstimate": "Nuevo estimado",
       "newJob": "Nuevo trabajo",
-      "addClient": "Agregar cliente"
+      "manualJob": "Trabajo manual",
+      "manualJobHint": "Mantenimiento, garantía, emergencia o trabajo sin estimado",
+      "createJobManually": "Crear trabajo manualmente",
+      "createJobManuallyHint": "Mantenimiento, garantía, emergencia o trabajo sin estimado",
+      "moreActions": "Más acciones",
+      "moreActionsWithCount": "Más acciones ({{count}})",
+      "addClient": "Agregar cliente",
+      "openLeadInbox": "Bandeja de leads ({{count}})"
     },
     "pillars": {
       "ariaLabel": "Operar, cobrar y crecer"
@@ -574,6 +582,11 @@
   "settingsHub": {
     "title": "Ajustes",
     "subtitle": "Administra tu cuenta de FieldBase, tu suscripcion y como cobras a tus clientes.",
+    "companyBranding": {
+      "title": "Empresa y logo",
+      "desc": "Sube tu logo y datos del negocio para estimados, facturas y PDFs.",
+      "cta": "Editar perfil de empresa"
+    },
     "clientPayments": {
       "title": "Cobros a clientes",
       "desc": "Conecta Stripe para que tus clientes paguen facturas en linea. El dinero va a tu negocio.",
@@ -583,6 +596,44 @@
       "title": "Suscripcion FieldBase",
       "desc": "Tu plan, periodo de prueba y facturacion de FieldBase.",
       "cta": "Gestionar suscripcion"
+    }
+  },
+  "companyBranding": {
+    "title": "Empresa y logo",
+    "subtitle": "Un solo perfil para PDFs de estimados, tu sitio publico y correos a clientes.",
+    "backToSettings": "Todos los ajustes",
+    "loading": "Cargando perfil de empresa…",
+    "saved": "Perfil de empresa guardado.",
+    "savedButton": "Guardado ✓",
+    "sections": {
+      "contact": "Datos del negocio",
+      "contactHint": "Se guarda aqui y se usa en PDFs, en el encabezado y pie de tu sitio web, y en correos al cliente."
+    },
+    "websiteSync": {
+      "title": "Sitio web publico",
+      "body": "Nombre, telefono, direccion y logo se sincronizan con la vista previa y el sitio en vivo (despues de publicar en el editor web).",
+      "openBuilder": "Abrir editor web",
+      "viewLive": "Ver sitio en vivo"
+    },
+    "labels": {
+      "displayName": "Nombre en documentos",
+      "website": "Sitio web (opcional)",
+      "websiteHint": "Dejalo vacio para usar automaticamente tu sitio FieldBase."
+    },
+    "placeholders": {
+      "companyName": "Tu empresa LLC",
+      "displayName": "Como te ven los clientes",
+      "address": "Calle, ciudad, estado, CP"
+    },
+    "preview": {
+      "title": "Vista previa del encabezado del PDF",
+      "noLogo": "Sin logo",
+      "unnamed": "Tu empresa",
+      "defaultSite": "https://fieldbaseapp.net"
+    },
+    "errors": {
+      "load": "No se pudo cargar el perfil de empresa",
+      "save": "No se pudo guardar el perfil de empresa"
     }
   },
   "settingsPayments": {
@@ -833,7 +884,12 @@
   },
   "clients": {
     "title": "Clientes",
-    "description": "Administra clientes, edita informacion y elimina registros.",
+    "description": "Tu directorio de clientes — busca, agrega clientes y abre perfiles para estimados y trabajos.",
+    "searchPlaceholder": "Buscar por nombre, empresa, telefono, email o direccion…",
+    "searchAria": "Buscar clientes",
+    "searchEmpty": "Ningun cliente coincide con la busqueda.",
+    "resultsCount": "{{count}} clientes",
+    "emptyHint": "Agrega tu primer cliente para enviar estimados.",
     "loading": "Cargando clientes...",
     "formTitleNew": "Nuevo cliente",
     "formTitleEdit": "Editar cliente",
@@ -884,6 +940,7 @@
       "total": "Total"
     },
     "buttons": {
+      "newClient": "Nuevo cliente",
       "saving": "Guardando...",
       "save": "Guardar",
       "update": "Actualizar",
@@ -1078,9 +1135,32 @@
       }
     }
   },
+  "estimatesPage": {
+    "title": "Estimados",
+    "subtitle": "Crea, envía y administra estimados profesionales para tus clientes. Haz seguimiento de aprobaciones, revisiones y oportunidades en un solo lugar."
+  },
+  "contractorWorkflow": {
+    "label": "Flujo del contratista",
+    "steps": {
+      "lead": "Lead",
+      "client": "Cliente",
+      "estimate": "Estimado",
+      "sent": "Enviado",
+      "approved": "Aprobado",
+      "job": "Trabajo",
+      "schedule": "Agendar",
+      "complete": "Completar",
+      "invoice": "Factura",
+      "paid": "Pagado"
+    }
+  },
   "jobs": {
     "title": "Trabajos",
     "description": "Crea, edita y elimina trabajos de servicio.",
+    "workflowHint": "La mayoría de trabajos empiezan en un estimado aprobado (Convertir a trabajo). Usa trabajo manual solo si no hay estimado.",
+    "openEstimates": "Pipeline de estimados",
+    "manualJobSummary": "Trabajo manual (sin estimado)",
+    "manualJobHint": "Mantenimiento recurrente, garantía, emergencia o trabajos sin cotización.",
     "loading": "Cargando trabajos...",
     "formTitleNew": "Nuevo trabajo",
     "formTitleEdit": "Editar trabajo",

@@ -449,6 +449,13 @@ export default function JobsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  useEffect(() => {
+    const jobId = String(searchParams.get("jobId") || "").trim();
+    if (!jobId || jobs.length === 0) return;
+    const match = jobs.find((job) => String(job._id || job.id) === jobId);
+    if (match) editJob(match);
+  }, [searchParams, jobs]);
+
   const generateEstimate = async () => {
     setEstimating(true);
     setError("");
@@ -599,6 +606,14 @@ export default function JobsPage() {
       {loading ? <p className={ws.subtitle}>{t("jobs.loading")}</p> : null}
 
       <section>
+        <details
+          className={jobStyles.manualJobDetails}
+          open={searchParams.get("action") === "new"}
+        >
+          <summary>{t("jobs.manualJobSummary")}</summary>
+          <p className={ws.subtitle} style={{ margin: "8px 0 14px" }}>
+            {t("jobs.manualJobHint")}
+          </p>
         <h2>{selectedId ? t("jobs.formTitleEdit") : t("jobs.formTitleNew")}</h2>
         <div className={jobStyles.formGrid}>
           <input
@@ -881,6 +896,7 @@ export default function JobsPage() {
             </button>
           </div>
         </div>
+        </details>
       </section>
 
       <section>

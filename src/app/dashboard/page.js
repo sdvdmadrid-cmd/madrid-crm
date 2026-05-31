@@ -281,25 +281,55 @@ export default function RevenueDashboardPage() {
               ? t("dashboardControl.subtitleWithName", { name: userName })
               : t("dashboardControl.subtitle")}
           </p>
+          <p className={styles.workflowGuide}>{t("dashboardControl.workflowGuide")}</p>
         </div>
         <div className={styles.quickActions}>
-          <Link href="/settings/payments" className={styles.collectAction}>
-            {t("dashboardControl.actions.collectPayment")}
-          </Link>
           <Link href="/estimates/new" className={styles.primaryAction}>
             <PlusIcon />
             {t("dashboardControl.actions.newEstimate")}
           </Link>
-          <Link href="/jobs?action=new" className={styles.secondaryAction}>{t("dashboardControl.actions.newJob")}</Link>
-          <Link href="/clients" className={styles.secondaryAction}>{t("dashboardControl.actions.addClient")}</Link>
-          {inboxAttention > 0 ? (
-            <Link href="/lead-inbox" className={styles.secondaryAction} data-testid="dashboard-lead-inbox-cta">
-              {t("dashboardControl.actions.openLeadInbox", {
-                count: inboxAttention,
-                defaultValue: `Lead inbox (${inboxAttention})`,
-              })}
-            </Link>
-          ) : null}
+          <Link href="/clients?action=new" className={styles.coPrimaryAction}>
+            {t("dashboardControl.actions.addClient")}
+          </Link>
+          <details className={styles.moreActions}>
+            <summary>
+              {inboxAttention > 0
+                ? t("dashboardControl.actions.moreActionsWithCount", {
+                    count: inboxAttention,
+                  })
+                : t("dashboardControl.actions.moreActions")}
+            </summary>
+            <div className={styles.moreActionsMenu} role="menu">
+              <Link
+                href="/settings/payments"
+                className={styles.moreActionsItem}
+                role="menuitem"
+              >
+                {t("dashboardControl.actions.collectPayment")}
+              </Link>
+              <Link
+                href="/jobs?action=new"
+                className={styles.moreActionsItem}
+                role="menuitem"
+                title={t("dashboardControl.actions.createJobManuallyHint")}
+              >
+                {t("dashboardControl.actions.createJobManually")}
+              </Link>
+              {inboxAttention > 0 ? (
+                <Link
+                  href="/lead-inbox"
+                  className={styles.moreActionsItem}
+                  role="menuitem"
+                  data-testid="dashboard-lead-inbox-cta"
+                >
+                  {t("dashboardControl.actions.openLeadInbox", {
+                    count: inboxAttention,
+                    defaultValue: `Lead inbox (${inboxAttention})`,
+                  })}
+                </Link>
+              ) : null}
+            </div>
+          </details>
         </div>
       </header>
 

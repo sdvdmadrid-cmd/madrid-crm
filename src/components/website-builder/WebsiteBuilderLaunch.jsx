@@ -1,71 +1,43 @@
 "use client";
 
 import styles from "./website-builder.module.css";
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
+import CompanyBrandMark from "./CompanyBrandMark";
 
 export default function WebsiteBuilderLaunch({
   t,
   companyProfile,
-  industryLabel,
-  industryIcon,
-  industryPackOptions,
-  industryKeyOverride,
-  onIndustryChange,
   onGenerate,
   onCancel,
   generating,
   genProgress,
   completenessScore,
+  themeColor = "#1d4ed8",
 }) {
+  const logoUrl = resolveCompanyLogoUrl(companyProfile);
   const companyName =
     companyProfile?.publicDisplayName ||
     companyProfile?.companyName ||
     t.launchCompanyFallback;
-  const city =
-    companyProfile?.businessCity || companyProfile?.city || t.launchCityFallback;
 
   return (
     <div className={styles.launchCard}>
       <div className={styles.launchGlow} aria-hidden />
       <div className={styles.launchInner}>
-        <p className={styles.launchEyebrow}>{t.launchEyebrow}</p>
-        <h2 className={styles.launchTitle}>{t.launchTitle}</h2>
-        <p className={styles.launchSubtitle}>{t.launchSubtitle}</p>
-
-        <div className={styles.launchFacts}>
-          <div className={styles.launchFact}>
-            <span className={styles.launchFactLabel}>{t.launchCompany}</span>
-            <strong>{companyName}</strong>
-          </div>
-          <div className={styles.launchFact}>
-            <span className={styles.launchFactLabel}>{t.launchLocation}</span>
-            <strong>{city}</strong>
-          </div>
-          <div className={styles.launchFact}>
-            <span className={styles.launchFactLabel}>{t.launchIndustry}</span>
-            <strong>
-              {industryIcon} {industryLabel}
-            </strong>
-          </div>
+        <div className={styles.launchBrandCenter}>
+          <CompanyBrandMark
+            logoUrl={logoUrl}
+            companyName={companyName}
+            themeColor={themeColor}
+            variant="heroCenter"
+            animate
+            showName={false}
+          />
         </div>
 
-        {industryPackOptions.length > 0 ? (
-          <label className={styles.launchIndustrySelect}>
-            <span>{t.launchIndustryPick}</span>
-            <select
-              value={industryKeyOverride || ""}
-              onChange={onIndustryChange}
-              disabled={generating}
-            >
-              <option value="">{t.industryUseProfile}</option>
-              {industryPackOptions.map((opt) => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.icon ? `${opt.icon} ` : ""}
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
+        <p className={styles.launchEyebrow}>{t.launchEyebrowCompany}</p>
+        <h2 className={styles.launchTitle}>{t.launchTitleCompany}</h2>
+        <p className={styles.launchSubtitle}>{t.launchSubtitleCompany}</p>
 
         <div className={styles.launchActions}>
           <button
@@ -96,13 +68,13 @@ export default function WebsiteBuilderLaunch({
             {t.launchCompleteness.replace("{score}", String(completenessScore))}
           </p>
         ) : (
-          <p className={styles.launchHint}>{t.launchHint}</p>
+          <p className={styles.launchHint}>{t.launchHintCompany}</p>
         )}
 
         <ul className={styles.launchList}>
-          <li>{t.launchBullet1}</li>
-          <li>{t.launchBullet2}</li>
-          <li>{t.launchBullet3}</li>
+          <li>{t.launchBulletCompany1}</li>
+          <li>{t.launchBulletCompany2}</li>
+          <li>{t.launchBulletCompany3}</li>
         </ul>
       </div>
     </div>

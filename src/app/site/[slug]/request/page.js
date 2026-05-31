@@ -5,6 +5,7 @@ import PublicSiteNav from "@/components/site/PublicSiteNav";
 import RequestServiceForm from "@/components/site/RequestServiceForm";
 import PublicSiteEnhancements from "@/components/site/PublicSiteEnhancements";
 import PublicSiteLeadExperience from "@/components/site/PublicSiteLeadExperience";
+import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
 import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import { getPublicWebsiteBySlug } from "@/lib/public-website";
@@ -43,6 +44,8 @@ export default async function PublicContractorRequestPage({ params, searchParams
   const serviceOptions = resolveWebsiteRequestServices({
     services: data.services,
     requestServices: data.requestServices,
+    industryKey: data.industryKey,
+    businessType: data.companyProfile?.businessType || "",
   });
   const initialService = normalizeRequestedService(
     resolvedSearchParams?.service,
@@ -50,6 +53,9 @@ export default async function PublicContractorRequestPage({ params, searchParams
   );
   const theme = data.themeColor || "#1d4ed8";
   const phone = data.companyProfile?.phone || "";
+  const logoUrl =
+    data.companyProfile?.resolvedLogoUrl ||
+    resolveCompanyLogoUrl(data.companyProfile);
 
   const ctaText = data.ctaText || copy.nav.getQuote;
 
@@ -66,7 +72,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
       <PublicSiteNav
         slug={data.slug}
         companyName={companyName}
-        logoUrl={data.companyProfile?.logoDataUrl || ""}
+        logoUrl={logoUrl}
         phone={phone}
         ctaText={data.ctaText || copy.nav.getQuote}
         themeColor={theme}
@@ -130,6 +136,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
       <PublicSiteFooter
         slug={data.slug}
         companyName={companyName}
+        logoUrl={logoUrl}
         phone={phone}
         businessAddress={data.companyProfile?.businessAddress || ""}
         socialLinks={data.socialLinks || {}}

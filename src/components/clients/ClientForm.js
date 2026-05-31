@@ -30,13 +30,10 @@ export default function ClientForm({
   onChange,
   onSubmit,
   onCancel,
+  embedded = false,
 }) {
-  return (
-    <section className="cf-card" style={{ padding: 22 }}>
-      <h2 style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 800 }}>
-        {isEditing ? t("clients.formTitleEdit") : t("clients.formTitleNew")}
-      </h2>
-
+  const fields = (
+    <>
       <div style={{ display: "grid", gap: 10 }}>
         <input
           className="cf-input"
@@ -219,6 +216,19 @@ export default function ClientForm({
         onSubmit={onSubmit}
         onCancel={onCancel}
       />
+    </>
+  );
+
+  if (embedded) {
+    return fields;
+  }
+
+  return (
+    <section className="cf-card" style={{ padding: 22 }}>
+      <h2 style={{ marginTop: 0, fontSize: "1.15rem", fontWeight: 800 }}>
+        {isEditing ? t("clients.formTitleEdit") : t("clients.formTitleNew")}
+      </h2>
+      {fields}
     </section>
   );
 }

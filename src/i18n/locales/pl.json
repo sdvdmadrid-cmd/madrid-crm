@@ -33,13 +33,21 @@
   "dashboardControl": {
     "operationsLabel": "Prowadz · Zbieraj · Rozwijaj",
     "title": "Centrum dowodzenia",
-    "subtitle": "Twoja firma w trzech ruchach: operacje, platnosci i rozwoj.",
-    "subtitleWithName": "Witaj ponownie, {{name}}. Tutaj widzisz swoja firme w jednym miejscu.",
+    "subtitle": "Wyceny, praca w terenie i platnosci — zacznij od klienta lub nowej wyceny.",
+    "subtitleWithName": "Witaj ponownie, {{name}}. Wyceny, praca w terenie i platnosci — zacznij od klienta lub nowej wyceny.",
+    "workflowGuide": "Klienci · Wyceny · Zlecenia · Faktury · Platnosci",
     "actions": {
       "collectPayment": "Pobierz platnosc",
       "newEstimate": "Nowa wycena",
       "newJob": "Nowe zlecenie",
-      "addClient": "Dodaj klienta"
+      "manualJob": "Zlecenie reczne",
+      "manualJobHint": "Serwis, gwarancja, awaria lub praca bez wyceny",
+      "createJobManually": "Utworz zlecenie recznie",
+      "createJobManuallyHint": "Serwis, gwarancja, awaria lub praca bez wyceny",
+      "moreActions": "Wiecej akcji",
+      "moreActionsWithCount": "Wiecej akcji ({{count}})",
+      "addClient": "Dodaj klienta",
+      "openLeadInbox": "Skrzynka leadow ({{count}})"
     },
     "pillars": {
       "ariaLabel": "Prowadz firme, zbieraj platnosci i rozwijaj"
@@ -701,7 +709,12 @@
   },
   "clients": {
     "title": "Klienci",
-    "description": "Zarzadzaj klientami, edytuj dane i usuwaj wpisy.",
+    "description": "Twoja baza klientow — wyszukuj, dodawaj klientow i otwieraj profile pod wyceny i zlecenia.",
+    "searchPlaceholder": "Szukaj po nazwie, firmie, telefonie, emailu lub adresie…",
+    "searchAria": "Szukaj klientow",
+    "searchEmpty": "Brak klientow pasujacych do wyszukiwania.",
+    "resultsCount": "{{count}} klientow",
+    "emptyHint": "Dodaj pierwszego klienta, aby wysylac wyceny.",
     "loading": "Ladowanie klientow...",
     "formTitleNew": "Nowy klient",
     "formTitleEdit": "Edytuj klienta",
@@ -743,6 +756,7 @@
       "total": "Razem"
     },
     "buttons": {
+      "newClient": "Nowy klient",
       "saving": "Zapisywanie...",
       "save": "Zapisz",
       "update": "Aktualizuj",
@@ -925,9 +939,32 @@
       }
     }
   },
+  "estimatesPage": {
+    "title": "Wyceny",
+    "subtitle": "Tworz, wysylaj i zarzadzaj profesjonalnymi wycenami dla klientow. Sledz akceptacje, poprawki i szanse w jednym miejscu."
+  },
+  "contractorWorkflow": {
+    "label": "Przeplyw pracy",
+    "steps": {
+      "lead": "Lead",
+      "client": "Klient",
+      "estimate": "Wycena",
+      "sent": "Wyslana",
+      "approved": "Zatwierdzona",
+      "job": "Zlecenie",
+      "schedule": "Harmonogram",
+      "complete": "Zakonczone",
+      "invoice": "Faktura",
+      "paid": "Oplacone"
+    }
+  },
   "jobs": {
     "title": "Zlecenia",
     "description": "Tworz, edytuj i usuwaj zlecenia uslugowe.",
+    "workflowHint": "Wiekszosc zlecen zaczyna sie od zatwierdzonej wyceny (Konwertuj na zlecenie). Zlecenie reczne tylko bez wyceny.",
+    "openEstimates": "Pipeline wycen",
+    "manualJobSummary": "Zlecenie reczne (bez wyceny)",
+    "manualJobHint": "Serwis cykliczny, gwarancja, awaria lub prace bez wyceny.",
     "loading": "Ladowanie zlecen...",
     "formTitleNew": "Nowe zlecenie",
     "formTitleEdit": "Edytuj zlecenie",

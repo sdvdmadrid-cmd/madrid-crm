@@ -6,7 +6,9 @@ import { getPublicSiteCopy } from "@/lib/public-site-copy";
 import {
   LEAD_BUDGET_OPTIONS,
   LEAD_CONTACT_PREFERENCES,
+  LEAD_SERVICE_OTHER,
   LEAD_TIMELINE_OPTIONS,
+  resolveLeadServiceNeeded,
 } from "@/lib/website-lead-form";
 import { normalizeWebsiteSlug, parsePublicWebsiteSlug } from "@/lib/public-website-routing";
 
@@ -76,6 +78,7 @@ export default function PremiumLeadForm({
     state: "",
     zipCode: "",
     serviceNeeded: "",
+    serviceOther: "",
     description: "",
     budgetRange: "",
     timeline: "",
@@ -188,10 +191,17 @@ export default function PremiumLeadForm({
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  const isOtherService =
+    String(form.serviceNeeded || "").trim().toLowerCase() ===
+    LEAD_SERVICE_OTHER.toLowerCase();
+
   const validateStep = (index) => {
     const next = {};
     if (index === 0) {
       if (!String(form.serviceNeeded || "").trim()) next.serviceNeeded = formCopy.selectService;
+      if (isOtherService && !String(form.serviceOther || "").trim()) {
+        next.serviceOther = formCopy.serviceOtherRequired;
+      }
       if (!String(form.description || "").trim()) next.description = formCopy.message;
       if (!String(form.budgetRange || "").trim()) next.budgetRange = formCopy.budgetRequired;
       if (!String(form.timeline || "").trim()) next.timeline = formCopy.timelineRequired;
@@ -260,10 +270,11 @@ export default function PremiumLeadForm({
     setLoading(true);
     setError("");
     try {
+      const serviceNeeded = resolveLeadServiceNeeded(form.serviceNeeded, form.serviceOther);
       const res = await fetch(`/api/site/${encodeURIComponent(canonicalSlug)}/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, turnstileToken }),
+        body: JSON.stringify({ ...form, serviceNeeded, turnstileToken }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -283,6 +294,7 @@ export default function PremiumLeadForm({
         state: "",
         zipCode: "",
         serviceNeeded: pickInitialService(serviceOptions, initialService),
+        serviceOther: "",
         description: "",
         budgetRange: "",
         timeline: "",
@@ -463,7 +475,9 @@ export default function PremiumLeadForm({
                   <option value="">{formCopy.selectService}</option>
                   {serviceOptions.map((option) => (
                     <option key={option} value={option} style={{ color: "#0f172a" }}>
-                      {option}
+                      {option === LEAD_SERVICE_OTHER
+                        ? formCopy.other || LEAD_SERVICE_OTHER
+                        : option}
                     </option>
                   ))}
                 </select>
@@ -471,6 +485,27 @@ export default function PremiumLeadForm({
                   <p className="ps-field-error">{errors.serviceNeeded}</p>
                 ) : null}
               </div>
+              {isOtherService ? (
+                <div className="ps-field">
+                  <label className="ps-label" htmlFor="ps-service-other">
+                    {formCopy.serviceOtherLabel}
+                  </label>
+                  <input
+                    id="ps-service-other"
+                    type="text"
+                    name="serviceOther"
+                    value={form.serviceOther}
+                    onChange={handleChange}
+                    className={`ps-input ${errors.serviceOther ? "ps-invalid" : ""}`}
+                    placeholder={formCopy.serviceOtherPlaceholder}
+                    maxLength={160}
+                    autoComplete="off"
+                  />
+                  {errors.serviceOther ? (
+                    <p className="ps-field-error">{errors.serviceOther}</p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="ps-field">
                 <label className="ps-label" htmlFor="ps-desc">
                   {formCopy.message}

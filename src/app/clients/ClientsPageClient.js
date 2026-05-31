@@ -1,28 +1,30 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { filterAndRankRecords } from "@/lib/record-search";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import { splitStreetFromLocality } from "@/lib/client-display";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
+import ClientFormModal from "@/components/clients/ClientFormModal";
 import ClientCsvActionsMenu from "@/components/clients/ClientCsvActionsMenu";
 import ClientCsvImportWizard from "@/components/clients/ClientCsvImportWizard";
-import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
 import ClientDetailsPanel from "@/components/clients/ClientDetailsPanel";
 import ClientsList from "@/components/clients/ClientsList";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
+import pageStyles from "@/components/clients/clients-page.module.css";
 import ws from "@/styles/workspace-dark.module.css";
 
 export default function ClientsPageClient() {
-  const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
   const { capabilities } = useCurrentUserAccess();
   const [clients, setClients] = useState([]);
   const [form, setForm] = useState(EMPTY_CLIENT_FORM);
   const [selectedId, setSelectedId] = useState("");
+  const [formOpen, setFormOpen] = useState(false);
   const [highlightedClientId, setHighlightedClientId] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,11 +35,11 @@ export default function ClientsPageClient() {
   const [detailsError, setDetailsError] = useState("");
   const [clientDetails, setClientDetails] = useState(null);
   const [detailsWarnings, setDetailsWarnings] = useState([]);
-  const [listSearch, setListSearch] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
 
   const displayedClients = useMemo(() => {
-    if (!listSearch.trim()) return clients;
-    return filterAndRankRecords(clients, listSearch, (client) => [
+    if (!clientSearch.trim()) return clients;
+    return filterAndRankRecords(clients, clientSearch, (client) => [
       client.name,
       client.company,
       client.companyName,
@@ -49,7 +51,7 @@ export default function ClientsPageClient() {
       client.zip,
       client.notes,
     ]);
-  }, [clients, listSearch]);
+  }, [clients, clientSearch]);
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
@@ -59,7 +61,6 @@ export default function ClientsPageClient() {
       const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
       setClients(data);
     } catch (err) {
-
       setError(err.message || t("clients.errors.load"));
     } finally {
       setLoading(false);
@@ -70,11 +71,25 @@ export default function ClientsPageClient() {
     fetchClients();
   }, [fetchClients]);
 
-  const resetForm = () => {
+  const closeForm = () => {
+    setForm(EMPTY_CLIENT_FORM);
+    setSelectedId("");
+    setFormOpen(false);
+    setError("");
+  };
+
+  const openNewClient = () => {
     setForm(EMPTY_CLIENT_FORM);
     setSelectedId("");
     setError("");
+    setFormOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get("action") === "new") {
+      openNewClient();
+    }
+  }, [searchParams]);
 
   const saveClient = async () => {
     const name = String(form.name || "").trim();
@@ -132,9 +147,8 @@ export default function ClientsPageClient() {
         setClients((prev) => [result.data, ...prev]);
       }
 
-      resetForm();
+      closeForm();
     } catch (err) {
-
       setError(err.message || t("clients.errors.saveFallback"));
     } finally {
       setSaving(false);
@@ -163,8 +177,6 @@ export default function ClientsPageClient() {
         typeof client.latitude === "number" ? client.latitude : null,
       longitude:
         typeof client.longitude === "number" ? client.longitude : null,
-      // Existing records may predate place_id tracking.
-      // Keep them editable unless the address field is changed.
       addressPlaceId: client.address ? "persisted" : "",
       notes: client.notes || "",
       billingAddress: client.billing_address || "",
@@ -176,7 +188,7 @@ export default function ClientsPageClient() {
     setHighlightedClientId(client.id);
     setSelectedId(client.id);
     setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setFormOpen(true);
   };
 
   const loadClientDetails = useCallback(
@@ -206,12 +218,6 @@ export default function ClientsPageClient() {
     setDetailsOpen(true);
     setError("");
     loadClientDetails(client.id);
-  };
-
-  /** Search pick → canonical estimate workflow (not the CRM side panel). */
-  const startEstimateForClient = (client) => {
-    if (!client?.id) return;
-    router.push(`/estimates/new?clientId=${encodeURIComponent(client.id)}`);
   };
 
   const removeDuplicateClients = async () => {
@@ -245,7 +251,7 @@ export default function ClientsPageClient() {
       const result = json.data || {};
 
       await fetchClients();
-      resetForm();
+      closeForm();
       setDetailsOpen(false);
       setHighlightedClientId("");
 
@@ -281,26 +287,39 @@ export default function ClientsPageClient() {
       await getJsonOrThrow(res, t("clients.errors.delete"));
       setClients((prev) => prev.filter((client) => client.id !== id));
       if (selectedId === id) {
-        resetForm();
+        closeForm();
         setDetailsOpen(false);
         setClientDetails(null);
       }
     } catch (err) {
-
       setError(err.message || t("clients.errors.deleteFallback"));
     }
   };
+
+  const formTitle = selectedId
+    ? t("clients.formTitleEdit")
+    : t("clients.formTitleNew");
 
   return (
     <PremiumPageShell
       title={t("clients.title")}
       subtitle={t("clients.description")}
       actions={
-        <ClientCsvActionsMenu
-          onImport={() => setImportOpen(true)}
-          onRemoveDuplicates={removeDuplicateClients}
-          canRemoveDuplicates={capabilities.canDeleteRecords}
-        />
+        <>
+          <button
+            type="button"
+            className={ws.btnPrimary}
+            onClick={openNewClient}
+            data-testid="clients-new-button"
+          >
+            + {t("clients.buttons.newClient")}
+          </button>
+          <ClientCsvActionsMenu
+            onImport={() => setImportOpen(true)}
+            onRemoveDuplicates={removeDuplicateClients}
+            canRemoveDuplicates={capabilities.canDeleteRecords}
+          />
+        </>
       }
     >
       <ClientCsvImportWizard
@@ -310,43 +329,51 @@ export default function ClientsPageClient() {
       />
       {error ? <div className={ws.noticeErrorBlock}>{error}</div> : null}
 
-      <section style={{ marginTop: 20, maxWidth: 720 }}>
-        <h2 style={{ margin: "0 0 10px", fontSize: "1rem", fontWeight: 700, color: "#e2e8f0" }}>
-          {t("clients.search.sectionTitle", { defaultValue: "Find a client" })}
-        </h2>
-        <ClientSearchAutocomplete
-          onSelect={openClientDetails}
-          secondaryActionLabel={t("clients.search.newEstimate", {
-            defaultValue: "New estimate",
-          })}
-          onSecondaryAction={startEstimateForClient}
-        />
-      </section>
-
-      <div className={`${ws.gridSidebar} cf-clients-layout`} style={{ marginTop: 24 }}>
-        <ClientForm
-          t={t}
-          form={form}
-          isEditing={Boolean(selectedId)}
-          saving={saving}
-          onChange={setForm}
-          onSubmit={saveClient}
-          onCancel={resetForm}
-        />
+      <section className={pageStyles.listSection}>
+        <div className={pageStyles.toolbar}>
+          <input
+            type="search"
+            className={pageStyles.searchInput}
+            value={clientSearch}
+            onChange={(event) => setClientSearch(event.target.value)}
+            placeholder={t("clients.searchPlaceholder")}
+            aria-label={t("clients.searchAria")}
+            data-testid="clients-search"
+          />
+          <span className={pageStyles.resultMeta}>
+            {t("clients.resultsCount", { count: displayedClients.length })}
+          </span>
+        </div>
 
         <ClientsList
           t={t}
           clients={displayedClients}
           loading={loading}
           highlightedId={highlightedClientId || selectedId}
-          listSearch={listSearch}
-          onListSearchChange={setListSearch}
+          isSearchActive={Boolean(clientSearch.trim())}
           onSelect={openClientDetails}
           onEdit={editClient}
           onDelete={deleteClient}
           canDelete={capabilities.canDeleteRecords}
         />
-      </div>
+      </section>
+
+      <ClientFormModal
+        open={formOpen}
+        title={formTitle}
+        onClose={closeForm}
+      >
+        <ClientForm
+          t={t}
+          form={form}
+          isEditing={Boolean(selectedId)}
+          saving={saving}
+          embedded
+          onChange={setForm}
+          onSubmit={saveClient}
+          onCancel={closeForm}
+        />
+      </ClientFormModal>
 
       <ClientDetailsPanel
         t={t}
@@ -367,7 +394,6 @@ export default function ClientsPageClient() {
         onDelete={deleteClient}
         canDelete={capabilities.canDeleteRecords}
       />
-
     </PremiumPageShell>
   );
 }

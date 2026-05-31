@@ -23,6 +23,7 @@ export default function HeroImageEditor({
   onGenerateSlot,
   generatingSlotId,
   labels,
+  showGenerateActions = true,
 }) {
   const fileRefs = useRef({});
   const [dragOverId, setDragOverId] = useState(null);
@@ -104,17 +105,20 @@ export default function HeroImageEditor({
                 value={slot.prompt || ""}
                 placeholder={labels.promptPlaceholder}
                 onChange={(e) => updateSlot(index, { prompt: e.target.value.slice(0, 320) })}
+                style={showGenerateActions ? undefined : { display: "none" }}
               />
 
               <div className={styles.heroCardActions}>
-                <button
-                  type="button"
-                  className={styles.chipGen}
-                  disabled={Boolean(generatingSlotId)}
-                  onClick={() => onGenerateSlot(index)}
-                >
-                  {isGenerating ? "…" : labels.regenerate}
-                </button>
+                {showGenerateActions ? (
+                  <button
+                    type="button"
+                    className={styles.chipGen}
+                    disabled={Boolean(generatingSlotId)}
+                    onClick={() => onGenerateSlot(index)}
+                  >
+                    {isGenerating ? "…" : labels.regenerate}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={styles.chip}
@@ -162,7 +166,7 @@ export default function HeroImageEditor({
                 }}
               />
 
-              {imagePresets?.[index] ? (
+              {showGenerateActions && imagePresets?.[index] ? (
                 <button
                   type="button"
                   className={styles.chip}

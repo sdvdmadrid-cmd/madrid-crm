@@ -40,6 +40,7 @@ test.describe("Contractor usability — core CRM workflows", () => {
       timeout: 15_000,
     });
 
+    await page.getByTestId("clients-new-button").click();
     await page.getByRole("textbox", { name: /Name/i }).fill(clientName);
     await page.getByRole("textbox", { name: /Email/i }).fill(clientEmail);
     await page.getByRole("textbox", { name: /Phone/i }).fill("+15550009999");
@@ -49,20 +50,20 @@ test.describe("Contractor usability — core CRM workflows", () => {
       timeout: 15_000,
     });
 
-    const search = page.getByRole("combobox", { name: /Search clients/i });
-    await search.fill(clientName);
-    await page.waitForTimeout(400);
-    await expect(
-      page.getByRole("option", { name: new RegExp(clientName) }),
-    ).toBeVisible({ timeout: 10_000 });
-
-    await page.getByRole("button", { name: /New estimate/i }).first().click();
+    await page.getByTestId("clients-search").fill(clientName);
+    const card = page.locator("article.cf-client-card").filter({
+      has: page.getByRole("heading", { name: clientName, level: 3 }),
+    });
+    await card.getByRole("button", { name: /Client actions/i }).click();
+    await page.getByRole("menuitem", { name: /New estimate/i }).click();
     await expect(page).toHaveURL(/\/estimates\/new\?clientId=/, { timeout: 15_000 });
 
     await page.goto("/clients", { waitUntil: "domcontentloaded" });
-    await search.fill(clientName);
-    await page.waitForTimeout(400);
-    await page.getByRole("option", { name: new RegExp(clientName) }).click();
+    await page.getByTestId("clients-search").fill(clientName);
+    await page
+      .locator("article.cf-client-card")
+      .filter({ has: page.getByRole("heading", { name: clientName, level: 3 }) })
+      .click();
     await expect(page.getByRole("heading", { name: clientName, level: 2 })).toBeVisible({
       timeout: 15_000,
     });
@@ -115,6 +116,7 @@ test.describe("Contractor usability — core CRM workflows", () => {
     ).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: new RegExp(clientName) }).click();
+    await page.getByText("More actions").click();
     await expect(page.getByRole("button", { name: /Edit estimate/i })).toBeVisible();
 
     await page.getByRole("button", { name: /Edit estimate/i }).click();

@@ -4,8 +4,8 @@ import styles from "./website-builder.module.css";
 
 const STEPS = [
   { id: 1, key: "setup", label: "Setup" },
-  { id: 2, key: "generate", label: "Generate" },
-  { id: 3, key: "customize", label: "Customize" },
+  { id: 2, key: "generate", label: "Draft" },
+  { id: 3, key: "customize", label: "Edit" },
   { id: 4, key: "preview", label: "Preview" },
   { id: 5, key: "publish", label: "Publish" },
 ];
