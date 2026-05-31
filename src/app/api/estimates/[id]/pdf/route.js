@@ -1,4 +1,4 @@
-import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
+import { getEstimatePdfBranding } from "@/lib/estimate-pdf-branding";
 import { pdfResponse } from "@/lib/document-pdf-core";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
 import { serializeEstimateBase } from "@/lib/estimate-serializer";
@@ -59,7 +59,7 @@ export async function GET(request, { params }) {
     if (!data) return jsonResponse({ success: false, error: "Estimate not found" }, 404);
 
     const estimate = serializeEstimateBase(data);
-    const branding = await getEstimateBrandingByTenant(estimate.tenantId);
+    const branding = await getEstimatePdfBranding(estimate.tenantId);
 
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });
     const filename = pdfFilenameForEstimate(estimate);

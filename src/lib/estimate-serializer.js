@@ -87,6 +87,7 @@ export function serializeEstimateBase(row) {
     tax: toNumber(row?.tax),
     total: toNumber(row?.total),
     notes: parsedNotes.noteText,
+    serviceTitle: parsedNotes.serviceTitle || "",
     audit: parsedNotes.audit,
     estimateNumber: row?.estimate_number || "",
     createdAt: row?.created_at || null,

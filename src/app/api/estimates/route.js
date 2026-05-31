@@ -2,6 +2,7 @@ import {
   buildPublicEstimateLink,
   isPublicEstimateStatus,
 } from "@/lib/estimate-public-access";
+import { deriveServiceTitleFromScope } from "@/lib/estimate-pdf-content";
 import {
   buildAuditForCreate,
   parseEstimateNotes,
@@ -108,6 +109,10 @@ function buildEstimateRow(body = {}, nowIso) {
     notes: stringifyEstimateNotes({
       address: String(body.address || "").trim(),
       noteText: String(body.notes || ""),
+      serviceTitle: deriveServiceTitleFromScope(
+        String(body.notes || ""),
+        body.serviceTitle,
+      ),
       clientUuid: String(body.clientUuid || body.clientId || "").trim(),
       clientEmail: String(body.clientEmail || "").trim().toLowerCase(),
       clientPhone: String(body.clientPhone || "").trim(),
