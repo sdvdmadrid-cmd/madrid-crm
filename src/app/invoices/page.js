@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientPickerField from "@/components/clients/ClientPickerField";
 import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
@@ -691,16 +692,21 @@ export default function InvoicesPage() {
           <h1 className={styles.headerTitle}>{t("invoices.title")}</h1>
           <p className={styles.headerSub}>{t("invoices.description")}</p>
         </div>
-        {canEditInvoices ? (
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            data-testid="invoices-new-button"
-            onClick={focusNewInvoiceForm}
-          >
-            {t("invoices.buttons.newInvoice", { defaultValue: "+ New invoice" })}
-          </button>
-        ) : null}
+        <div className={styles.headerActions}>
+          <Link href="/invoices/summary" className={styles.btnGhost}>
+            {t("sidebar.invoiceTotals", { defaultValue: "Invoice totals" })}
+          </Link>
+          {canEditInvoices ? (
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              data-testid="invoices-new-button"
+              onClick={focusNewInvoiceForm}
+            >
+              {t("invoices.buttons.newInvoice", { defaultValue: "+ New invoice" })}
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {!canEditInvoices ? (

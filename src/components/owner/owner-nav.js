@@ -6,6 +6,7 @@ export const OWNER_NAV_GROUPS = [
       { labelKey: "ownerNav.overview", href: "/owner/overview", icon: "◉" },
       { labelKey: "ownerNav.paymentCards", href: "/owner/payment-cards", icon: "💳" },
       { labelKey: "ownerNav.revenue", href: "/owner/revenue", icon: "📈" },
+      { labelKey: "ownerNav.invoiceRevenue", href: "/owner/invoice-revenue", icon: "🧾" },
       { labelKey: "ownerNav.tenants", href: "/owner/tenants", icon: "🏢" },
     ],
   },

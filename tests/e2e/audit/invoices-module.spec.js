@@ -412,4 +412,23 @@ test.describe("Invoices module audit", () => {
     await expect(page.getByRole("heading", { name: /New invoice/i })).toBeVisible();
     await expect(page.getByPlaceholder("Invoice number", { exact: true })).toHaveValue("");
   });
+
+  test("invoice totals page shows paid and unpaid summary", async ({ page }) => {
+    await page.goto("/invoices/summary", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("invoice-revenue-summary")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const apiRes = await page.request.get(`${ORIGIN}/api/invoices/summary`, {
+      headers: ORIGIN_HEADERS,
+    });
+    expect(apiRes.ok()).toBeTruthy();
+    const payload = await apiRes.json();
+    expect(payload.success).toBeTruthy();
+    expect(payload.data?.summary?.totalPaid).toBeGreaterThanOrEqual(0);
+    expect(payload.data?.summary?.totalUnpaid).toBeGreaterThanOrEqual(0);
+
+    await page.getByRole("link", { name: /Back to invoices|Volver a facturas/i }).click();
+    await expect(page.getByRole("heading", { name: /^Invoices$|Facturas/i })).toBeVisible();
+  });
 });

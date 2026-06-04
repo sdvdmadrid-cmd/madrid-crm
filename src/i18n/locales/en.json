@@ -501,6 +501,7 @@
     "contracts": "Contracts",
     "jobs": "Jobs",
     "invoices": "Invoices",
+    "invoiceTotals": "Invoice totals",
     "billPayments": "Bill Payments",
     "payBills": "Pay bills",
     "paymentMethods": "Payment Methods",
@@ -1468,6 +1469,27 @@
       "sendInvoiceTextFallback": "Error preparing invoice text message"
     }
   },
+  "invoiceSummary": {
+    "title": "Invoice totals",
+    "platformTitle": "Platform invoice revenue",
+    "subtitle": "See how much you have collected and what is still unpaid on your invoices.",
+    "platformSubtitle": "Total collected and outstanding balances across all contractor invoices.",
+    "totalPaid": "Total paid",
+    "totalUnpaid": "Total unpaid",
+    "totalInvoiced": "Total invoiced",
+    "paidHint": "{{count}} paid invoices",
+    "unpaidHint": "{{count}} open invoices",
+    "invoicedHint": "{{count}} invoices total",
+    "breakdownTitle": "Breakdown",
+    "partial": "Partial payments",
+    "overdue": "Overdue",
+    "drafts": "Drafts",
+    "draftNote": "Draft invoices are not included in unpaid totals until you save and send them.",
+    "byTenantTitle": "By tenant",
+    "tenant": "Tenant",
+    "backToInvoices": "Back to invoices",
+    "backToOwner": "Back to Mission Control"
+  },
   "calendar": {
     "title": "Calendar",
     "description": "Manage your appointments and meetings.",
@@ -1713,6 +1735,7 @@
     "overview": "Overview",
     "paymentCards": "Payment cards",
     "revenue": "Revenue",
+    "invoiceRevenue": "Invoice revenue",
     "tenants": "Tenants",
     "aiOps": "AI Ops",
     "monitoring": "Monitoring",
