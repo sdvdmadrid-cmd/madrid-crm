@@ -328,11 +328,12 @@ export default function EstimatesPage() {
         "Unable to convert estimate to a job.",
       );
       const jobId = payload?.data?.jobId;
-      await loadEstimates();
-      setSelectedEstimate(null);
       if (jobId) {
         router.push(`/jobs?jobId=${encodeURIComponent(jobId)}`);
+        setSelectedEstimate(null);
+        void loadEstimates();
       } else {
+        await loadEstimates();
         setStatusMessage("Job created. Open Jobs to schedule and complete the work.");
       }
     } catch (error) {

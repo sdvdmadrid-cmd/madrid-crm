@@ -9,6 +9,10 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
+import {
+  appointmentGeoFieldsFromBody,
+  validateAppointmentLocationPayload,
+} from "@/lib/appointment-address";
 
 // Tabla relacional: appointments
 
@@ -48,6 +52,15 @@ const serialize = (doc) => ({
   createdAt: doc.created_at || null,
   googleEventId: doc.google_event_id || null,
   endTime: doc.end_time || "",
+  latitude:
+    doc.latitude == null || doc.latitude === ""
+      ? null
+      : Number(doc.latitude),
+  longitude:
+    doc.longitude == null || doc.longitude === ""
+      ? null
+      : Number(doc.longitude),
+  addressPlaceId: doc.address_place_id || "",
 });
 
 const toAppointmentRecord = (body, extra = {}) => ({
@@ -59,6 +72,7 @@ const toAppointmentRecord = (body, extra = {}) => ({
   location: assertSafeText("location", body.location || "", 300),
   notes: assertSafeText("notes", body.notes || "", 2000),
   status: statusToDb(body.status),
+  ...appointmentGeoFieldsFromBody(body),
   // Nunca incluir user_id desde el body — la asignamos desde el contexto auth.
   ...extra,
 });
@@ -80,7 +94,7 @@ function validateAppointmentBody(body) {
   if (!isValidYmd(body.date)) return "Date must be in YYYY-MM-DD format";
   if (isPastYmd(body.date)) return "Cannot schedule in the past";
   if (!String(body?.time || "").trim()) return "Time is required";
-  return "";
+  return validateAppointmentLocationPayload(body);
 }
 
 export async function GET(request) {
@@ -185,6 +199,9 @@ export async function POST(request) {
         const stripped = { ...toInsert };
         delete stripped.user_id;
         delete stripped.end_time;
+        delete stripped.latitude;
+        delete stripped.longitude;
+        delete stripped.address_place_id;
         const retry = await supabaseAdmin
           .from("appointments")
           .insert([stripped])

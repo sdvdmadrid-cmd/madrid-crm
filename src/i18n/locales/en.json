@@ -1177,6 +1177,8 @@
     "formTitleNew": "New job",
     "formTitleEdit": "Edit job",
     "listTitle": "Job list",
+    "searchLabel": "Search jobs",
+    "searchPlaceholder": "Search jobs by title, client, service, or status…",
     "placeholders": {
       "title": "Title",
       "client": "Client",
@@ -1377,8 +1379,30 @@
       "invoiceShareText": "Invoice {{invoice}} for {{amount}} is ready to pay.",
       "invoiceLinkCopied": "Payment link copied"
     },
+    "party": {
+      "customerAddress": "Customer",
+      "propertyAddress": "Job site",
+      "phone": "Phone",
+      "email": "Email"
+    },
+    "branding": {
+      "poweredBy": "Powered by FieldBase"
+    },
+    "lineItems": {
+      "title": "Line items",
+      "hint": "Add services with quantity and unit price. Invoice total updates automatically.",
+      "description": "Description",
+      "descriptionPlaceholder": "e.g. Labor, materials",
+      "quantity": "Qty",
+      "unitPrice": "Unit price",
+      "lineTotal": "Line total",
+      "add": "Add line item",
+      "remove": "Remove line",
+      "subtotal": "Line items subtotal"
+    },
     "labels": {
       "untitled": "Invoice without number",
+      "lineItems": "Line items",
       "amount": "Amount",
       "paid": "Paid",
       "balance": "Balance",
@@ -1519,6 +1543,10 @@
       "confirmDeleteMessage": "Are you sure you want to delete this appointment?"
     },
     "empty": "No appointments to display.",
+    "address": {
+      "autocompleteHint": "Start typing and pick an address from the list. Manual text like \"asdf\" is not accepted.",
+      "verified": "Address verified"
+    },
     "errors": {
       "fetch": "Unable to load appointments",
       "load": "Error loading calendar",
@@ -1527,6 +1555,8 @@
       "required": "This field is required",
       "invalidDate": "Date must be in YYYY-MM-DD format",
       "pastDate": "Cannot schedule in the past",
+      "invalidAddress": "That does not look like a real address. Choose one from the suggestions.",
+      "addressNotVerified": "Select a valid address from the suggestions (with city and coordinates).",
       "delete": "Unable to delete appointment",
       "deleteFallback": "Error deleting appointment"
     }

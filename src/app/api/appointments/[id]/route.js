@@ -9,6 +9,10 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import {
+  appointmentGeoFieldsFromBody,
+  validateAppointmentLocationPayload,
+} from "@/lib/appointment-address";
 
 // Tabla relacional: appointments
 
@@ -46,6 +50,15 @@ const serialize = (doc) => ({
   status: statusFromDb(doc.status),
   tenantId: doc.tenant_id || "",
   createdAt: doc.created_at || null,
+  latitude:
+    doc.latitude == null || doc.latitude === ""
+      ? null
+      : Number(doc.latitude),
+  longitude:
+    doc.longitude == null || doc.longitude === ""
+      ? null
+      : Number(doc.longitude),
+  addressPlaceId: doc.address_place_id || "",
 });
 
 const toAppointmentPatch = (body) => ({
@@ -56,6 +69,7 @@ const toAppointmentPatch = (body) => ({
   location: assertSafeText("location", body.location || "", 300),
   notes: assertSafeText("notes", body.notes || "", 2000),
   status: statusToDb(body.status),
+  ...appointmentGeoFieldsFromBody(body),
 });
 
 function validateAppointmentBody(body) {
@@ -65,7 +79,7 @@ function validateAppointmentBody(body) {
   if (!isValidYmd(body.date)) return "Date must be in YYYY-MM-DD format";
   if (isPastYmd(body.date)) return "Cannot schedule in the past";
   if (!String(body?.time || "").trim()) return "Time is required";
-  return "";
+  return validateAppointmentLocationPayload(body);
 }
 
 function badId() {

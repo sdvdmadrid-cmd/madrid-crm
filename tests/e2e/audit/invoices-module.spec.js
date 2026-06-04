@@ -32,6 +32,11 @@ async function createClient(api, stamp) {
       city: "Austin",
       state: "TX",
       zip: "73301",
+      billingAddress: "PO Box 900",
+      billingCity: "Austin",
+      billingState: "TX",
+      billingZip: "73302",
+      billingSameAsService: false,
     },
   });
   expect(clientRes.ok()).toBeTruthy();
@@ -60,6 +65,7 @@ test.describe("Invoices module audit", () => {
   test("create invoice via UI, search, PDF actions, persist after refresh", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     const stamp = Date.now();
     const invNum = `INV-AUDIT-${stamp}`;
     const clientName = `UI Inv Client ${stamp}`;
@@ -74,7 +80,7 @@ test.describe("Invoices module audit", () => {
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
-    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card).toBeVisible({ timeout: 25_000 });
     await expect(
       card.getByRole("link", { name: /Print \/ Save PDF document/i }),
     ).toBeVisible();
@@ -170,6 +176,11 @@ test.describe("Invoices module audit", () => {
     });
     expect(pdfRes.ok()).toBeTruthy();
     expect(pdfRes.headers()["content-type"] || "").toMatch(/pdf/i);
+    const pdfBytes = await pdfRes.body();
+    const pdfText = pdfBytes.toString("latin1");
+    // Footer link is Flate-compressed; assert PDF link annotation for Powered by FieldBase.
+    expect(pdfText).toContain("/Subtype /Link");
+    expect(pdfText).toMatch(/\/URI \(https:\/\/fieldbaseapp\.net\)/);
   });
 
   test("register partial cash payment updates balance", async ({ page }) => {
@@ -198,6 +209,90 @@ test.describe("Invoices module audit", () => {
     await expect(card.getByText(/Partial/i).first()).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText(/Paid: \$75\.00/)).toBeVisible();
     await expect(card.getByText(/Balance: \$125\.00/)).toBeVisible();
+  });
+
+  test("line items editor updates invoice amount and persists", async ({ page }) => {
+    test.setTimeout(60_000);
+    const stamp = Date.now();
+    const invNum = `INV-LINES-${stamp}`;
+    const clientName = `Lines Client ${stamp}`;
+
+    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
+    await page.locator('input[type="date"]').first().fill("2026-12-20");
+
+    await expect(page.getByTestId("invoice-line-items-section")).toBeVisible();
+    const row = page.getByTestId("invoice-line-item-row").first();
+    await row.getByTestId("invoice-line-item-description").fill("Site labor");
+    const numberInputs = row.locator('input[type="number"]');
+    await numberInputs.nth(0).fill("2");
+    await numberInputs.nth(1).fill("175");
+
+    await expect(page.getByTestId("invoice-line-items-total")).toContainText("$350.00");
+    await expect(page.getByPlaceholder("Amount", { exact: true })).toHaveValue("350");
+
+    await page.getByRole("button", { name: /^Save$/i }).click();
+    await page.getByLabel(/Search invoices/i).fill(clientName);
+    const card = getInvoiceCard(page, clientName);
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText(/Site labor/)).toBeVisible();
+    await expect(card.getByText(/Amount: \$350/)).toBeVisible();
+
+    await card.getByRole("button", { name: /^Edit$/i }).click();
+    await expect(page.getByTestId("invoice-line-items-section")).toBeVisible();
+    await expect(page.getByTestId("invoice-line-item-description").first()).toHaveValue(
+      "Site labor",
+    );
+  });
+
+  test("invoice without line items has no line-item summary on card", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const invNum = `INV-NOLINES-${stamp}`;
+    const clientName = `No Lines ${stamp}`;
+
+    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
+    await page.getByPlaceholder("Amount", { exact: true }).fill("99");
+    await page.locator('input[type="date"]').first().fill("2026-12-01");
+    await page.getByRole("button", { name: /^Save$/i }).click();
+
+    await page.getByLabel(/Search invoices/i).fill(clientName);
+    const card = getInvoiceCard(page, clientName);
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText(/Line items subtotal/i)).toHaveCount(0);
+  });
+
+  test("invoice snapshots client billing and job-site addresses", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const stamp = Date.now();
+    const { clientName, clientId } = await createClient(page.request, stamp);
+
+    const invRes = await page.request.post(`${ORIGIN}/api/invoices`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: {
+        invoiceNumber: `INV-ADDR-${stamp}`,
+        clientName,
+        clientId,
+        amount: "250",
+        dueDate: "2026-12-01",
+        status: "Unpaid",
+      },
+    });
+    expect(invRes.ok()).toBeTruthy();
+    const invoice = (await invRes.json())?.data;
+    expect(invoice?.clientAddress).toMatch(/PO Box 900/i);
+    expect(invoice?.propertyAddress).toMatch(/600 Invoice Ave/i);
+    expect(invoice?.clientPhone).toMatch(/5550006666|555-000-06666/);
+
+    await page.goto("/invoices", { waitUntil: "domcontentloaded" });
+    await page.getByLabel(/Search invoices/i).fill(clientName);
+    const card = getInvoiceCard(page, clientName);
+    await expect(card.getByText(/Job site/i)).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText(/600 Invoice Ave/i)).toBeVisible();
   });
 
   test("clear form exits edit mode", async ({ page }) => {

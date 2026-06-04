@@ -24,6 +24,8 @@ import {
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
 
+import { fetchInvoicePartyDbFields } from "@/lib/invoice-party";
+import { normalizeInvoiceLineItemsForSave } from "@/lib/invoice-line-items";
 import { normalizeBaseNumber } from "@/lib/quote-numbering";
 
 const INVOICES = "invoices";
@@ -45,6 +47,9 @@ function serialize(doc) {
     clientId: doc.client_id || "",
     clientName: doc.client_name || "",
     clientEmail: doc.client_email || "",
+    clientPhone: doc.client_phone || "",
+    clientAddress: doc.client_address || "",
+    propertyAddress: doc.property_address || "",
     amount: amount ? String(amount) : "",
     dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
     lineItems: Array.isArray(doc.items) ? doc.items : [],
@@ -179,7 +184,7 @@ export async function POST(request) {
 
     const body = await request.json();
     const nowIso = new Date().toISOString();
-    const lineItems = Array.isArray(body.lineItems) ? body.lineItems : [];
+    const lineItems = normalizeInvoiceLineItemsForSave(body.lineItems);
     const amount = normalizeMoney(body.amount);
     const amountCents = Math.round(amount * 100);
     const submittedQuoteId = normalizeUuid(body.quoteId);
@@ -251,6 +256,17 @@ export async function POST(request) {
       payments: [],
     });
 
+    const partyFields = linkedClientId
+      ? await fetchInvoicePartyDbFields(supabaseAdmin, tenantDbId, linkedClientId, {
+          clientEmail: body.clientEmail,
+        })
+      : {
+          client_phone: "",
+          client_address: "",
+          property_address: "",
+          client_email: String(body.clientEmail || "").trim(),
+        };
+
     const toInsert = {
       tenant_id: tenantDbId,
       user_id: userId || null,
@@ -259,7 +275,10 @@ export async function POST(request) {
       job_id: normalizeUuid(body.jobId),
       client_id: linkedClientId,
       client_name: String(body.clientName || "").trim(),
-      client_email: String(body.clientEmail || "").trim(),
+      client_email: partyFields.client_email || String(body.clientEmail || "").trim(),
+      client_phone: partyFields.client_phone || "",
+      client_address: partyFields.client_address || "",
+      property_address: partyFields.property_address || "",
       amount,
       due_date: normalizeTimestamp(body.dueDate),
       items: lineItems,

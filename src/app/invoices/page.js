@@ -1,8 +1,9 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientPickerField from "@/components/clients/ClientPickerField";
 import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
+import InvoiceLineItemsEditor from "@/components/invoices/InvoiceLineItemsEditor";
 import styles from "./invoices.module.css";
 import UniversalShareButton from "@/components/UniversalShareButton";
 import { useTranslation } from "react-i18next";
@@ -14,6 +15,18 @@ import {
   openPrintableHtmlDocument,
 } from "@/lib/print-html-document";
 import { filterAndRankRecords } from "@/lib/record-search";
+import {
+  computeInvoiceLineItemTotal,
+  createInvoiceLineItem,
+  formatInvoiceLineItemsForList,
+  getInvoiceLineItemDescription,
+  hasDisplayableInvoiceLineItems,
+  normalizeInvoiceLineItemsForForm,
+  normalizeInvoiceLineItemsForSave,
+  sumInvoiceLineItemsTotals,
+} from "@/lib/invoice-line-items";
+import { buildFieldBasePoweredByHtml } from "@/lib/fieldbase-document-branding";
+import { buildInvoicePartyHtmlBlock } from "@/lib/invoice-party";
 import "@/i18n";
 
 const initialInvoice = {
@@ -26,7 +39,7 @@ const initialInvoice = {
   dueDate: "",
   status: "Unpaid",
   preferredPaymentMethod: "bank_transfer",
-  lineItemsText: "",
+  lineItems: [createInvoiceLineItem("line-1")],
   notes: "",
 };
 
@@ -77,40 +90,6 @@ const initialPaymentDraft = (invoice) => ({
   reference: "",
   notes: "",
 });
-
-const formatInvoiceLineItems = (lineItems = []) =>
-  Array.isArray(lineItems)
-    ? lineItems
-        .map((item) => {
-          const label = String(item?.label || "").trim();
-          const details = String(item?.details || "").trim();
-          const amount = String(item?.amount || "").trim();
-          if (!label && !details && !amount) {
-            return "";
-          }
-
-          const left = [label, details].filter(Boolean).join(" - ");
-          return amount ? `${left} | $${amount}` : left;
-        })
-        .filter(Boolean)
-        .join("\n")
-    : "";
-
-const parseInvoiceLineItems = (value = "") =>
-  String(value)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [leftPart, rightPart = ""] = line.split("|");
-      const [label, ...detailParts] = leftPart.split(" - ");
-      return {
-        id: `manual-${index + 1}`,
-        label: String(label || "").trim(),
-        details: detailParts.join(" - ").trim(),
-        amount: String(rightPart || "").replace(/[^0-9.]/g, ""),
-      };
-    });
 
 function IconPencil() {
   return (
@@ -190,19 +169,38 @@ export default function InvoicesPage() {
     return raw;
   };
 
+  const handleLineItemsChange = (lineItems) => {
+    const total = sumInvoiceLineItemsTotals(lineItems);
+    setForm((prev) => ({
+      ...prev,
+      lineItems,
+      amount: total > 0 ? String(total) : prev.amount,
+    }));
+  };
+
   const openPrintableInvoice = (invoice) => {
-    const lineRows = (invoice.lineItems || [])
-      .map(
-        (line) =>
-          `<tr><td>${escapeHtml(line.description || line.name || "")}</td><td>$${Number(line.amount ?? line.price ?? 0).toFixed(2)}</td></tr>`,
-      )
+    const printableItems = normalizeInvoiceLineItemsForSave(invoice.lineItems);
+    const lineRows = printableItems
+      .map((line) => {
+        const qty = Number(line.quantity ?? line.qty ?? 1) || 1;
+        const unit = Number(line.unitPrice || 0);
+        const total = computeInvoiceLineItemTotal(line);
+        const label = escapeHtml(getInvoiceLineItemDescription(line));
+        const detail =
+          qty > 1 || unit > 0
+            ? `${qty} × $${unit.toFixed(2)} = $${total.toFixed(2)}`
+            : `$${total.toFixed(2)}`;
+        return `<tr><td>${label}</td><td>${escapeHtml(detail)}</td></tr>`;
+      })
       .join("");
     const lineTable = lineRows
-      ? `<table><thead><tr><th>${escapeHtml(t("invoices.labels.lineItems", { defaultValue: "Line items" }))}</th><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th></tr></thead><tbody>${lineRows}</tbody></table>`
+      ? `<table><thead><tr><th>${escapeHtml(t("invoices.lineItems.title", { defaultValue: "Line items" }))}</th><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th></tr></thead><tbody>${lineRows}</tbody></table>`
       : "";
+    const partyHtml = buildInvoicePartyHtmlBlock(invoice);
     const bodyHtml = `
       <h1>${escapeHtml(t("invoices.listTitle", { defaultValue: "Invoice" }))}</h1>
       <p class="meta">${escapeHtml(invoice.invoiceNumber || "")} · ${escapeHtml(invoice.clientName || "")}</p>
+      ${partyHtml}
       <table><tbody>
         <tr><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th><td>$${Number(invoice.amount || 0).toFixed(2)}</td></tr>
         <tr><th>${escapeHtml(t("invoices.labels.paid", { defaultValue: "Paid" }))}</th><td>$${Number(invoice.paidAmount || 0).toFixed(2)}</td></tr>
@@ -211,7 +209,8 @@ export default function InvoicesPage() {
         <tr><th>${escapeHtml(t("invoices.labels.status", { defaultValue: "Status" }))}</th><td>${escapeHtml(invoice.status || "")}</td></tr>
       </tbody></table>
       ${lineTable}
-      ${invoice.notes ? `<p><strong>${escapeHtml(t("invoices.placeholders.notes", { defaultValue: "Notes" }))}</strong><br/>${escapeHtml(invoice.notes)}</p>` : ""}`;
+      ${invoice.notes ? `<p><strong>${escapeHtml(t("invoices.placeholders.notes", { defaultValue: "Notes" }))}</strong><br/>${escapeHtml(invoice.notes)}</p>` : ""}
+      ${buildFieldBasePoweredByHtml()}`;
     const opened = openPrintableHtmlDocument({
       title: `Invoice ${invoice.invoiceNumber || ""}`,
       bodyHtml,
@@ -270,6 +269,8 @@ export default function InvoicesPage() {
     return "";
   };
 
+  const lastInvoiceFetchRef = useRef(0);
+
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -277,6 +278,7 @@ export default function InvoicesPage() {
       const res = await apiFetch("/api/invoices");
       const data = await getJsonOrThrow(res, t("invoices.errors.fetch"));
       setInvoices(data);
+      lastInvoiceFetchRef.current = Date.now();
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.load")));
     } finally {
@@ -290,7 +292,11 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") fetchInvoices();
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastInvoiceFetchRef.current < 60_000) return;
+      lastInvoiceFetchRef.current = now;
+      fetchInvoices();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -348,7 +354,7 @@ export default function InvoicesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          lineItems: parseInvoiceLineItems(form.lineItemsText),
+          lineItems: normalizeInvoiceLineItemsForSave(form.lineItems),
         }),
       });
       const result = await getJsonOrThrow(res, t("invoices.errors.save"));
@@ -382,9 +388,14 @@ export default function InvoicesPage() {
         amount: result.data.amount || current.amount,
         dueDate: result.data.dueDate || current.dueDate,
         invoiceTitle: result.data.invoiceTitle || current.invoiceTitle,
-        lineItemsText: result.data.lineItems?.length
-          ? formatInvoiceLineItems(result.data.lineItems)
-          : current.lineItemsText,
+        lineItems: result.data.lineItems?.length
+          ? normalizeInvoiceLineItemsForForm(result.data.lineItems)
+          : current.lineItems,
+        amount:
+          result.data.amount ||
+          (result.data.lineItems?.length
+            ? String(sumInvoiceLineItemsTotals(result.data.lineItems))
+            : current.amount),
         notes: result.data.notes || current.notes,
       }));
     } catch (err) {
@@ -405,8 +416,7 @@ export default function InvoicesPage() {
       dueDate: invoice.dueDate || "",
       status: invoice.status || "Unpaid",
       preferredPaymentMethod: invoice.preferredPaymentMethod || "bank_transfer",
-      lineItemsText:
-        invoice.lineItemsText || formatInvoiceLineItems(invoice.lineItems),
+      lineItems: normalizeInvoiceLineItemsForForm(invoice.lineItems),
       notes: invoice.notes || "",
     });
     setSelectedId(invoice._id);
@@ -682,11 +692,12 @@ export default function InvoicesPage() {
                 displayValue={form.clientName}
                 showHint={false}
                 placeholder={t("invoices.placeholders.client")}
-                onChange={({ clientId, clientName, displayValue }) =>
+                onChange={({ clientId, clientName, displayValue, client }) =>
                   setForm((prev) => ({
                     ...prev,
                     clientId: clientId || "",
                     clientName: clientName || displayValue || "",
+                    clientEmail: client?.email || prev.clientEmail || "",
                   }))
                 }
               />
@@ -761,13 +772,9 @@ export default function InvoicesPage() {
                   </option>
                 ))}
               </select>
-              <textarea
-                placeholder={t("invoices.placeholders.lineItems")}
-                value={form.lineItemsText}
-                onChange={(e) =>
-                  setForm({ ...form, lineItemsText: e.target.value })
-                }
-                className={styles.fieldTextareaTall}
+              <InvoiceLineItemsEditor
+                lineItems={form.lineItems}
+                onChange={handleLineItemsChange}
               />
               <textarea
                 placeholder={t("invoices.placeholders.notes")}
@@ -857,6 +864,28 @@ export default function InvoicesPage() {
                   {invoice.invoiceTitle
                     ? <p className={styles.muted}>{invoice.invoiceTitle}</p>
                     : null}
+                  {invoice.clientAddress
+                    ? <p className={styles.muted}>
+                        {t("invoices.party.customerAddress", {
+                          defaultValue: "Customer",
+                        })}
+                        : {invoice.clientAddress}
+                      </p>
+                    : null}
+                  {invoice.propertyAddress
+                    ? <p className={styles.muted}>
+                        {t("invoices.party.propertyAddress", {
+                          defaultValue: "Job site",
+                        })}
+                        : {invoice.propertyAddress}
+                      </p>
+                    : null}
+                  {invoice.clientPhone
+                    ? <p className={styles.muted}>
+                        {t("invoices.party.phone", { defaultValue: "Phone" })}:{" "}
+                        {invoice.clientPhone}
+                      </p>
+                    : null}
                   {invoice.quoteNumber
                     ? <p className={styles.muted}>
                         Quote ID: {invoice.quoteNumber}
@@ -881,9 +910,9 @@ export default function InvoicesPage() {
                     {t("invoices.labels.dueDate")}:{" "}
                     {invoice.dueDate || t("invoices.labels.noDate")}
                   </p>
-                  {invoice.lineItems?.length
+                  {hasDisplayableInvoiceLineItems(invoice.lineItems)
                     ? <p className={styles.mutedPre}>
-                        {formatInvoiceLineItems(invoice.lineItems)}
+                        {formatInvoiceLineItemsForList(invoice.lineItems)}
                       </p>
                     : null}
                   {invoice.payments?.length

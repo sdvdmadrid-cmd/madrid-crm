@@ -1,5 +1,13 @@
 ﻿import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { normalizeRecipients, sendEmail } from "@/lib/email";
+import {
+  appendFieldBasePoweredByText,
+  buildFieldBasePoweredByHtml,
+} from "@/lib/fieldbase-document-branding";
+import {
+  buildInvoicePartyHtmlBlock,
+  enrichInvoiceWithPartyInfo,
+} from "@/lib/invoice-party";
 import { computeInvoicePaymentState } from "@/lib/invoice-payments";
 import {
   createStripeCheckoutSessionForAccess,
@@ -27,6 +35,8 @@ function buildInvoiceEmailTemplate({
   amount,
   dueDate,
   checkoutUrl,
+  partyHtml = "",
+  brandingHtml = "",
 }) {
   const safeCompany = companyName || "FieldBase";
   const safeClient = clientName || "Client";
@@ -52,12 +62,15 @@ function buildInvoiceEmailTemplate({
     "",
     `Thank you,`,
     safeCompany,
+    "",
+    appendFieldBasePoweredByText(""),
   ].join("\n");
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1a1a1a;">
       <p>Hi ${safeClient},</p>
       <p>Your invoice is ready: <strong>${safeInvoice}</strong>.</p>
+      ${partyHtml}
       <ul>
         <li><strong>Description:</strong> ${safeTitle}</li>
         <li><strong>Amount due:</strong> $${safeAmount}</li>
@@ -70,6 +83,7 @@ function buildInvoiceEmailTemplate({
       }
       <p>For questions, reply to this email.</p>
       <p>Thank you,<br />${safeCompany}</p>
+      ${brandingHtml}
     </div>
   `;
 
@@ -154,6 +168,19 @@ export async function POST(request, { params }) {
       payments: invoice.payments,
     });
 
+    const enrichedInvoice = await enrichInvoiceWithPartyInfo(
+      supabaseAdmin,
+      tenantDbId,
+      {
+        clientName: invoice.client_name,
+        clientEmail: invoice.client_email,
+        clientPhone: invoice.client_phone,
+        clientAddress: invoice.client_address,
+        propertyAddress: invoice.property_address,
+        clientId: invoice.client_id,
+      },
+    );
+
     const template = buildInvoiceEmailTemplate({
       companyName:
         companyProfile?.publicDisplayName || companyProfile?.companyName || "FieldBase",
@@ -163,6 +190,8 @@ export async function POST(request, { params }) {
       amount: paymentState.balanceDue || invoice.amount || 0,
       dueDate: invoice.due_date || "",
       checkoutUrl,
+      partyHtml: buildInvoicePartyHtmlBlock(enrichedInvoice),
+      brandingHtml: buildFieldBasePoweredByHtml(),
     });
 
     const sendResult = await sendEmail({

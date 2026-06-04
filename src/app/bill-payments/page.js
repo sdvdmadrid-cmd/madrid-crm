@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Elements,
-  PaymentElement,
-  useElements,
-  useStripe,
-} from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useDeferredValue,
@@ -16,7 +10,6 @@ import {
 } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import PaymentMethodsHub from "@/components/payments/PaymentMethodsHub";
 import BillPaymentsSecureShell from "@/components/bill-payments/BillPaymentsSecureShell";
 import {
   BILL_PAY_CATEGORIES,
@@ -31,9 +24,19 @@ import {
 } from "@/lib/bill-payments-validation";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  : null;
+const PaymentMethodsHub = dynamic(
+  () => import("@/components/payments/PaymentMethodsHub"),
+  {
+    ssr: false,
+    loading: () => (
+      <p style={{ margin: 0, opacity: 0.8 }}>Loading payment methods…</p>
+    ),
+  },
+);
+
+const stripeConfigured = Boolean(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+);
 
 const BILL_CATEGORIES = BILL_PAY_CATEGORIES;
 
@@ -110,147 +113,6 @@ function buildAutopayDraft(bill) {
     monthlyDay: rule.monthlyDay == null ? "1" : String(rule.monthlyDay),
     notifyDaysBefore: String(rule.notifyDaysBefore ?? 3),
   };
-}
-
-function PaymentMethodSetupForm({
-  methodType,
-  billingDetails,
-  onCancel,
-  onSaved,
-  onError,
-  saving,
-  setSaving,
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-
-  const submit = useCallback(async (event) => {
-    event.preventDefault();
-    if (!stripe || !elements) return;
-
-    setSaving(true);
-    onError("");
-
-    let result;
-    try {
-      result = await Promise.race([
-        stripe.confirmSetup({
-          elements,
-          redirect: "if_required",
-          confirmParams: {
-            return_url:
-              typeof window !== "undefined" ? window.location.href : undefined,
-            payment_method_data: {
-              billing_details: {
-                name: billingDetails?.name || "Cardholder",
-                email: billingDetails?.email || undefined,
-              },
-            },
-          },
-        }),
-        new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(new Error("Stripe is taking too long. Please try again."));
-          }, 30000);
-        }),
-      ]);
-    } catch (error) {
-      onError(error.message || "Unable to save payment method.");
-      setSaving(false);
-      return;
-    }
-
-    if (result.error) {
-      onError(result.error.message || "Unable to save payment method.");
-      setSaving(false);
-      return;
-    }
-
-    const paymentMethodId = result.setupIntent?.payment_method;
-    if (typeof paymentMethodId !== "string") {
-      onError("Stripe did not return a payment method.");
-      setSaving(false);
-      return;
-    }
-
-    try {
-      const syncResponse = await apiFetch(
-        "/api/bill-payments/payment-methods/sync",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentMethodId, setDefault: false }),
-          timeoutMs: 30000,
-        },
-      );
-      const payload = await getJsonOrThrow(
-        syncResponse,
-        "Unable to sync saved payment method.",
-      );
-      onSaved(payload.data);
-    } catch (error) {
-      onError(error.message || "Unable to sync saved payment method.");
-    } finally {
-      setSaving(false);
-    }
-  }, [billingDetails?.email, billingDetails?.name, elements, onError, onSaved, setSaving, stripe]);
-
-  return (
-    <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
-      <div
-        style={{
-          padding: 14,
-          borderRadius: 16,
-          border: "1px solid rgba(15, 23, 42, 0.12)",
-          background: "rgba(255,255,255,0.9)",
-        }}
-      >
-        <PaymentElement
-          options={{
-            layout: { type: "tabs", defaultCollapsed: false },
-            fields: { billingDetails: "auto" },
-            wallets: { applePay: "never", googlePay: "never" },
-          }}
-        />
-      </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button
-          type="submit"
-          disabled={!stripe || !elements || saving}
-          style={{
-            border: 0,
-            borderRadius: 999,
-            background: "#0f766e",
-            color: "#fff",
-            padding: "12px 18px",
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          {saving
-            ? "Saving method..."
-            : methodType === "bank_account"
-              ? "Save ACH account"
-              : "Save card or debit"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          style={{
-            borderRadius: 999,
-            border: "1px solid rgba(15, 23, 42, 0.14)",
-            background: "#fff",
-            color: "#0f172a",
-            padding: "12px 18px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-  );
 }
 
 function loadPlaidScript() {
@@ -969,7 +831,7 @@ export default function BillPaymentsPage() {
       setNotice("Add a card or bank account in the Wallet tab.");
       return;
     }
-    if (!executablePaymentMethods.length && !stripePromise) {
+    if (!executablePaymentMethods.length && !stripeConfigured) {
       setShowPaymentMethods(true);
       setError(
         "Payment setup is unavailable. Configure Stripe publishable key or link a bank via Plaid.",

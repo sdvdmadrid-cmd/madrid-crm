@@ -1,9 +1,5 @@
-﻿import WebsiteBuilderClient from "@/components/website-builder/WebsiteBuilderClient";
+﻿import WebsiteBuilderPageClient from "./WebsiteBuilderPageClient";
 
 export default function WebsiteBuilderPage() {
-  return (
-    <div className="wb-page-root">
-      <WebsiteBuilderClient />
-    </div>
-  );
+  return <WebsiteBuilderPageClient />;
 }

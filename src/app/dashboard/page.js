@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
+import { useCurrentUserAccess } from "@/lib/current-user-client";
 import GettingStartedChecklist from "@/components/workspace/GettingStartedChecklist";
 import PaymentsReadinessBanner from "@/components/workspace/PaymentsReadinessBanner";
 import { FIELDBASE_PILLARS } from "@/lib/fieldbase-pillars";
@@ -76,8 +77,9 @@ function PlusIcon() {
 export default function RevenueDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { authUser } = useCurrentUserAccess();
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState("");
+  const userName = String(authUser?.name || "").trim();
   const [metrics, setMetrics] = useState(null);
   const [revenueData, setRevenueData] = useState({
     totalRevenue: 0,
@@ -99,7 +101,6 @@ export default function RevenueDashboardPage() {
       let requests;
       try {
         requests = await Promise.allSettled([
-          apiFetch("/api/auth/me", { signal: controller.signal, suppressUnauthorizedEvent: true }),
           apiFetch("/api/dashboard-metrics", { signal: controller.signal, suppressUnauthorizedEvent: true }),
           apiFetch("/api/revenue-dashboard?limit=10", { signal: controller.signal, suppressUnauthorizedEvent: true }),
           apiFetch("/api/payments/connect/status", {
@@ -113,16 +114,12 @@ export default function RevenueDashboardPage() {
 
       if (cancelled) return;
 
-      const [sessionResult, metricsResult, revenueResult, connectResult] = requests;
+      const [metricsResult, revenueResult, connectResult] = requests;
 
-      if (sessionResult.status === "fulfilled" && sessionResult.value.ok) {
-        const sessionPayload = await sessionResult.value.json().catch(() => null);
-        const sessionRole = String(sessionPayload?.data?.role || "").toLowerCase();
-        if (sessionRole === "super_admin") {
-          router.replace("/owner/overview");
-          return;
-        }
-        setUserName(String(sessionPayload?.data?.name || "").trim());
+      const sessionRole = String(authUser?.role || "").toLowerCase();
+      if (sessionRole === "super_admin") {
+        router.replace("/owner/overview");
+        return;
       }
 
       if (metricsResult.status === "fulfilled" && metricsResult.value.ok) {
@@ -160,7 +157,7 @@ export default function RevenueDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, authUser?.role, authUser?.userId]);
 
   const activeJobs = metrics?.jobs?.active ?? 0;
   const pendingEstimates = metrics?.estimateRequests?.newCount ?? 0;
@@ -291,8 +288,19 @@ export default function RevenueDashboardPage() {
           <Link href="/clients?action=new" className={styles.coPrimaryAction}>
             {t("dashboardControl.actions.addClient")}
           </Link>
+          <Link
+            href="/settings/payments"
+            className={styles.secondaryAction}
+            data-testid="dashboard-collect-payment"
+          >
+            {t("dashboardControl.actions.collectPayment")}
+          </Link>
           <details className={styles.moreActions}>
-            <summary>
+            <summary
+              role="button"
+              aria-haspopup="menu"
+              data-testid="dashboard-more-actions"
+            >
               {inboxAttention > 0
                 ? t("dashboardControl.actions.moreActionsWithCount", {
                     count: inboxAttention,

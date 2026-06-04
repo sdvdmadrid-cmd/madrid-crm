@@ -109,8 +109,8 @@ export function useWeather(
         new Date().getDate() + 15,
       ),
     );
-    for (const { date } of calendarDays) {
-      if (!date) continue;
+    for (const { date, isCurrentMonth } of calendarDays) {
+      if (!date || isCurrentMonth === false) continue;
       const dateStr = formatLocalDate(date);
       if (!dateStr || dateStr < today || dateStr > maxForecastDate) continue;
       fetchOne(defaultLocation, dateStr);

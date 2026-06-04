@@ -31,13 +31,20 @@ export default function PaymentsReadinessBanner() {
 
   if (loading) {
     return (
-      <div className={`${styles.banner} ${styles.banner_loading} fb-shimmer`} />
+      <div
+        className={`${styles.banner} ${styles.banner_loading} fb-shimmer`}
+        data-testid="payments-readiness-banner"
+        aria-busy="true"
+      />
     );
   }
 
   if (status?.onboarded) {
     return (
-      <section className={`${styles.banner} ${styles.banner_ready}`}>
+      <section
+        className={`${styles.banner} ${styles.banner_ready}`}
+        data-testid="payments-readiness-banner"
+      >
         <div className={styles.content}>
           <p className={styles.kicker}>{t("paymentsBanner.ready.kicker")}</p>
           <h2 className={styles.title}>{t("paymentsBanner.ready.title")}</h2>
@@ -60,6 +67,7 @@ export default function PaymentsReadinessBanner() {
   return (
     <section
       className={`${styles.banner} ${featureOff ? styles.banner_soon : styles.banner_action}`}
+      data-testid="payments-readiness-banner"
     >
       <div className={styles.content}>
         <p className={styles.kicker}>

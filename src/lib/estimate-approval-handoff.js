@@ -15,6 +15,7 @@ import {
   pickMaxQuoteSequence,
   toCents,
 } from "@/lib/quote-numbering";
+import { fetchInvoicePartyDbFields } from "@/lib/invoice-party";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const QUOTES_TABLE = "quotes";
@@ -210,6 +211,16 @@ async function ensureInvoiceForApprovedEstimate({ estimate, quote, nowIso }) {
     // Do not set estimate_id — FK targets estimate_builder (uuid) only; pipeline
     // estimates use integer ids and must link via quote_id + invoice_number.
   };
+
+  if (invoiceDoc.client_id) {
+    const partyFields = await fetchInvoicePartyDbFields(
+      supabaseAdmin,
+      tenantId,
+      invoiceDoc.client_id,
+      { clientEmail: invoiceDoc.client_email },
+    );
+    Object.assign(invoiceDoc, partyFields);
+  }
 
   let lastError = null;
   for (let attempt = 0; attempt < 5; attempt += 1) {

@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import PlacesAutocomplete from "@/components/PlacesAutocomplete";
+import {
+  buildEmptyAppointmentAddress,
+  buildLocationFromAddressParts,
+  getAppointmentAddressValidationError,
+  parseLocationToAddressParts,
+} from "@/lib/appointment-address";
 import {
   formatLocalDate,
   isPastYmd,
@@ -128,36 +135,6 @@ const buildEmptyForm = (initialDate) => ({
   status: "Scheduled",
 });
 
-const buildEmptyAddress = () => ({
-  street: "",
-  city: "",
-  state: "",
-  zip: "",
-});
-
-const parseLocationToAddress = (location) => {
-  const raw = String(location || "").trim();
-  if (!raw) return buildEmptyAddress();
-  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
-  const address = buildEmptyAddress();
-  address.street = parts[0] || "";
-  address.city = parts[1] || "";
-  const stateZip = parts[2] || "";
-  const match = stateZip.match(/^([A-Za-z]{2})(?:\s+([A-Za-z0-9-]{3,10}))?$/);
-  if (match) {
-    address.state = match[1] || "";
-    address.zip = match[2] || "";
-  } else {
-    address.state = stateZip;
-  }
-  return address;
-};
-
-const buildLocationFromAddress = (address) => {
-  const stateZip = [address.state, address.zip].filter(Boolean).join(" ");
-  return [address.street, address.city, stateZip].filter(Boolean).join(", ");
-};
-
 const normalizeAppointmentToForm = (appointment, initialDate) => ({
   title: appointment?.title || "",
   clientName: appointment?.clientName || appointment?.client || "",
@@ -180,7 +157,7 @@ export default function AppointmentModal({
 }) {
   const { t } = useTranslation();
   const [form, setForm] = useState(buildEmptyForm(initialDate));
-  const [address, setAddress] = useState(buildEmptyAddress());
+  const [address, setAddress] = useState(buildEmptyAppointmentAddress());
   const [isEditMode, setIsEditMode] = useState(!existingAppointment);
 
   const [errors, setErrors] = useState({});
@@ -192,11 +169,21 @@ export default function AppointmentModal({
     if (existingAppointment) {
       const nextForm = normalizeAppointmentToForm(existingAppointment, initialDate);
       setForm(nextForm);
-      setAddress(parseLocationToAddress(nextForm.location));
+      const parsed = parseLocationToAddressParts(nextForm.location);
+      const hasGeo =
+        typeof appointment?.latitude === "number" &&
+        typeof appointment?.longitude === "number";
+      setAddress({
+        ...parsed,
+        latitude: hasGeo ? appointment.latitude : null,
+        longitude: hasGeo ? appointment.longitude : null,
+        placeId: appointment?.addressPlaceId || "",
+        verified: Boolean(hasGeo && appointment?.addressPlaceId),
+      });
       setIsEditMode(false);
     } else {
       setForm(buildEmptyForm(initialDate));
-      setAddress(buildEmptyAddress());
+      setAddress(buildEmptyAppointmentAddress());
       setIsEditMode(true);
     }
     setErrors({});
@@ -214,20 +201,39 @@ export default function AppointmentModal({
       newErrors.date = t("calendar.errors.pastDate");
     }
     if (!form.time) newErrors.time = t("calendar.errors.required");
+
+    const addressError = getAppointmentAddressValidationError(address, t);
+    if (addressError) newErrors.addressStreet = addressError;
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const clearAddressVerification = (patch) =>
+    setAddress((current) => ({
+      ...current,
+      ...patch,
+      placeId: "",
+      latitude: null,
+      longitude: null,
+      verified: false,
+    }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    const formatted =
+      address.formattedAddress || buildLocationFromAddressParts(address);
     await onSave({
       ...form,
-      location: buildLocationFromAddress(address),
+      location: formatted,
+      latitude: address.latitude,
+      longitude: address.longitude,
+      addressPlaceId: address.placeId,
     });
     if (!existingAppointment) {
       setForm(buildEmptyForm(initialDate));
-      setAddress(buildEmptyAddress());
+      setAddress(buildEmptyAppointmentAddress());
     }
     setErrors({});
   };
@@ -461,13 +467,54 @@ export default function AppointmentModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t("calendar.labels.addressStreet")}
                 </label>
-                <input
-                  type="text"
+                <PlacesAutocomplete
+                  id="appointment-address-street"
                   value={address.street}
-                  onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                  selectedValueKey="street"
+                  onChange={(value) =>
+                    clearAddressVerification({ street: value, formattedAddress: "" })
+                  }
+                  onSelect={({
+                    street,
+                    city,
+                    state,
+                    zip,
+                    formattedAddress,
+                    latitude,
+                    longitude,
+                    placeId,
+                  }) => {
+                    setAddress({
+                      street: street || "",
+                      city: city || "",
+                      state: state || "",
+                      zip: zip || "",
+                      formattedAddress: formattedAddress || "",
+                      latitude:
+                        typeof latitude === "number" ? latitude : null,
+                      longitude:
+                        typeof longitude === "number" ? longitude : null,
+                      placeId: placeId || "",
+                      verified: Boolean(placeId),
+                    });
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.addressStreet;
+                      return next;
+                    });
+                  }}
                   placeholder={t("calendar.placeholders.addressStreet")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  inputClass={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
+                    errors.addressStreet ? "border-red-500" : "border-gray-300"
+                  }`}
+                  disabled={isSaving}
                 />
+                {errors.addressStreet ? (
+                  <p className="text-red-600 text-xs mt-1">{errors.addressStreet}</p>
+                ) : null}
+                <p className="text-xs text-gray-500 mt-1">
+                  {t("calendar.address.autocompleteHint")}
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -478,7 +525,7 @@ export default function AppointmentModal({
                   <input
                     type="text"
                     value={address.city}
-                    onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                    onChange={(e) => clearAddressVerification({ city: e.target.value })}
                     placeholder={t("calendar.placeholders.city")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
@@ -491,7 +538,7 @@ export default function AppointmentModal({
                   <input
                     type="text"
                     value={address.state}
-                    onChange={(e) => setAddress({ ...address, state: e.target.value })}
+                    onChange={(e) => clearAddressVerification({ state: e.target.value })}
                     placeholder={t("calendar.placeholders.state")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
@@ -505,7 +552,7 @@ export default function AppointmentModal({
                 <input
                   type="text"
                   value={address.zip}
-                  onChange={(e) => setAddress({ ...address, zip: e.target.value })}
+                  onChange={(e) => clearAddressVerification({ zip: e.target.value })}
                   placeholder={t("calendar.placeholders.zip")}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />

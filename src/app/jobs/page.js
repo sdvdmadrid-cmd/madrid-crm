@@ -608,7 +608,7 @@ export default function JobsPage() {
       <section>
         <details
           className={jobStyles.manualJobDetails}
-          open={searchParams.get("action") === "new"}
+          open={searchParams.get("action") !== "collapse"}
         >
           <summary>{t("jobs.manualJobSummary")}</summary>
           <p className={ws.subtitle} style={{ margin: "8px 0 14px" }}>

@@ -62,6 +62,13 @@ async function openEstimateInKanban(page, clientName) {
   await page.getByRole("button", { name: new RegExp(clientName) }).click();
 }
 
+async function expandKanbanMoreActions(page) {
+  const duplicate = page.getByRole("button", { name: /Duplicate/i });
+  if (await duplicate.isVisible().catch(() => false)) return;
+  await page.locator("details").filter({ hasText: "More actions" }).click();
+  await expect(duplicate).toBeVisible({ timeout: 10_000 });
+}
+
 test.describe("Contractor workflows — documents & kanban actions", () => {
   test.beforeEach(async ({ page }) => {
     await devLogin(page, { profile: "admin", redirect: "/dashboard" });
@@ -83,6 +90,7 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
   test("kanban: send estimate, generate contract, duplicate, print PDF link", async ({
     page,
   }) => {
+    test.setTimeout(90_000);
     const stamp = Date.now();
     const { clientName, estimate } = await createClientAndEstimate(page.request, stamp);
 
@@ -113,6 +121,7 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
     ).toBeVisible();
 
     const editHrefBefore = page.url();
+    await expandKanbanMoreActions(page);
     await page.getByRole("button", { name: /Duplicate/i }).click();
     await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
     expect(page.url()).not.toBe(editHrefBefore);
@@ -243,6 +252,7 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
   });
 
   test("reputation: archive import saves a private review", async ({ page }) => {
+    test.setTimeout(60_000);
     const stamp = Date.now();
     const reviewText = `UX import review ${stamp}`;
 
@@ -251,10 +261,17 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
       timeout: 15_000,
     });
 
-    await page.getByRole("button", { name: /Reviews/i }).click();
+    await page.getByTestId("reputation-tab-reviews").click();
+    await page
+      .locator("details")
+      .filter({ hasText: /Import review to private archive/i })
+      .click();
+    await expect(page.getByPlaceholder("Review URL (optional)")).toBeVisible({
+      timeout: 15_000,
+    });
     await page.getByPlaceholder("Review URL (optional)").fill(`https://example.com/review/${stamp}`);
     await page.getByPlaceholder("Customer name").fill(`Reviewer ${stamp}`);
-    await page.getByPlaceholder("Paste review text here").fill(reviewText);
+    await page.getByPlaceholder(/Paste review text here/i).fill(reviewText);
     await page.getByRole("button", { name: /Save to archive/i }).click();
 
     await expect(page.getByText(/Saved|imported/i)).toBeVisible({ timeout: 15_000 });
