@@ -1,4 +1,8 @@
 import {
+  attachFreshPartyToEstimateDbRow,
+  enrichEstimateWithPartyInfo,
+} from "@/lib/client-document-party";
+import {
   buildPublicEstimateLink,
   isPublicEstimateStatus,
 } from "@/lib/estimate-public-access";
@@ -176,9 +180,19 @@ export async function GET(request) {
     const { data, error } = await query;
     if (error) throw new Error(error.message);
 
+    const serialized = await Promise.all(
+      (data || []).map(async (row) =>
+        enrichEstimateWithPartyInfo(
+          supabaseAdmin,
+          tenantDbId,
+          serializeEstimate(row),
+        ),
+      ),
+    );
+
     return jsonResponse({
       success: true,
-      data: (data || []).map(serializeEstimate),
+      data: serialized,
     });
   } catch (error) {
     console.error("[api/estimates][GET] error", {
@@ -214,6 +228,12 @@ export async function POST(request) {
       return jsonResponse({ success: false, error: "Client name is required" }, 400);
     }
 
+    const mappedWithParty = await attachFreshPartyToEstimateDbRow(
+      supabaseAdmin,
+      tenantDbId,
+      mapped,
+    );
+
     const userProvidedNumber = String(body.estimateNumber || "").trim();
 
     // Insert with retry on unique-constraint violation. Under concurrent
@@ -231,7 +251,7 @@ export async function POST(request) {
       const insertResult = await supabaseAdmin
         .from(ESTIMATES_TABLE)
         .insert({
-          ...mapped,
+          ...mappedWithParty,
           estimate_number: estimateNumber,
           currency: "USD",
           tenant_id: tenantDbId,

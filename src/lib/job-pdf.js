@@ -6,6 +6,7 @@ import {
   renderBrandedPdfHeader,
   renderPdfFooter,
 } from "./document-pdf-core.js";
+import { renderInvoicePartySection } from "./invoice-party.js";
 
 export async function buildJobPdfBuffer({ job, branding = {} }) {
   if (!job?.id && !job?._id) {
@@ -34,8 +35,19 @@ export async function buildJobPdfBuffer({ job, branding = {} }) {
     branding,
   });
 
+  renderInvoicePartySection(
+    doc,
+    {
+      clientName: job.clientName,
+      clientAddress: job.billingAddress || job.clientAddress,
+      propertyAddress: job.propertyAddress,
+      clientPhone: job.clientPhone,
+      clientEmail: job.clientEmail,
+    },
+    pageWidth,
+  );
+
   const rows = [
-    ["Client", job.clientName],
     ["Service", job.service],
     ["Price", formatMoney(job.price)],
     ["Tax state", job.taxState],

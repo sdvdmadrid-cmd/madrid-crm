@@ -67,27 +67,41 @@ function renderClientAndProject(doc, estimate, pageWidth) {
   const rightX = leftX + colW + colGap;
   const startY = doc.y;
 
+  const billingAddress = String(
+    estimate.billingAddress || estimate.clientAddress || "",
+  ).trim();
+  const projectAddress = String(
+    estimate.address || estimate.propertyAddress || "",
+  ).trim();
+
   doc.font("Helvetica-Bold").fontSize(9).fillColor(SLATE_500);
   doc.text("PREPARED FOR", leftX, startY, { width: colW });
-  doc.text("PROJECT", rightX, startY, { width: colW });
+  doc.text("JOB SITE", rightX, startY, { width: colW });
 
   const bodyY = startY + 14;
   doc.font("Helvetica-Bold").fontSize(11).fillColor(SLATE_900);
   doc.text(estimate.clientName || "—", leftX, bodyY, { width: colW });
   doc.font("Helvetica").fontSize(10).fillColor(SLATE_600);
   let leftEnd = doc.y;
-  if (estimate.clientEmail) {
-    doc.text(estimate.clientEmail, leftX, leftEnd, { width: colW });
+  if (billingAddress) {
+    doc.text(billingAddress, leftX, leftEnd, { width: colW });
     leftEnd = doc.y;
   }
   if (estimate.clientPhone) {
-    doc.text(estimate.clientPhone, leftX, leftEnd, { width: colW });
+    doc.text(`Phone: ${estimate.clientPhone}`, leftX, leftEnd, { width: colW });
+    leftEnd = doc.y;
+  }
+  if (estimate.clientEmail) {
+    doc.text(`Email: ${estimate.clientEmail}`, leftX, leftEnd, { width: colW });
     leftEnd = doc.y;
   }
 
   doc.font("Helvetica").fontSize(10).fillColor(SLATE_600);
-  const address = String(estimate.address || "").trim() || "—";
-  doc.text(address, rightX, bodyY, { width: colW });
+  if (projectAddress) {
+    doc.text(projectAddress, rightX, bodyY, { width: colW });
+  } else {
+    doc.fillColor(SLATE_400).text("—", rightX, bodyY, { width: colW });
+  }
   const rightEnd = doc.y;
 
   doc.y = Math.max(leftEnd, rightEnd) + 14;

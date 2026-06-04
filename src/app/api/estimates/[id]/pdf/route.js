@@ -1,3 +1,4 @@
+import { enrichEstimateWithPartyInfo } from "@/lib/client-document-party";
 import { getEstimatePdfBranding } from "@/lib/estimate-pdf-branding";
 import { pdfResponse } from "@/lib/document-pdf-core";
 import { buildEstimatePdfBuffer, pdfFilenameForEstimate } from "@/lib/estimate-pdf";
@@ -58,7 +59,12 @@ export async function GET(request, { params }) {
     if (error) throw new Error(error.message);
     if (!data) return jsonResponse({ success: false, error: "Estimate not found" }, 404);
 
-    const estimate = serializeEstimateBase(data);
+    let estimate = serializeEstimateBase(data);
+    estimate = await enrichEstimateWithPartyInfo(
+      supabaseAdmin,
+      estimate.tenantId || tenantDbId,
+      estimate,
+    );
     const branding = await getEstimatePdfBranding(estimate.tenantId);
 
     const buffer = await buildEstimatePdfBuffer({ estimate, branding });

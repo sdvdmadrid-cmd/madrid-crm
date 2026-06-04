@@ -1,3 +1,7 @@
+import {
+  attachFreshPartyToJobDbRow,
+  enrichJobWithPartyInfo,
+} from "@/lib/client-document-party";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { JOB_FILES_BUCKET } from "@/lib/job-files";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
@@ -130,7 +134,14 @@ export async function GET(request, { params }) {
       return notFound();
     }
 
-    return new Response(JSON.stringify(serialize(doc)), {
+    const serialized = serialize(doc);
+    const enriched = await enrichJobWithPartyInfo(
+      supabaseAdmin,
+      tenantDbId,
+      serialized,
+    );
+
+    return new Response(JSON.stringify(enriched), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -168,6 +179,27 @@ export async function PATCH(request, { params }) {
     const body = sanitizePayloadDeep(await request.json());
     const updateRow = buildUpdateRow(body);
 
+    let existingQuery = supabaseAdmin
+      .from(JOBS)
+      .select("client_id, client_name")
+      .eq("id", id)
+      .maybeSingle();
+    if ((role || "").toLowerCase() !== "super_admin") {
+      existingQuery = existingQuery.eq("tenant_id", tenantDbId);
+    }
+    const { data: existing } = await existingQuery;
+
+    const withParty = await attachFreshPartyToJobDbRow(
+      supabaseAdmin,
+      tenantDbId,
+      {
+        client_id: updateRow.client_id ?? existing?.client_id,
+        client_name: updateRow.client_name ?? existing?.client_name,
+      },
+    );
+    if (withParty.client_id) updateRow.client_id = withParty.client_id;
+    if (withParty.client_name) updateRow.client_name = withParty.client_name;
+
     let query = supabaseAdmin
       .from(JOBS)
       .update(updateRow)
@@ -200,8 +232,14 @@ export async function PATCH(request, { params }) {
       return notFound();
     }
 
+    const enriched = await enrichJobWithPartyInfo(
+      supabaseAdmin,
+      tenantDbId,
+      serialize(updated),
+    );
+
     return new Response(
-      JSON.stringify({ success: true, data: serialize(updated) }),
+      JSON.stringify({ success: true, data: enriched }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
