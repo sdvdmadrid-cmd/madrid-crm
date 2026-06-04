@@ -4,6 +4,12 @@
 
 export const SLASH_COMMAND_HELP = [
   { cmd: "/help", desc: "List all commands" },
+  { cmd: "/estimate …", desc: "Create estimate from natural language (action mode)" },
+  { cmd: "/invoice …", desc: "Create invoice from job or client (action mode)" },
+  { cmd: "/schedule …", desc: "Book calendar appointment (action mode)" },
+  { cmd: "/job …", desc: "Create a job/project (action mode)" },
+  { cmd: "/client …", desc: "Create or find a client (action mode)" },
+  { cmd: "/search …", desc: "Search clients, jobs, invoices, estimates" },
   { cmd: "/audit", desc: "Analyze website completeness and issues" },
   { cmd: "/seo", desc: "Improve SEO title and meta description" },
   { cmd: "/services", desc: "Apply landscaping service catalog (Website Builder)" },
@@ -63,6 +69,37 @@ const COMMANDS = {
       }
       return [];
     },
+  },
+  estimate: {
+    intentIds: [],
+    buildMessage: (args) =>
+      args
+        ? `Create an estimate: ${args}`
+        : "Help me create an estimate from the services catalog.",
+  },
+  invoice: {
+    intentIds: [],
+    buildMessage: (args) =>
+      args ? `Create an invoice: ${args}` : "List unpaid invoices and help me bill a job.",
+  },
+  schedule: {
+    intentIds: [],
+    buildMessage: (args) =>
+      args ? `Schedule an appointment: ${args}` : "What is on my calendar tomorrow?",
+  },
+  job: {
+    intentIds: [],
+    buildMessage: (args) =>
+      args ? `Create a job: ${args}` : "Create a new job for a client.",
+  },
+  client: {
+    intentIds: [],
+    buildMessage: (args) =>
+      args ? `Find or create client: ${args}` : "Search my clients.",
+  },
+  search: {
+    intentIds: [],
+    buildMessage: (args) => (args ? `Search the CRM for: ${args}` : "Search clients, jobs, and invoices."),
   },
 };
 

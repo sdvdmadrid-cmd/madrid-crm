@@ -1,13 +1,33 @@
 "use client";
 
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import page from "./clients-page.module.css";
 
 export default function ClientFormModal({ open, title, onClose, children }) {
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
-  return (
+  const dialog = (
     <div
-      className={page.modalOverlay}
+      className={`${page.modalOverlay} fb-workspace`}
       onClick={onClose}
       data-testid="client-form-modal-overlay"
     >
@@ -18,9 +38,6 @@ export default function ClientFormModal({ open, title, onClose, children }) {
         aria-labelledby="client-form-modal-title"
         data-testid="client-form-modal"
         onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") onClose();
-        }}
       >
         <header className={page.modalHeader}>
           <h2 id="client-form-modal-title" className={page.modalTitle}>
@@ -39,4 +56,7 @@ export default function ClientFormModal({ open, title, onClose, children }) {
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return dialog;
+  return createPortal(dialog, document.body);
 }

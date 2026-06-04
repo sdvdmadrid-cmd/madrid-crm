@@ -27,6 +27,27 @@ test.describe("Clients module audit", () => {
     });
   });
 
+  test("initial load has no blocking modal overlay", async ({ page }) => {
+    await expect(page.getByTestId("client-form-modal-overlay")).toHaveCount(0);
+    await expect(page.locator("#client-details-panel")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByTestId("clients-search")).toBeVisible();
+    await expect(page.getByTestId("clients-new-button")).toBeEnabled();
+  });
+
+  test("add client opens visible form dialog above overlay", async ({ page }) => {
+    await openNewClientModal(page);
+    const modal = page.getByTestId("client-form-modal");
+    await expect(modal).toBeVisible();
+    await expect(modal).toContainText(/new client/i);
+    const nameField = page.getByRole("textbox", { name: /name/i }).first();
+    await expect(nameField).toBeVisible();
+    await expect(nameField).toBeEditable();
+    const box = await modal.boundingBox();
+    expect(box?.width).toBeGreaterThan(280);
+    expect(box?.height).toBeGreaterThan(200);
+  });
+
   for (const viewport of VIEWPORTS) {
     test(`layout: ${viewport.name} — single search and list`, async ({ page }) => {
       await page.setViewportSize({

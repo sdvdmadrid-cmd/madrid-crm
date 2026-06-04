@@ -62,6 +62,16 @@ export async function executeWorkspaceActions(actions = [], helpers = {}) {
     if (type === "notice" && showNotice) {
       showNotice(summary || payload.message || "Done");
       summaries.push(summary || "Notification shown");
+      continue;
+    }
+
+    if (type === "ops.openUrl" && payload.url && typeof window !== "undefined") {
+      const url = String(payload.url).startsWith("/")
+        ? `${window.location.origin}${payload.url}`
+        : String(payload.url);
+      window.open(url, "_blank", "noopener,noreferrer");
+      summaries.push(summary || "Opened document");
+      continue;
     }
   }
 
