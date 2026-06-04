@@ -6,6 +6,11 @@ import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import { splitStreetFromLocality } from "@/lib/client-display";
+import {
+  CLIENTS_UI_PAGE_SIZE,
+  getClientsListMeta,
+  normalizeClientsListPayload,
+} from "@/lib/clients-list-response";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientFormModal from "@/components/clients/ClientFormModal";
@@ -36,6 +41,9 @@ export default function ClientsPageClient() {
   const [clientDetails, setClientDetails] = useState(null);
   const [detailsWarnings, setDetailsWarnings] = useState([]);
   const [clientSearch, setClientSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const displayedClients = useMemo(() => {
     if (!clientSearch.trim()) return clients;
@@ -53,19 +61,36 @@ export default function ClientsPageClient() {
     ]);
   }, [clients, clientSearch]);
 
-  const fetchClients = useCallback(async () => {
-    setLoading(true);
+  const fetchClients = useCallback(async ({ page = 1, append = false } = {}) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError("");
     try {
-      const res = await apiFetch("/api/clients");
-      const data = await getJsonOrThrow(res, t("clients.errors.fetch"));
-      setClients(data);
+      const res = await apiFetch(
+        `/api/clients?limit=${CLIENTS_UI_PAGE_SIZE}&page=${page}`,
+      );
+      const payload = await getJsonOrThrow(res, t("clients.errors.fetch"));
+      const batch = normalizeClientsListPayload(payload);
+      const meta = getClientsListMeta(payload, batch.length);
+      setListPage(meta.page);
+      setListTotal(meta.total);
+      setClients((prev) => (append ? [...prev, ...batch] : batch));
     } catch (err) {
       setError(err.message || t("clients.errors.load"));
+      if (!append) setClients([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [t]);
+
+  const loadMoreClients = useCallback(() => {
+    if (loading || loadingMore || clients.length >= listTotal) return;
+    fetchClients({ page: listPage + 1, append: true });
+  }, [clients.length, fetchClients, listPage, listTotal, loading, loadingMore]);
 
   useEffect(() => {
     fetchClients();
@@ -342,7 +367,23 @@ export default function ClientsPageClient() {
           />
           <span className={pageStyles.resultMeta}>
             {t("clients.resultsCount", { count: displayedClients.length })}
+            {listTotal > clients.length
+              ? ` · ${clients.length}/${listTotal}`
+              : null}
           </span>
+          {listTotal > clients.length ? (
+            <button
+              type="button"
+              className={ws.btnSecondary}
+              onClick={loadMoreClients}
+              disabled={loadingMore}
+              data-testid="clients-load-more"
+            >
+              {loadingMore
+                ? t("clients.loading")
+                : t("clients.loadMore", { defaultValue: "Load more" })}
+            </button>
+          ) : null}
         </div>
 
         <ClientsList

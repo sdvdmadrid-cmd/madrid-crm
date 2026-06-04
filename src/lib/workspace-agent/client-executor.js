@@ -2,11 +2,27 @@
  * Execute workspace agent actions on the client (Website Builder bridge, navigation, CRM, etc.)
  */
 
+/** Coerce unknown summary payloads to a string array (dev-only shape warnings). */
+export function normalizeAgentSummaries(value, label = "summaries") {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  if (value != null && typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+    console.warn(
+      `[workspace-agent] Expected ${label} to be an array, received:`,
+      typeof value,
+      value,
+    );
+  }
+  return [];
+}
+
 export async function executeWorkspaceActions(actions = [], helpers = {}) {
   const summaries = [];
   const { applyWebsitePatches, navigate, showNotice, apiFetch, getJsonOrThrow } = helpers;
+  const safeActions = Array.isArray(actions) ? actions : [];
 
-  for (const action of actions) {
+  for (const action of safeActions) {
     const type = String(action?.type || "").trim();
     const payload = action?.payload && typeof action.payload === "object" ? action.payload : {};
     const summary = String(action?.summary || "").trim();
@@ -79,5 +95,7 @@ export async function executeWorkspaceActions(actions = [], helpers = {}) {
 }
 
 export function mergeAgentSummaries(serverSummaries = [], clientSummaries = []) {
-  return [...new Set([...serverSummaries, ...clientSummaries].filter(Boolean))];
+  const server = normalizeAgentSummaries(serverSummaries, "serverSummaries");
+  const client = normalizeAgentSummaries(clientSummaries, "clientSummaries");
+  return [...new Set([...server, ...client])];
 }

@@ -3,6 +3,7 @@ import {
   getCompanyProfileByTenant,
   upsertCompanyProfileForTenant,
 } from "@/lib/company-profile-store";
+import { mergeClientPaymentsIntoPreferences } from "@/lib/invoice-client-payment-instructions";
 import {
   getTenantPublishedWebsiteUrl,
   resolveDocumentWebsiteUrl,
@@ -215,7 +216,34 @@ function buildProfilePatch(body, existing = {}) {
       base.signatureRequiredAboveAmount,
       normalizeSignatureThreshold,
     ),
+    serviceCatalogPreferences: resolveServiceCatalogPreferencesPatch(body, base),
   };
+}
+
+function resolveServiceCatalogPreferencesPatch(body, base = {}) {
+  let prefs =
+    base.serviceCatalogPreferences && typeof base.serviceCatalogPreferences === "object"
+      ? { ...base.serviceCatalogPreferences }
+      : {};
+
+  if (body.serviceCatalogPreferences && typeof body.serviceCatalogPreferences === "object") {
+    prefs = { ...prefs, ...body.serviceCatalogPreferences };
+    if (
+      body.serviceCatalogPreferences.clientPayments &&
+      typeof body.serviceCatalogPreferences.clientPayments === "object"
+    ) {
+      prefs = mergeClientPaymentsIntoPreferences(
+        prefs,
+        body.serviceCatalogPreferences.clientPayments,
+      );
+    }
+  }
+
+  if (body.clientPayments && typeof body.clientPayments === "object") {
+    prefs = mergeClientPaymentsIntoPreferences(prefs, body.clientPayments);
+  }
+
+  return prefs;
 }
 
 export async function GET(request) {

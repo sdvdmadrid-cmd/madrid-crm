@@ -144,15 +144,26 @@ export default function PlacesAutocomplete({
     }
   }
 
+  function applySelection(selection) {
+    const street = selection.street || "";
+    const formattedAddress = selection.formattedAddress || street;
+    const selectedValue =
+      selectedValueKey === "formattedAddress" ? formattedAddress : street;
+
+    if (onSelect) {
+      onSelect(selection);
+      return;
+    }
+    onChange?.(selectedValue);
+  }
+
   async function handleSelect(prediction) {
-    // Instantly show partial result in the input so the UI feels snappy
-    onChange?.(prediction.mainText);
     setSuggestions([]);
     setOpen(false);
     setActiveIndex(-1);
     inputRef.current?.focus();
 
-    // Fetch structured details (city / state / zip) from the server proxy
+    // Fetch structured details (street / city / state / zip) from the server proxy
     setLoading(true);
     try {
       const res = await apiFetch(
@@ -164,11 +175,7 @@ export default function PlacesAutocomplete({
         const street = data.street || prediction.mainText;
         const formattedAddress =
           data.formattedAddress || prediction.description || street;
-        const selectedValue =
-          selectedValueKey === "formattedAddress" ? formattedAddress : street;
-
-        onChange?.(selectedValue);
-        onSelect?.({
+        applySelection({
           street,
           city: data.city || "",
           state: data.state || "",
@@ -182,13 +189,9 @@ export default function PlacesAutocomplete({
         });
       } else {
         const formattedAddress = prediction.description || prediction.mainText;
-        const selectedValue =
-          selectedValueKey === "formattedAddress"
-            ? formattedAddress
-            : prediction.mainText;
-        onChange?.(selectedValue);
-        onSelect?.({
-          street: prediction.mainText,
+        const street = prediction.mainText;
+        applySelection({
+          street,
           city: "",
           state: "",
           zip: "",
@@ -200,13 +203,9 @@ export default function PlacesAutocomplete({
       }
     } catch {
       const formattedAddress = prediction.description || prediction.mainText;
-      const selectedValue =
-        selectedValueKey === "formattedAddress"
-          ? formattedAddress
-          : prediction.mainText;
-      onChange?.(selectedValue);
-      onSelect?.({
-        street: prediction.mainText,
+      const street = prediction.mainText;
+      applySelection({
+        street,
         city: "",
         state: "",
         zip: "",

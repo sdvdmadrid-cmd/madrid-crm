@@ -1,3 +1,4 @@
+import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import { pdfResponse } from "@/lib/document-pdf-core";
 import { enrichInvoiceWithPartyInfo } from "@/lib/invoice-party";
@@ -71,8 +72,16 @@ export async function GET(request, { params }) {
       invoice.tenantId || tenantDbId,
       invoice,
     );
-    const branding = await getEstimateBrandingByTenant(invoice.tenantId);
-    const buffer = await buildInvoicePdfBuffer({ invoice, branding });
+    const [branding, companyProfile] = await Promise.all([
+      getEstimateBrandingByTenant(invoice.tenantId),
+      getCompanyProfileByTenant({ tenantId: invoice.tenantId || tenantDbId }),
+    ]);
+    const buffer = await buildInvoicePdfBuffer({
+      invoice,
+      branding,
+      companyProfile: companyProfile || {},
+      checkoutUrl: data.last_checkout_url || "",
+    });
     const filename = pdfFilenameForInvoice(invoice);
     const download = new URL(request.url).searchParams.get("download") === "1";
 

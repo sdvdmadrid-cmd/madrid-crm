@@ -12,6 +12,7 @@ import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
 import { getRequestLanguage } from "@/lib/ai-service";
 import { buildWorkspaceContext } from "@/lib/workspace-agent/context.js";
 import { fetchCrmLeadSnapshot } from "@/lib/workspace-agent/crm-context.js";
+import { normalizeAgentSummaries } from "@/lib/workspace-agent/client-executor.js";
 import { runWorkspaceAgentTurn } from "@/lib/workspace-agent/orchestrator.js";
 
 export async function POST(request) {
@@ -76,8 +77,8 @@ export async function POST(request) {
     success: true,
     data: {
       answer: result.answer,
-      actions: result.actions,
-      summaries: result.summaries,
+      actions: Array.isArray(result.actions) ? result.actions : [],
+      summaries: normalizeAgentSummaries(result.summaries, "apiSummaries"),
       plan: result.plan,
       requiresConfirmation: result.requiresConfirmation === true,
       patches: result.patches,

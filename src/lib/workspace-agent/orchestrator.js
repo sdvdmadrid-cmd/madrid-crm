@@ -12,6 +12,11 @@ import {
 import { resolveAgentMessage } from "./slash-commands.js";
 import { generateHeroCopyPatches } from "./hero-copy.js";
 import { patchRequiresConfirmation, isHeroOnlyPatch } from "./patch-risk.js";
+import { normalizeAgentSummaries } from "./client-executor.js";
+
+function safeSummaries(value) {
+  return normalizeAgentSummaries(value);
+}
 
 function buildPlanFromExecutor(result, title = "Confirm changes") {
   return {
@@ -20,7 +25,7 @@ function buildPlanFromExecutor(result, title = "Confirm changes") {
     steps: result.planSteps?.length ? result.planSteps : ["Apply suggested workspace changes"],
     actions: result.actions,
     patches: result.patches,
-    summaries: result.summaries,
+    summaries: safeSummaries(result.summaries),
   };
 }
 
@@ -110,7 +115,7 @@ export async function runWorkspaceAgentTurn({
       return {
         answer: ops.answer,
         actions: agentMode ? ops.actions || [] : [],
-        summaries: ops.summaries || [],
+        summaries: safeSummaries(ops.summaries),
         plan: null,
         requiresConfirmation: false,
         patches: null,
@@ -139,10 +144,10 @@ export async function runWorkspaceAgentTurn({
             steps: crmExec.summaries,
             actions: crmExec.actions,
             patches: null,
-            summaries: crmExec.summaries,
+            summaries: safeSummaries(crmExec.summaries),
           },
           actions: [],
-          summaries: crmExec.summaries,
+          summaries: safeSummaries(crmExec.summaries),
           requiresConfirmation: true,
           patches: null,
           source: "crm_plan",
@@ -151,7 +156,7 @@ export async function runWorkspaceAgentTurn({
       return {
         answer: mergeAnswer(crmExec.answerParts),
         actions: agentMode ? crmExec.actions : [],
-        summaries: crmExec.summaries,
+        summaries: safeSummaries(crmExec.summaries),
         plan: null,
         requiresConfirmation: false,
         patches: null,
@@ -179,7 +184,7 @@ export async function runWorkspaceAgentTurn({
             `**Done:**\n${hero.summaries.map((s) => `• ${s}`).join("\n")}`,
           ]),
           actions,
-          summaries: hero.summaries,
+          summaries: safeSummaries(hero.summaries),
           plan: null,
           requiresConfirmation: false,
           patches: hero.patches,
@@ -210,7 +215,7 @@ export async function runWorkspaceAgentTurn({
         ]),
         plan,
         actions: [],
-        summaries: exec.summaries,
+        summaries: safeSummaries(exec.summaries),
         requiresConfirmation: true,
         patches: null,
         source: "deterministic_plan",
@@ -226,7 +231,7 @@ export async function runWorkspaceAgentTurn({
             : "",
         ]),
         actions: agentMode ? exec.actions : [],
-        summaries: exec.summaries,
+        summaries: safeSummaries(exec.summaries),
         plan: null,
         requiresConfirmation: false,
         patches: exec.patches,
@@ -324,10 +329,10 @@ export async function runWorkspaceAgentTurn({
           : actions.map((a) => a.summary || a.type).filter(Boolean),
         actions,
         patches,
-        summaries: parsed.summaries,
+        summaries: safeSummaries(parsed.summaries),
       },
       actions: [],
-      summaries: parsed.summaries,
+      summaries: safeSummaries(parsed.summaries),
       requiresConfirmation: true,
       patches: null,
       source: "ai_plan",
@@ -337,7 +342,7 @@ export async function runWorkspaceAgentTurn({
   return {
     answer: parsed.answer,
     actions,
-    summaries: parsed.summaries,
+    summaries: safeSummaries(parsed.summaries),
     plan: null,
     requiresConfirmation: false,
     patches,

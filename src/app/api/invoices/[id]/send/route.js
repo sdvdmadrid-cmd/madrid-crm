@@ -1,5 +1,6 @@
 ﻿import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { normalizeRecipients, sendEmail } from "@/lib/email";
+import { buildInvoicePaymentInstructions } from "@/lib/invoice-client-payment-instructions";
 import {
   appendFieldBasePoweredByText,
   buildFieldBasePoweredByHtml,
@@ -37,6 +38,8 @@ function buildInvoiceEmailTemplate({
   checkoutUrl,
   partyHtml = "",
   brandingHtml = "",
+  paymentTextBlock = "",
+  paymentHtmlBlock = "",
 }) {
   const safeCompany = companyName || "FieldBase";
   const safeClient = clientName || "Client";
@@ -55,9 +58,7 @@ function buildInvoiceEmailTemplate({
     `Amount due: $${safeAmount}`,
     `Due date: ${safeDueDate}`,
     "",
-    safeCheckoutUrl
-      ? `Pay securely online: ${safeCheckoutUrl}`
-      : "If you already received a payment link, you can complete payment securely online.",
+    ...(paymentTextBlock ? ["", paymentTextBlock] : []),
     "For questions, reply to this email.",
     "",
     `Thank you,`,
@@ -181,6 +182,16 @@ export async function POST(request, { params }) {
       },
     );
 
+    const paymentInstructions = buildInvoicePaymentInstructions({
+      companyProfile: companyProfile || {},
+      invoice: {
+        preferredPaymentMethod: invoice.preferred_payment_method,
+      },
+      checkoutUrl,
+    });
+    const paymentTextBlock = paymentInstructions.textLines.join("\n");
+    const paymentHtmlBlock = paymentInstructions.htmlBlock;
+
     const template = buildInvoiceEmailTemplate({
       companyName:
         companyProfile?.publicDisplayName || companyProfile?.companyName || "FieldBase",
@@ -192,6 +203,8 @@ export async function POST(request, { params }) {
       checkoutUrl,
       partyHtml: buildInvoicePartyHtmlBlock(enrichedInvoice),
       brandingHtml: buildFieldBasePoweredByHtml(),
+      paymentTextBlock,
+      paymentHtmlBlock,
     });
 
     const sendResult = await sendEmail({
@@ -295,6 +308,13 @@ export async function POST(request, { params }) {
         success: true,
         data: {
           recipientEmail,
+          checkoutUrl: checkoutUrl || null,
+          paymentInstructions: {
+            preferredMethod: paymentInstructions.preferredMethod,
+            includesCardLink: Boolean(checkoutUrl),
+            includesZelle: paymentTextBlock.includes("Zelle"),
+            textLines: paymentInstructions.textLines,
+          },
           provider: sendResult.provider,
           providerMessageId: sendResult.providerMessageId || null,
           invoice: updatedInvoice

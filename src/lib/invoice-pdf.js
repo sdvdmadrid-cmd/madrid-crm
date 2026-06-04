@@ -16,6 +16,7 @@ import {
   normalizeInvoiceLineItemsForSave,
 } from "./invoice-line-items.js";
 import { renderInvoicePartySection } from "./invoice-party.js";
+import { buildInvoicePaymentInstructions } from "./invoice-client-payment-instructions.js";
 
 function renderInvoicePdfFooter(doc, companyName = "") {
   const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -91,7 +92,29 @@ function renderInvoiceLineItemsTable(doc, invoice, pageWidth) {
   }
 }
 
-export async function buildInvoicePdfBuffer({ invoice, branding = {} }) {
+function renderInvoicePaymentSection(doc, invoice, companyProfile, checkoutUrl, pageWidth) {
+  const { textLines } = buildInvoicePaymentInstructions({
+    companyProfile: companyProfile || {},
+    invoice,
+    checkoutUrl,
+  });
+  if (!textLines.length) return;
+
+  doc.moveDown(0.8);
+  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text("How to pay");
+  doc.moveDown(0.25);
+  doc.font("Helvetica").fontSize(10).fillColor("#475569");
+  for (const line of textLines) {
+    doc.text(String(line), { width: pageWidth });
+  }
+}
+
+export async function buildInvoicePdfBuffer({
+  invoice,
+  branding = {},
+  companyProfile = null,
+  checkoutUrl = "",
+}) {
   if (!invoice?.id && !invoice?._id) {
     throw new Error("Invoice payload is required");
   }
@@ -129,6 +152,14 @@ export async function buildInvoicePdfBuffer({ invoice, branding = {} }) {
   doc.text(`Invoice total: ${formatMoney(invoice.amount || 0)}`);
 
   renderInvoiceLineItemsTable(doc, invoice, pageWidth);
+
+  renderInvoicePaymentSection(
+    doc,
+    invoice,
+    companyProfile,
+    checkoutUrl || invoice.lastCheckoutUrl || "",
+    pageWidth,
+  );
 
   if (invoice.notes) {
     doc.moveDown(0.8);
