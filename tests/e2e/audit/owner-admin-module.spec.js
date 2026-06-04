@@ -47,4 +47,20 @@ test.describe("Owner/Admin module audit", () => {
     expect(payload.data?.summary).toBeTruthy();
     expect(Array.isArray(payload.data?.rows)).toBeTruthy();
   });
+
+  test("owner invoice revenue API (platform scope)", async ({ page }) => {
+    await devLogin(page, { profile: "super_admin", redirect: "/owner/invoice-revenue" });
+    await expect(page.getByTestId("invoice-revenue-summary")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    const apiRes = await page.request.get(`${ORIGIN}/api/invoices/summary?scope=platform`, {
+      headers: ORIGIN_HEADERS,
+    });
+    expect(apiRes.ok()).toBeTruthy();
+    const payload = await apiRes.json();
+    expect(payload.success).toBeTruthy();
+    expect(payload.data?.scope).toBe("platform");
+    expect(payload.data?.summary?.totalPaid).toBeGreaterThanOrEqual(0);
+  });
 });

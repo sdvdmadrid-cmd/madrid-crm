@@ -7,6 +7,10 @@ const TENANT_SECTIONS = {
   clients: { href: "/clients", labelKey: "sidebar.clients" },
   jobs: { href: "/jobs", labelKey: "sidebar.jobs" },
   invoices: { href: "/invoices", labelKey: "sidebar.invoices" },
+  "invoices/summary": {
+    href: "/invoices/summary",
+    labelKey: "sidebar.invoiceTotals",
+  },
   estimates: { href: "/estimates", labelKey: "sidebar.estimates" },
   contracts: { href: "/contracts", labelKey: "sidebar.contracts" },
   "lead-inbox": { href: "/lead-inbox", labelKey: "sidebar.leadInbox" },
@@ -29,6 +33,10 @@ const OWNER_SECTIONS = {
   overview: { href: "/owner/overview", labelKey: "sidebar.adminOverview" },
   tenants: { href: "/owner/tenants", labelKey: "nav.ownerTenants" },
   revenue: { href: "/owner/revenue", labelKey: "sidebar.adminStripe" },
+  "invoice-revenue": {
+    href: "/owner/invoice-revenue",
+    labelKey: "ownerNav.invoiceRevenue",
+  },
   "ai-ops": { href: "/owner/ai-ops", labelKey: "sidebar.adminAi" },
   activity: { href: "/owner/activity", labelKey: "nav.ownerActivity" },
   support: { href: "/owner/support", labelKey: "sidebar.adminSupport" },

@@ -496,6 +496,7 @@
     "estimates": "Estimados",
     "jobs": "Trabajos",
     "invoices": "Facturas",
+    "invoiceTotals": "Totales de facturas",
     "billPayments": "Pago de facturas",
     "payBills": "Pagar facturas",
     "paymentMethods": "Métodos de pago",
@@ -1384,6 +1385,27 @@
       "sendInvoiceTextFallback": "Error al preparar el mensaje de texto de la factura"
     }
   },
+  "invoiceSummary": {
+    "title": "Totales de facturas",
+    "platformTitle": "Ingresos por facturas (plataforma)",
+    "subtitle": "Cuanto has cobrado y cuanto sigue pendiente en tus facturas.",
+    "platformSubtitle": "Total cobrado y saldo pendiente en todas las facturas de los contractors.",
+    "totalPaid": "Total pagado",
+    "totalUnpaid": "Total impagado",
+    "totalInvoiced": "Total facturado",
+    "paidHint": "{{count}} facturas pagadas",
+    "unpaidHint": "{{count}} facturas abiertas",
+    "invoicedHint": "{{count}} facturas en total",
+    "breakdownTitle": "Desglose",
+    "partial": "Pagos parciales",
+    "overdue": "Vencidas",
+    "drafts": "Borradores",
+    "draftNote": "Los borradores no cuentan como impagados hasta que los guardes y envies.",
+    "byTenantTitle": "Por tenant",
+    "tenant": "Tenant",
+    "backToInvoices": "Volver a facturas",
+    "backToOwner": "Volver a Mission Control"
+  },
   "calendar": {
     "title": "Calendario",
     "description": "Gestiona tus citas y reuniones.",
@@ -1623,6 +1645,7 @@
     "overview": "Resumen",
     "paymentCards": "Tarjetas y uso",
     "revenue": "Ingresos",
+    "invoiceRevenue": "Ingresos por facturas",
     "tenants": "Inquilinos",
     "aiOps": "IA Ops",
     "monitoring": "Monitoreo",

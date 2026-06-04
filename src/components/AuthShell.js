@@ -1167,6 +1167,11 @@ export default function AuthShell({ children }) {
             label: t("sidebar.invoices"),
             iconKey: "invoices",
           },
+          {
+            href: "/invoices/summary",
+            label: t("sidebar.invoiceTotals"),
+            iconKey: "invoices",
+          },
         ]
     : [
         {
@@ -1190,6 +1195,11 @@ export default function AuthShell({ children }) {
         {
           href: "/invoices",
           label: t("sidebar.invoices"),
+          iconKey: "invoices",
+        },
+        {
+          href: "/invoices/summary",
+          label: t("sidebar.invoiceTotals"),
           iconKey: "invoices",
         },
         {
@@ -1221,6 +1231,11 @@ export default function AuthShell({ children }) {
           href: "/owner/revenue",
           label: t("sidebar.adminStripe"),
           iconKey: "billPayments",
+        },
+        {
+          href: "/owner/invoice-revenue",
+          label: t("ownerNav.invoiceRevenue"),
+          iconKey: "invoices",
         },
         {
           href: "/owner/payment-cards",
