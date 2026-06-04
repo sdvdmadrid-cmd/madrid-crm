@@ -1,5 +1,6 @@
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import { pdfResponse } from "@/lib/document-pdf-core";
+import { enrichInvoiceWithPartyInfo } from "@/lib/invoice-party";
 import { buildInvoicePdfBuffer, pdfFilenameForInvoice } from "@/lib/invoice-pdf";
 import {
   computeInvoicePaymentState,
@@ -25,6 +26,10 @@ function serializeInvoice(doc) {
     invoiceTitle: doc.invoice_title || "",
     clientName: doc.client_name || "",
     clientEmail: doc.client_email || "",
+    clientPhone: doc.client_phone || "",
+    clientAddress: doc.client_address || "",
+    propertyAddress: doc.property_address || "",
+    clientId: doc.client_id || "",
     amount: amount ? String(amount) : "",
     dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
     lineItems: Array.isArray(doc.items) ? doc.items : [],
@@ -60,7 +65,12 @@ export async function GET(request, { params }) {
       return Response.json({ success: false, error: "Invoice not found" }, { status: 404 });
     }
 
-    const invoice = serializeInvoice(data);
+    let invoice = serializeInvoice(data);
+    invoice = await enrichInvoiceWithPartyInfo(
+      supabaseAdmin,
+      invoice.tenantId || tenantDbId,
+      invoice,
+    );
     const branding = await getEstimateBrandingByTenant(invoice.tenantId);
     const buffer = await buildInvoicePdfBuffer({ invoice, branding });
     const filename = pdfFilenameForInvoice(invoice);

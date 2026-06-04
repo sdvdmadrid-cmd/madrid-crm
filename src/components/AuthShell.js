@@ -14,6 +14,7 @@ import { WebsiteBuilderAiProvider } from "@/contexts/WebsiteBuilderAiContext";
 import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";
 import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
+import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { TenantWorkspaceProvider } from "@/context/TenantWorkspaceContext";
 import {
   isOwnerCommandCenterPath,
@@ -22,6 +23,8 @@ import {
 } from "@/lib/auth-redirect";
 import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 import { useStoredUiLanguage } from "@/lib/ui-language";
+import { buildPublicWebsitePath } from "@/lib/public-website-routing";
+import { usePublishedWebsiteStatus } from "@/hooks/usePublishedWebsiteStatus";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -176,10 +179,10 @@ export default function AuthShell({ children }) {
     featureAiInvoiceAssistant: true,
     featureAdminAiAssistant: true,
   });
-  const [websiteStatus, setWebsiteStatus] = useState({
-    loaded: false,
-    published: false,
-  });
+  const websiteStatus = usePublishedWebsiteStatus(
+    Boolean(authUser) &&
+      String(authUser?.role || "").toLowerCase() !== "super_admin",
+  );
 
   const resolveAuthRedirect = useCallback((user) => {
     if (typeof window === "undefined") return "/dashboard";
@@ -617,7 +620,7 @@ export default function AuthShell({ children }) {
     } catch {
       setAuthUser(null);
     }
-  }, [pathname]);
+  }, []);
 
   // Persist industry to localStorage so catalog pages can read it without an extra fetch
   useEffect(() => {
@@ -627,44 +630,6 @@ export default function AuthShell({ children }) {
     }
   }, [authUser]);
 
-  // Once authenticated, learn whether the tenant has already published its
-  // contractor website so the nav can relabel "Build Website" -> "Website".
-  useEffect(() => {
-    if (!authUser) {
-      setWebsiteStatus({ loaded: false, published: false });
-      return;
-    }
-    const role = String(authUser?.role || "").toLowerCase();
-    if (role === "super_admin") {
-      setWebsiteStatus({ loaded: true, published: false });
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/website-builder/publish-status", {
-          cache: "no-store",
-          suppressUnauthorizedEvent: true,
-        });
-        if (!res.ok) {
-          if (!cancelled) setWebsiteStatus({ loaded: true, published: false });
-          return;
-        }
-        const payload = await res.json().catch(() => null);
-        if (cancelled) return;
-        setWebsiteStatus({
-          loaded: true,
-          published: Boolean(payload?.data?.published),
-        });
-      } catch {
-        if (!cancelled) setWebsiteStatus({ loaded: true, published: false });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser, pathname]);
-
   useEffect(() => {
     if (!hasMounted) return;
 
@@ -673,35 +638,24 @@ export default function AuthShell({ children }) {
       return;
     }
 
+    if (authBootstrappedRef.current) return;
+
     let active = true;
-    const run = async () => {
-      if (!authBootstrappedRef.current) {
-        console.info("[dashboard-protection] loading auth context", {
-          pathname,
-        });
-        try {
-          await fetchMe();
-        } finally {
-          if (active) {
-            authBootstrappedRef.current = true;
-            setAuthChecked(true);
-            console.info("[dashboard-protection] auth context loaded", {
-              pathname,
-            });
-          }
+    (async () => {
+      try {
+        await fetchMe();
+      } finally {
+        if (active) {
+          authBootstrappedRef.current = true;
+          setAuthChecked(true);
         }
-        return;
       }
-
-      await fetchMe();
-    };
-
-    run();
+    })();
 
     return () => {
       active = false;
     };
-  }, [hasMounted, isPublicPage, fetchMe, pathname]);
+  }, [hasMounted, isPublicPage, fetchMe]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -1245,6 +1199,11 @@ export default function AuthShell({ children }) {
         },
       ];
 
+  const publishedLiveSitePath =
+    websiteStatus.published && websiteStatus.slug
+      ? buildPublicWebsitePath(websiteStatus.slug)
+      : null;
+
   const secondaryNavItems = isSuperAdminRole
     ? [
         {
@@ -1292,11 +1251,12 @@ export default function AuthShell({ children }) {
             iconKey: "invoices",
           },
           {
-            href: "/website",
+            href: publishedLiveSitePath || "/website",
             label: websiteStatus.published
               ? t("sidebar.websiteLive")
               : t("sidebar.websiteBuilder"),
             iconKey: "websiteBuilder",
+            openInNewTab: Boolean(publishedLiveSitePath),
           },
           {
             href: "/calendar",
@@ -1321,11 +1281,12 @@ export default function AuthShell({ children }) {
           iconKey: "invoices",
         },
         {
-          href: "/website",
+          href: publishedLiveSitePath || "/website",
           label: websiteStatus.published
             ? t("sidebar.websiteLive")
             : t("sidebar.websiteBuilder"),
           iconKey: "websiteBuilder",
+          openInNewTab: Boolean(publishedLiveSitePath),
         },
         {
           href: "/calendar",
@@ -1387,6 +1348,11 @@ export default function AuthShell({ children }) {
   const isWebsiteBuilderRoute = Boolean(pathname?.startsWith("/website"));
 
   return (
+    <AuthSessionProvider
+      authUser={authUser}
+      authChecked={authChecked}
+      refreshSession={fetchMe}
+    >
     <TenantWorkspaceProvider initialWorkspace={authUser?.workspace ?? null}>
     <WebsiteBuilderAiProvider>
     <div
@@ -1691,26 +1657,46 @@ export default function AuthShell({ children }) {
             {t("sidebar.secondary")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {normalizedSecondaryNavItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigationItemClick}
-                className={linkClass(item.href, item.exact)}
-              >
-                <span
-                  className="sb-icon"
-                  style={{
-                    color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
-                    display: "flex",
-                    flexShrink: 0,
-                  }}
+            {normalizedSecondaryNavItems.map((item) => {
+              const iconStyle = {
+                color: isActive(item.href, item.exact) ? "#93c5fd" : "#64748b",
+                display: "flex",
+                flexShrink: 0,
+              };
+              const label = (
+                <>
+                  <span className="sb-icon" style={iconStyle}>
+                    <Icon d={icons[item.iconKey]} />
+                  </span>
+                  {item.label}
+                </>
+              );
+              if (item.openInNewTab) {
+                return (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="sidebar-live-website"
+                    onClick={onNavigationItemClick}
+                    className={linkClass(item.href, item.exact)}
+                  >
+                    {label}
+                  </a>
+                );
+              }
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigationItemClick}
+                  className={linkClass(item.href, item.exact)}
                 >
-                  <Icon d={icons[item.iconKey]} />
-                </span>
-                {item.label}
-              </Link>
-            ))}
+                  {label}
+                </Link>
+              );
+            })}
           </div>
         </nav>
 
@@ -1894,6 +1880,7 @@ export default function AuthShell({ children }) {
     </div>
     </WebsiteBuilderAiProvider>
     </TenantWorkspaceProvider>
+    </AuthSessionProvider>
   );
 }
 

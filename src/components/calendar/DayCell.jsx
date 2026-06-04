@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import WeatherBadge from "./WeatherBadge";
-import { parseYmdToLocalDate } from "@/lib/local-date";
 
-export default function DayCell({
+function DayCell({
   day,
   date,
   dateKey,
   isCurrentMonth,
   isToday,
-  appointments,
+  dayAppointments = [],
   onClick,
   onEventClick,
   getWeather,
@@ -18,16 +17,6 @@ export default function DayCell({
 }) {
   const dayNumber = date.getDate();
   const [expandedEvents, setExpandedEvents] = useState(false);
-
-  const dayAppointments = appointments.filter((apt) => {
-    const aptDate = parseYmdToLocalDate(apt.date);
-    if (!aptDate) return false;
-    return (
-      aptDate.getFullYear() === date.getFullYear() &&
-      aptDate.getMonth() === date.getMonth() &&
-      aptDate.getDate() === date.getDate()
-    );
-  });
 
   const statusColors = {
     Scheduled: "bg-sky-50/90 text-sky-800 border-sky-200/80",
@@ -148,4 +137,6 @@ export default function DayCell({
     </div>
   );
 }
+
+export default memo(DayCell);
 

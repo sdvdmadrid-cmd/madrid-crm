@@ -274,6 +274,18 @@ export default function Calendar() {
     return days;
   }, [currentDate, daysInMonth, firstDayOfMonth]);
 
+  const appointmentsByDateKey = useMemo(() => {
+    const map = new Map();
+    for (const apt of appointments) {
+      const aptDate = parseYmdToLocalDate(apt.date);
+      if (!aptDate) continue;
+      const key = formatLocalDate(aptDate);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(apt);
+    }
+    return map;
+  }, [appointments]);
+
   const { getWeather, getDayWeather } = useWeather(appointments, {
     calendarDays,
     defaultLocation: defaultWeatherLocation,
@@ -833,21 +845,24 @@ export default function Calendar() {
 
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3 bg-transparent min-w-0">
-              {calendarDays.map((dayObj, index) => (
+              {calendarDays.map((dayObj) => {
+                const dateKey = formatLocalDate(dayObj.date);
+                return (
                 <DayCell
-                  key={index}
+                  key={dateKey}
                   day={dayObj.date.getDate()}
                   date={dayObj.date}
-                  dateKey={formatLocalDate(dayObj.date)}
+                  dateKey={dateKey}
                   isCurrentMonth={dayObj.isCurrentMonth}
                   isToday={isToday(dayObj.date)}
-                  appointments={appointments}
+                  dayAppointments={appointmentsByDateKey.get(dateKey) || []}
                   onClick={handleDayClick}
                   onEventClick={handleEventClick}
                   getWeather={getWeather}
                   getDayWeather={getDayWeather}
                 />
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

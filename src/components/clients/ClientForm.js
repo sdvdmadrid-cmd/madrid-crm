@@ -1,6 +1,21 @@
 "use client";
 
-import PlacesAutocomplete from "@/components/PlacesAutocomplete";
+import dynamic from "next/dynamic";
+
+const PlacesAutocomplete = dynamic(
+  () => import("@/components/PlacesAutocomplete"),
+  {
+    ssr: false,
+    loading: () => (
+      <input
+        disabled
+        aria-busy="true"
+        placeholder="Loading address search…"
+        style={{ width: "100%", opacity: 0.7 }}
+      />
+    ),
+  },
+);
 
 export const EMPTY_CLIENT_FORM = {
   id: "",

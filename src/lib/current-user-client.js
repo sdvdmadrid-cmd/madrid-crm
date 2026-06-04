@@ -2,24 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
-
-const DEFAULT_CAPABILITIES = {
-  role: "worker",
-  isSuperAdmin: false,
-  isAdmin: false,
-  isWorker: true,
-  canReadTenantData: true,
-  canWriteOperationalData: true,
-  canDeleteRecords: false,
-  canManageSensitiveData: false,
-  canSendExternalCommunications: false,
-};
+import {
+  DEFAULT_CAPABILITIES,
+  useAuthSession,
+} from "@/context/AuthSessionContext";
 
 export function useCurrentUserAccess() {
-  const [authUser, setAuthUser] = useState(null);
-  const [capabilities, setCapabilities] = useState(DEFAULT_CAPABILITIES);
+  const session = useAuthSession();
+  const [fallbackUser, setFallbackUser] = useState(null);
+  const [fallbackCapabilities, setFallbackCapabilities] =
+    useState(DEFAULT_CAPABILITIES);
 
+  // Outside AuthShell (rare): one fetch on mount only.
   useEffect(() => {
+    if (session) return;
     let active = true;
 
     (async () => {
@@ -29,19 +25,28 @@ export function useCurrentUserAccess() {
         });
         const payload = await getJsonOrThrow(res, "Unable to load session");
         if (!active) return;
-        setAuthUser(payload?.data || null);
-        setCapabilities(payload?.data?.capabilities || DEFAULT_CAPABILITIES);
+        setFallbackUser(payload?.data || null);
+        setFallbackCapabilities(
+          payload?.data?.capabilities || DEFAULT_CAPABILITIES,
+        );
       } catch {
         if (!active) return;
-        setAuthUser(null);
-        setCapabilities(DEFAULT_CAPABILITIES);
+        setFallbackUser(null);
+        setFallbackCapabilities(DEFAULT_CAPABILITIES);
       }
     })();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [session]);
 
-  return { authUser, capabilities };
+  if (session) {
+    return {
+      authUser: session.authUser,
+      capabilities: session.capabilities,
+    };
+  }
+
+  return { authUser: fallbackUser, capabilities: fallbackCapabilities };
 }

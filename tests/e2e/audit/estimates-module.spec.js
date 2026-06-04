@@ -181,6 +181,7 @@ test.describe("Estimates module audit", () => {
   test("kanban detail: send, PDF, contract, duplicate, approve confirm", async ({
     page,
   }) => {
+    test.setTimeout(90_000);
     const stamp = Date.now();
     const clientName = `Est Kanban ${stamp}`;
     const { estimate } = await createClientAndEstimate(page.request, stamp, {

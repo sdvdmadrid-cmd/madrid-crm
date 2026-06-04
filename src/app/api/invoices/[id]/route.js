@@ -4,6 +4,8 @@ import {
   normalizePaymentMethod,
 } from "@/lib/invoice-payments";
 import { findEstimateForNumber } from "@/lib/estimate-invoice-linking";
+import { fetchInvoicePartyDbFields } from "@/lib/invoice-party";
+import { normalizeInvoiceLineItemsForSave } from "@/lib/invoice-line-items";
 import { normalizeBaseNumber } from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -39,6 +41,9 @@ function serialize(doc) {
     clientId: doc.client_id || "",
     clientName: doc.client_name || "",
     clientEmail: doc.client_email || "",
+    clientPhone: doc.client_phone || "",
+    clientAddress: doc.client_address || "",
+    propertyAddress: doc.property_address || "",
     amount: amount ? String(amount) : "",
     dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
     lineItems: Array.isArray(doc.items) ? doc.items : [],
@@ -269,11 +274,23 @@ export async function PATCH(request, { params }) {
       updateRow.client_name = String(body.clientName || "");
     if ("clientEmail" in body)
       updateRow.client_email = String(body.clientEmail || "");
+    if ("clientId" in body || "clientName" in body || "clientEmail" in body) {
+      const partyFields = linkedClientId
+        ? await fetchInvoicePartyDbFields(supabaseAdmin, tenantDbId, linkedClientId, {
+            clientEmail: updateRow.client_email ?? body.clientEmail ?? existing.client_email,
+          })
+        : {
+            client_phone: "",
+            client_address: "",
+            property_address: "",
+          };
+      Object.assign(updateRow, partyFields);
+    }
     if ("amount" in body) updateRow.amount = normalizedAmount;
     if ("dueDate" in body)
       updateRow.due_date = normalizeTimestamp(body.dueDate);
     if ("lineItems" in body) {
-      updateRow.items = Array.isArray(body.lineItems) ? body.lineItems : [];
+      updateRow.items = normalizeInvoiceLineItemsForSave(body.lineItems);
     }
     if ("notes" in body) updateRow.notes = String(body.notes || "");
 

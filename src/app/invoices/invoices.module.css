@@ -152,6 +152,124 @@
   gap: 12px;
 }
 
+.lineItemsSection {
+  grid-column: 1 / -1;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.lineItemsHeader {
+  margin-bottom: 12px;
+}
+
+.lineItemsTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.lineItemsHint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.lineItemsTableWrap {
+  overflow-x: auto;
+}
+
+.lineItemsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lineItemsTable th {
+  text-align: left;
+  padding: 8px 6px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lineItemsTable td {
+  padding: 6px;
+  vertical-align: middle;
+}
+
+.lineItemField {
+  width: 100%;
+  min-width: 140px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+}
+
+.lineItemFieldQty {
+  width: 72px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+}
+
+.lineItemFieldMoney {
+  width: 96px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-heading);
+}
+
+.lineItemTotalCell {
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 88px;
+}
+
+.lineItemRemoveBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.lineItemRemoveBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lineItemsFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.lineItemsSum {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
 .clientPicker {
   grid-column: 1 / -1;
 }

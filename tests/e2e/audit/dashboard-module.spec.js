@@ -23,7 +23,7 @@ test.describe("Dashboard module audit", () => {
   });
 
   test("secondary actions live under More actions", async ({ page }) => {
-    await page.getByRole("button", { name: /More actions/i }).click();
+    await page.getByTestId("dashboard-more-actions").click();
     await expect(page.getByRole("menuitem", { name: /Collect payment/i })).toBeVisible();
     await expect(
       page.getByRole("menuitem", { name: /Create job manually/i }),
