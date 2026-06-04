@@ -78,7 +78,10 @@ export default function ClientForm({
           value={form.email}
           onChange={(e) => onChange({ ...form, email: e.target.value })}
         />
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", marginTop: 4 }}>
+        <div
+          className="cf-muted"
+          style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}
+        >
           {t("clients.labels.serviceAddress")}
         </div>
         <PlacesAutocomplete

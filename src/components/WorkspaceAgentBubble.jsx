@@ -16,12 +16,14 @@ const TEXT = {
     open: "AI Assistant",
     close: "Close",
     title: "FieldBase Assistant",
-    subtitle: "ChatGPT-style workspace operator — asks, plans, and applies changes.",
+    subtitle: "Operations assistant — creates estimates, invoices, jobs, appointments, and more.",
     agentMode: "Agent Mode",
     agentModeHint: "When on, I can apply approved changes across this workspace.",
-    placeholder: "Ask anything or try /help, /audit, /hero premium, /leads…",
+    placeholder: "e.g. Create estimate for John Smith — spring cleanup… or /help",
     slashHint: "Quick commands",
     send: "Send",
+    voice: "Voice",
+    voiceStop: "Stop",
     sending: "Working…",
     clearChat: "Clear chat",
     confirmPlan: "Apply plan",
@@ -41,6 +43,8 @@ const TEXT = {
     placeholder: "Pregunta o usa /help, /audit, /hero, /leads…",
     slashHint: "Comandos rápidos",
     send: "Enviar",
+    voice: "Voz",
+    voiceStop: "Detener",
     sending: "Trabajando…",
     clearChat: "Limpiar chat",
     confirmPlan: "Aplicar plan",
@@ -60,6 +64,8 @@ const TEXT = {
     placeholder: "Zapytaj lub użyj /help, /audit, /hero, /leads…",
     slashHint: "Szybkie polecenia",
     send: "Wyślij",
+    voice: "Głos",
+    voiceStop: "Stop",
     sending: "Pracuję…",
     clearChat: "Wyczyść czat",
     confirmPlan: "Zastosuj plan",
@@ -101,7 +107,9 @@ export default function WorkspaceAgentBubble({
   const [error, setError] = useState("");
   const [pendingPlan, setPendingPlan] = useState(null);
   const [lastSummaries, setLastSummaries] = useState([]);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   const historyForApi = useMemo(
     () =>
@@ -178,6 +186,34 @@ export default function WorkspaceAgentBubble({
     setInput("");
     appendMessage("user", prompt);
     await runAgent({ message: prompt });
+  };
+
+  const toggleVoiceInput = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("Voice input is not supported in this browser.");
+      return;
+    }
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = language === "es" ? "es-US" : language === "pl" ? "pl-PL" : "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      if (transcript) setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
   };
 
   const handleConfirmPlan = async () => {
@@ -422,6 +458,18 @@ export default function WorkspaceAgentBubble({
               }}
             />
             <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={toggleVoiceInput}
+                disabled={loading}
+                title={listening ? t.voiceStop : t.voice}
+                style={{
+                  ...secondaryBtnStyle,
+                  borderColor: listening ? "rgba(248,113,113,0.6)" : secondaryBtnStyle.border,
+                }}
+              >
+                {listening ? "⏹" : "🎤"}
+              </button>
               <button
                 type="button"
                 onClick={handleSend}

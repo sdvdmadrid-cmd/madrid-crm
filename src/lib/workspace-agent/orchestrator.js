@@ -5,6 +5,10 @@ import { executeCrmIntents } from "./crm-executor.js";
 import { buildWorkspaceAgentSystemPrompt } from "./prompt.js";
 import { parseAgentStructuredResponse } from "./parse-response.js";
 import { runAiCompletion } from "../ai-service.js";
+import {
+  runOperationsAgent,
+  shouldRunOperationsAgent,
+} from "./operations-agent.js";
 import { resolveAgentMessage } from "./slash-commands.js";
 import { generateHeroCopyPatches } from "./hero-copy.js";
 import { patchRequiresConfirmation, isHeroOnlyPatch } from "./patch-risk.js";
@@ -85,6 +89,35 @@ export async function runWorkspaceAgentTurn({
   const intents = uniqueIntents(detectWorkspaceIntents(prompt), resolved.intentIds);
   const onWebsite = pageId === "website_builder" && snapshot;
   const crm = context?.crm || null;
+
+  if (
+    shouldRunOperationsAgent({
+      message: prompt,
+      agentMode,
+      pageId,
+    })
+  ) {
+    const ops = await runOperationsAgent({
+      request,
+      tenantId,
+      userId,
+      message: prompt,
+      history,
+      context,
+      language,
+    });
+    if (ops.handled) {
+      return {
+        answer: ops.answer,
+        actions: agentMode ? ops.actions || [] : [],
+        summaries: ops.summaries || [],
+        plan: null,
+        requiresConfirmation: false,
+        patches: null,
+        source: ops.source || "operations_agent",
+      };
+    }
+  }
 
   const crmIntentIds = intents.filter((id) => id.startsWith("crm."));
   if (crmIntentIds.length > 0 || pageId === "lead_inbox") {
@@ -209,13 +242,6 @@ export async function runWorkspaceAgentTurn({
         "Open Calendar and describe the job — I'll parse date, client, and location.",
       actions: [{ type: "navigate", payload: { path: "/calendar" }, summary: "Opened Calendar" }],
       summaries: ["Opened Calendar"],
-    });
-  }
-  if (intents.includes("estimate.draft") && pageId !== "estimates") {
-    crossPageHints.push({
-      answer: "I'll open the estimate editor for you.",
-      actions: [{ type: "navigate", payload: { path: "/estimates/new" }, summary: "Opened new estimate" }],
-      summaries: ["Opened new estimate"],
     });
   }
   if (crossPageHints.length === 1) {
