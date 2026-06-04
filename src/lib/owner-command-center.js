@@ -5,6 +5,7 @@ import {
   buildPlatformOverview,
   listAllAuthUsers,
 } from "@/lib/platform-overview";
+import { summarizeOwnerLoginActivity } from "@/lib/owner-login-activity";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const FEEDBACK_TABLE = "product_feedback";
@@ -13,6 +14,14 @@ function parseContractorRole(user) {
   return String(
     user?.app_metadata?.role || user?.user_metadata?.role || "contractor",
   ).toLowerCase();
+}
+
+/**
+ * Contractor login activity for owner platform dashboards.
+ */
+export async function loadOwnerLoginActivity() {
+  const users = await listAllAuthUsers();
+  return summarizeOwnerLoginActivity(users);
 }
 
 /**
