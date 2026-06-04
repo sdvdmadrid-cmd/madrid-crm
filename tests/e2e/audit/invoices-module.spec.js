@@ -266,6 +266,36 @@ test.describe("Invoices module audit", () => {
     await expect(card.getByText(/Line items subtotal/i)).toHaveCount(0);
   });
 
+  test("invoice enriches addresses from client name when client_id was missing", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const { clientName, clientId } = await createClient(page.request, stamp);
+
+    const invRes = await page.request.post(`${ORIGIN}/api/invoices`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: {
+        invoiceNumber: `INV-LINK-${stamp}`,
+        clientName,
+        amount: "120",
+        dueDate: "2026-12-01",
+        status: "Unpaid",
+      },
+    });
+    expect(invRes.ok()).toBeTruthy();
+    const invId = (await invRes.json())?.data?._id;
+    expect(invId).toBeTruthy();
+
+    const getRes = await page.request.get(`${ORIGIN}/api/invoices/${invId}`, {
+      headers: ORIGIN_HEADERS,
+    });
+    expect(getRes.ok()).toBeTruthy();
+    const invoice = await getRes.json();
+    expect(invoice.clientId || invoice.client_id).toBe(clientId);
+    expect(String(invoice.clientAddress || "")).toMatch(/PO Box 900/i);
+    expect(String(invoice.propertyAddress || "")).toMatch(/600 Invoice Ave/i);
+  });
+
   test("invoice snapshots client billing and job-site addresses", async ({
     page,
   }) => {

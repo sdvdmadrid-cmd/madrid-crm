@@ -4,7 +4,10 @@ import {
   normalizePaymentMethod,
 } from "@/lib/invoice-payments";
 import { findEstimateForNumber } from "@/lib/estimate-invoice-linking";
-import { fetchInvoicePartyDbFields } from "@/lib/invoice-party";
+import {
+  attachFreshPartyFieldsToInvoiceRow,
+  enrichInvoiceWithPartyInfo,
+} from "@/lib/invoice-party";
 import { normalizeInvoiceLineItemsForSave } from "@/lib/invoice-line-items";
 import { normalizeBaseNumber } from "@/lib/quote-numbering";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
@@ -113,7 +116,14 @@ export async function GET(request, { params }) {
 
     if (!data) return notFound();
 
-    return new Response(JSON.stringify(serialize(data)), {
+    let invoice = serialize(data);
+    invoice = await enrichInvoiceWithPartyInfo(
+      supabaseAdmin,
+      tenantDbId,
+      invoice,
+    );
+
+    return new Response(JSON.stringify(invoice), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -274,18 +284,6 @@ export async function PATCH(request, { params }) {
       updateRow.client_name = String(body.clientName || "");
     if ("clientEmail" in body)
       updateRow.client_email = String(body.clientEmail || "");
-    if ("clientId" in body || "clientName" in body || "clientEmail" in body) {
-      const partyFields = linkedClientId
-        ? await fetchInvoicePartyDbFields(supabaseAdmin, tenantDbId, linkedClientId, {
-            clientEmail: updateRow.client_email ?? body.clientEmail ?? existing.client_email,
-          })
-        : {
-            client_phone: "",
-            client_address: "",
-            property_address: "",
-          };
-      Object.assign(updateRow, partyFields);
-    }
     if ("amount" in body) updateRow.amount = normalizedAmount;
     if ("dueDate" in body)
       updateRow.due_date = normalizeTimestamp(body.dueDate);
@@ -297,6 +295,20 @@ export async function PATCH(request, { params }) {
     updateRow.estimate_id = estimateId;
     updateRow.quote_id = quoteId;
     updateRow.quote_number = quoteNumber;
+
+    Object.assign(
+      updateRow,
+      await attachFreshPartyFieldsToInvoiceRow(
+        supabaseAdmin,
+        tenantDbId,
+        updateRow,
+        {
+          clientId: updateRow.client_id ?? existing.client_id,
+          clientName: updateRow.client_name ?? existing.client_name,
+          clientEmail: updateRow.client_email ?? existing.client_email,
+        },
+      ),
+    );
 
     let updateQuery = supabaseAdmin
       .from(INVOICES)

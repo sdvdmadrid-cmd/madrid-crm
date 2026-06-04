@@ -1,7 +1,10 @@
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import { pdfResponse } from "@/lib/document-pdf-core";
-import { enrichInvoiceWithPartyInfo } from "@/lib/invoice-party";
+import {
+  enrichInvoiceWithPartyInfo,
+  persistInvoicePartySnapshot,
+} from "@/lib/invoice-party";
 import { buildInvoicePdfBuffer, pdfFilenameForInvoice } from "@/lib/invoice-pdf";
 import {
   computeInvoicePaymentState,
@@ -72,6 +75,14 @@ export async function GET(request, { params }) {
       invoice.tenantId || tenantDbId,
       invoice,
     );
+    await persistInvoicePartySnapshot(
+      supabaseAdmin,
+      invoice.tenantId || tenantDbId,
+      data,
+      invoice,
+    ).catch((persistErr) => {
+      console.warn("[api/invoices/:id/pdf] party snapshot persist skipped", persistErr);
+    });
     const [branding, companyProfile] = await Promise.all([
       getEstimateBrandingByTenant(invoice.tenantId),
       getCompanyProfileByTenant({ tenantId: invoice.tenantId || tenantDbId }),

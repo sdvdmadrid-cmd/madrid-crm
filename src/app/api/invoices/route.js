@@ -24,7 +24,11 @@ import {
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
 
-import { fetchInvoicePartyDbFields } from "@/lib/invoice-party";
+import {
+  attachFreshPartyFieldsToInvoiceRow,
+  hydrateInvoiceDocsParty,
+  resolveClientForInvoiceParty,
+} from "@/lib/invoice-party";
 import { normalizeInvoiceLineItemsForSave } from "@/lib/invoice-line-items";
 import { normalizeBaseNumber } from "@/lib/quote-numbering";
 
@@ -136,7 +140,12 @@ export async function GET(request) {
       throw new Error(error.message);
     }
 
-    const docs = (data || []).map(serialize);
+    const hydrated = await hydrateInvoiceDocsParty(
+      supabaseAdmin,
+      tenantDbId,
+      data || [],
+    );
+    const docs = hydrated.map(serialize);
 
     if (paginate) {
       const total = Number(count || 0);
@@ -251,23 +260,26 @@ export async function POST(request) {
       }
     }
 
+    if (!linkedClientId && String(body.clientName || "").trim()) {
+      const resolved = await resolveClientForInvoiceParty(
+        supabaseAdmin,
+        tenantDbId,
+        {
+          clientName: body.clientName,
+          clientEmail: body.clientEmail,
+        },
+      );
+      if (resolved?.id) {
+        linkedClientId = normalizeUuid(resolved.id);
+      }
+    }
+
     const paymentState = computeInvoicePaymentState({
       amount,
       payments: [],
     });
 
-    const partyFields = linkedClientId
-      ? await fetchInvoicePartyDbFields(supabaseAdmin, tenantDbId, linkedClientId, {
-          clientEmail: body.clientEmail,
-        })
-      : {
-          client_phone: "",
-          client_address: "",
-          property_address: "",
-          client_email: String(body.clientEmail || "").trim(),
-        };
-
-    const toInsert = {
+    let toInsert = {
       tenant_id: tenantDbId,
       user_id: userId || null,
       invoice_number: invoiceNumber,
@@ -275,10 +287,10 @@ export async function POST(request) {
       job_id: normalizeUuid(body.jobId),
       client_id: linkedClientId,
       client_name: String(body.clientName || "").trim(),
-      client_email: partyFields.client_email || String(body.clientEmail || "").trim(),
-      client_phone: partyFields.client_phone || "",
-      client_address: partyFields.client_address || "",
-      property_address: partyFields.property_address || "",
+      client_email: String(body.clientEmail || "").trim(),
+      client_phone: "",
+      client_address: "",
+      property_address: "",
       amount,
       due_date: normalizeTimestamp(body.dueDate),
       items: lineItems,
@@ -300,6 +312,17 @@ export async function POST(request) {
       quote_id: quoteId,
       quote_number: quoteNumber,
     };
+
+    toInsert = await attachFreshPartyFieldsToInvoiceRow(
+      supabaseAdmin,
+      tenantDbId,
+      toInsert,
+      {
+        clientId: linkedClientId,
+        clientName: body.clientName,
+        clientEmail: body.clientEmail,
+      },
+    );
 
     // Retry-on-23505 only when the invoice number was auto-allocated.
     // Caller-provided numbers do NOT retry: a unique violation there

@@ -474,6 +474,9 @@
       "invoiceTextOpened": "Opened SMS app for {phone}",
       "invoiceTextMessage": "Hi, your invoice {invoice} for {amount} is ready. Pay online here: {link}",
       "invoiceTextNoLink": "ask us for the secure card payment link"
+    },
+    "warnings": {
+      "clientNotLinked": "Pick the client from the search list (not only typing the name) so billing and job site addresses appear on the invoice."
     }
   },
   "nav": {
