@@ -238,4 +238,31 @@ test.describe("Jobs module audit", () => {
     await expect(page.getByRole("heading", { name: /New job/i })).toBeVisible();
     await expect(page.getByPlaceholder("Title", { exact: true })).toHaveValue("");
   });
+
+  test("job enriches addresses from client name when client_id was missing", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const { clientName, clientId } = await createClient(page.request, stamp);
+
+    const jobRes = await page.request.post(`${ORIGIN}/api/jobs`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: {
+        title: `Job Link ${stamp}`,
+        clientName,
+      },
+    });
+    expect(jobRes.ok()).toBeTruthy();
+    const jobId = (await jobRes.json())?.data?.id;
+    expect(jobId).toBeTruthy();
+
+    const getRes = await page.request.get(`${ORIGIN}/api/jobs/${jobId}`, {
+      headers: ORIGIN_HEADERS,
+    });
+    expect(getRes.ok()).toBeTruthy();
+    const job = await getRes.json();
+    expect(job.clientId).toBe(clientId);
+    expect(String(job.propertyAddress || "")).toMatch(/500 Job Lane/i);
+    expect(String(job.billingAddress || "")).toMatch(/500 Job Lane/i);
+  });
 });

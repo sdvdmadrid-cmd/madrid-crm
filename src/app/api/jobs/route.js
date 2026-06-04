@@ -1,3 +1,4 @@
+import { attachFreshPartyToJobDbRow } from "@/lib/client-document-party";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -167,7 +168,11 @@ export async function POST(request) {
     }
 
     const body = sanitizePayloadDeep(await request.json());
-    const toInsert = buildInsertRow(body, tenantDbId, userId);
+    const toInsert = await attachFreshPartyToJobDbRow(
+      supabaseAdmin,
+      tenantDbId,
+      buildInsertRow(body, tenantDbId, userId),
+    );
 
     const { data, error } = await supabaseAdmin
       .from(JOBS)

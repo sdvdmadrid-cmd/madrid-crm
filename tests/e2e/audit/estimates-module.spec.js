@@ -359,6 +359,39 @@ test.describe("Estimates module audit", () => {
     await expect(page.getByText(/shown/i)).toBeVisible();
   });
 
+  test("estimate enriches addresses from client name when client_id was missing", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const { clientName, clientId } = await createClientOnly(page.request, stamp);
+
+    const estRes = await page.request.post(`${ORIGIN}/api/estimates`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: {
+        clientName,
+        services: [
+          { id: "base_price", name: "Base Price", qty: 1, unitPrice: 500, price: 500 },
+        ],
+        subtotal: 500,
+        tax: 0,
+        total: 500,
+        status: "draft",
+      },
+    });
+    expect(estRes.ok()).toBeTruthy();
+    const estId = (await estRes.json())?.data?.id;
+    expect(estId).toBeTruthy();
+
+    const getRes = await page.request.get(`${ORIGIN}/api/estimates/${estId}`, {
+      headers: ORIGIN_HEADERS,
+    });
+    expect(getRes.ok()).toBeTruthy();
+    const estimate = (await getRes.json())?.data;
+    expect(estimate.clientId || estimate.clientUuid).toBe(clientId);
+    expect(String(estimate.address || "")).toMatch(/400 Client Row/i);
+    expect(String(estimate.billingAddress || "")).toMatch(/400 Client Row/i);
+  });
+
   for (const viewport of VIEWPORTS) {
     test(`editor layout: ${viewport.name} — save actions visible`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });

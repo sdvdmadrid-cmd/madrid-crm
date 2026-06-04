@@ -1,3 +1,4 @@
+import { enrichJobWithPartyInfo } from "@/lib/client-document-party";
 import { getEstimateBrandingByTenant } from "@/lib/estimate-email-branding";
 import { pdfResponse } from "@/lib/document-pdf-core";
 import { buildJobPdfBuffer, pdfFilenameForJob } from "@/lib/job-pdf";
@@ -17,6 +18,7 @@ function serializeJob(doc) {
     _id: doc.id,
     tenantId: doc.tenant_id || "",
     title: doc.title || "",
+    clientId: doc.client_id || "",
     clientName: doc.client_name || "",
     service: doc.service || "",
     status: doc.status || "Pending",
@@ -50,7 +52,12 @@ export async function GET(request, { params }) {
       return Response.json({ success: false, error: "Job not found" }, { status: 404 });
     }
 
-    const job = serializeJob(data);
+    let job = serializeJob(data);
+    job = await enrichJobWithPartyInfo(
+      supabaseAdmin,
+      job.tenantId || tenantDbId,
+      job,
+    );
     const branding = await getEstimateBrandingByTenant(job.tenantId);
     const buffer = await buildJobPdfBuffer({ job, branding });
     const filename = pdfFilenameForJob(job);

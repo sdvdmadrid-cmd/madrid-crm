@@ -1,4 +1,8 @@
 import {
+  attachFreshPartyToEstimateDbRow,
+  enrichEstimateWithPartyInfo,
+} from "@/lib/client-document-party";
+import {
   buildPublicEstimateLink,
   isPublicEstimateStatus,
 } from "@/lib/estimate-public-access";
@@ -198,7 +202,14 @@ export async function GET(request, { params }) {
       return jsonResponse({ success: false, error: "Estimate not found" }, 404);
     }
 
-    return jsonResponse({ success: true, data: serializeEstimate(data) });
+    const serialized = serializeEstimate(data);
+    const enriched = await enrichEstimateWithPartyInfo(
+      supabaseAdmin,
+      tenantDbId,
+      serialized,
+    );
+
+    return jsonResponse({ success: true, data: enriched });
   } catch (error) {
     console.error("[api/estimates/:id][GET] error", {
       error: error?.message || String(error),
@@ -278,6 +289,18 @@ export async function PATCH(request, { params }) {
       currentStatus: existing.status || "draft",
     });
 
+    const withParty = await attachFreshPartyToEstimateDbRow(
+      supabaseAdmin,
+      tenantDbId,
+      {
+        client_name: toUpdate.client_name ?? existing.client_name,
+        client_id: existing.client_id,
+        notes: toUpdate.notes ?? existing.notes,
+      },
+    );
+    if (withParty.client_id) toUpdate.client_id = withParty.client_id;
+    if (withParty.notes) toUpdate.notes = withParty.notes;
+
     // Optimistic concurrency: only update if updated_at still
     // matches what we read into `existing` a few lines up. Prevents
     // two contractors (or a contractor + the customer's public
@@ -323,6 +346,11 @@ export async function PATCH(request, { params }) {
     }
 
     const serialized = serializeEstimate(data);
+    const enriched = await enrichEstimateWithPartyInfo(
+      supabaseAdmin,
+      tenantDbId,
+      serialized,
+    );
 
     // F3: contractor kanban can mark an estimate approved in-person.
     // Mirror the public respond handoff so the row gets a quote +
@@ -380,13 +408,13 @@ export async function PATCH(request, { params }) {
     const nextStatus = normalizeStatus(body?.status, serialized.status);
 
     const delivery = await deliverEstimateNotifications({
-      estimate: serialized,
+      estimate: enriched,
       sendChannels: body?.sendChannels,
       requestedStatus: nextStatus,
       contextLabel: "api/estimates/:id][PATCH",
     });
 
-    return jsonResponse({ success: true, data: { ...serialized, delivery } });
+    return jsonResponse({ success: true, data: { ...enriched, delivery } });
   } catch (error) {
     // Structured log line so production traces capture enough context
     // to repro / triage. Previously: `[api/estimates/:id][PATCH] error
