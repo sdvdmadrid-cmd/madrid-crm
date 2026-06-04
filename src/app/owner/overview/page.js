@@ -1,6 +1,7 @@
 import { AdminFinancialDashboardClient } from "@/components/admin/AdminFinancialDashboardClient";
 import AdminAiMonitoringClient from "@/components/admin/AdminAiMonitoringClient";
 import AdminCapacitySnapshotClient from "@/components/admin/AdminCapacitySnapshotClient";
+import OwnerLoginActivityClient from "@/components/owner/OwnerLoginActivityClient";
 import Link from "next/link";
 
 export default function OwnerOverviewPage() {
@@ -60,6 +61,7 @@ export default function OwnerOverviewPage() {
         </div>
       </div>
 
+      <OwnerLoginActivityClient />
       <AdminCapacitySnapshotClient />
       <AdminFinancialDashboardClient />
       <AdminAiMonitoringClient />

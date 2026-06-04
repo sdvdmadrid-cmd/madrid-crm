@@ -28,4 +28,23 @@ test.describe("Owner/Admin module audit", () => {
     });
     expect(res.ok()).toBeTruthy();
   });
+
+  test("owner login activity panel and API", async ({ page }) => {
+    await devLogin(page, { profile: "super_admin", redirect: "/owner/overview" });
+    await expect(page.getByTestId("owner-login-activity")).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page.getByRole("heading", { name: /Contractor login activity/i }),
+    ).toBeVisible();
+
+    const apiRes = await page.request.get(`${ORIGIN}/api/owner/login-activity`, {
+      headers: ORIGIN_HEADERS,
+    });
+    expect(apiRes.ok()).toBeTruthy();
+    const payload = await apiRes.json();
+    expect(payload.success).toBeTruthy();
+    expect(payload.data?.summary).toBeTruthy();
+    expect(Array.isArray(payload.data?.rows)).toBeTruthy();
+  });
 });

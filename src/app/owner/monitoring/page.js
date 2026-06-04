@@ -1,6 +1,7 @@
 import AdminAiMonitoringClient from '@/components/admin/AdminAiMonitoringClient';
 import AdminBillPaymentsOpsClient from '@/components/admin/AdminBillPaymentsOpsClient';
 import InvoiceClientPaymentsGuide from '@/components/invoices/InvoiceClientPaymentsGuide';
+import OwnerLoginActivityClient from '@/components/owner/OwnerLoginActivityClient';
 import OwnerSystemStatusCard from '@/components/owner/OwnerSystemStatusCard';
 import OwnerUsageDashboard from '@/components/owner/OwnerUsageDashboard';
 
@@ -20,6 +21,7 @@ export default function OwnerMonitoringPage() {
           queue, processors, global KPIs). Tenant users do not see this panel.
         </p>
       </div>
+      <OwnerLoginActivityClient />
       <OwnerUsageDashboard />
       <OwnerSystemStatusCard />
       <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-1">
