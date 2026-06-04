@@ -64,6 +64,71 @@ export function buildInvoicePartyDbFields(client = {}, overrides = {}) {
   };
 }
 
+/** Apply latest client billing + job-site fields onto an invoice DB update/insert row. */
+export function applyPartyFieldsToInvoiceRow(row = {}, client = {}, overrides = {}) {
+  if (!client?.id) return row;
+  const party = buildInvoicePartyDbFields(client, overrides);
+  return {
+    ...row,
+    client_id: toText(row.client_id) || client.id,
+    client_phone: party.client_phone,
+    client_address: party.client_address,
+    property_address: party.property_address,
+    ...(party.client_email ? { client_email: party.client_email } : {}),
+  };
+}
+
+export async function attachFreshPartyFieldsToInvoiceRow(
+  supabase,
+  tenantId,
+  row = {},
+  { clientId, clientName, clientEmail } = {},
+) {
+  const resolved = await resolveClientForInvoiceParty(supabase, tenantId, {
+    clientId,
+    clientName,
+    clientEmail,
+  });
+  if (!resolved) return row;
+  return applyPartyFieldsToInvoiceRow(row, resolved, { clientEmail });
+}
+
+export async function hydrateInvoiceDocsParty(supabase, tenantId, docs = []) {
+  if (!Array.isArray(docs) || !docs.length) return docs || [];
+
+  const out = [];
+  for (const doc of docs) {
+    const missingBilling = !toText(doc.client_address);
+    const missingJobSite = !toText(doc.property_address);
+    if (
+      (!missingBilling && !missingJobSite) ||
+      (!doc.client_id && !toText(doc.client_name))
+    ) {
+      out.push(doc);
+      continue;
+    }
+
+    const enriched = await enrichInvoiceWithPartyInfo(supabase, tenantId, {
+      clientId: doc.client_id,
+      clientName: doc.client_name,
+      clientEmail: doc.client_email,
+      clientPhone: doc.client_phone,
+      clientAddress: doc.client_address,
+      propertyAddress: doc.property_address,
+    });
+
+    out.push({
+      ...doc,
+      client_id: enriched.clientId || doc.client_id,
+      client_phone: enriched.clientPhone || doc.client_phone,
+      client_address: enriched.clientAddress || doc.client_address,
+      property_address: enriched.propertyAddress || doc.property_address,
+      client_email: enriched.clientEmail || doc.client_email,
+    });
+  }
+  return out;
+}
+
 export function invoicePartyFieldsFromDoc(doc = {}) {
   return {
     clientPhone: doc.client_phone || "",
@@ -110,13 +175,61 @@ export async function loadClientRowForInvoiceParty(supabase, tenantId, clientId)
   return data || null;
 }
 
+/**
+ * Resolve a client row for invoice party data by id, then by exact name (and email if ambiguous).
+ */
+export async function resolveClientForInvoiceParty(
+  supabase,
+  tenantId,
+  { clientId, clientName, clientEmail } = {},
+) {
+  if (!supabase) return null;
+
+  const byId = await loadClientRowForInvoiceParty(
+    supabase,
+    tenantId,
+    clientId,
+  );
+  if (byId) return byId;
+
+  const name = toText(clientName);
+  if (!name || !tenantId) return null;
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select(CLIENT_PARTY_SELECT)
+    .eq("tenant_id", tenantId)
+    .ilike("name", name)
+    .limit(8);
+
+  if (error) throw new Error(error.message);
+
+  const rows = Array.isArray(data) ? data : [];
+  if (!rows.length) return null;
+  if (rows.length === 1) return rows[0];
+
+  const email = toText(clientEmail).toLowerCase();
+  if (email) {
+    const emailMatch = rows.find(
+      (row) => toText(row.email).toLowerCase() === email,
+    );
+    if (emailMatch) return emailMatch;
+  }
+
+  return rows[0];
+}
+
 export async function fetchInvoicePartyDbFields(
   supabase,
   tenantId,
   clientId,
   overrides = {},
 ) {
-  const client = await loadClientRowForInvoiceParty(supabase, tenantId, clientId);
+  const client = await resolveClientForInvoiceParty(supabase, tenantId, {
+    clientId,
+    clientName: overrides.clientName,
+    clientEmail: overrides.clientEmail,
+  });
   if (!client) {
     return {
       client_phone: "",
@@ -130,17 +243,58 @@ export async function fetchInvoicePartyDbFields(
   return buildInvoicePartyDbFields(client, overrides);
 }
 
-export async function enrichInvoiceWithPartyInfo(supabase, tenantId, invoice = {}) {
-  const party = resolveInvoicePartyDisplay(invoice);
-  if (party.hasCustomerAddress || party.hasPropertyAddress) {
-    return { ...invoice, ...invoicePartyFieldsFromDoc(invoice) };
+/** Write resolved party fields back to the invoice row when they were missing. */
+export async function persistInvoicePartySnapshot(
+  supabase,
+  tenantId,
+  storedRow = {},
+  invoice = {},
+) {
+  if (!supabase || !storedRow?.id) return;
+
+  const patch = { updated_at: new Date().toISOString() };
+  if (!toText(storedRow.client_id) && toText(invoice.clientId)) {
+    patch.client_id = invoice.clientId;
+  }
+  if (!toText(storedRow.client_address) && toText(invoice.clientAddress)) {
+    patch.client_address = invoice.clientAddress;
+  }
+  if (!toText(storedRow.property_address) && toText(invoice.propertyAddress)) {
+    patch.property_address = invoice.propertyAddress;
+  }
+  if (!toText(storedRow.client_phone) && toText(invoice.clientPhone)) {
+    patch.client_phone = invoice.clientPhone;
+  }
+  if (!toText(storedRow.client_email) && toText(invoice.clientEmail)) {
+    patch.client_email = invoice.clientEmail;
   }
 
-  const clientId = toText(invoice.clientId || invoice.client_id);
-  if (!clientId) return invoice;
+  if (Object.keys(patch).length <= 1) return;
 
-  const client = await loadClientRowForInvoiceParty(supabase, tenantId, clientId);
-  if (!client) return invoice;
+  let query = supabase
+    .from("invoices")
+    .update(patch)
+    .eq("id", storedRow.id);
+
+  if (tenantId) {
+    query = query.eq("tenant_id", tenantId);
+  }
+
+  const { error } = await query;
+  if (error) throw new Error(error.message);
+}
+
+export async function enrichInvoiceWithPartyInfo(supabase, tenantId, invoice = {}) {
+  const party = resolveInvoicePartyDisplay(invoice);
+  const client = await resolveClientForInvoiceParty(supabase, tenantId, {
+    clientId: invoice.clientId || invoice.client_id,
+    clientName: invoice.clientName || invoice.client_name,
+    clientEmail: invoice.clientEmail || invoice.client_email,
+  });
+
+  if (!client) {
+    return { ...invoice, ...invoicePartyFieldsFromDoc(invoice) };
+  }
 
   const dbFields = buildInvoicePartyDbFields(client, {
     clientEmail: invoice.clientEmail || invoice.client_email,
@@ -148,10 +302,14 @@ export async function enrichInvoiceWithPartyInfo(supabase, tenantId, invoice = {
 
   return {
     ...invoice,
-    clientPhone: dbFields.client_phone,
-    clientAddress: dbFields.client_address,
-    propertyAddress: dbFields.property_address,
-    clientEmail: dbFields.client_email || invoice.clientEmail,
+    clientId: toText(invoice.clientId || invoice.client_id) || client.id,
+    clientPhone: dbFields.client_phone || party.clientPhone,
+    clientAddress: dbFields.client_address || party.clientAddress,
+    propertyAddress: dbFields.property_address || party.propertyAddress,
+    clientEmail:
+      dbFields.client_email ||
+      party.clientEmail ||
+      toText(invoice.clientEmail || invoice.client_email),
   };
 }
 

@@ -182,8 +182,19 @@ export default function InvoicesPage() {
     }));
   };
 
-  const openPrintableInvoice = (invoice) => {
-    const printableItems = normalizeInvoiceLineItemsForSave(invoice.lineItems);
+  const openPrintableInvoice = async (invoice) => {
+    let printableInvoice = invoice;
+    try {
+      const res = await apiFetch(`/api/invoices/${invoice._id}`);
+      if (res.ok) {
+        const fresh = await res.json();
+        printableInvoice = { ...invoice, ...(fresh?.data || fresh) };
+      }
+    } catch {
+      printableInvoice = invoice;
+    }
+
+    const printableItems = normalizeInvoiceLineItemsForSave(printableInvoice.lineItems);
     const lineRows = printableItems
       .map((line) => {
         const qty = Number(line.quantity ?? line.qty ?? 1) || 1;
@@ -200,23 +211,23 @@ export default function InvoicesPage() {
     const lineTable = lineRows
       ? `<table><thead><tr><th>${escapeHtml(t("invoices.lineItems.title", { defaultValue: "Line items" }))}</th><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th></tr></thead><tbody>${lineRows}</tbody></table>`
       : "";
-    const partyHtml = buildInvoicePartyHtmlBlock(invoice);
+    const partyHtml = buildInvoicePartyHtmlBlock(printableInvoice);
     const bodyHtml = `
       <h1>${escapeHtml(t("invoices.listTitle", { defaultValue: "Invoice" }))}</h1>
-      <p class="meta">${escapeHtml(invoice.invoiceNumber || "")} · ${escapeHtml(invoice.clientName || "")}</p>
+      <p class="meta">${escapeHtml(printableInvoice.invoiceNumber || "")} · ${escapeHtml(printableInvoice.clientName || "")}</p>
       ${partyHtml}
       <table><tbody>
-        <tr><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th><td>$${Number(invoice.amount || 0).toFixed(2)}</td></tr>
-        <tr><th>${escapeHtml(t("invoices.labels.paid", { defaultValue: "Paid" }))}</th><td>$${Number(invoice.paidAmount || 0).toFixed(2)}</td></tr>
-        <tr><th>${escapeHtml(t("invoices.labels.balance", { defaultValue: "Balance" }))}</th><td>$${Number(invoice.balanceDue || invoice.amount || 0).toFixed(2)}</td></tr>
-        <tr><th>${escapeHtml(t("invoices.labels.dueDate", { defaultValue: "Due date" }))}</th><td>${escapeHtml(invoice.dueDate || "—")}</td></tr>
-        <tr><th>${escapeHtml(t("invoices.labels.status", { defaultValue: "Status" }))}</th><td>${escapeHtml(invoice.status || "")}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.amount", { defaultValue: "Amount" }))}</th><td>$${Number(printableInvoice.amount || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.paid", { defaultValue: "Paid" }))}</th><td>$${Number(printableInvoice.paidAmount || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.balance", { defaultValue: "Balance" }))}</th><td>$${Number(printableInvoice.balanceDue || printableInvoice.amount || 0).toFixed(2)}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.dueDate", { defaultValue: "Due date" }))}</th><td>${escapeHtml(printableInvoice.dueDate || "—")}</td></tr>
+        <tr><th>${escapeHtml(t("invoices.labels.status", { defaultValue: "Status" }))}</th><td>${escapeHtml(printableInvoice.status || "")}</td></tr>
       </tbody></table>
       ${lineTable}
-      ${invoice.notes ? `<p><strong>${escapeHtml(t("invoices.placeholders.notes", { defaultValue: "Notes" }))}</strong><br/>${escapeHtml(invoice.notes)}</p>` : ""}
+      ${printableInvoice.notes ? `<p><strong>${escapeHtml(t("invoices.placeholders.notes", { defaultValue: "Notes" }))}</strong><br/>${escapeHtml(printableInvoice.notes)}</p>` : ""}
       ${buildFieldBasePoweredByHtml()}`;
     const opened = openPrintableHtmlDocument({
-      title: `Invoice ${invoice.invoiceNumber || ""}`,
+      title: `Invoice ${printableInvoice.invoiceNumber || ""}`,
       bodyHtml,
     });
     if (!opened) {
@@ -748,7 +759,7 @@ export default function InvoicesPage() {
                 variant="dark"
                 clientId={form.clientId || ""}
                 displayValue={form.clientName}
-                showHint={false}
+                showHint
                 placeholder={t("invoices.placeholders.client")}
                 onChange={({ clientId, clientName, displayValue, client }) =>
                   setForm((prev) => ({
@@ -759,6 +770,14 @@ export default function InvoicesPage() {
                   }))
                 }
               />
+              {form.clientName && !form.clientId ? (
+                <p className={styles.clientLinkWarning} role="status">
+                  {t("invoices.warnings.clientNotLinked", {
+                    defaultValue:
+                      "Pick the client from the search list (not only typing the name) so billing and job site addresses appear on the invoice.",
+                  })}
+                </p>
+              ) : null}
               <input
                 placeholder={t("invoices.placeholders.invoiceTitle")}
                 value={form.invoiceTitle}
@@ -996,7 +1015,7 @@ export default function InvoicesPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => openPrintableInvoice(invoice)}
+                    onClick={() => void openPrintableInvoice(invoice)}
                     className={styles.btnIcon}
                     aria-label={t("invoices.buttons.printBrowser", {
                       defaultValue: "Print in browser",
