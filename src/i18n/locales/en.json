@@ -472,7 +472,8 @@
     "messages": {
       "invoiceSent": "Invoice sent to {email}",
       "invoiceTextOpened": "Opened SMS app for {phone}",
-      "invoiceTextMessage": "Hi, your invoice {invoice} for {amount} is ready. Pay online here: {link}"
+      "invoiceTextMessage": "Hi, your invoice {invoice} for {amount} is ready. Pay online here: {link}",
+      "invoiceTextNoLink": "ask us for the secure card payment link"
     }
   },
   "nav": {
@@ -641,6 +642,14 @@
       "noLogo": "No logo",
       "unnamed": "Your company",
       "defaultSite": "https://fieldbaseapp.net"
+    },
+    "clientPayments": {
+      "title": "Zelle & offline payments",
+      "hint": "Shown on invoice emails, PDFs, and text messages when you send an invoice to a client.",
+      "zelleEmail": "Zelle email",
+      "zellePhone": "Zelle phone (optional)",
+      "bankInstructions": "Bank transfer instructions (optional)",
+      "bankPlaceholder": "Bank name, routing, account, or memo to include on the invoice"
     },
     "errors": {
       "load": "Unable to load company profile",
@@ -1319,6 +1328,7 @@
       "paymentCancelled": "Checkout cancelled. No charge was made."
     },
     "loading": "Loading invoices...",
+    "readOnlyHint": "You can view invoices here. Ask an admin to grant write access to create or edit invoices.",
     "formTitleNew": "New invoice",
     "formTitleEdit": "Edit invoice",
     "listTitle": "Invoice list",
@@ -1351,6 +1361,7 @@
       "Overdue": "Overdue"
     },
     "buttons": {
+      "newInvoice": "+ New invoice",
       "ai": "AI complete invoice",
       "aiLoading": "AI generating...",
       "save": "Save",

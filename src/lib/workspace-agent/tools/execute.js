@@ -171,7 +171,13 @@ export async function executeWorkspaceTool(toolName, args, ctx) {
   switch (toolName) {
     case "searchClients": {
       const clients = await findClients(tenantId, args.query || "");
-      return { ok: true, clients };
+      return {
+        ok: true,
+        clients: Array.isArray(clients) ? clients : [],
+        message: clients.length
+          ? undefined
+          : "No clients matched that search. Try another name, email, or phone.",
+      };
     }
     case "searchJobs": {
       const jobs = await findByTable(
@@ -243,7 +249,7 @@ export async function executeWorkspaceTool(toolName, args, ctx) {
         zipCode: args.zip || args.zipCode,
         notes: args.notes,
       };
-      const row = buildClientInsertRow(body, tenantId, userId);
+      const row = buildClientInsertRow(body, { tenantId, userId });
       const { data, error } = await supabaseAdmin
         .from("clients")
         .insert(row)

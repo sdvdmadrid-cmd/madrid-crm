@@ -87,7 +87,7 @@ export default function ClientForm({
         <PlacesAutocomplete
           id="client-address"
           value={form.address || ""}
-          selectedValueKey="formattedAddress"
+          selectedValueKey="street"
           onChange={(value) =>
             onChange({
               ...form,
@@ -101,17 +101,17 @@ export default function ClientForm({
             })
           }
           onSelect={({
+            street,
             city,
             state,
             zip,
-            formattedAddress,
             latitude,
             longitude,
             placeId,
           }) => {
             onChange({
               ...form,
-              address: formattedAddress || form.address || "",
+              address: street || form.address || "",
               city: city || "",
               state: state || "",
               zip: zip || "",
@@ -177,14 +177,14 @@ export default function ClientForm({
               <PlacesAutocomplete
                 id="client-billing-address"
                 value={form.billingAddress || ""}
-                selectedValueKey="formattedAddress"
+                selectedValueKey="street"
                 onChange={(value) =>
                   onChange({ ...form, billingAddress: value, billingCity: "", billingState: "", billingZip: "" })
                 }
-                onSelect={({ city, state, zip, formattedAddress }) => {
+                onSelect={({ street, city, state, zip }) => {
                   onChange({
                     ...form,
-                    billingAddress: formattedAddress || form.billingAddress || "",
+                    billingAddress: street || form.billingAddress || "",
                     billingCity: city || "",
                     billingState: state || "",
                     billingZip: zip || "",

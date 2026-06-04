@@ -658,6 +658,7 @@ export async function createStripeCheckoutSessionForAccess({
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
+        payment_method_types: ["card"],
         success_url: `${safeBase}/invoices?payment=success&invoiceId=${access.invoice.id}`,
         cancel_url: `${safeBase}/invoices?payment=cancel&invoiceId=${access.invoice.id}`,
         payment_intent_data: paymentIntentData,

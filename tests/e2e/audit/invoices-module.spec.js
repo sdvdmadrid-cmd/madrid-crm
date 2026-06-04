@@ -56,6 +56,8 @@ test.describe("Invoices module audit", () => {
   for (const viewport of VIEWPORTS) {
     test(`layout: ${viewport.name} — form and list search`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(page.getByTestId("invoices-new-button")).toBeVisible();
+      await expect(page.getByTestId("invoices-form-section")).toBeVisible();
       await expect(page.getByRole("combobox", { name: /Search clients/i })).toBeVisible();
       await expect(page.getByLabel(/Search invoices/i)).toBeVisible();
       await expect(page.getByRole("heading", { name: /Invoice list/i })).toBeVisible();
@@ -293,6 +295,73 @@ test.describe("Invoices module audit", () => {
     const card = getInvoiceCard(page, clientName);
     await expect(card.getByText(/Job site/i)).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText(/600 Invoice Ave/i)).toBeVisible();
+  });
+
+  test("send invoice email includes card and Zelle payment instructions", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const email = `inv.pay+${stamp}@example.com`;
+    const zelleEmail = `zelle+${stamp}@contractor.test`;
+
+    const profileRes = await page.request.patch(`${ORIGIN}/api/company-profile`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: {
+        clientPayments: {
+          zelleEmail,
+          zellePhone: "+15551234000",
+        },
+      },
+    });
+    expect(profileRes.ok()).toBeTruthy();
+
+    const invRes = await page.request.post(`${ORIGIN}/api/invoices`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: {
+        invoiceNumber: `INV-PAY-${stamp}`,
+        clientName: `Pay Flow ${stamp}`,
+        clientEmail: email,
+        amount: "275",
+        dueDate: "2026-12-20",
+        status: "Unpaid",
+        preferredPaymentMethod: "zelle",
+      },
+    });
+    expect(invRes.ok()).toBeTruthy();
+    const invId = (await invRes.json())?.data?._id;
+    expect(invId).toBeTruthy();
+
+    const sendRes = await page.request.post(`${ORIGIN}/api/invoices/${invId}/send`, {
+      headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+      data: { recipientEmail: email },
+    });
+    expect(sendRes.ok()).toBeTruthy();
+    const sendJson = await sendRes.json();
+    expect(sendJson?.success).toBe(true);
+    expect(sendJson?.data?.recipientEmail).toBe(email);
+
+    const lines = sendJson?.data?.paymentInstructions?.textLines || [];
+    const blob = lines.join("\n");
+    expect(blob).toMatch(/Credit|debit card/i);
+    expect(blob).toMatch(/Zelle/i);
+    expect(blob).toContain(zelleEmail);
+    expect(sendJson?.data?.paymentInstructions?.includesZelle).toBe(true);
+
+    const checkoutRes = await page.request.post(
+      `${ORIGIN}/api/invoices/${invId}/checkout`,
+      {
+        headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
+        data: { amount: "275" },
+      },
+    );
+    if (checkoutRes.ok()) {
+      const checkoutJson = await checkoutRes.json();
+      const checkoutUrl = String(checkoutJson?.data?.checkoutUrl || "").trim();
+      if (checkoutUrl) {
+        expect(checkoutUrl).toMatch(/^https?:\/\//i);
+        expect(sendJson?.data?.paymentInstructions?.includesCardLink).toBe(true);
+      }
+    }
   });
 
   test("clear form exits edit mode", async ({ page }) => {

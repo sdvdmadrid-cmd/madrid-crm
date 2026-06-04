@@ -9,6 +9,7 @@ import { useWorkspaceAgentSession } from "@/hooks/useWorkspaceAgentSession";
 import {
   executeWorkspaceActions,
   mergeAgentSummaries,
+  normalizeAgentSummaries,
 } from "@/lib/workspace-agent/client-executor";
 
 const TEXT = {
@@ -151,7 +152,10 @@ export default function WorkspaceAgentBubble({
 
       if (data.requiresConfirmation && data.plan) {
         setPendingPlan(data.plan);
-        appendMessage("assistant", data.answer, { plan: true, summaries: data.summaries });
+        appendMessage("assistant", data.answer, {
+          plan: true,
+          summaries: normalizeAgentSummaries(data.summaries, "planSummaries"),
+        });
         return;
       }
 
@@ -159,15 +163,17 @@ export default function WorkspaceAgentBubble({
       let clientSummaries = [];
 
       if (agentMode && Array.isArray(data.actions) && data.actions.length > 0) {
-        clientSummaries = executeWorkspaceActions(data.actions, {
+        clientSummaries = await executeWorkspaceActions(data.actions, {
           applyWebsitePatches: (p) => {
             wbAi?.applyPatches?.(p);
           },
           navigate: (path) => router.push(path),
+          apiFetch,
+          getJsonOrThrow,
         });
       } else if (data.patches && onWebsiteBuilder) {
         wbAi?.applyPatches?.(data.patches);
-        clientSummaries.push(t.applied);
+        clientSummaries = [t.applied];
       }
 
       const summaries = mergeAgentSummaries(data.summaries, clientSummaries);
@@ -369,9 +375,9 @@ export default function WorkspaceAgentBubble({
                   >
                     {msg.content}
                   </div>
-                  {msg.meta?.summaries?.length ? (
+                  {normalizeAgentSummaries(msg.meta?.summaries, "messageSummaries").length ? (
                     <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                      {msg.meta.summaries.map((s) => (
+                      {normalizeAgentSummaries(msg.meta?.summaries, "messageSummaries").map((s) => (
                         <span key={s} style={summaryChipStyle}>
                           {s}
                         </span>

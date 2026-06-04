@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useRouter } from "next/navigation";
 import { formatClientCardLines } from "@/lib/client-display";
 import ClientCardActions from "./ClientCardActions";
@@ -17,7 +18,7 @@ function ContactLine({ value }) {
   return <p className={list.metaLine}>{value}</p>;
 }
 
-export default function ClientsList({
+function ClientsList({
   t,
   clients,
   loading,
@@ -131,3 +132,5 @@ export default function ClientsList({
     </section>
   );
 }
+
+export default memo(ClientsList);

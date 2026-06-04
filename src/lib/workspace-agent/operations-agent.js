@@ -150,13 +150,24 @@ export async function runOperationsAgent({
 }
 
 function formatFallbackAnswer(toolResults, summaries) {
-  if (summaries.length) {
-    return `Done:\n${summaries.map((s) => `• ${s}`).join("\n")}`;
+  const safeSummaries = Array.isArray(summaries) ? summaries : [];
+  if (safeSummaries.length) {
+    return `Done:\n${safeSummaries.map((s) => `• ${s}`).join("\n")}`;
   }
-  const errors = toolResults
+  const errors = (Array.isArray(toolResults) ? toolResults : [])
     .filter((t) => t.result && !t.result.ok)
     .map((t) => t.result.error)
     .filter(Boolean);
   if (errors.length) return errors[0];
+
+  const last = Array.isArray(toolResults) ? toolResults[toolResults.length - 1] : null;
+  const lastResult = last?.result;
+  if (lastResult?.ok && Array.isArray(lastResult.clients) && !lastResult.clients.length) {
+    return "No matching clients found. Add the client in Clients or provide a clearer name, email, or phone.";
+  }
+  if (lastResult?.ok && lastResult.client == null && last?.tool === "createEstimate") {
+    return "I could not match a client for that estimate. Create the client first or use the exact name on file.";
+  }
+
   return "I could not complete that action. Try rephrasing with the client name and service details.";
 }

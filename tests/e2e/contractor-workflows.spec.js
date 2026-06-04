@@ -204,6 +204,9 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
       data: { recipientEmail: email },
     });
     expect(sendRes.ok()).toBeTruthy();
+    const sendJson = await sendRes.json();
+    const paymentLines = sendJson?.data?.paymentInstructions?.textLines || [];
+    expect(paymentLines.join("\n")).toMatch(/How to pay|Credit|debit card/i);
 
     const pdfRes = await page.request.get(`${ORIGIN}/api/invoices/${invId}/pdf`, {
       headers: ORIGIN_HEADERS,

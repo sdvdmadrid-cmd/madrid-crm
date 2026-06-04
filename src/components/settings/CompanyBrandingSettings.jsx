@@ -10,6 +10,14 @@ import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import ws from "@/styles/workspace-dark.module.css";
 import styles from "./company-branding.module.css";
 
+const EMPTY_CLIENT_PAYMENTS = {
+  zelleEmail: "",
+  zellePhone: "",
+  venmoHandle: "",
+  paypalEmail: "",
+  bankTransferInstructions: "",
+};
+
 const EMPTY_PROFILE = {
   companyName: "",
   publicDisplayName: "",
@@ -20,7 +28,13 @@ const EMPTY_PROFILE = {
   logoPlacement: "top-left",
   publishedSiteUrl: "",
   documentWebsiteUrl: "",
+  serviceCatalogPreferences: { clientPayments: { ...EMPTY_CLIENT_PAYMENTS } },
 };
+
+function readClientPayments(profile = {}) {
+  const prefs = profile?.serviceCatalogPreferences?.clientPayments;
+  return { ...EMPTY_CLIENT_PAYMENTS, ...(prefs && typeof prefs === "object" ? prefs : {}) };
+}
 
 export default function CompanyBrandingSettings() {
   const { t, i18n } = useTranslation();
@@ -110,6 +124,7 @@ export default function CompanyBrandingSettings() {
           websiteUrl: profile.websiteUrl,
           logoUrl: profile.logoUrl,
           logoPlacement: profile.logoPlacement,
+          clientPayments: readClientPayments(profile),
         }),
       });
       const payload = await getJsonOrThrow(res, t("companyBranding.errors.save"));
@@ -251,6 +266,81 @@ export default function CompanyBrandingSettings() {
                 <span className={styles.fieldNote}>
                   {t("companyBranding.labels.websiteHint")}
                 </span>
+              </label>
+            </div>
+          </section>
+
+          <section className={styles.formCard}>
+            <h2 className={styles.sectionTitle}>
+              {t("companyBranding.clientPayments.title")}
+            </h2>
+            <p className={styles.sectionHint}>
+              {t("companyBranding.clientPayments.hint")}
+            </p>
+            <div className={styles.fieldGrid}>
+              <label className={styles.field}>
+                <span>{t("companyBranding.clientPayments.zelleEmail")}</span>
+                <input
+                  className={styles.input}
+                  type="email"
+                  value={readClientPayments(profile).zelleEmail}
+                  onChange={(e) =>
+                    updateProfile((prev) => ({
+                      ...prev,
+                      serviceCatalogPreferences: {
+                        ...(prev.serviceCatalogPreferences || {}),
+                        clientPayments: {
+                          ...readClientPayments(prev),
+                          zelleEmail: e.target.value,
+                        },
+                      },
+                    }))
+                  }
+                  placeholder="pay@yourbusiness.com"
+                  data-testid="company-zelle-email"
+                />
+              </label>
+              <label className={styles.field}>
+                <span>{t("companyBranding.clientPayments.zellePhone")}</span>
+                <input
+                  className={styles.input}
+                  value={readClientPayments(profile).zellePhone}
+                  onChange={(e) =>
+                    updateProfile((prev) => ({
+                      ...prev,
+                      serviceCatalogPreferences: {
+                        ...(prev.serviceCatalogPreferences || {}),
+                        clientPayments: {
+                          ...readClientPayments(prev),
+                          zellePhone: e.target.value,
+                        },
+                      },
+                    }))
+                  }
+                  placeholder={profile.phone || "(555) 123-4567"}
+                  data-testid="company-zelle-phone"
+                />
+              </label>
+              <label className={`${styles.field} ${styles.fieldFull}`}>
+                <span>{t("companyBranding.clientPayments.bankInstructions")}</span>
+                <textarea
+                  className={styles.input}
+                  rows={3}
+                  value={readClientPayments(profile).bankTransferInstructions}
+                  onChange={(e) =>
+                    updateProfile((prev) => ({
+                      ...prev,
+                      serviceCatalogPreferences: {
+                        ...(prev.serviceCatalogPreferences || {}),
+                        clientPayments: {
+                          ...readClientPayments(prev),
+                          bankTransferInstructions: e.target.value,
+                        },
+                      },
+                    }))
+                  }
+                  placeholder={t("companyBranding.clientPayments.bankPlaceholder")}
+                />
               </label>
             </div>
 

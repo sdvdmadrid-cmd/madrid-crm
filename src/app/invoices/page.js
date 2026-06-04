@@ -27,6 +27,7 @@ import {
 } from "@/lib/invoice-line-items";
 import { buildFieldBasePoweredByHtml } from "@/lib/fieldbase-document-branding";
 import { buildInvoicePartyHtmlBlock } from "@/lib/invoice-party";
+import { buildInvoicePaymentInstructions } from "@/lib/invoice-client-payment-instructions";
 import "@/i18n";
 
 const initialInvoice = {
@@ -137,6 +138,9 @@ export default function InvoicesPage() {
   const [listSearch, setListSearch] = useState("");
 
   const filterClientId = String(searchParams.get("clientId") || "").trim();
+  const canEditInvoices = capabilities.canWriteOperationalData;
+  const canManageInvoicePayments = capabilities.canManageSensitiveData;
+  const formSectionRef = useRef(null);
 
   const visibleInvoices = useMemo(() => {
     let list = invoices;
@@ -585,15 +589,41 @@ export default function InvoicesPage() {
         throw new Error(t("invoices.errors.invalidRecipientPhone"));
       }
 
-      const checkoutUrl = await getInvoiceCheckoutUrl(invoice);
+      let checkoutUrl = "";
+      try {
+        checkoutUrl = await getInvoiceCheckoutUrl(invoice);
+      } catch {
+        checkoutUrl = String(invoice.lastCheckoutUrl || "").trim();
+      }
+
+      let companyProfile = {};
+      try {
+        const profileRes = await apiFetch("/api/company-profile");
+        if (profileRes.ok) {
+          const profileJson = await profileRes.json();
+          companyProfile = profileJson?.data || {};
+        }
+      } catch {
+        companyProfile = {};
+      }
+
+      const { textLines } = buildInvoicePaymentInstructions({
+        companyProfile,
+        invoice,
+        checkoutUrl,
+      });
       const amount = Number(invoice.balanceDue || invoice.amount || 0).toFixed(
         2,
       );
-      const smsBody = t("invoices.messages.invoiceTextMessage", {
-        invoice: invoice.invoiceNumber || t("invoices.labels.untitled"),
-        amount,
-        link: checkoutUrl,
-      });
+      const smsBody = [
+        t("invoices.messages.invoiceTextMessage", {
+          invoice: invoice.invoiceNumber || t("invoices.labels.untitled"),
+          amount,
+          link: checkoutUrl || t("invoices.messages.invoiceTextNoLink"),
+        }),
+        "",
+        ...textLines,
+      ].join("\n");
 
       window.location.href = `sms:${recipientPhone}?body=${encodeURIComponent(smsBody)}`;
       window.alert(
@@ -638,16 +668,40 @@ export default function InvoicesPage() {
     }
   }, []);
 
+  const focusNewInvoiceForm = () => {
+    resetForm();
+    formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <main className={styles.page}>
-      <header>
+      <header className={styles.headerRow}>
         <div>
           <h1 className={styles.headerTitle}>{t("invoices.title")}</h1>
           <p className={styles.headerSub}>{t("invoices.description")}</p>
         </div>
+        {canEditInvoices ? (
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            data-testid="invoices-new-button"
+            onClick={focusNewInvoiceForm}
+          >
+            {t("invoices.buttons.newInvoice", { defaultValue: "+ New invoice" })}
+          </button>
+        ) : null}
       </header>
 
-      {capabilities.canManageSensitiveData ? (
+      {!canEditInvoices ? (
+        <p className={styles.muted} style={{ marginTop: 16 }}>
+          {t("invoices.readOnlyHint", {
+            defaultValue:
+              "You can view invoices here. Ask an admin to grant write access to create or edit invoices.",
+          })}
+        </p>
+      ) : null}
+
+      {canManageInvoicePayments ? (
         <InvoiceClientPaymentsGuide
           variant="contractor"
           defaultExpanded={showClientPaymentsBanner}
@@ -669,8 +723,12 @@ export default function InvoicesPage() {
       {error && <div className={styles.error}>{error}</div>}
       {loading && <div className={styles.loading}>{t("invoices.loading")}</div>}
 
-      {capabilities.canManageSensitiveData
-        ? <section className={styles.card}>
+      {canEditInvoices
+        ? <section
+            ref={formSectionRef}
+            className={styles.card}
+            data-testid="invoices-form-section"
+          >
             <h2 className={styles.cardTitle}>
               {selectedId
                 ? t("invoices.formTitleEdit")
@@ -982,7 +1040,7 @@ export default function InvoicesPage() {
                       }}
                     />
                   ) : null}
-                  {capabilities.canManageSensitiveData &&
+                  {canManageInvoicePayments &&
                     stripePublishableConfigured
                     ? <button
                         type="button"
@@ -992,7 +1050,7 @@ export default function InvoicesPage() {
                         {t("invoices.buttons.chargeOnline")}
                       </button>
                     : null}
-                  {capabilities.canManageSensitiveData
+                  {canManageInvoicePayments
                     ? <button
                         type="button"
                         onClick={() => startRegisterPayment(invoice)}
@@ -1001,7 +1059,7 @@ export default function InvoicesPage() {
                         {t("invoices.buttons.registerPayment")}
                       </button>
                     : null}
-                  {capabilities.canManageSensitiveData
+                  {canEditInvoices
                     ? <button
                         type="button"
                         onClick={() => editInvoice(invoice)}
