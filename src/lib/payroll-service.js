@@ -15,6 +15,12 @@ import { sendPayrollApprovalEmail } from "./payroll-email-notifications.js";
 import { loadPayrollTaxTables } from "./payroll-tax-tables-server.js";
 import { roundMoney } from "./payroll-money.js";
 import {
+  applyEmployeeSettingsDefaults,
+  getPayrollSettingsForTenant,
+  resolveRunItemHours,
+  taxTablesForEmployee,
+} from "./payroll-settings-service.js";
+import {
   serializePayrollEmployee,
   serializePayrollRun,
   serializePayrollRunItem,
@@ -124,8 +130,9 @@ export async function calculatePayrollRun({
     .eq("run_id", runId);
   if (itemsError) throw new Error(itemsError.message);
 
-  const taxTables = await loadPayrollTaxTables({ asOfDate: run.pay_date });
-  const periods = payPeriodsPerYear(run.schedule_type);
+  const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
+  const taxTablesBase = await loadPayrollTaxTables({ asOfDate: run.pay_date });
+  const periods = payPeriodsPerYear(run.schedule_type || settings.defaultPaySchedule);
   const calculatedItems = [];
   const employeeIds = (items || []).map((item) => item.employee_id).filter(Boolean);
   const ytdMap = await fetchBatchEmployeeYtdBeforeRun({
@@ -142,11 +149,22 @@ export async function calculatePayrollRun({
 
     const ytdBefore = ytdMap.get(item.employee_id) || normalizeYtdTotals({});
 
-    const employee = serializePayrollEmployee(employeeRow);
-    const result = calculatePayrollRunItem({
-      employee,
+    const employee = applyEmployeeSettingsDefaults(
+      serializePayrollEmployee(employeeRow),
+      settings,
+    );
+    const resolvedHours = resolveRunItemHours({
       hoursRegular: item.hours_regular,
       hoursOvertime: item.hours_overtime,
+      standardWeeklyHours: settings.standardWeeklyHours,
+      scheduleType: run.schedule_type || settings.defaultPaySchedule,
+    });
+    const taxTables = taxTablesForEmployee(taxTablesBase, settings, employee);
+
+    const result = calculatePayrollRunItem({
+      employee,
+      hoursRegular: resolvedHours.hoursRegular,
+      hoursOvertime: resolvedHours.hoursOvertime,
       hourlyRateOverride: item.hourly_rate || employee.hourlyRate,
       taxTables,
       ytdBefore,
@@ -154,11 +172,20 @@ export async function calculatePayrollRun({
     });
 
     const updateRow = {
+      hours_regular: resolvedHours.hoursRegular,
+      hours_overtime: resolvedHours.hoursOvertime,
       gross_pay: result.grossPay,
       deductions: result.deductions,
       employer_taxes: result.employerTaxes,
       net_pay: result.netPay,
-      stub_snapshot: result.stubSnapshot,
+      stub_snapshot: {
+        ...result.stubSnapshot,
+        settingsApplied: {
+          standardWeeklyHours: settings.standardWeeklyHours,
+          defaultPaySchedule: settings.defaultPaySchedule,
+          overtimeAutoSplit: resolvedHours.autoSplitApplied,
+        },
+      },
       ytd_snapshot: result.ytdAfter,
       updated_at: new Date().toISOString(),
     };
@@ -183,10 +210,11 @@ export async function calculatePayrollRun({
     .update({
       status: "calculated",
       totals,
-      tax_table_version: taxTables.versionLabel || "",
+      tax_table_version: taxTablesBase.versionLabel || "",
       updated_at: now,
     })
     .eq("id", runId)
+    .eq("tenant_id", tenantDbId)
     .select("*")
     .single();
 
@@ -196,7 +224,7 @@ export async function calculatePayrollRun({
     run: serializePayrollRun(updatedRun),
     items: calculatedItems,
     totals,
-    taxTableVersion: taxTables.versionLabel || "",
+    taxTableVersion: taxTablesBase.versionLabel || "",
   };
 }
 
@@ -221,6 +249,7 @@ export async function approvePayrollRun({ tenantDbId, role, runId, userId }) {
       updated_at: now,
     })
     .eq("id", runId)
+    .eq("tenant_id", tenantDbId)
     .select("*")
     .single();
 
@@ -277,6 +306,7 @@ export async function finalizePayrollRun({ tenantDbId, role, runId, userId }) {
       updated_at: now,
     })
     .eq("id", runId)
+    .eq("tenant_id", tenantDbId)
     .select("*")
     .single();
 

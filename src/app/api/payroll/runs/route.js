@@ -4,6 +4,10 @@ import {
   serializePayrollRunItem,
 } from "@/lib/payroll-serializer";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
+import {
+  getPayrollSettingsForTenant,
+  suggestedPayRunFromSettings,
+} from "@/lib/payroll-settings-service.js";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { scopeByTenant } from "@/lib/tenant-scope";
 import {
@@ -58,15 +62,24 @@ export async function POST(request) {
 
     const body = await request.json();
     const now = new Date().toISOString();
+    const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
+    const suggested = body.useTenantDefaults
+      ? suggestedPayRunFromSettings(settings)
+      : null;
 
     const row = {
       tenant_id: tenantDbId,
       user_id: userId || null,
-      schedule_type: String(body.scheduleType || "biweekly"),
-      period_start: body.periodStart,
-      period_end: body.periodEnd,
-      pay_date: body.payDate,
-      title: String(body.title || "").trim() || `Payroll ${body.periodEnd || ""}`,
+      schedule_type: String(
+        body.scheduleType || suggested?.scheduleType || settings.defaultPaySchedule || "biweekly",
+      ),
+      period_start: body.periodStart || suggested?.periodStart,
+      period_end: body.periodEnd || suggested?.periodEnd,
+      pay_date: body.payDate || suggested?.payDate,
+      title:
+        String(body.title || "").trim() ||
+        suggested?.title ||
+        `Payroll ${body.periodEnd || suggested?.periodEnd || ""}`,
       notes: String(body.notes || ""),
       status: "draft",
       created_by: userId || null,

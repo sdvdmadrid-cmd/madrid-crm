@@ -10,6 +10,7 @@ import {
 } from "@/lib/payroll-serializer";
 import { listEmployeePayrollHistory } from "@/lib/payroll-service";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
+import { getPayrollSettingsForTenant } from "@/lib/payroll-settings-service.js";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { scopeByTenant } from "@/lib/tenant-scope";
 import {
@@ -73,7 +74,11 @@ export async function POST(request) {
     if (!canWrite(role)) return forbiddenResponse();
 
     const body = await request.json();
+    const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
     const row = buildEmployeeInsertRow(body, tenantDbId, userId);
+    if (!row.work_state && settings.defaultWorkState) {
+      row.work_state = String(settings.defaultWorkState).toUpperCase();
+    }
     row.created_at = new Date().toISOString();
 
     if (body.ssn && canManageSensitive(role)) {
