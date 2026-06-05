@@ -292,9 +292,9 @@ export default function InvoicesPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/invoices");
-      const data = await getJsonOrThrow(res, t("invoices.errors.fetch"));
-      setInvoices(data);
+      const res = await apiFetch("/api/invoices?limit=250&page=1");
+      const payload = await getJsonOrThrow(res, t("invoices.errors.fetch"));
+      setInvoices(Array.isArray(payload) ? payload : payload?.data || []);
       lastInvoiceFetchRef.current = Date.now();
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.load")));

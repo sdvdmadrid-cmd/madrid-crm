@@ -348,49 +348,21 @@ export async function listJobProfitRollups(tenantDbId, { search = "", limit = 50
 }
 
 export async function listProjectPlSummaries(tenantDbId, { search = "", limit = 50 } = {}) {
-  const { data: jobs, error } = await supabaseAdmin
-    .from("jobs")
-    .select("id, title, client_name, status")
-    .eq("tenant_id", tenantDbId)
-    .order("updated_at", { ascending: false })
-    .limit(Math.min(limit, 100));
-
-  if (error) throw new Error(error.message);
-
-  const q = String(search || "").toLowerCase();
-  const filtered = (jobs || []).filter((job) => {
-    if (!q) return true;
-    return (
-      String(job.title || "").toLowerCase().includes(q) ||
-      String(job.client_name || "").toLowerCase().includes(q)
-    );
-  });
-
-  const summaries = await Promise.all(
-    filtered.slice(0, limit).map(async (job) => {
-      try {
-        const pl = await getJobProjectPl(tenantDbId, job.id);
-        return {
-          jobId: pl.jobId,
-          jobTitle: pl.jobTitle,
-          clientName: pl.clientName,
-          revenue: pl.revenue,
-          totalCost: pl.actual.totalCost,
-          actualLaborBurden: pl.actual.laborBurden,
-          materialsCost: pl.actual.materialsCost,
-          equipmentCost: pl.actual.equipmentCost,
-          subcontractorCost: pl.actual.subcontractorCost,
-          grossProfit: pl.profit.grossProfit,
-          marginPercent: pl.profit.marginPercent,
-          isLosingMoney: pl.metrics.isLosingMoney,
-        };
-      } catch {
-        return null;
-      }
-    }),
-  );
-
-  return summaries.filter(Boolean);
+  const rollups = await listJobProfitRollups(tenantDbId, { search, limit });
+  return rollups.map((row) => ({
+    jobId: row.jobId,
+    jobTitle: row.jobTitle,
+    clientName: row.clientName,
+    revenue: row.revenue,
+    totalCost: row.totalCost,
+    actualLaborBurden: row.actualLaborBurden,
+    materialsCost: row.materialsCost,
+    equipmentCost: row.equipmentCost,
+    subcontractorCost: row.subcontractorCost,
+    grossProfit: row.grossProfit,
+    marginPercent: row.marginPercent,
+    isLosingMoney: row.isLosingMoney,
+  }));
 }
 
 export async function listLosingJobs(tenantDbId, limit = 20) {

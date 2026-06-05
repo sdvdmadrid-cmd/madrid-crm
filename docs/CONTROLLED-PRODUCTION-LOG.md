@@ -67,7 +67,8 @@ npx playwright test tests/e2e/audit/production-readiness.spec.js tests/e2e/audit
 
 | ID | Sev | Module | Summary | Status | Reported |
 |----|-----|--------|---------|--------|----------|
-| — | — | — | *No issues logged yet.* | — | — |
+| LIVE-001 | P2 | Perf / Nav | fieldbaseapp.net slow between every module | `InstantNavigation` prefetched all routes on each DOM change; weather burst on calendar; PL N+1 | Throttled prefetch; website status cache; weather queue; PL rollups | Fixed (pending deploy) | 2026-06-05 |
+| LIVE-002 | P1 | Perf / Supabase | Disk IO budget depletion; global slowness | 17-query dashboard; unpaginated lists; N+1 hydrate; full job scan on P&L | See `docs/SUPABASE-DISK-IO-AUDIT.md` + migration `20260614120000` | Fixed (pending deploy) | 2026-06-05 |
 
 ---
 

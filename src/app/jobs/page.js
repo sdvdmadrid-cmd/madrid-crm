@@ -186,9 +186,9 @@ export default function JobsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/jobs");
-      const data = await getJsonOrThrow(res, t("jobs.errors.fetch"));
-      setJobs(data);
+      const res = await apiFetch("/api/jobs?limit=250&page=1");
+      const payload = await getJsonOrThrow(res, t("jobs.errors.fetch"));
+      setJobs(Array.isArray(payload) ? payload : payload?.data || []);
     } catch (err) {
 
       setError(err.message || t("jobs.errors.load"));

@@ -7,7 +7,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const cache = new Map();
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 120_000;
 
 function getCached(tenantId) {
   const entry = cache.get(tenantId);

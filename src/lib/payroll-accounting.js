@@ -93,7 +93,7 @@ export async function createPayrollExpenseRecordsForRun({ tenantDbId, runId }) {
 export async function getPayrollPlSummary({ tenantDbId, startDate, endDate, jobId }) {
   let query = supabaseAdmin
     .from("payroll_expense_records")
-    .select("*")
+    .select("gross_amount, employer_tax_amount, labor_burden")
     .eq("tenant_id", tenantDbId)
     .gte("period_date", startDate)
     .lte("period_date", endDate);

@@ -48,6 +48,37 @@ function summarizeInvoicesForMonth(invoices, startDate, endDate) {
   };
 }
 
+async function countJobsByStatus(tenantDbId, statusPatterns) {
+  const { count, error } = await supabaseAdmin
+    .from("jobs")
+    .select("id", { head: true, count: "exact" })
+    .eq("tenant_id", tenantDbId)
+    .in("status", statusPatterns);
+  if (error) throw new Error(error.message);
+  return Number(count || 0);
+}
+
+async function getJobPipelineCounts(tenantDbId) {
+  const [totalRes, active, pending, completed] = await Promise.all([
+    supabaseAdmin
+      .from("jobs")
+      .select("id", { head: true, count: "exact" })
+      .eq("tenant_id", tenantDbId),
+    countJobsByStatus(tenantDbId, ["Active", "In Progress"]),
+    countJobsByStatus(tenantDbId, ["Pending", "Draft"]),
+    countJobsByStatus(tenantDbId, ["Completed", "Done"]),
+  ]);
+
+  if (totalRes.error) throw new Error(totalRes.error.message);
+
+  return {
+    total: Number(totalRes.count || 0),
+    active,
+    pending,
+    completed,
+  };
+}
+
 export async function getExecutiveDashboardMetrics(tenantDbId) {
   const { startDate, endDate, monthLabel, monthStartIso } = monthBounds();
 
@@ -56,7 +87,7 @@ export async function getExecutiveDashboardMetrics(tenantDbId) {
     openInvoicesRes,
     payrollSummary,
     expenseSumRes,
-    jobsRes,
+    jobPipeline,
     projectSummaries,
   ] = await Promise.all([
     supabaseAdmin
@@ -65,12 +96,14 @@ export async function getExecutiveDashboardMetrics(tenantDbId) {
         "id, amount, status, balance_due, paid_amount, created_at, updated_at, stripe_last_payment_at",
       )
       .eq("tenant_id", tenantDbId)
-      .gte("stripe_last_payment_at", monthStartIso),
+      .gte("stripe_last_payment_at", monthStartIso)
+      .limit(500),
     supabaseAdmin
       .from("invoices")
       .select("id, amount, status, balance_due, created_at, updated_at, stripe_last_payment_at")
       .eq("tenant_id", tenantDbId)
-      .gt("balance_due", 0),
+      .gt("balance_due", 0)
+      .limit(500),
     getPayrollPlSummary({ tenantDbId, startDate, endDate }),
     supabaseAdmin
       .from(JOB_EXPENSE_TABLE)
@@ -78,24 +111,21 @@ export async function getExecutiveDashboardMetrics(tenantDbId) {
       .eq("tenant_id", tenantDbId)
       .gte("expense_date", startDate)
       .lte("expense_date", endDate),
-    supabaseAdmin
-      .from("jobs")
-      .select("id, status, title")
-      .eq("tenant_id", tenantDbId),
+    getJobPipelineCounts(tenantDbId),
     listJobProfitRollups(tenantDbId, { limit: 40 }),
   ]);
 
   if (paidInvoicesRes.error) throw new Error(paidInvoicesRes.error.message);
   if (openInvoicesRes.error) throw new Error(openInvoicesRes.error.message);
   if (expenseSumRes.error) throw new Error(expenseSumRes.error.message);
-  if (jobsRes.error) throw new Error(jobsRes.error.message);
 
   const paidMonthRes = await supabaseAdmin
     .from("invoices")
     .select("id, amount, status, balance_due, created_at, updated_at, stripe_last_payment_at")
     .eq("tenant_id", tenantDbId)
     .ilike("status", "paid")
-    .gte("updated_at", monthStartIso);
+    .gte("updated_at", monthStartIso)
+    .limit(500);
 
   const byId = new Map();
   for (const inv of [
@@ -124,14 +154,6 @@ export async function getExecutiveDashboardMetrics(tenantDbId) {
       ? roundMoney((grossProfit / invoiceMetrics.revenueThisMonth) * 100)
       : 0;
 
-  const jobs = jobsRes.data || [];
-  const pipeline = {
-    total: jobs.length,
-    active: jobs.filter((j) => /progress|active|in progress/i.test(j.status || "")).length,
-    pending: jobs.filter((j) => /pending/i.test(j.status || "")).length,
-    completed: jobs.filter((j) => /complete|done/i.test(j.status || "")).length,
-  };
-
   const losingJobs = projectSummaries.filter((p) => p.isLosingMoney);
   const topProfitable = [...projectSummaries]
     .sort((a, b) => b.grossProfit - a.grossProfit)
@@ -148,7 +170,7 @@ export async function getExecutiveDashboardMetrics(tenantDbId) {
     netProfit: grossProfit,
     outstandingInvoices: invoiceMetrics.outstandingInvoices,
     accountsReceivable: invoiceMetrics.accountsReceivable,
-    jobPipeline: pipeline,
+    jobPipeline,
     losingJobs: losingJobs.slice(0, 10),
     topProfitableJobs: topProfitable,
     projectSummaries: projectSummaries.slice(0, 15),

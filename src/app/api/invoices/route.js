@@ -22,7 +22,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
-import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
+import { getListPaginationParams, scopeByTenant, applyUnpaginatedSafetyLimit } from "@/lib/tenant-scope";
 
 import {
   attachFreshPartyFieldsToInvoiceRow,
@@ -129,6 +129,8 @@ export async function GET(request) {
 
     if (paginate) {
       query = query.range(from, to);
+    } else {
+      query = applyUnpaginatedSafetyLimit(query, paginate);
     }
 
     const { data, error, count } = await query;

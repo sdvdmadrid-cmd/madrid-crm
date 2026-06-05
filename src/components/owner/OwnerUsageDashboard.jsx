@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-auth";
 
-const REFRESH_MS = 30_000;
+const REFRESH_MS = 120_000;
 
 function fmt(n) {
   if (n == null || Number.isNaN(n)) return "—";

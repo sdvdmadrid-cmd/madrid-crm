@@ -6,7 +6,7 @@ import {
 } from "@/lib/tenant";
 
 const cache = new Map();
-const CACHE_TTL_MS = 45_000;
+const CACHE_TTL_MS = 120_000;
 
 function cacheKey(tenantId) {
   return `dashboard:${tenantId}`;
@@ -60,10 +60,24 @@ async function safeCount(table, tenantId, role, extraFilters = []) {
   return Number(count || 0);
 }
 
-async function safeRows(table, columns, tenantId, role, limit = 500) {
+async function safeRows(
+  table,
+  columns,
+  tenantId,
+  role,
+  limit = 150,
+  extraFilters = [],
+) {
   let query = supabaseAdmin.from(table).select(columns).limit(limit);
   if ((role || "").toLowerCase() !== "super_admin") {
     query = query.eq("tenant_id", tenantId);
+  }
+
+  for (const filter of extraFilters) {
+    if (filter?.type === "eq") query = query.eq(filter.column, filter.value);
+    if (filter?.type === "in") query = query.in(filter.column, filter.value);
+    if (filter?.type === "neq") query = query.neq(filter.column, filter.value);
+    if (filter?.type === "gt") query = query.gt(filter.column, filter.value);
   }
 
   const { data, error } = await query;
@@ -116,8 +130,9 @@ export async function GET(request) {
       estimateRequestsNew,
       websiteLeadsNew,
       invoicesOverdue,
-      jobRows,
-      invoiceRows,
+      pendingInvoiceCount,
+      jobPriceRows,
+      openInvoiceRows,
     ] = await Promise.all([
       safeCount("clients", tenantDbId, role),
       safeCount("clients", tenantDbId, role, [
@@ -154,24 +169,25 @@ export async function GET(request) {
       safeCount("invoices", tenantDbId, role, [
         { type: "in", column: "status", value: ["Overdue", "Past Due"] },
       ]),
-      safeRows("jobs", "price,status,invoiced", tenantDbId, role),
-      safeRows("invoices", "amount,balance_due,status", tenantDbId, role),
+      safeCount("jobs", tenantDbId, role, [
+        { type: "eq", column: "status", value: "Completed" },
+        { type: "eq", column: "invoiced", value: false },
+      ]),
+      safeRows("jobs", "price", tenantDbId, role, 150),
+      safeRows("invoices", "balance_due,amount,status", tenantDbId, role, 200, [
+        { type: "gt", column: "balance_due", value: 0 },
+      ]),
     ]);
 
-    const pendingInvoice = jobRows.filter(
-      (row) => String(row.status || "") === "Completed" && !row.invoiced,
-    ).length;
+    const pendingInvoice = pendingInvoiceCount;
 
     const totalRevenue = Number(
-      jobRows.reduce((sum, row) => sum + Number(row.price || 0), 0).toFixed(2),
+      jobPriceRows.reduce((sum, row) => sum + Number(row.price || 0), 0).toFixed(2),
     );
 
     const outstanding = Number(
-      invoiceRows
-        .reduce((sum, row) => {
-          if (String(row.status || "") === "Paid") return sum;
-          return sum + Number(row.balance_due || row.amount || 0);
-        }, 0)
+      openInvoiceRows
+        .reduce((sum, row) => sum + Number(row.balance_due || row.amount || 0), 0)
         .toFixed(2),
     );
 

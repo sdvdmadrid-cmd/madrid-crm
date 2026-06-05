@@ -1,6 +1,7 @@
 import {
   attachFreshPartyToEstimateDbRow,
   enrichEstimateWithPartyInfo,
+  enrichEstimatesWithPartyBatch,
 } from "@/lib/client-document-party";
 import {
   buildPublicEstimateLink,
@@ -171,7 +172,8 @@ export async function GET(request) {
       .from(ESTIMATES_TABLE)
       .select("*")
       .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(250);
 
     if ((role || "").toLowerCase() !== "super_admin") {
       query = query.eq("tenant_id", tenantDbId);
@@ -180,14 +182,10 @@ export async function GET(request) {
     const { data, error } = await query;
     if (error) throw new Error(error.message);
 
-    const serialized = await Promise.all(
-      (data || []).map(async (row) =>
-        enrichEstimateWithPartyInfo(
-          supabaseAdmin,
-          tenantDbId,
-          serializeEstimate(row),
-        ),
-      ),
+    const serialized = await enrichEstimatesWithPartyBatch(
+      supabaseAdmin,
+      tenantDbId,
+      (data || []).map(serializeEstimate),
     );
 
     return jsonResponse({

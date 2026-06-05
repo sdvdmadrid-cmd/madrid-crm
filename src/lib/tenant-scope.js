@@ -39,6 +39,8 @@ export function scopeByTenant(
  * Set CRM_DEFAULT_LIST_LIMIT (e.g. 50) to enable a server default without breaking
  * existing clients that expect the full list.
  */
+export const DEFAULT_UNPAGINATED_CAP = 250;
+
 export function getListPaginationParams(searchParams, { maxLimit = 100 } = {}) {
   const envDefault = Number(process.env.CRM_DEFAULT_LIST_LIMIT || 0);
   const hasExplicit =
@@ -57,4 +59,12 @@ export function getListPaginationParams(searchParams, { maxLimit = 100 } = {}) {
   const to = from + limit - 1;
 
   return { paginate: true, page, limit, from, to };
+}
+
+/** Caps unpaginated list queries to reduce full-table scans on large tenants. */
+export function applyUnpaginatedSafetyLimit(query, paginate, cap = DEFAULT_UNPAGINATED_CAP) {
+  if (!paginate) {
+    return query.limit(cap);
+  }
+  return query;
 }

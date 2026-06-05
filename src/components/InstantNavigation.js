@@ -4,20 +4,14 @@ import { useRouter } from "next/navigation";
 import { startTransition, useEffect } from "react";
 
 const PREFETCH_TTL_MS = 5 * 60 * 1000;
+const WARM_COOLDOWN_MS = 45_000;
+const MAX_DYNAMIC_PREFETCH = 6;
 const PREFETCH_CACHE = new Map();
-const CRITICAL_ROUTES = [
-  "/",
-  "/dashboard",
-  "/clients",
-  "/jobs",
-  "/invoices",
-  "/estimates",
-  "/calendar",
-];
+const CRITICAL_ROUTES = ["/dashboard", "/clients", "/jobs"];
 
 function requestIdleWork(callback) {
   if (typeof window.requestIdleCallback === "function") {
-    return window.requestIdleCallback(callback, { timeout: 1200 });
+    return window.requestIdleCallback(callback, { timeout: 2000 });
   }
 
   return window.setTimeout(() => {
@@ -82,12 +76,13 @@ function markPrefetch(route) {
   PREFETCH_CACHE.set(route, Date.now() + PREFETCH_TTL_MS);
 }
 
-function collectInternalRoutesFromAnchors() {
-  const routes = new Set();
+function collectInternalRoutesFromAnchors(limit = MAX_DYNAMIC_PREFETCH) {
+  const routes = [];
   const anchors = document.querySelectorAll("a[href]");
   for (const anchor of anchors) {
     if (!isInternalNavigableAnchor(anchor)) continue;
-    routes.add(toAppHref(anchor, { includeHash: false }));
+    routes.push(toAppHref(anchor, { includeHash: false }));
+    if (routes.length >= limit) break;
   }
   return routes;
 }
@@ -97,6 +92,8 @@ export default function InstantNavigation() {
 
   useEffect(() => {
     const prefetchedInSession = new Set();
+    let lastWarmAt = 0;
+    let hoverTimer = null;
 
     const prefetchRoute = (route) => {
       if (!route) return;
@@ -108,12 +105,15 @@ export default function InstantNavigation() {
     };
 
     const warmKnownAndVisibleRoutes = () => {
+      const now = Date.now();
+      if (now - lastWarmAt < WARM_COOLDOWN_MS) return;
+      lastWarmAt = now;
+
       for (const route of CRITICAL_ROUTES) {
         prefetchRoute(route);
       }
 
-      const dynamicRoutes = collectInternalRoutesFromAnchors();
-      for (const route of dynamicRoutes) {
+      for (const route of collectInternalRoutesFromAnchors()) {
         prefetchRoute(route);
       }
     };
@@ -133,7 +133,7 @@ export default function InstantNavigation() {
         }
       },
       {
-        rootMargin: "240px 0px",
+        rootMargin: "120px 0px",
         threshold: 0,
       },
     );
@@ -163,10 +163,6 @@ export default function InstantNavigation() {
           observeInternalAnchors(addedNode);
         }
       }
-
-      requestIdleWork(() => {
-        warmKnownAndVisibleRoutes();
-      });
     });
 
     mutationObserver.observe(document.body, {
@@ -177,25 +173,9 @@ export default function InstantNavigation() {
     const onPointerOver = (event) => {
       const anchor = event.target?.closest?.("a[href]");
       if (!isInternalNavigableAnchor(anchor)) return;
-      prefetchRoute(toAppHref(anchor, { includeHash: false }));
-    };
-
-    const onFocusIn = (event) => {
-      const anchor = event.target?.closest?.("a[href]");
-      if (!isInternalNavigableAnchor(anchor)) return;
-      prefetchRoute(toAppHref(anchor, { includeHash: false }));
-    };
-
-    const onTouchStart = (event) => {
-      const anchor = event.target?.closest?.("a[href]");
-      if (!isInternalNavigableAnchor(anchor)) return;
-      prefetchRoute(toAppHref(anchor, { includeHash: false }));
-    };
-
-    const onMouseDown = (event) => {
-      const anchor = event.target?.closest?.("a[href]");
-      if (!isInternalNavigableAnchor(anchor)) return;
-      prefetchRoute(toAppHref(anchor, { includeHash: false }));
+      const route = toAppHref(anchor, { includeHash: false });
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => prefetchRoute(route), 180);
     };
 
     const onClick = (event) => {
@@ -213,19 +193,14 @@ export default function InstantNavigation() {
     };
 
     document.addEventListener("pointerover", onPointerOver, true);
-    document.addEventListener("focusin", onFocusIn, true);
-    document.addEventListener("touchstart", onTouchStart, true);
-    document.addEventListener("mousedown", onMouseDown, true);
     document.addEventListener("click", onClick, true);
 
     return () => {
+      clearTimeout(hoverTimer);
       cancelIdleWork(idleTaskId);
       mutationObserver.disconnect();
       intersectionObserver.disconnect();
       document.removeEventListener("pointerover", onPointerOver, true);
-      document.removeEventListener("focusin", onFocusIn, true);
-      document.removeEventListener("touchstart", onTouchStart, true);
-      document.removeEventListener("mousedown", onMouseDown, true);
       document.removeEventListener("click", onClick, true);
     };
   }, [router]);
