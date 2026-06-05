@@ -1076,6 +1076,12 @@ export default function AuthShell({ children }) {
       "M16 17H8",
       "M10 9H8",
     ],
+    payroll: [
+      "M12 3v18",
+      "M7 8h10",
+      "M7 12h10",
+      "M7 16h6",
+    ],
     billPayments: [
       "M4 6h16a2 2 0 012 2v8a6 6 0 01-6 6H8a6 6 0 01-6-6V8a2 2 0 012-2z",
       "M16 11a4 4 0 10-8 0 4 4 0 008 0z",
@@ -1120,6 +1126,11 @@ export default function AuthShell({ children }) {
       "M12 22V12",
       "M21 6.9L12 12",
       "M3 6.9L12 12",
+    ],
+    insights: [
+      "M3 3v18h18",
+      "M7 16l4-4 4 4",
+      "M7 12h10",
     ],
     logout: [
       "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4",
@@ -1172,6 +1183,26 @@ export default function AuthShell({ children }) {
             label: t("sidebar.invoiceTotals"),
             iconKey: "invoices",
           },
+          {
+            href: "/payroll",
+            label: t("sidebar.payroll"),
+            iconKey: "payroll",
+          },
+          {
+            href: "/dashboard/financial",
+            label: t("sidebar.businessPl"),
+            iconKey: "dashboard",
+          },
+          {
+            href: "/reports",
+            label: t("sidebar.reports"),
+            iconKey: "insights",
+          },
+          {
+            href: "/equipment",
+            label: t("sidebar.equipment"),
+            iconKey: "jobs",
+          },
         ]
     : [
         {
@@ -1201,6 +1232,26 @@ export default function AuthShell({ children }) {
           href: "/invoices/summary",
           label: t("sidebar.invoiceTotals"),
           iconKey: "invoices",
+        },
+        {
+          href: "/payroll",
+          label: t("sidebar.payroll"),
+          iconKey: "payroll",
+        },
+        {
+          href: "/dashboard/financial",
+          label: t("sidebar.businessPl"),
+          iconKey: "dashboard",
+        },
+        {
+          href: "/reports",
+          label: t("sidebar.reports"),
+          iconKey: "insights",
+        },
+        {
+          href: "/equipment",
+          label: t("sidebar.equipment"),
+          iconKey: "jobs",
         },
         {
           href: "/subscriptions",

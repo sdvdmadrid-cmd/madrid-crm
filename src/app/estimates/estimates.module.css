@@ -83,6 +83,25 @@
   min-height: 420px;
 }
 
+@media (max-width: 768px) {
+  .kanbanScroll {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .kanbanRow {
+    flex-direction: column;
+    min-height: 0;
+    height: auto;
+  }
+
+  .column {
+    width: 100%;
+    flex-shrink: 1;
+    min-height: 200px;
+  }
+}
+
 .column {
   display: flex;
   width: 15rem;

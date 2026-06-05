@@ -29,6 +29,7 @@ import {
 import { buildFieldBasePoweredByHtml } from "@/lib/fieldbase-document-branding";
 import { buildInvoicePartyHtmlBlock } from "@/lib/invoice-party";
 import { buildInvoicePaymentInstructions } from "@/lib/invoice-client-payment-instructions";
+import { isPositiveMoney, requireNonEmptyString } from "@/lib/field-validation";
 import "@/i18n";
 
 const initialInvoice = {
@@ -291,9 +292,9 @@ export default function InvoicesPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/invoices");
-      const data = await getJsonOrThrow(res, t("invoices.errors.fetch"));
-      setInvoices(data);
+      const res = await apiFetch("/api/invoices?limit=250&page=1");
+      const payload = await getJsonOrThrow(res, t("invoices.errors.fetch"));
+      setInvoices(Array.isArray(payload) ? payload : payload?.data || []);
       lastInvoiceFetchRef.current = Date.now();
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.load")));
@@ -303,8 +304,22 @@ export default function InvoicesPage() {
   }, [t]);
 
   useEffect(() => {
+    const payment = searchParams.get("payment");
+    if (payment === "success") {
+      setPaymentNotice(t("invoices.guide.paymentSuccess"));
+      setPaymentNoticeTone("success");
+      fetchInvoices();
+      router.replace("/invoices", { scroll: false });
+      return;
+    }
+    if (payment === "cancel") {
+      setPaymentNotice(t("invoices.guide.paymentCancelled"));
+      setPaymentNoticeTone("info");
+      router.replace("/invoices", { scroll: false });
+      return;
+    }
     fetchInvoices();
-  }, [fetchInvoices]);
+  }, [searchParams, router, fetchInvoices, t]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -340,21 +355,6 @@ export default function InvoicesPage() {
 
   const [paymentNoticeTone, setPaymentNoticeTone] = useState("success");
 
-  useEffect(() => {
-    const payment = searchParams.get("payment");
-    if (payment === "success") {
-      setPaymentNotice(t("invoices.guide.paymentSuccess"));
-      setPaymentNoticeTone("success");
-      fetchInvoices();
-    } else if (payment === "cancel") {
-      setPaymentNotice(t("invoices.guide.paymentCancelled"));
-      setPaymentNoticeTone("info");
-    } else {
-      return;
-    }
-    router.replace("/invoices", { scroll: false });
-  }, [searchParams, router, fetchInvoices, t]);
-
   const resetForm = () => {
     setForm(initialInvoice);
     setSelectedId(null);
@@ -362,6 +362,15 @@ export default function InvoicesPage() {
   };
 
   const saveInvoice = async () => {
+    const clientErr = requireNonEmptyString(form.clientName, "Client");
+    if (clientErr) {
+      setError(clientErr);
+      return;
+    }
+    if (!isPositiveMoney(form.amount)) {
+      setError(t("invoices.errors.invalidAmount", { defaultValue: "Enter a valid invoice amount." }));
+      return;
+    }
     try {
       const method = selectedId ? "PATCH" : "POST";
       const url = selectedId ? `/api/invoices/${selectedId}` : "/api/invoices";
@@ -927,9 +936,11 @@ export default function InvoicesPage() {
         <div className={styles.listGrid}>
           {visibleInvoices.length === 0 && !loading ? (
             <p className={styles.muted}>
-              {t("invoices.noSearchResults", {
-                defaultValue: "No invoices match your search.",
-              })}
+              {listSearch.trim()
+                ? t("invoices.noSearchResults", {
+                    defaultValue: "No invoices match your search.",
+                  })
+                : t("invoices.empty", { defaultValue: "No invoices yet. Create one above." })}
             </p>
           ) : null}
           {visibleInvoices.map((invoice) => (
@@ -1220,9 +1231,6 @@ export default function InvoicesPage() {
                 : null}
             </div>
           ))}
-          {invoices.length === 0 && !loading && (
-            <p className={styles.empty}>{t("invoices.empty")}</p>
-          )}
         </div>
       </section>
     </main>

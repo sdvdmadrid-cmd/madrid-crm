@@ -96,37 +96,75 @@ export async function attachFreshPartyFieldsToInvoiceRow(
 export async function hydrateInvoiceDocsParty(supabase, tenantId, docs = []) {
   if (!Array.isArray(docs) || !docs.length) return docs || [];
 
-  const out = [];
-  for (const doc of docs) {
+  const needsHydrate = docs.filter((doc) => {
+    const missingBilling = !toText(doc.client_address);
+    const missingJobSite = !toText(doc.property_address);
+    return (
+      (missingBilling || missingJobSite) &&
+      (doc.client_id || toText(doc.client_name))
+    );
+  });
+
+  const clientIds = [
+    ...new Set(needsHydrate.map((doc) => toText(doc.client_id)).filter(Boolean)),
+  ];
+
+  const clientMap = new Map();
+  if (clientIds.length && supabase && tenantId) {
+    const { data, error } = await supabase
+      .from("clients")
+      .select(CLIENT_PARTY_SELECT)
+      .eq("tenant_id", tenantId)
+      .in("id", clientIds);
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      if (row?.id) clientMap.set(row.id, row);
+    }
+  }
+
+  const nameOnlyDocs = needsHydrate.filter((doc) => !toText(doc.client_id));
+  const nameResolved = new Map();
+  for (const doc of nameOnlyDocs) {
+    const key = `${toText(doc.client_name).toLowerCase()}::${toText(doc.client_email).toLowerCase()}`;
+    if (nameResolved.has(key)) continue;
+    const client = await resolveClientForInvoiceParty(supabase, tenantId, {
+      clientName: doc.client_name,
+      clientEmail: doc.client_email,
+    });
+    nameResolved.set(key, client);
+  }
+
+  return docs.map((doc) => {
     const missingBilling = !toText(doc.client_address);
     const missingJobSite = !toText(doc.property_address);
     if (
       (!missingBilling && !missingJobSite) ||
       (!doc.client_id && !toText(doc.client_name))
     ) {
-      out.push(doc);
-      continue;
+      return doc;
     }
 
-    const enriched = await enrichInvoiceWithPartyInfo(supabase, tenantId, {
-      clientId: doc.client_id,
-      clientName: doc.client_name,
+    const client =
+      clientMap.get(toText(doc.client_id)) ||
+      nameResolved.get(
+        `${toText(doc.client_name).toLowerCase()}::${toText(doc.client_email).toLowerCase()}`,
+      );
+
+    if (!client) return doc;
+
+    const party = buildInvoicePartyDbFields(client, {
       clientEmail: doc.client_email,
-      clientPhone: doc.client_phone,
-      clientAddress: doc.client_address,
-      propertyAddress: doc.property_address,
     });
 
-    out.push({
+    return {
       ...doc,
-      client_id: enriched.clientId || doc.client_id,
-      client_phone: enriched.clientPhone || doc.client_phone,
-      client_address: enriched.clientAddress || doc.client_address,
-      property_address: enriched.propertyAddress || doc.property_address,
-      client_email: enriched.clientEmail || doc.client_email,
-    });
-  }
-  return out;
+      client_id: doc.client_id || client.id,
+      client_phone: party.client_phone || doc.client_phone,
+      client_address: party.client_address || doc.client_address,
+      property_address: party.property_address || doc.property_address,
+      client_email: party.client_email || doc.client_email,
+    };
+  });
 }
 
 export function invoicePartyFieldsFromDoc(doc = {}) {

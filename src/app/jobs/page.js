@@ -1,9 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import JobProjectPlPanel from "@/components/jobs/JobProjectPlPanel";
 import {
   escapeHtml,
   openPrintableHtmlDocument,
@@ -18,9 +21,15 @@ import {
   computeEstimateFinancials,
   US_STATE_OPTIONS,
 } from "@/lib/estimate-pricing";
+import { requireNonEmptyString } from "@/lib/field-validation";
 import "@/i18n";
 import ws from "@/styles/workspace-dark.module.css";
 import jobStyles from "./jobs.module.css";
+
+const PlacesAutocomplete = dynamic(
+  () => import("@/components/PlacesAutocomplete"),
+  { ssr: false },
+);
 
 const initialJob = {
   title: "",
@@ -32,6 +41,7 @@ const initialJob = {
   taxState: "TX",
   downPaymentPercent: "0",
   scopeDetails: "",
+  jobSiteStreet: "",
   squareMeters: "",
   complexity: "standard",
   materialsIncluded: true,
@@ -176,9 +186,9 @@ export default function JobsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/jobs");
-      const data = await getJsonOrThrow(res, t("jobs.errors.fetch"));
-      setJobs(data);
+      const res = await apiFetch("/api/jobs?limit=250&page=1");
+      const payload = await getJsonOrThrow(res, t("jobs.errors.fetch"));
+      setJobs(Array.isArray(payload) ? payload : payload?.data || []);
     } catch (err) {
 
       setError(err.message || t("jobs.errors.load"));
@@ -386,6 +396,16 @@ export default function JobsPage() {
   };
 
   const saveJob = async () => {
+    const titleErr = requireNonEmptyString(form.title, "Job title");
+    if (titleErr) {
+      setError(titleErr);
+      return;
+    }
+    const clientErr = requireNonEmptyString(form.clientName, "Client");
+    if (clientErr) {
+      setError(clientErr);
+      return;
+    }
     try {
       const method = selectedId ? "PATCH" : "POST";
       const url = selectedId ? `/api/jobs/${selectedId}` : "/api/jobs";
@@ -434,6 +454,7 @@ export default function JobsPage() {
       taxState: job.taxState || "TX",
       downPaymentPercent: job.downPaymentPercent || "0",
       scopeDetails: job.scopeDetails || "",
+      jobSiteStreet: "",
       squareMeters: job.squareMeters || "",
       complexity: job.complexity || "standard",
       materialsIncluded:
@@ -637,6 +658,29 @@ export default function JobsPage() {
             value={form.service}
             onChange={(e) => setForm({ ...form, service: e.target.value })}
           />
+          <div style={{ gridColumn: "1 / -1" }}>
+            <p className={ws.subtitle} style={{ margin: "0 0 6px", fontSize: 12 }}>
+              {t("jobs.placeholders.jobSite", { defaultValue: "Job site address" })}
+            </p>
+            <PlacesAutocomplete
+              id="job-site-address"
+              value={form.jobSiteStreet || ""}
+              selectedValueKey="formattedAddress"
+              onChange={(value) => setForm({ ...form, jobSiteStreet: value })}
+              onSelect={({ formattedAddress, street }) => {
+                const line = formattedAddress || street || "";
+                setForm({
+                  ...form,
+                  jobSiteStreet: street || line,
+                  scopeDetails: line || form.scopeDetails,
+                });
+              }}
+              placeholder={t("jobs.placeholders.jobSite", {
+                defaultValue: "Job site address",
+              })}
+              inputClass={jobStyles.formInput}
+            />
+          </div>
           <textarea
             className={`${jobStyles.formInput} ${jobStyles.formTextarea}`}
             placeholder={t("jobs.placeholders.scopeDetails")}
@@ -933,9 +977,9 @@ export default function JobsPage() {
         <div className={jobStyles.jobList}>
           {visibleJobs.length === 0 && !loading ? (
             <p className={ws.subtitle}>
-              {t("jobs.noSearchResults", {
-                defaultValue: "No jobs match your search.",
-              })}
+              {listSearch.trim()
+                ? t("jobs.noSearchResults", { defaultValue: "No jobs match your search." })
+                : t("jobs.empty", { defaultValue: "No jobs yet. Create your first job above." })}
             </p>
           ) : null}
           {visibleJobs.map((job) => (
@@ -969,6 +1013,12 @@ export default function JobsPage() {
                         {t("jobs.labels.status")}:{" "}
                         {t(`jobs.statusOptions.${job.status}`) || job.status} |{" "}
                         {t("jobs.labels.price")}: ${job.price}
+                        {Number(job.laborCostTotal || 0) > 0
+                          ? ` | Labor: $${Number(job.laborCostTotal).toFixed(2)} (${Number(job.laborHoursTotal || 0).toFixed(1)}h)`
+                          : ""}
+                        {Number(job.laborBurdenTotal || 0) > 0
+                          ? ` | Burden: $${Number(job.laborBurdenTotal).toFixed(2)}`
+                          : ""}
                       </p>
                       <p className={jobStyles.jobCardMeta}>
                         {t("jobs.labels.tax")}: {financials.taxState} (
@@ -1000,6 +1050,7 @@ export default function JobsPage() {
                             {t("jobs.labels.confidence")}
                           </p>
                         : null}
+                      <JobProjectPlPanel jobId={job._id} />
                       </div>
                       <div
                         style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
@@ -1029,6 +1080,12 @@ export default function JobsPage() {
                             defaultValue: "Print (browser)",
                           })}
                         </button>
+                        <Link
+                          href={`/jobs/${job._id}/financial`}
+                          className={jobStyles.btnFileLink}
+                        >
+                          Financial
+                        </Link>
                         <button
                           type="button"
                           onClick={() => editJob(job)}
@@ -1247,9 +1304,6 @@ export default function JobsPage() {
               })()}
             </div>
           ))}
-          {jobs.length === 0 && !loading && (
-            <p style={{ color: "#777" }}>{t("jobs.empty")}</p>
-          )}
         </div>
       </section>
 

@@ -462,3 +462,193 @@
   gap: 10px;
   margin-bottom: 12px;
 }
+
+.plPanel {
+  margin-top: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  overflow: hidden;
+}
+
+.plToggle {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plBody {
+  padding: 0 12px 12px;
+}
+
+.plGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.plStat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.plLabel {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plPositive {
+  color: #86efac;
+}
+
+.plNegative {
+  color: #fca5a5;
+}
+
+.plTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.plTable th,
+.plTable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  text-align: left;
+}
+
+.plTable th {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.plMuted {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.plBreakdownList {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: #cbd5e1;
+  display: grid;
+  gap: 4px;
+}
+
+.plError {
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+.plDetails {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.plEntryList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.financialPage {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 20px;
+}
+
+.financialHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.financialActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.financialSection {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.financialSection h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: #e2e8f0;
+}
+
+.expenseFormGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.expenseFormGrid input,
+.expenseFormGrid select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.8);
+  color: #f1f5f9;
+}
+
+.jobCardMeta {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .jobsPage {
+    padding: 4px 4px 24px;
+  }
+
+  .jobsPage section {
+    padding: 14px;
+  }
+
+  .jobList {
+    gap: 10px;
+  }
+
+  .financialPage {
+    padding: 8px;
+  }
+
+  .financialActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .expenseFormGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .plTable {
+    display: block;
+    overflow-x: auto;
+  }
+}

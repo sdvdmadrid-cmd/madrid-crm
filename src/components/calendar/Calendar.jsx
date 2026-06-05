@@ -113,6 +113,18 @@ export default function Calendar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [draggingAppointmentId, setDraggingAppointmentId] = useState("");
+
+  const appointmentRange = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const fromDate = new Date(year, month - 1, 1);
+    const toDate = new Date(year, month + 2, 0);
+    return {
+      from: formatLocalDate(fromDate),
+      to: formatLocalDate(toDate),
+    };
+  }, [currentDate]);
 
   const {
     appointments,
@@ -121,7 +133,7 @@ export default function Calendar() {
     create,
     update,
     remove,
-  } = useAppointments();
+  } = useAppointments(appointmentRange);
 
   const [defaultWeatherLocation, setDefaultWeatherLocation] = useState("");
   const [activeWeatherLocationLabel, setActiveWeatherLocationLabel] = useState("");
@@ -179,14 +191,17 @@ export default function Calendar() {
     });
   }, []);
 
+  const weatherBootstrapRef = useRef(false);
+
   useEffect(() => {
-    if (defaultWeatherLocation) return;
+    if (weatherBootstrapRef.current || defaultWeatherLocation) return;
     if (typeof window !== "undefined") {
       const storedLabel = window.localStorage.getItem(WEATHER_LOCATION_STORAGE_LABEL_KEY) || "";
       const storedQuery = window.localStorage.getItem(WEATHER_LOCATION_STORAGE_QUERY_KEY) || "";
       if (storedLabel || storedQuery) {
         setDefaultWeatherLocation(storedQuery || storedLabel);
         setActiveWeatherLocationLabel(storedLabel || storedQuery);
+        weatherBootstrapRef.current = true;
         return;
       }
     }
@@ -194,11 +209,13 @@ export default function Calendar() {
     if (appointmentLocation) {
       setDefaultWeatherLocation(appointmentLocation);
       setActiveWeatherLocationLabel(appointmentLocation);
+      weatherBootstrapRef.current = true;
       return;
     }
     const guessedLocation = guessLocationFromTimezone();
     setDefaultWeatherLocation(guessedLocation);
     setActiveWeatherLocationLabel(guessedLocation);
+    weatherBootstrapRef.current = true;
     if (!globalThis.navigator?.geolocation) return;
     globalThis.navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
@@ -474,6 +491,29 @@ export default function Calendar() {
       setSelectedDate(null);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRescheduleAppointment = async (appointmentId, newDateKey) => {
+    const apt = appointments.find((row) => row._id === appointmentId);
+    if (!apt || apt.date === newDateKey) return;
+    setIsSaving(true);
+    try {
+      await update(apt._id, {
+        title: apt.title,
+        clientName: apt.clientName || apt.client || "",
+        date: newDateKey,
+        time: apt.time,
+        location: apt.location || "",
+        notes: apt.notes || "",
+        status: apt.status,
+        latitude: apt.latitude,
+        longitude: apt.longitude,
+        addressPlaceId: apt.addressPlaceId || "",
+      });
+    } finally {
+      setIsSaving(false);
+      setDraggingAppointmentId("");
     }
   };
 
@@ -858,6 +898,10 @@ export default function Calendar() {
                   dayAppointments={appointmentsByDateKey.get(dateKey) || []}
                   onClick={handleDayClick}
                   onEventClick={handleEventClick}
+                  onReschedule={handleRescheduleAppointment}
+                  draggingAppointmentId={draggingAppointmentId}
+                  onDragStart={(id) => setDraggingAppointmentId(id)}
+                  onDragEnd={() => setDraggingAppointmentId("")}
                   getWeather={getWeather}
                   getDayWeather={getDayWeather}
                 />

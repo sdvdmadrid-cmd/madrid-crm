@@ -81,6 +81,7 @@ export default function RevenueDashboardPage() {
   const [loading, setLoading] = useState(true);
   const userName = String(authUser?.name || "").trim();
   const [metrics, setMetrics] = useState(null);
+  const [metricsError, setMetricsError] = useState("");
   const [revenueData, setRevenueData] = useState({
     totalRevenue: 0,
     totalPayments: 0,
@@ -88,6 +89,7 @@ export default function RevenueDashboardPage() {
   });
   const [revenueUnavailable, setRevenueUnavailable] = useState(false);
   const [paymentsOnboarded, setPaymentsOnboarded] = useState(false);
+  const [connectStatus, setConnectStatus] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,12 +127,19 @@ export default function RevenueDashboardPage() {
       if (metricsResult.status === "fulfilled" && metricsResult.value.ok) {
         const payload = await metricsResult.value.json().catch(() => null);
         setMetrics(payload || null);
+        setMetricsError("");
       } else {
         setMetrics(null);
+        setMetricsError(
+          metricsResult.status === "rejected"
+            ? "Unable to load dashboard metrics."
+            : "Dashboard metrics unavailable.",
+        );
       }
 
       if (connectResult?.status === "fulfilled" && connectResult.value.ok) {
         const connectPayload = await connectResult.value.json().catch(() => null);
+        setConnectStatus(connectPayload?.data || null);
         setPaymentsOnboarded(Boolean(connectPayload?.data?.onboarded));
       }
 
@@ -288,6 +297,9 @@ export default function RevenueDashboardPage() {
           <Link href="/clients?action=new" className={styles.coPrimaryAction}>
             {t("dashboardControl.actions.addClient")}
           </Link>
+          <Link href="/dashboard/financial" className={styles.secondaryAction}>
+            Business P&L
+          </Link>
           <Link
             href="/settings/payments"
             className={styles.secondaryAction}
@@ -341,7 +353,7 @@ export default function RevenueDashboardPage() {
         </div>
       </header>
 
-      <PaymentsReadinessBanner />
+      <PaymentsReadinessBanner connectStatus={connectStatus} skipFetch />
       <GettingStartedChecklist steps={gettingStartedSteps} />
 
       <section className={styles.pillarsGrid} aria-label={t("dashboardControl.pillars.ariaLabel")}>
@@ -374,6 +386,12 @@ export default function RevenueDashboardPage() {
               <div className={`fb-shimmer ${styles.skeletonCard}`} />
             </div>
           ) : (
+            <>
+              {metricsError ? (
+                <p className={styles.workflowGuide} role="alert" data-testid="dashboard-metrics-error">
+                  {metricsError}
+                </p>
+              ) : null}
             <div className={styles.metricTopGrid}>
               <article className={`${styles.metricHero} ${styles.metricRevenue}`}>
                 <div className={styles.metricHead}>
@@ -418,6 +436,7 @@ export default function RevenueDashboardPage() {
                 </p>
               </Link>
             </div>
+            </>
           )}
         </section>
 

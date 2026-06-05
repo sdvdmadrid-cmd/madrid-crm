@@ -1,5 +1,5 @@
 const OPS_TRIGGER =
-  /\b(create|schedule|book|find|search|show|list|send|invoice|estimate|contract|appointment|job|client|unpaid|tomorrow)\b/i;
+  /\b(create|schedule|book|find|search|show|list|send|invoice|estimate|contract|appointment|job|client|unpaid|tomorrow|payroll|paycheck|pay stub|w-?2|1099|withholding|run payroll|labor cost|profit|project p&l|glendale)\b/i;
 
 export function shouldRunOperationsAgent({ message, agentMode, pageId }) {
   if (!agentMode) return false;

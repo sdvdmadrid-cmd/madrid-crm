@@ -36,6 +36,9 @@ export const PRIVATE_DASHBOARD_PAGE_PREFIXES = [
   "/dashboard",
   "/clients",
   "/jobs",
+  "/dashboard/financial",
+  "/reports",
+  "/equipment",
   "/invoices",
   "/estimates",
   "/smart-estimator",
@@ -50,6 +53,10 @@ export const PRIVATE_DASHBOARD_PAGE_PREFIXES = [
   "/payment-methods",
   "/contracts",
   "/bill-payments",
+  "/payroll",
+  "/payroll/calendar",
+  "/portal/payroll",
+  "/employees",
 ];
 
 /** Private APIs — never return cross-tenant data; use getAuthenticatedTenantContext. */
@@ -69,6 +76,11 @@ export const PRIVATE_DASHBOARD_API_PREFIXES = [
   "/api/places",
   "/api/contracts",
   "/api/email/campaigns",
+  "/api/payroll",
+  "/api/payroll/projects",
+  "/api/dashboard/financial",
+  "/api/equipment",
+  "/api/portal/payroll",
 ];
 
 export function normalizePathname(pathname) {

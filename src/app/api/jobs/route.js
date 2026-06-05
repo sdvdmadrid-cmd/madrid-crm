@@ -10,7 +10,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
-import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
+import { getListPaginationParams, scopeByTenant, applyUnpaginatedSafetyLimit } from "@/lib/tenant-scope";
 
 const JOBS = "jobs";
 
@@ -37,6 +37,9 @@ const serialize = (doc) => ({
   travelMinutes: doc.travel_minutes || "",
   urgency: doc.urgency || "flexible",
   estimateSnapshot: doc.estimate_snapshot || null,
+  laborCostTotal: Number(doc.labor_cost_total || 0),
+  laborHoursTotal: Number(doc.labor_hours_total || 0),
+  laborBurdenTotal: Number(doc.labor_burden_total || 0),
   quoteToken: doc.quote_token || null,
   quoteSharedAt: doc.quote_shared_at || null,
   quoteSentAt: doc.quote_sent_at || null,
@@ -100,6 +103,8 @@ export async function GET(request) {
 
     if (paginate) {
       query = query.range(from, to);
+    } else {
+      query = applyUnpaginatedSafetyLimit(query, paginate);
     }
 
     const { data, error, count } = await query;

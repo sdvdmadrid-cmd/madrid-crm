@@ -8,7 +8,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
-import { getListPaginationParams, scopeByTenant } from "@/lib/tenant-scope";
+import { getListPaginationParams, scopeByTenant, applyUnpaginatedSafetyLimit } from "@/lib/tenant-scope";
 import {
   appointmentGeoFieldsFromBody,
   validateAppointmentLocationPayload,
@@ -106,6 +106,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const { paginate, page, limit, from, to } =
       getListPaginationParams(searchParams);
+    const rangeFrom = String(searchParams.get("from") || "").trim();
+    const rangeTo = String(searchParams.get("to") || "").trim();
 
     let query = scopeByTenant(
       supabaseAdmin
@@ -115,8 +117,14 @@ export async function GET(request) {
       { tenantDbId, role },
     );
 
+    if (rangeFrom && rangeTo) {
+      query = query.gte("date", rangeFrom).lte("date", rangeTo);
+    }
+
     if (paginate) {
       query = query.range(from, to);
+    } else {
+      query = applyUnpaginatedSafetyLimit(query, paginate, 400);
     }
 
     const { data, error, count } = await query;

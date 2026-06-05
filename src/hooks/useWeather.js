@@ -7,6 +7,9 @@ import { formatLocalDate, parseYmdToLocalDate, todayLocalYmd } from "@/lib/local
 // ─── Client-side in-memory cache (survives re-renders, cleared on page refresh)
 const clientCache = new Map();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_WEATHER_IN_FLIGHT = 4;
+const MAX_APPOINTMENT_WEATHER = 12;
+const MAX_CALENDAR_DAY_WEATHER = 8;
 
 function getCached(key) {
   const entry = clientCache.get(key);
@@ -34,13 +37,14 @@ export function useWeather(
   { calendarDays = [], defaultLocation = "", forecastDates = [] } = {},
 ) {
   const [weatherMap, setWeatherMap] = useState(new Map());
-  const fetchingRef = useRef(new Set()); // Prevents duplicate in-flight requests
+  const fetchingRef = useRef(new Set());
+  const queueRef = useRef([]);
+  const activeRef = useRef(0);
 
   const fetchOne = useCallback(async (location, date) => {
     const key = weatherKey(location, date);
     if (!key || fetchingRef.current.has(key)) return;
 
-    // Serve from client cache if fresh
     const cached = getCached(key);
     if (cached !== undefined) {
       setWeatherMap((prev) => {
@@ -57,7 +61,6 @@ export function useWeather(
       const params = new URLSearchParams({ location, date });
       const res = await apiFetch(`/api/weather?${params}`);
       if (!res.ok) {
-        // Avoid hammering the endpoint on repeated renders when weather is unavailable.
         setClientCache(key, null);
         setWeatherMap((prev) => {
           const next = new Map(prev);
@@ -80,7 +83,31 @@ export function useWeather(
     }
   }, []);
 
-  // Fetch weather for each appointment that has a location
+  const pumpQueue = useCallback(() => {
+    while (activeRef.current < MAX_WEATHER_IN_FLIGHT && queueRef.current.length > 0) {
+      const { location, date } = queueRef.current.shift();
+      const key = weatherKey(location, date);
+      if (!key || fetchingRef.current.has(key) || getCached(key) !== undefined) {
+        continue;
+      }
+      activeRef.current += 1;
+      fetchOne(location, date).finally(() => {
+        activeRef.current -= 1;
+        pumpQueue();
+      });
+    }
+  }, [fetchOne]);
+
+  const enqueueWeather = useCallback(
+    (location, date) => {
+      const key = weatherKey(location, date);
+      if (!key) return;
+      queueRef.current.push({ location, date });
+      pumpQueue();
+    },
+    [pumpQueue],
+  );
+
   useEffect(() => {
     if (!appointments || appointments.length === 0) return;
     const seen = new Set();
@@ -93,12 +120,11 @@ export function useWeather(
         pairs.push({ location: apt.location, date: apt.date });
       }
     }
-    for (const { location, date } of pairs) {
-      fetchOne(location, date);
+    for (const { location, date } of pairs.slice(0, MAX_APPOINTMENT_WEATHER)) {
+      enqueueWeather(location, date);
     }
-  }, [appointments, fetchOne]);
+  }, [appointments, enqueueWeather]);
 
-  // Fetch day-level weather for every visible calendar day using defaultLocation
   useEffect(() => {
     if (!defaultLocation || !calendarDays || calendarDays.length === 0) return;
     const today = todayLocalYmd();
@@ -106,25 +132,27 @@ export function useWeather(
       new Date(
         new Date().getFullYear(),
         new Date().getMonth(),
-        new Date().getDate() + 15,
+        new Date().getDate() + 7,
       ),
     );
+    let queued = 0;
     for (const { date, isCurrentMonth } of calendarDays) {
+      if (queued >= MAX_CALENDAR_DAY_WEATHER) break;
       if (!date || isCurrentMonth === false) continue;
       const dateStr = formatLocalDate(date);
       if (!dateStr || dateStr < today || dateStr > maxForecastDate) continue;
-      fetchOne(defaultLocation, dateStr);
+      enqueueWeather(defaultLocation, dateStr);
+      queued += 1;
     }
-  }, [calendarDays, defaultLocation, fetchOne]);
+  }, [calendarDays, defaultLocation, enqueueWeather]);
 
-  // Fetch explicit forecast dates so weather appears without depending on appointments.
   useEffect(() => {
     if (!defaultLocation || !forecastDates || forecastDates.length === 0) return;
-    for (const date of forecastDates) {
+    for (const date of forecastDates.slice(0, MAX_CALENDAR_DAY_WEATHER)) {
       if (!date) continue;
-      fetchOne(defaultLocation, date);
+      enqueueWeather(defaultLocation, date);
     }
-  }, [defaultLocation, fetchOne, forecastDates]);
+  }, [defaultLocation, enqueueWeather, forecastDates]);
 
   const getWeather = useCallback(
     (location, date) => {

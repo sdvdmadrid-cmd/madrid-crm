@@ -243,4 +243,169 @@ export const WORKSPACE_OPERATIONS_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "searchPayrollEmployees",
+      description: "Find payroll employees by name or email.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string" } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "calculateEmployeePaycheck",
+      description:
+        "Calculate a paycheck for an employee given hours and optional hourly rate. Example: Jorge 7 hours at $25/hour.",
+      parameters: {
+        type: "object",
+        properties: {
+          employeeName: { type: "string" },
+          hoursRegular: { type: "number" },
+          hourlyRate: { type: "number" },
+        },
+        required: ["employeeName", "hoursRegular"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "runPayrollForPeriod",
+      description: "Create and calculate a pay run for the current week or period using approved time entries.",
+      parameters: {
+        type: "object",
+        properties: {
+          scheduleType: {
+            type: "string",
+            enum: ["weekly", "biweekly", "semimonthly", "monthly"],
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getPayrollReport",
+      description: "Generate payroll report by date range, YTD, monthly, or by employee name.",
+      parameters: {
+        type: "object",
+        properties: {
+          reportType: {
+            type: "string",
+            enum: ["date_range", "weekly", "monthly", "quarterly", "ytd"],
+          },
+          startDate: { type: "string" },
+          endDate: { type: "string" },
+          employeeName: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "findEmployeesMissingHours",
+      description: "List hourly employees with no time entries in the current pay period.",
+      parameters: {
+        type: "object",
+        properties: {
+          scheduleType: { type: "string", enum: ["weekly", "biweekly"] },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getJobPayrollCost",
+      description:
+        "Show payroll and labor burden cost for a project/job by name. Example: Glendale Lakes.",
+      parameters: {
+        type: "object",
+        properties: { jobSearch: { type: "string" } },
+        required: ["jobSearch"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getLaborCostByProject",
+      description: "List labor cost and burden for all projects/jobs this month.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getProjectProfitSummary",
+      description:
+        "Show revenue, labor cost, and profit for a project. Example: What was the profit on Smith Patio Project?",
+      parameters: {
+        type: "object",
+        properties: { jobSearch: { type: "string" } },
+        required: ["jobSearch"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getMaterialCostByProject",
+      description: "Show material and vendor costs by project/job.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "listLosingJobs",
+      description: "List jobs/projects that are losing money (negative gross profit).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "createInvoiceForJob",
+      description: "Generate an invoice for a completed job by name. Supports progress, final, or full billing.",
+      parameters: {
+        type: "object",
+        properties: {
+          jobSearch: { type: "string" },
+          billingType: { type: "string", enum: ["full", "progress", "final", "change_order"] },
+        },
+        required: ["jobSearch"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getMonthlyProfitReport",
+      description: "Show monthly revenue, costs, and profit report.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getOutstandingInvoices",
+      description: "Show outstanding invoices and accounts receivable.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getPayrollCostsThisMonth",
+      description: "Show payroll and job expense costs for the current month.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];

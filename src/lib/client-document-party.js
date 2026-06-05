@@ -28,6 +28,10 @@ export async function enrichEstimateWithPartyInfo(
     clientEmail: estimate.clientEmail,
   });
 
+  return enrichEstimateWithClientRow(estimate, client);
+}
+
+export function enrichEstimateWithClientRow(estimate = {}, client = null) {
   if (!client) return estimate;
 
   const party = partyFieldsFromClient(client, {
@@ -48,6 +52,52 @@ export async function enrichEstimateWithPartyInfo(
     billingAddress,
     propertyAddress: party.property_address,
   };
+}
+
+/** Batch client lookup for estimate lists — avoids N+1 per row. */
+export async function enrichEstimatesWithPartyBatch(
+  supabase,
+  tenantId,
+  estimates = [],
+) {
+  if (!Array.isArray(estimates) || !estimates.length) return estimates;
+
+  const clientIds = [
+    ...new Set(
+      estimates
+        .map((row) => toText(row.clientId || row.clientUuid))
+        .filter(Boolean),
+    ),
+  ];
+
+  const clientMap = new Map();
+  if (clientIds.length && supabase && tenantId) {
+    const { data, error } = await supabase
+      .from("clients")
+      .select(
+        "id, tenant_id, name, email, phone, address, city, state, zip_code, billing_address, billing_city, billing_state, billing_zip, billing_same_as_service",
+      )
+      .eq("tenant_id", tenantId)
+      .in("id", clientIds);
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      if (row?.id) clientMap.set(row.id, row);
+    }
+  }
+
+  const results = [];
+  for (const estimate of estimates) {
+    const id = toText(estimate.clientId || estimate.clientUuid);
+    let client = id ? clientMap.get(id) : null;
+    if (!client && toText(estimate.clientName)) {
+      client = await resolveClientForInvoiceParty(supabase, tenantId, {
+        clientName: estimate.clientName,
+        clientEmail: estimate.clientEmail,
+      });
+    }
+    results.push(enrichEstimateWithClientRow(estimate, client));
+  }
+  return results;
 }
 
 export async function enrichJobWithPartyInfo(supabase, tenantId, job = {}) {
