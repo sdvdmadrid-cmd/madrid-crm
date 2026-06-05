@@ -1,3 +1,8 @@
+import {
+  getApiResponseCache,
+  isApiResponseCacheEnabled,
+  setApiResponseCache,
+} from "@/lib/api-response-cache";
 import { getExecutiveDashboardMetrics } from "@/lib/executive-dashboard.js";
 import {
   getAuthenticatedTenantContext,
@@ -6,18 +11,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const cache = new Map();
-const CACHE_TTL_MS = 120_000;
+const CACHE_TTL_SECONDS = 120;
 
-function getCached(tenantId) {
-  const entry = cache.get(tenantId);
-  if (!entry || Date.now() > entry.expiresAt) return null;
-  return entry.data;
-}
-
-function setCached(tenantId, data) {
-  if (cache.size > 500) cache.clear();
-  cache.set(tenantId, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+function cacheKey(tenantId) {
+  return `dashboard-financial:${tenantId}`;
 }
 
 export async function GET(request) {
@@ -26,17 +23,26 @@ export async function GET(request) {
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
 
-    const cached = getCached(tenantDbId);
+    const key = cacheKey(tenantDbId);
+    const cached = await getApiResponseCache(key);
     if (cached) {
       return Response.json(
         { success: true, data: cached, cached: true },
-        { headers: { "Cache-Control": "private, max-age=30" } },
+        {
+          headers: {
+            "Cache-Control": "private, max-age=30",
+            "X-Cache": isApiResponseCacheEnabled() ? "HIT-REDIS" : "HIT-MEMORY",
+          },
+        },
       );
     }
 
     const metrics = await getExecutiveDashboardMetrics(tenantDbId);
-    setCached(tenantDbId, metrics);
-    return Response.json({ success: true, data: metrics });
+    await setApiResponseCache(key, metrics, CACHE_TTL_SECONDS);
+    return Response.json(
+      { success: true, data: metrics },
+      { headers: { "X-Cache": "MISS" } },
+    );
   } catch (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }

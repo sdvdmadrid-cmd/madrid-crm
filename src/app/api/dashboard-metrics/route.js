@@ -1,3 +1,9 @@
+import {
+  deleteApiResponseCache,
+  getApiResponseCache,
+  isApiResponseCacheEnabled,
+  setApiResponseCache,
+} from "@/lib/api-response-cache";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -5,91 +11,78 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
-const cache = new Map();
-const CACHE_TTL_MS = 120_000;
+const CACHE_TTL_SECONDS = 120;
 
 function cacheKey(tenantId) {
-  return `dashboard:${tenantId}`;
+  return `dashboard-metrics:${tenantId}`;
 }
 
-function getCached(key) {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return null;
-  }
-  return entry.data;
+function buildMetricsFromRpc(row) {
+  const clientsTotal = Number(row?.clientsTotal || 0);
+  const clientsWon = Number(row?.clientsWon || 0);
+  const clientsEstimateSent = Number(row?.clientsEstimateSent || 0);
+
+  const conversionRate =
+    clientsTotal > 0
+      ? Number(((clientsWon / clientsTotal) * 100).toFixed(1))
+      : 0;
+
+  const winRateFromEstimates =
+    clientsEstimateSent > 0
+      ? Number(((clientsWon / clientsEstimateSent) * 100).toFixed(1))
+      : 0;
+
+  return {
+    clients: { total: clientsTotal },
+    jobs: {
+      total: Number(row?.jobsTotal || 0),
+      active: Number(row?.jobsActive || 0),
+      pendingDraft: Number(row?.jobsPendingDraft || 0),
+      pendingInvoice: Number(row?.jobsPendingInvoice || 0),
+      totalRevenue: Number(row?.totalRevenue || 0),
+    },
+    invoices: {
+      total: Number(row?.invoicesTotal || 0),
+      unpaidCount: Number(row?.invoicesUnpaid || 0),
+      draftCount: Number(row?.invoicesDraft || 0),
+      overdueCount: Number(row?.invoicesOverdue || 0),
+      outstanding: Number(row?.outstanding || 0),
+    },
+    contracts: {
+      total: Number(row?.contractsTotal || 0),
+      active: Number(row?.contractsActive || 0),
+    },
+    estimateRequests: {
+      total: Number(row?.estimateRequestsTotal || 0),
+      newCount: Number(row?.estimateRequestsNew || 0),
+    },
+    leadInbox: {
+      newCount: Number(row?.websiteLeadsNew || 0),
+    },
+    conversion: {
+      totalLeads: clientsTotal,
+      wonLeads: clientsWon,
+      estimatesSent: clientsEstimateSent,
+      conversionRate,
+      winRateFromEstimates,
+    },
+  };
 }
 
-const MAX_CACHE_SIZE = 2000;
+async function fetchDashboardMetrics(tenantId) {
+  const { data, error } = await supabaseAdmin.rpc("get_dashboard_metrics", {
+    p_tenant_id: tenantId,
+  });
 
-function setCached(key, data) {
-  if (cache.size >= MAX_CACHE_SIZE) {
-    // Evict the oldest entry
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
-  }
-  cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
-}
-
-async function safeCount(table, tenantId, role, extraFilters = []) {
-  let query = supabaseAdmin
-    .from(table)
-    .select("id", { head: true, count: "exact" });
-
-  if ((role || "").toLowerCase() !== "super_admin") {
-    query = query.eq("tenant_id", tenantId);
-  }
-
-  for (const filter of extraFilters) {
-    if (filter?.type === "eq") query = query.eq(filter.column, filter.value);
-    if (filter?.type === "in") query = query.in(filter.column, filter.value);
-    if (filter?.type === "neq") query = query.neq(filter.column, filter.value);
-  }
-
-  const { count, error } = await query;
   if (error) {
-    console.error("[api/dashboard-metrics] Supabase count error", {
-      table,
+    console.error("[api/dashboard-metrics] Supabase RPC error", {
       tenantId,
       error,
     });
-    return 0;
-  }
-  return Number(count || 0);
-}
-
-async function safeRows(
-  table,
-  columns,
-  tenantId,
-  role,
-  limit = 150,
-  extraFilters = [],
-) {
-  let query = supabaseAdmin.from(table).select(columns).limit(limit);
-  if ((role || "").toLowerCase() !== "super_admin") {
-    query = query.eq("tenant_id", tenantId);
+    throw new Error(error.message);
   }
 
-  for (const filter of extraFilters) {
-    if (filter?.type === "eq") query = query.eq(filter.column, filter.value);
-    if (filter?.type === "in") query = query.in(filter.column, filter.value);
-    if (filter?.type === "neq") query = query.neq(filter.column, filter.value);
-    if (filter?.type === "gt") query = query.gt(filter.column, filter.value);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[api/dashboard-metrics] Supabase rows error", {
-      table,
-      tenantId,
-      error,
-    });
-    return [];
-  }
-  return data || [];
+  return buildMetricsFromRpc(data || {});
 }
 
 export async function GET(request) {
@@ -98,143 +91,23 @@ export async function GET(request) {
     if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
-    const { tenantDbId, role } = context;
+    const { tenantDbId } = context;
 
     const key = cacheKey(tenantDbId);
-
-    const cached = getCached(key);
+    const cached = await getApiResponseCache(key);
     if (cached) {
       return new Response(JSON.stringify(cached), {
         status: 200,
         headers: {
           "Content-Type": "application/json",
-          "X-Cache": "HIT",
+          "X-Cache": isApiResponseCacheEnabled() ? "HIT-REDIS" : "HIT-MEMORY",
           "Cache-Control": "private, max-age=45",
         },
       });
     }
 
-    const [
-      clientsTotal,
-      clientsWon,
-      clientsEstimateSent,
-      jobsTotal,
-      jobsActive,
-      jobsPendingDraft,
-      invoicesTotal,
-      invoicesUnpaid,
-      invoicesDraft,
-      contractsTotal,
-      contractsActive,
-      estimateRequestsTotal,
-      estimateRequestsNew,
-      websiteLeadsNew,
-      invoicesOverdue,
-      pendingInvoiceCount,
-      jobPriceRows,
-      openInvoiceRows,
-    ] = await Promise.all([
-      safeCount("clients", tenantDbId, role),
-      safeCount("clients", tenantDbId, role, [
-        { type: "eq", column: "lead_status", value: "won" },
-      ]),
-      safeCount("clients", tenantDbId, role, [
-        { type: "eq", column: "estimate_sent", value: true },
-      ]),
-      safeCount("jobs", tenantDbId, role),
-      safeCount("jobs", tenantDbId, role, [
-        { type: "in", column: "status", value: ["Active", "In Progress"] },
-      ]),
-      safeCount("jobs", tenantDbId, role, [
-        { type: "in", column: "status", value: ["Pending", "Draft"] },
-      ]),
-      safeCount("invoices", tenantDbId, role),
-      safeCount("invoices", tenantDbId, role, [
-        { type: "in", column: "status", value: ["Unpaid", "Sent"] },
-      ]),
-      safeCount("invoices", tenantDbId, role, [
-        { type: "eq", column: "status", value: "Draft" },
-      ]),
-      safeCount("contracts", tenantDbId, role),
-      safeCount("contracts", tenantDbId, role, [
-        { type: "neq", column: "status", value: "Cancelled" },
-      ]),
-      safeCount("estimate_requests", tenantDbId, role),
-      safeCount("estimate_requests", tenantDbId, role, [
-        { type: "eq", column: "status", value: "new" },
-      ]),
-      safeCount("contractor_website_leads", tenantDbId, role, [
-        { type: "eq", column: "status", value: "new" },
-      ]),
-      safeCount("invoices", tenantDbId, role, [
-        { type: "in", column: "status", value: ["Overdue", "Past Due"] },
-      ]),
-      safeCount("jobs", tenantDbId, role, [
-        { type: "eq", column: "status", value: "Completed" },
-        { type: "eq", column: "invoiced", value: false },
-      ]),
-      safeRows("jobs", "price", tenantDbId, role, 150),
-      safeRows("invoices", "balance_due,amount,status", tenantDbId, role, 200, [
-        { type: "gt", column: "balance_due", value: 0 },
-      ]),
-    ]);
-
-    const pendingInvoice = pendingInvoiceCount;
-
-    const totalRevenue = Number(
-      jobPriceRows.reduce((sum, row) => sum + Number(row.price || 0), 0).toFixed(2),
-    );
-
-    const outstanding = Number(
-      openInvoiceRows
-        .reduce((sum, row) => sum + Number(row.balance_due || row.amount || 0), 0)
-        .toFixed(2),
-    );
-
-    const conversionRate =
-      clientsTotal > 0
-        ? Number(((clientsWon / clientsTotal) * 100).toFixed(1))
-        : 0;
-
-    const winRateFromEstimates =
-      clientsEstimateSent > 0
-        ? Number(((clientsWon / clientsEstimateSent) * 100).toFixed(1))
-        : 0;
-
-    const metrics = {
-      clients: { total: clientsTotal },
-      jobs: {
-        total: jobsTotal,
-        active: jobsActive,
-        pendingDraft: jobsPendingDraft,
-        pendingInvoice,
-        totalRevenue,
-      },
-      invoices: {
-        total: invoicesTotal,
-        unpaidCount: invoicesUnpaid,
-        draftCount: invoicesDraft,
-        overdueCount: invoicesOverdue,
-        outstanding,
-      },
-      contracts: { total: contractsTotal, active: contractsActive },
-      estimateRequests: {
-        total: estimateRequestsTotal,
-        newCount: estimateRequestsNew,
-      },
-      leadInbox: {
-        newCount: websiteLeadsNew,
-      },
-      conversion: {
-        totalLeads: clientsTotal,
-        wonLeads: clientsWon,
-        estimatesSent: clientsEstimateSent,
-        conversionRate,
-        winRateFromEstimates,
-      },
-    };
-
-    setCached(key, metrics);
+    const metrics = await fetchDashboardMetrics(tenantDbId);
+    await setApiResponseCache(key, metrics, CACHE_TTL_SECONDS);
 
     return new Response(JSON.stringify(metrics), {
       status: 200,
@@ -265,7 +138,7 @@ export async function DELETE(request) {
       return unauthenticatedResponse();
     }
 
-    cache.delete(cacheKey(context.tenantDbId));
+    await deleteApiResponseCache(cacheKey(context.tenantDbId));
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
