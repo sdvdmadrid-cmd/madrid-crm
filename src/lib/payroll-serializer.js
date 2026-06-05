@@ -111,6 +111,7 @@ export function serializePayrollSettings(row = {}) {
     employerLegalName: row.employer_legal_name || "",
     hasEmployerEin: Boolean(row.employer_ein_encrypted),
     defaultPaySchedule: row.default_pay_schedule || "biweekly",
+    standardWeeklyHours: Number(row.standard_weekly_hours ?? 40),
     payWeekStartDay: Number(row.pay_week_start_day ?? 1),
     defaultWorkState: row.default_work_state || "",
     futaRate: Number(row.futa_rate ?? 0.006),

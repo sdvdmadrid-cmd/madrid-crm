@@ -55,6 +55,10 @@ export async function PUT(request) {
       tenant_id: tenantDbId,
       employer_legal_name: String(body.employerLegalName || ""),
       default_pay_schedule: String(body.defaultPaySchedule || "biweekly"),
+      standard_weekly_hours: Math.min(
+        168,
+        Math.max(1, Number(body.standardWeeklyHours ?? 40)),
+      ),
       pay_week_start_day: Number(body.payWeekStartDay ?? 1),
       default_work_state: String(body.defaultWorkState || "").toUpperCase(),
       futa_rate: Number(body.futaRate ?? 0.006),

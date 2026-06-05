@@ -107,6 +107,9 @@ test.describe("Payroll module audit", () => {
     await expect(page.getByRole("heading", { name: /Personal information/i })).toBeVisible();
     await expect(page.getByLabel(/Social Security Number/i)).toBeVisible();
     await expect(page.getByLabel(/Hire date \(first day of work\)/i)).toBeVisible();
+    await expect(page.getByLabel(/^City$/i)).toBeVisible();
+    await expect(page.getByLabel(/^State$/i)).toBeVisible();
+    await expect(page.getByLabel(/ZIP code/i)).toBeVisible();
     await expect(page.getByRole("group", { name: /Pay type/i })).toBeVisible();
 
     await page.getByLabel(/Hourly rate/i).fill("25");

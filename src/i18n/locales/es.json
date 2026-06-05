@@ -584,14 +584,21 @@
         "sickBalance": "Horas de enfermedad acumuladas."
       },
       "placeholders": {
-        "street": "123 Calle Principal"
+        "street": "123 Calle Principal",
+        "city": "Austin",
+        "zip": "78701"
       },
       "preview": {
         "title": "Vista previa de pago",
         "note": "Pago bruto estimado antes de impuestos. Por hora asume 40 horas por semana.",
+        "noteHourly": "Pago bruto estimado antes de impuestos. Usa {{hours}} horas por semana de tu configuracion de nomina.",
+        "noteSalary": "Pago bruto estimado antes de impuestos, repartido en el ano.",
         "grossAnnual": "Pago bruto anual",
         "weekly": "Pago semanal est.",
-        "biweekly": "Pago quincenal est."
+        "biweekly": "Pago quincenal est.",
+        "perWeekly": "Pago semanal est.",
+        "perSemimonthly": "Pago quincenal est.",
+        "perMonthly": "Pago mensual est."
       }
     },
     "runs": {
@@ -616,6 +623,7 @@
       "phone": "Telefono",
       "addressStreet": "Direccion",
       "addressCity": "Ciudad",
+      "addressState": "Estado",
       "addressZip": "Codigo postal",
       "state": "Estado",
       "ssn": "SSN (cifrado)",

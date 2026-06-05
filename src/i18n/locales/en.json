@@ -596,14 +596,21 @@
         "sickBalance": "Sick time hours already earned."
       },
       "placeholders": {
-        "street": "123 Main St"
+        "street": "123 Main St",
+        "city": "Austin",
+        "zip": "78701"
       },
       "preview": {
         "title": "Pay preview",
-        "note": "Estimated gross pay before taxes and deductions. Hourly assumes 40 hours per week.",
+        "note": "Estimated gross pay before taxes. Hourly assumes 40 hours per week.",
+        "noteHourly": "Estimated gross pay before taxes. Uses {{hours}} hours per week from your payroll settings.",
+        "noteSalary": "Estimated gross pay before taxes and deductions, spread across the year.",
         "grossAnnual": "Gross annual pay",
         "weekly": "Est. weekly pay",
-        "biweekly": "Est. bi-weekly pay"
+        "biweekly": "Est. bi-weekly pay",
+        "perWeekly": "Est. weekly pay period",
+        "perSemimonthly": "Est. semi-monthly pay",
+        "perMonthly": "Est. monthly pay"
       }
     },
     "runs": {
@@ -677,6 +684,7 @@
       "phone": "Phone",
       "addressStreet": "Street address",
       "addressCity": "City",
+      "addressState": "State",
       "addressZip": "ZIP code",
       "state": "State",
       "ssn": "SSN (encrypted at rest)",
