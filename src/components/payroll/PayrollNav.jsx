@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/payroll/time", labelKey: "payroll.nav.time" },
   { href: "/payroll/calendar", labelKey: "payroll.nav.calendar" },
   { href: "/payroll/reports", labelKey: "payroll.nav.reports" },
+  { href: "/payroll/settings", labelKey: "payroll.nav.settings" },
 ];
 
 export default function PayrollNav() {
