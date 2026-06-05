@@ -29,7 +29,7 @@ test("active address forms import PlacesAutocomplete", () => {
 
 test("payroll employees use AddressFieldsGroup with Places", () => {
   const src = readFileSync(
-    path.join(root, "src/components/payroll/PayrollEmployeesClient.jsx"),
+    path.join(root, "src/components/payroll/PayrollEmployeeForm.jsx"),
     "utf8",
   );
   assert.match(src, /AddressFieldsGroup/);

@@ -562,7 +562,49 @@
       "editTitle": "Edit employee",
       "rosterTitle": "Employee roster",
       "historyTitle": "Payroll history",
-      "saved": "Employee saved."
+      "saved": "Employee saved.",
+      "formIntro": "Enter the basics first. You can skip tax and direct-deposit details until you're ready to run payroll.",
+      "errors": {
+        "nameRequired": "First and last name are required."
+      },
+      "sections": {
+        "personal": "Personal information",
+        "address": "Home address",
+        "compensation": "Pay & compensation",
+        "payment": "How they get paid",
+        "advanced": "Advanced payroll settings"
+      },
+      "hints": {
+        "email": "Used for pay stubs and tax documents.",
+        "phone": "Optional — helpful for scheduling and emergencies.",
+        "dateOfBirth": "Required for some tax forms and age verification.",
+        "socialSecurityNumber": "Encrypted and stored securely. Needed for W-2 and tax filing.",
+        "hireDate": "The date this person started working for your business.",
+        "address": "Used on pay stubs and state tax reporting.",
+        "taxForm": "W-2 for employees on payroll. 1099 for independent contractors.",
+        "filingStatus": "From their W-4 — affects federal tax withholding.",
+        "payType": "Choose how this person is paid before each pay run.",
+        "hourlyRate": "Regular pay per hour before taxes (example: 25.00).",
+        "annualSalary": "Total yearly pay before taxes (example: 52000).",
+        "directDeposit": "Turn on to pay this employee via bank transfer instead of a paper check.",
+        "routingNumber": "9-digit number from a voided check or bank app.",
+        "accountNumber": "Encrypted when saved. Re-enter to update an existing account.",
+        "advanced": "Most small businesses can leave these at the defaults.",
+        "w4ExtraWithholding": "Extra federal tax withheld each pay period (from W-4 Step 4).",
+        "stateWithholdingExtra": "Additional state tax withheld each pay period.",
+        "ptoBalance": "Paid time off hours already earned.",
+        "sickBalance": "Sick time hours already earned."
+      },
+      "placeholders": {
+        "street": "123 Main St"
+      },
+      "preview": {
+        "title": "Pay preview",
+        "note": "Estimated gross pay before taxes and deductions. Hourly assumes 40 hours per week.",
+        "grossAnnual": "Gross annual pay",
+        "weekly": "Est. weekly pay",
+        "biweekly": "Est. bi-weekly pay"
+      }
     },
     "runs": {
       "title": "Pay runs",
@@ -638,11 +680,21 @@
       "addressZip": "ZIP code",
       "state": "State",
       "ssn": "SSN (encrypted at rest)",
+      "socialSecurityNumber": "Social Security Number",
       "taxForm": "Tax form",
+      "payType": "Pay type",
       "hourly": "Hourly",
       "salary": "Salary",
       "hourlyRate": "Hourly rate ($)",
+      "hourlyRateLabel": "Hourly rate",
       "annualSalary": "Annual salary ($)",
+      "annualSalaryLabel": "Annual salary",
+      "filingStatus": "Federal filing status",
+      "directDepositEnabled": "Pay by direct deposit",
+      "accountType": "Account type",
+      "checking": "Checking",
+      "savings": "Savings",
+      "w4ExtraWithholding": "Extra federal withholding ($/pay period)",
       "rate": "Rate",
       "filingSingle": "Single",
       "filingMarried": "Married",
@@ -663,6 +715,7 @@
       "overtimeHours": "Overtime hours",
       "dateOfBirth": "Date of birth",
       "hireDate": "Hire date",
+      "hireDateLabel": "Hire date (first day of work)",
       "federalExempt": "Federal tax exempt",
       "stateExempt": "State tax exempt",
       "stateWithholdingExtra": "Extra state withholding ($/period)",
