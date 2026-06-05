@@ -1,4 +1,5 @@
 import { PAYROLL_TABLES } from "@/lib/payroll-constants";
+import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import { serializePayrollSettings } from "@/lib/payroll-serializer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { scopeByTenant } from "@/lib/tenant-scope";
@@ -43,6 +44,9 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
+  const csrf = applyMutationCsrfGuard(request);
+  if (csrf) return csrf;
+
   try {
     const { authenticated, tenantDbId, role, userId } =
       await getAuthenticatedTenantContext(request);

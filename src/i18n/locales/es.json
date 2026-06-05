@@ -532,7 +532,11 @@
       "aria": "Secciones de nomina",
       "overview": "Resumen",
       "employees": "Empleados",
-      "runs": "Corridas de pago"
+      "runs": "Corridas de pago",
+      "time": "Tiempo",
+      "calendar": "Calendario",
+      "reports": "Reportes",
+      "settings": "Configuracion"
     },
     "overview": {
       "getStarted": "Comenzar",
@@ -614,6 +618,50 @@
       "finalized": "Corrida finalizada.",
       "notFound": "Corrida no encontrada.",
       "backToList": "Volver a corridas"
+    },
+    "settings": {
+      "title": "Configuracion de nomina",
+      "subtitle": "Valores predeterminados de tu negocio — calendario de pago, horas semanales e info del empleador.",
+      "save": "Guardar configuracion",
+      "saved": "Configuracion de nomina guardada.",
+      "scopeTitle": "Solo para tu negocio",
+      "scopeBody": "Estas opciones aplican solo a tu cuenta FieldBase y tus empleados. Otros contratistas en FieldBase tienen su propia configuracion de nomina.",
+      "sections": {
+        "business": "Tu negocio",
+        "schedule": "Calendario de pago y horas"
+      },
+      "fields": {
+        "employerLegalName": "Nombre legal del negocio",
+        "defaultWorkState": "Estado principal de trabajo",
+        "defaultPaySchedule": "Con que frecuencia pagas",
+        "standardWeeklyHours": "Horas semanales estandar",
+        "payWeekStartDay": "La semana laboral empieza"
+      },
+      "hints": {
+        "employerLegalName": "Aparece en recibos de pago y formularios fiscales.",
+        "defaultWorkState": "Estado predeterminado para nuevos empleados.",
+        "defaultPaySchedule": "Usado en vistas previas y fechas sugeridas de pago.",
+        "standardWeeklyHours": "Para estimar pago anual de empleados por hora (ej.: 40 tiempo completo).",
+        "payWeekStartDay": "Primer dia de tu semana laboral de nomina."
+      },
+      "placeholders": {
+        "employerLegalName": "Mi Empresa LLC"
+      },
+      "schedules": {
+        "weekly": "Cada semana",
+        "biweekly": "Cada dos semanas (quincenal)",
+        "semimonthly": "Dos veces al mes",
+        "monthly": "Una vez al mes"
+      },
+      "weekdays": {
+        "sunday": "Domingo",
+        "monday": "Lunes",
+        "tuesday": "Martes",
+        "wednesday": "Miercoles",
+        "thursday": "Jueves",
+        "friday": "Viernes",
+        "saturday": "Sabado"
+      }
     },
     "fields": {
       "firstName": "Nombre",

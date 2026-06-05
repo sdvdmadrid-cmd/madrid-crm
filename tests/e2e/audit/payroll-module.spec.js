@@ -82,6 +82,7 @@ test.describe("Payroll module audit", () => {
     const payrollNav = page.getByRole("navigation", { name: /Payroll sections/i });
     await expect(payrollNav.getByRole("link", { name: /^Employees$/i })).toBeVisible();
     await expect(payrollNav.getByRole("link", { name: /^Pay runs$/i })).toBeVisible();
+    await expect(payrollNav.getByRole("link", { name: /^Settings$/i })).toBeVisible();
 
     await payrollNav.getByRole("link", { name: /^Employees$/i }).click();
     await expect(page).toHaveURL(/\/payroll\/employees/);
@@ -121,6 +122,21 @@ test.describe("Payroll module audit", () => {
     await expect(page.getByLabel(/Routing number/i)).toBeVisible();
 
     await expect(page.getByText(/Advanced payroll settings/i)).toBeVisible();
+  });
+
+  test("payroll settings page is scoped to the business tenant", async ({ page }) => {
+    const payrollNav = page.getByRole("navigation", { name: /Payroll sections/i });
+    await payrollNav.getByRole("link", { name: /^Settings$/i }).click();
+    await expect(page).toHaveURL(/\/payroll\/settings/);
+    await expect(page.getByTestId("payroll-settings-page")).toBeVisible();
+    await expect(page.getByTestId("payroll-settings-scope-note")).toContainText(
+      /your business only/i,
+    );
+    await page.getByLabel(/Standard weekly hours/i).fill("32");
+    await page.getByTestId("payroll-settings-save").click();
+    await expect(page.getByText(/Payroll settings saved/i)).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("API: employee, hours, calculate Jorge 7×$25", async ({ page }) => {

@@ -543,7 +543,8 @@
       "runs": "Pay runs",
       "time": "Time tracking",
       "calendar": "Calendar",
-      "reports": "Reports"
+      "reports": "Reports",
+      "settings": "Settings"
     },
     "dashboard": {
       "subtitle": "Payroll dashboard — totals, tax liability, and upcoming runs.",
@@ -667,6 +668,50 @@
     "calendar": {
       "title": "Payroll calendar",
       "subtitle": "Upcoming pay periods and pay dates for your schedule."
+    },
+    "settings": {
+      "title": "Payroll settings",
+      "subtitle": "Defaults for your business — pay schedule, weekly hours, and employer info.",
+      "save": "Save settings",
+      "saved": "Payroll settings saved.",
+      "scopeTitle": "Settings for your business only",
+      "scopeBody": "These options apply to your FieldBase account and your employees only. Other contractors on FieldBase have their own separate payroll settings.",
+      "sections": {
+        "business": "Your business",
+        "schedule": "Pay schedule & hours"
+      },
+      "fields": {
+        "employerLegalName": "Legal business name",
+        "defaultWorkState": "Primary work state",
+        "defaultPaySchedule": "How often you pay employees",
+        "standardWeeklyHours": "Standard weekly hours",
+        "payWeekStartDay": "Work week starts on"
+      },
+      "hints": {
+        "employerLegalName": "Shown on pay stubs and tax forms for your company.",
+        "defaultWorkState": "Default state for new employees and state tax setup.",
+        "defaultPaySchedule": "Used for pay previews and suggested pay run dates.",
+        "standardWeeklyHours": "Used to estimate annual pay for hourly employees (example: 40 for full-time).",
+        "payWeekStartDay": "First day of your payroll work week."
+      },
+      "placeholders": {
+        "employerLegalName": "Madrid Landscaping LLC"
+      },
+      "schedules": {
+        "weekly": "Every week",
+        "biweekly": "Every two weeks (bi-weekly)",
+        "semimonthly": "Twice a month (semi-monthly)",
+        "monthly": "Once a month"
+      },
+      "weekdays": {
+        "sunday": "Sunday",
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday"
+      }
     },
     "portal": {
       "title": "My payroll",
