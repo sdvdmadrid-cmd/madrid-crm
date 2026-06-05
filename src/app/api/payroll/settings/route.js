@@ -1,8 +1,8 @@
 import { PAYROLL_TABLES } from "@/lib/payroll-constants";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
+import { getPayrollSettingsForTenant } from "@/lib/payroll-settings-service.js";
 import { serializePayrollSettings } from "@/lib/payroll-serializer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { scopeByTenant } from "@/lib/tenant-scope";
 import {
   canWrite,
   forbiddenResponse,
@@ -22,20 +22,11 @@ export async function GET(request) {
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
 
-    const { data, error } = await scopeByTenant(
-      supabaseAdmin
-        .from(PAYROLL_TABLES.SETTINGS)
-        .select("*")
-        .eq("tenant_id", tenantDbId)
-        .maybeSingle(),
-      { tenantDbId, role },
-    );
-
-    if (error) throw new Error(error.message);
+    const data = await getPayrollSettingsForTenant({ tenantDbId, role });
 
     return json({
       success: true,
-      data: data ? serializePayrollSettings(data) : serializePayrollSettings({ tenant_id: tenantDbId }),
+      data,
     });
   } catch (error) {
     console.error("[api/payroll/settings][GET]", error);

@@ -46,13 +46,15 @@ function computeGrossPay({
   bonusAmount = 0,
   isCorrection = false,
   correctionMultiplier = 1,
+  payPeriodsPerYear = 26,
 }) {
   const payType = String(employee?.payType || employee?.pay_type || "hourly");
   const multiplier = isCorrection ? Number(correctionMultiplier || 1) : 1;
 
   if (payType === "salary") {
     const annual = Number(employee?.annualSalary ?? employee?.annual_salary ?? 0);
-    return roundMoney((annual / 26) * multiplier);
+    const periods = Math.max(1, Number(payPeriodsPerYear || 26));
+    return roundMoney((annual / periods) * multiplier);
   }
 
   const prevailing = Number(
@@ -105,6 +107,7 @@ export function calculatePayrollRunItem({
     bonusAmount,
     isCorrection,
     correctionMultiplier,
+    payPeriodsPerYear,
   });
 
   const ytd = normalizeYtdTotals(ytdBefore);

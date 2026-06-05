@@ -22,8 +22,9 @@ export async function listPayrollReminders({ tenantDbId, status = "pending" }) {
 export async function syncUpcomingRunReminders({
   tenantDbId,
   scheduleType = "biweekly",
+  weekStartDay = 1,
 }) {
-  const periods = upcomingPayPeriods({ scheduleType, count: 2 });
+  const periods = upcomingPayPeriods({ scheduleType, count: 2, weekStartDay });
   const next = periods[0];
   if (!next) return [];
 

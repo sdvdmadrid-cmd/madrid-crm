@@ -4,6 +4,7 @@ import { buildPayrollReport } from "./payroll-reports.js";
 import { calculatePayrollRunItem } from "./payroll-calculator.js";
 import { defaultFederalTables } from "./payroll-tax-tables.js";
 import { calculatePayrollRun } from "./payroll-service.js";
+import { getPayrollSettingsForTenant } from "./payroll-settings-service.js";
 import { upcomingPayPeriods, computePayPeriod } from "./payroll-calendar.js";
 import { getJobProjectPl, listProjectPlSummaries, listLosingJobs } from "./project-pl.js";
 import { getExecutiveDashboardMetrics } from "./executive-dashboard.js";
@@ -123,15 +124,22 @@ export async function aiFindMissingHours(tenantDbId, periodStart, periodEnd) {
   return { ok: true, missing, periodStart, periodEnd };
 }
 
-export async function aiRunPayrollForWeek(tenantDbId, role, userId, scheduleType = "weekly") {
-  const period = computePayPeriod({ scheduleType, anchorDate: new Date() });
+export async function aiRunPayrollForWeek(tenantDbId, role, userId, scheduleType) {
+  const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
+  const resolvedSchedule =
+    scheduleType || settings.defaultPaySchedule || "weekly";
+  const period = computePayPeriod({
+    scheduleType: resolvedSchedule,
+    anchorDate: new Date(),
+    weekStartDay: settings.payWeekStartDay,
+  });
 
   const { data: run, error } = await supabaseAdmin
     .from(PAYROLL_TABLES.RUNS)
     .insert({
       tenant_id: tenantDbId,
       user_id: userId || null,
-      schedule_type: scheduleType,
+      schedule_type: resolvedSchedule,
       period_start: period.periodStart,
       period_end: period.periodEnd,
       pay_date: period.payDate,

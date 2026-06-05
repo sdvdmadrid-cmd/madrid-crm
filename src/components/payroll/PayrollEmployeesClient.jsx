@@ -103,7 +103,13 @@ export default function PayrollEmployeesClient() {
         setPayrollSettings({
           standardWeeklyHours: Number(settingsPayload.data.standardWeeklyHours || 40),
           defaultPaySchedule: settingsPayload.data.defaultPaySchedule || "biweekly",
+          defaultWorkState: settingsPayload.data.defaultWorkState || "TX",
         });
+        setForm((current) => ({
+          ...current,
+          addressState: current.addressState || settingsPayload.data.defaultWorkState || "TX",
+          workState: current.workState || settingsPayload.data.defaultWorkState || "TX",
+        }));
       }
     } catch (err) {
       setError(err.message);

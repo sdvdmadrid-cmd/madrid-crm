@@ -8,10 +8,6 @@ import { apiFetch } from "@/lib/client-auth";
 import styles from "@/app/payroll/payroll.module.css";
 import "@/i18n";
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function money(value) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -48,21 +44,11 @@ export default function PayrollRunsClient() {
   const createRun = async () => {
     setCreating(true);
     setError("");
-    const end = todayIso();
-    const start = new Date();
-    start.setDate(start.getDate() - 13);
-    const body = {
-      title: `Payroll ${end}`,
-      scheduleType: "biweekly",
-      periodStart: start.toISOString().slice(0, 10),
-      periodEnd: end,
-      payDate: end,
-    };
 
     const res = await apiFetch("/api/payroll/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ useTenantDefaults: true }),
     });
     const payload = await res.json();
     setCreating(false);

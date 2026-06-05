@@ -9,7 +9,7 @@ import "@/i18n";
 
 export default function PayrollCalendarClient() {
   const { t } = useTranslation();
-  const [schedule, setSchedule] = useState("biweekly");
+  const [schedule, setSchedule] = useState("");
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -18,10 +18,14 @@ export default function PayrollCalendarClient() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch(`/api/payroll/calendar?schedule=${schedule}&count=8`);
+      const query = schedule ? `?schedule=${encodeURIComponent(schedule)}&count=8` : "?count=8";
+      const res = await apiFetch(`/api/payroll/calendar${query}`);
       const payload = await res.json();
       if (!res.ok || !payload.success) {
         throw new Error(payload.error || "Unable to load calendar");
+      }
+      if (!schedule && payload.data?.settings?.defaultPaySchedule) {
+        setSchedule(payload.data.settings.defaultPaySchedule);
       }
       setPeriods(payload.data?.periods || []);
     } catch (err) {
@@ -51,7 +55,7 @@ export default function PayrollCalendarClient() {
       <section className={styles.card}>
         <select
           className={styles.fieldSelect}
-          value={schedule}
+          value={schedule || "biweekly"}
           onChange={(e) => setSchedule(e.target.value)}
         >
           <option value="weekly">{t("payroll.reports.weekly")}</option>

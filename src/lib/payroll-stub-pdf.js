@@ -40,6 +40,16 @@ function renderSectionTitle(doc, title) {
   doc.moveDown(0.25);
 }
 
+function formatPayFrequencyLabel(scheduleType) {
+  const map = {
+    weekly: "Weekly",
+    biweekly: "Bi-weekly",
+    semimonthly: "Semi-monthly",
+    monthly: "Monthly",
+  };
+  return map[String(scheduleType || "").toLowerCase()] || "Bi-weekly";
+}
+
 /**
  * Build a professional pay stub PDF buffer.
  */
@@ -58,11 +68,13 @@ export async function buildPayStubPdfBuffer({
   const deductions = item.deductions || {};
   const employerTaxes = item.employerTaxes || {};
   const ytd = item.ytdSnapshot || {};
+  const settingsApplied = item.stubSnapshot?.settingsApplied || {};
+  const payFrequency = formatPayFrequencyLabel(run.scheduleType);
 
   await renderBrandedPdfHeader(doc, {
     title: "Pay Stub",
     subtitle: run.title || "Pay Period",
-    meta: `Pay date: ${formatDateUtc(run.payDate)}  ·  Period: ${formatDateUtc(run.periodStart)} – ${formatDateUtc(run.periodEnd)}`,
+    meta: `Pay date: ${formatDateUtc(run.payDate)}  ·  Period: ${formatDateUtc(run.periodStart)} – ${formatDateUtc(run.periodEnd)}  ·  Pay frequency: ${payFrequency}`,
     branding,
   });
 
@@ -98,6 +110,13 @@ export async function buildPayStubPdfBuffer({
   }
   renderMoneyRow(doc, "Hourly rate", item.hourlyRate || employee.hourlyRate || 0);
   renderMoneyRow(doc, "Gross pay", item.grossPay || 0, { bold: true });
+  if (settingsApplied.standardWeeklyHours) {
+    doc.font("Helvetica").fontSize(9).fillColor("#64748b");
+    doc.text(
+      `Hourly estimates use ${settingsApplied.standardWeeklyHours} standard weekly hours from your payroll settings.`,
+    );
+    doc.moveDown(0.25);
+  }
 
   renderSectionTitle(doc, "Employee taxes & deductions");
   renderMoneyRow(doc, "Federal income tax", deductions.federalWithholding || 0);

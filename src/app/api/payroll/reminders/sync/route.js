@@ -1,5 +1,6 @@
 import { syncUpcomingRunReminders } from "@/lib/payroll-reminders.js";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
+import { getPayrollSettingsForTenant } from "@/lib/payroll-settings-service.js";
 import {
   canWrite,
   forbiddenResponse,
@@ -20,9 +21,16 @@ export async function POST(request) {
     if (!canWrite(role)) return forbiddenResponse();
 
     const body = await request.json().catch(() => ({}));
-    const scheduleType = String(body.schedule || "biweekly");
+    const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
+    const scheduleType = String(
+      body.schedule || settings.defaultPaySchedule || "biweekly",
+    );
 
-    await syncUpcomingRunReminders({ tenantDbId, scheduleType });
+    await syncUpcomingRunReminders({
+      tenantDbId,
+      scheduleType,
+      weekStartDay: settings.payWeekStartDay,
+    });
     return Response.json({ success: true });
   } catch (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 });

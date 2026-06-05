@@ -4,6 +4,7 @@ import {
   syncUpcomingRunReminders,
 } from "@/lib/payroll-reminders.js";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
+import { getPayrollSettingsForTenant } from "@/lib/payroll-settings-service.js";
 import {
   canWrite,
   forbiddenResponse,
@@ -15,16 +16,22 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId } =
+    const { authenticated, tenantDbId, role } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
 
+    const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
     const url = new URL(request.url);
     const sync = url.searchParams.get("sync") === "1";
-    const scheduleType = url.searchParams.get("schedule") || "biweekly";
+    const scheduleType =
+      url.searchParams.get("schedule") || settings.defaultPaySchedule || "biweekly";
 
     if (sync) {
-      await syncUpcomingRunReminders({ tenantDbId, scheduleType });
+      await syncUpcomingRunReminders({
+        tenantDbId,
+        scheduleType,
+        weekStartDay: settings.payWeekStartDay,
+      });
     }
 
     const reminders = await listPayrollReminders({ tenantDbId });
