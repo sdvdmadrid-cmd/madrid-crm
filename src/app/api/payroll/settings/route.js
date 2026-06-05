@@ -46,6 +46,16 @@ export async function PUT(request) {
 
     const body = await request.json();
     const now = new Date().toISOString();
+
+    const existing = await getPayrollSettingsForTenant({ tenantDbId, role });
+    const metadata = { ...(existing.metadata || {}) };
+    if ("autoSplitOvertime" in body) {
+      metadata.autoSplitOvertime = body.autoSplitOvertime !== false;
+    }
+    if (body.metadata && typeof body.metadata === "object") {
+      Object.assign(metadata, body.metadata);
+    }
+
     const row = {
       tenant_id: tenantDbId,
       employer_legal_name: String(body.employerLegalName || ""),
@@ -56,9 +66,9 @@ export async function PUT(request) {
       ),
       pay_week_start_day: Number(body.payWeekStartDay ?? 1),
       default_work_state: String(body.defaultWorkState || "").toUpperCase(),
-      futa_rate: Number(body.futaRate ?? 0.006),
-      suta_rate: Number(body.sutaRate ?? 0.027),
-      metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
+      futa_rate: Number(body.futaRate ?? existing.futaRate ?? 0.006),
+      suta_rate: Number(body.sutaRate ?? existing.sutaRate ?? 0.027),
+      metadata,
       updated_at: now,
     };
 

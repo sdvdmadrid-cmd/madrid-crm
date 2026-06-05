@@ -64,9 +64,18 @@ export function resolveRunItemHours({
   hoursOvertime = 0,
   standardWeeklyHours = 40,
   scheduleType = "biweekly",
+  autoSplitOvertime = true,
 }) {
   const regular = Number(hoursRegular || 0);
   const overtime = Number(hoursOvertime || 0);
+
+  if (!autoSplitOvertime) {
+    return {
+      hoursRegular: regular,
+      hoursOvertime: overtime,
+      autoSplitApplied: false,
+    };
+  }
 
   if (overtime > 0) {
     return {

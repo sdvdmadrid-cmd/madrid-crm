@@ -24,6 +24,7 @@ const initialSettings = {
   standardWeeklyHours: "40",
   payWeekStartDay: "1",
   defaultWorkState: "TX",
+  autoSplitOvertime: true,
 };
 
 function FormField({ id, label, hint, children }) {
@@ -62,6 +63,7 @@ export default function PayrollSettingsClient() {
         standardWeeklyHours: String(data.standardWeeklyHours ?? 40),
         payWeekStartDay: String(data.payWeekStartDay ?? 1),
         defaultWorkState: data.defaultWorkState || "TX",
+        autoSplitOvertime: data.autoSplitOvertime !== false,
       });
     } catch (err) {
       setError(err.message);
@@ -88,6 +90,7 @@ export default function PayrollSettingsClient() {
           standardWeeklyHours: Number(form.standardWeeklyHours || 40),
           payWeekStartDay: Number(form.payWeekStartDay ?? 1),
           defaultWorkState: form.defaultWorkState,
+          autoSplitOvertime: form.autoSplitOvertime,
         }),
       });
       const payload = await res.json();
@@ -236,6 +239,23 @@ export default function PayrollSettingsClient() {
                     ))}
                   </select>
                 </FormField>
+                <div className={styles.formField}>
+                  <label className={styles.toggleRow}>
+                    <input
+                      id="payroll-auto-split-overtime"
+                      type="checkbox"
+                      checked={form.autoSplitOvertime}
+                      onChange={(e) =>
+                        setForm({ ...form, autoSplitOvertime: e.target.checked })
+                      }
+                      data-testid="payroll-auto-split-overtime"
+                    />
+                    <span>{t("payroll.settings.fields.autoSplitOvertime")}</span>
+                  </label>
+                  <p className={styles.helperText}>
+                    {t("payroll.settings.hints.autoSplitOvertime")}
+                  </p>
+                </div>
               </div>
             </div>
 

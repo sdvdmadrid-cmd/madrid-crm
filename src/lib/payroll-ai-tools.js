@@ -12,6 +12,7 @@ import { createInvoiceFromJob } from "./job-invoice-service.js";
 import { supabaseAdmin } from "./supabase-admin.js";
 import { PAYROLL_TABLES } from "./payroll-constants.js";
 import { serializePayrollEmployee } from "./payroll-serializer.js";
+import { buildRunLineFromTimeEntries, groupTimeEntriesByEmployee } from "./payroll-time-utils.js";
 
 export async function aiSearchPayrollEmployees(tenantDbId, query = "") {
   const { data, error } = await supabaseAdmin
@@ -165,28 +166,37 @@ export async function aiRunPayrollForWeek(tenantDbId, role, userId, scheduleType
     .select("employee_id, hours, hourly_rate, entry_type")
     .eq("tenant_id", tenantDbId)
     .in("status", ["submitted", "approved"])
-    .gte("created_at", `${period.periodStart}T00:00:00Z`);
+    .gte("created_at", `${period.periodStart}T00:00:00Z`)
+    .lte("created_at", `${period.periodEnd}T23:59:59Z`);
 
-  const hoursMap = new Map();
-  for (const entry of timeEntries || []) {
-    const key = entry.employee_id;
-    const prev = hoursMap.get(key) || { regular: 0, overtime: 0, rate: entry.hourly_rate };
-    if (entry.entry_type === "overtime") prev.overtime += Number(entry.hours || 0);
-    else prev.regular += Number(entry.hours || 0);
-    hoursMap.set(key, prev);
-  }
+  const grouped = groupTimeEntriesByEmployee(
+    (timeEntries || []).map((entry) => ({
+      employeeId: entry.employee_id,
+      hours: entry.hours,
+      entryType: entry.entry_type,
+      hourlyRate: entry.hourly_rate,
+    })),
+  );
 
   const now = new Date().toISOString();
   for (const emp of employees || []) {
-    const h = hoursMap.get(emp.id) || { regular: 0, overtime: 0, rate: emp.hourly_rate };
-    if (h.regular <= 0 && h.overtime <= 0) continue;
+    const entries = grouped.get(emp.id);
+    if (!entries?.length) continue;
+
+    const line = buildRunLineFromTimeEntries(entries, settings, resolvedSchedule);
+    const totalHours =
+      line.hoursRegular + line.hoursOvertime + line.ptoHours + line.sickHours;
+    if (totalHours <= 0) continue;
+
     await supabaseAdmin.from(PAYROLL_TABLES.RUN_ITEMS).insert({
       tenant_id: tenantDbId,
       run_id: run.id,
       employee_id: emp.id,
-      hours_regular: h.regular,
-      hours_overtime: h.overtime,
-      hourly_rate: h.rate || emp.hourly_rate,
+      hours_regular: line.hoursRegular,
+      hours_overtime: line.hoursOvertime,
+      pto_hours: line.ptoHours,
+      sick_hours: line.sickHours,
+      hourly_rate: line.hourlyRate || emp.hourly_rate,
       created_at: now,
       updated_at: now,
     });
