@@ -74,6 +74,10 @@ export default function PayrollEmployeesClient() {
   const { t } = useTranslation();
   const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(initialEmployee);
+  const [payrollSettings, setPayrollSettings] = useState({
+    standardWeeklyHours: 40,
+    defaultPaySchedule: "biweekly",
+  });
   const [selectedId, setSelectedId] = useState("");
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,10 +88,23 @@ export default function PayrollEmployeesClient() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/payroll/employees?status=all");
-      const payload = await res.json();
-      if (!res.ok || !payload.success) throw new Error(payload.error || "Load failed");
+      const [employeesRes, settingsRes] = await Promise.all([
+        apiFetch("/api/payroll/employees?status=all"),
+        apiFetch("/api/payroll/settings"),
+      ]);
+      const payload = await employeesRes.json();
+      if (!employeesRes.ok || !payload.success) {
+        throw new Error(payload.error || "Load failed");
+      }
       setEmployees(payload.data || []);
+
+      const settingsPayload = await settingsRes.json();
+      if (settingsRes.ok && settingsPayload.success && settingsPayload.data) {
+        setPayrollSettings({
+          standardWeeklyHours: Number(settingsPayload.data.standardWeeklyHours || 40),
+          defaultPaySchedule: settingsPayload.data.defaultPaySchedule || "biweekly",
+        });
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -199,6 +216,7 @@ export default function PayrollEmployeesClient() {
         selectedId={selectedId}
         onSave={saveEmployee}
         onClear={clearForm}
+        payrollSettings={payrollSettings}
       />
 
       {error ? <div className={styles.error}>{error}</div> : null}

@@ -33,19 +33,37 @@ function FormField({
   );
 }
 
+function payPeriodPreviewLabelKey(schedule) {
+  if (schedule === "weekly") return "payroll.employees.preview.perWeekly";
+  if (schedule === "semimonthly") return "payroll.employees.preview.perSemimonthly";
+  if (schedule === "monthly") return "payroll.employees.preview.perMonthly";
+  return "payroll.employees.preview.biweekly";
+}
+
 export default function PayrollEmployeeForm({
   form,
   setForm,
   selectedId,
   onSave,
   onClear,
+  payrollSettings = {},
 }) {
   const { t } = useTranslation();
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const preview = useMemo(
-    () => computePayPreview(form.payType, form.hourlyRate, form.annualSalary),
-    [form.payType, form.hourlyRate, form.annualSalary],
+    () =>
+      computePayPreview(form.payType, form.hourlyRate, form.annualSalary, {
+        standardWeeklyHours: payrollSettings.standardWeeklyHours,
+        defaultPaySchedule: payrollSettings.defaultPaySchedule,
+      }),
+    [
+      form.payType,
+      form.hourlyRate,
+      form.annualSalary,
+      payrollSettings.standardWeeklyHours,
+      payrollSettings.defaultPaySchedule,
+    ],
   );
 
   const directDepositEnabled = Boolean(form.directDepositEnabled);
@@ -172,27 +190,33 @@ export default function PayrollEmployeeForm({
         </h3>
         <p className={styles.sectionHint}>{t("payroll.employees.hints.address")}</p>
         <div className={styles.addressBlock}>
-          <FormField
-            id="payroll-employee-address"
-            label={t("payroll.fields.addressStreet")}
-          >
-            <AddressFieldsGroup
-              street={form.addressStreet}
-              city={form.addressCity}
-              state={form.addressState}
-              zip={form.addressZip}
-              streetId="payroll-employee-address"
-              streetPlaceholder={t("payroll.employees.placeholders.street")}
-              inputClass={styles.field}
-              selectClass={styles.fieldSelect}
-              onStreetChange={(value) => setForm({ ...form, addressStreet: value })}
-              onCityChange={(value) => setForm({ ...form, addressCity: value })}
-              onStateChange={(value) =>
-                setForm({ ...form, addressState: value, workState: value })
-              }
-              onZipChange={(value) => setForm({ ...form, addressZip: value })}
-            />
-          </FormField>
+          <AddressFieldsGroup
+            street={form.addressStreet}
+            city={form.addressCity}
+            state={form.addressState}
+            zip={form.addressZip}
+            streetId="payroll-employee-address"
+            cityId="payroll-employee-city"
+            stateId="payroll-employee-state"
+            zipId="payroll-employee-zip"
+            streetLabel={t("payroll.fields.addressStreet")}
+            cityLabel={t("payroll.fields.addressCity")}
+            stateLabel={t("payroll.fields.addressState")}
+            zipLabel={t("payroll.fields.addressZip")}
+            streetPlaceholder={t("payroll.employees.placeholders.street")}
+            cityPlaceholder={t("payroll.employees.placeholders.city")}
+            zipPlaceholder={t("payroll.employees.placeholders.zip")}
+            labelClass={styles.formLabel}
+            fieldWrapperClass={styles.formField}
+            inputClass={styles.field}
+            selectClass={styles.fieldSelect}
+            onStreetChange={(value) => setForm({ ...form, addressStreet: value })}
+            onCityChange={(value) => setForm({ ...form, addressCity: value })}
+            onStateChange={(value) =>
+              setForm({ ...form, addressState: value, workState: value })
+            }
+            onZipChange={(value) => setForm({ ...form, addressZip: value })}
+          />
         </div>
       </div>
 
@@ -305,7 +329,13 @@ export default function PayrollEmployeeForm({
           <h4 className={styles.payPreviewTitle}>
             {t("payroll.employees.preview.title")}
           </h4>
-          <p className={styles.sectionHint}>{t("payroll.employees.preview.note")}</p>
+          <p className={styles.sectionHint}>
+            {form.payType === "hourly"
+              ? t("payroll.employees.preview.noteHourly", {
+                  hours: preview.standardWeeklyHours,
+                })
+              : t("payroll.employees.preview.noteSalary")}
+          </p>
           <div className={styles.payPreviewGrid}>
             <div className={styles.payPreviewItem}>
               <span className={styles.payPreviewLabel}>
@@ -325,7 +355,7 @@ export default function PayrollEmployeeForm({
             </div>
             <div className={styles.payPreviewItem}>
               <span className={styles.payPreviewLabel}>
-                {t("payroll.employees.preview.biweekly")}
+                {t(payPeriodPreviewLabelKey(preview.defaultPaySchedule))}
               </span>
               <strong className={styles.payPreviewValue}>
                 {money(preview.biweekly)}
