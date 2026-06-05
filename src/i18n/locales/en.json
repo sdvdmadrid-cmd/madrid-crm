@@ -506,6 +506,7 @@
     "businessPl": "Business P&L",
     "reports": "Reports",
     "equipment": "Equipment",
+    "expenses": "Bills & Expenses",
     "employees": "Employees",
     "billPayments": "Bill Payments",
     "payBills": "Pay bills",
@@ -531,6 +532,59 @@
     "clientPayments": "Client payments",
     "logout": "Logout",
     "signingOut": "Signing out..."
+  },
+  "expenses": {
+    "title": "Bills & Expenses",
+    "subtitle": "Track bills, manage vendors, and link costs to jobs — no national bill-pay network.",
+    "loading": "Loading bills and vendors…",
+    "tabs": {
+      "bills": "Bills",
+      "vendors": "Vendor Directory"
+    },
+    "vendors": {
+      "addTitle": "Add vendor",
+      "addHint": "Create your own material stores, subcontractors, and suppliers. No predefined list required.",
+      "addMaterialStore": "Add Material Store",
+      "addVendor": "Add Vendor",
+      "directoryTitle": "Vendor directory",
+      "materialStoreCount": "{{count}} material store(s)",
+      "saved": "Vendor saved.",
+      "fields": {
+        "name": "Vendor name",
+        "category": "Category",
+        "contactPerson": "Contact person",
+        "phone": "Phone",
+        "email": "Email",
+        "website": "Website",
+        "paymentTerms": "Payment terms",
+        "notes": "Notes"
+      },
+      "placeholders": {
+        "name": "SiteOne, Menards, local nursery, your supplier…"
+      }
+    },
+    "bills": {
+      "addTitle": "Add bill",
+      "addBill": "Save bill",
+      "listTitle": "Bills",
+      "saved": "Bill saved.",
+      "exportCsv": "Export CSV",
+      "selectVendor": "Select vendor",
+      "noJob": "No job (office expense)",
+      "recurring": "Recurring bill",
+      "markPaid": "Mark paid",
+      "actions": "Actions",
+      "fields": {
+        "vendor": "Vendor",
+        "job": "Job",
+        "amount": "Amount",
+        "dueDate": "Due date",
+        "category": "Category",
+        "status": "Status",
+        "portalUrl": "Vendor payment portal link",
+        "notes": "Notes"
+      }
+    }
   },
   "payroll": {
     "title": "Payroll",
@@ -1527,6 +1581,65 @@
     },
     "materialsIncluded": "Include materials in the estimate",
     "empty": "No jobs to display.",
+    "workspace": {
+      "aria": "Job workspace sections",
+      "backToJobs": "Jobs",
+      "financial": "Financial",
+      "photos": "Photos",
+      "dailyReports": "Daily Reports"
+    },
+    "dailyReports": {
+      "title": "Daily Reports",
+      "loading": "Loading daily reports…",
+      "addTitle": "Add daily report",
+      "historyTitle": "Report history",
+      "saved": "Daily report saved.",
+      "empty": "No daily reports yet. Log crew, materials, and progress each day.",
+      "crewMember": "Crew member",
+      "hours": "Hours",
+      "materials": "Materials used",
+      "equipment": "Equipment used",
+      "weather": "Weather",
+      "notes": "Notes",
+      "save": "Save report",
+      "openPhotos": "Open job photos"
+    },
+    "photos": {
+      "loading": "Loading job photos…",
+      "loadError": "Unable to load photos",
+      "jobNotFound": "Job not found",
+      "uploadError": "Unable to upload photo",
+      "updateError": "Unable to update photo",
+      "deleteError": "Unable to delete photo",
+      "uploadedOne": "Photo uploaded.",
+      "uploadedMany": "{{count}} photos uploaded.",
+      "deleted": "Photo deleted.",
+      "saved": "Photo updated.",
+      "deleteConfirm": "Delete this photo?",
+      "takePhoto": "Take photo",
+      "uploadPhotos": "Upload photos",
+      "uploading": "Uploading…",
+      "uploadAs": "Save as",
+      "totalCount": "{{count}} photos",
+      "emptyTitle": "No job photos yet",
+      "emptyBody": "Document before, progress, and completion photos for this job. Use your camera on site or upload from your gallery.",
+      "filters": { "all": "All" },
+      "stages": {
+        "before": "Before",
+        "progress": "Progress",
+        "completion": "Completion"
+      },
+      "viewGallery": "Gallery",
+      "viewTimeline": "Timeline",
+      "unknownDate": "Unknown date",
+      "close": "Close",
+      "stageLabel": "Stage",
+      "captionLabel": "Caption",
+      "captionPlaceholder": "Add notes about this photo…",
+      "saveCaption": "Save",
+      "download": "Download",
+      "delete": "Delete"
+    },
     "errors": {
       "fetch": "Unable to load jobs",
       "load": "Error loading jobs",

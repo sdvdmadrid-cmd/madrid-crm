@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
+import JobWorkspaceNav from "@/components/jobs/JobWorkspaceNav";
 import { apiFetch } from "@/lib/client-auth";
 import {
   getJobFileValidationError,
@@ -155,6 +156,8 @@ export default function JobFinancialDashboardClient({ jobId }) {
           </button>
         </div>
       </header>
+
+      <JobWorkspaceNav jobId={jobId} active="financial" />
 
       <div className={jobStyles.plGrid}>
         <div className={jobStyles.plStat}>

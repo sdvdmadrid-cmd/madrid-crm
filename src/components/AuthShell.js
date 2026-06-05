@@ -1203,6 +1203,11 @@ export default function AuthShell({ children }) {
             label: t("sidebar.equipment"),
             iconKey: "jobs",
           },
+          {
+            href: "/expenses",
+            label: t("sidebar.expenses"),
+            iconKey: "insights",
+          },
         ]
     : [
         {
@@ -1252,6 +1257,11 @@ export default function AuthShell({ children }) {
           href: "/equipment",
           label: t("sidebar.equipment"),
           iconKey: "jobs",
+        },
+        {
+          href: "/expenses",
+          label: t("sidebar.expenses"),
+          iconKey: "insights",
         },
         {
           href: "/subscriptions",

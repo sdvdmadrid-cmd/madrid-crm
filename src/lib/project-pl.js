@@ -7,6 +7,7 @@ import {
   listJobExpenses,
   summarizeExpensesByCategory,
 } from "./job-expense-service.js";
+import { sumJobAssignedBills } from "./bills-expenses-service.js";
 import {
   buildCostComparison,
   computeProjectProfit,
@@ -141,13 +142,14 @@ export async function getJobProjectPl(tenantDbId, jobId) {
   if (jobError) throw new Error(jobError.message);
   if (!job) throw new Error("Job not found");
 
-  const [invoices, expenseRecords, runItems, jobExpenses, equipmentAssignments] =
+  const [invoices, expenseRecords, runItems, jobExpenses, equipmentAssignments, billsAssignedTotal] =
     await Promise.all([
       fetchJobInvoices(tenantDbId, jobId),
       fetchJobPayrollExpenses(tenantDbId, jobId),
       fetchJobPayrollRunItems(tenantDbId, jobId),
       listJobExpenses(tenantDbId, jobId),
       listEquipmentAssignments(tenantDbId, jobId),
+      sumJobAssignedBills(tenantDbId, jobId),
     ]);
 
   const estimate = extractJobEstimateBreakdown(job);
@@ -176,6 +178,8 @@ export async function getJobProjectPl(tenantDbId, jobId) {
     jobExpenses.map((e) => ({ category: e.category, amount: e.amount })),
   );
   const actualCosts = splitActualCosts(expenseSummary, equipmentAssignments);
+  actualCosts.otherCost = roundMoney(actualCosts.otherCost + billsAssignedTotal);
+  actualCosts.billsAssignedTotal = billsAssignedTotal;
 
   const revenue =
     invoiceSummary.paidTotal > 0
@@ -244,6 +248,7 @@ export async function getJobProjectPl(tenantDbId, jobId) {
       equipmentCost: actualCosts.equipmentCost,
       subcontractorCost: actualCosts.subcontractorCost,
       otherCost: actualCosts.otherCost,
+      billsAssignedTotal: actualCosts.billsAssignedTotal,
       totalCost: profitMetrics.totalCosts,
       totalJobCost: roundMoney(Number(job.total_job_cost || 0) || profitMetrics.totalCosts),
     },

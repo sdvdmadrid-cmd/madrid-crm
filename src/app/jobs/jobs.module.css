@@ -621,7 +621,318 @@
   overflow-wrap: anywhere;
 }
 
+.jobWorkspaceNav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 8px;
+}
+
+.jobWorkspaceTab {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.jobWorkspaceTabActive {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(59, 130, 246, 0.18);
+  color: #eff6ff;
+}
+
+.photosToolbar {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.photosUploadRow,
+.photosFilterRow,
+.photosViewToggle {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.photosStageSelect {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.photosStageSelect select {
+  min-width: 140px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.8);
+  color: #f1f5f9;
+}
+
+.hiddenFileInput {
+  display: none;
+}
+
+.photoFilterBtn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.75);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.photoFilterBtnActive {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(59, 130, 246, 0.2);
+  color: #eff6ff;
+}
+
+.photosSummaryPills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.photoCountPill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #bfdbfe;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.photosEmpty {
+  padding: 32px 20px;
+  text-align: center;
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  color: #94a3b8;
+}
+
+.photosEmpty h2 {
+  margin: 0 0 8px;
+  color: #e2e8f0;
+}
+
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.photoCard {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.photoThumbBtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: #0f172a;
+  cursor: pointer;
+  aspect-ratio: 4 / 3;
+}
+
+.photoThumbBtn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photoCardMeta {
+  padding: 0 10px 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.photoCardMeta p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.photoStageBadge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.photoTimeline {
+  display: grid;
+  gap: 16px;
+}
+
+.photoTimelineDay h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.photoTimelineList {
+  display: grid;
+  gap: 8px;
+}
+
+.photoTimelineItem {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.photoTimelineItem img {
+  width: 72px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.photoTimelineItem strong {
+  display: block;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.photoTimelineItem span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.photoTimelineItem p {
+  margin: 4px 0 0;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.photoLightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(2, 6, 23, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.photoLightboxPanel {
+  position: relative;
+  width: min(960px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  border-radius: 14px;
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.photoLightboxClose {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.photoLightboxImage {
+  width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #020617;
+}
+
+.photoLightboxForm {
+  display: grid;
+  gap: 10px;
+}
+
+.photoLightboxForm label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.photoLightboxForm select,
+.photoLightboxForm textarea {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+}
+
+.photoLightboxActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 @media (max-width: 760px) {
+  .photoGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .photosUploadRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .photosStageSelect select,
+  .photosUploadRow .btnFileLink {
+    width: 100%;
+  }
+
+  .photoLightboxPanel {
+    padding: 12px;
+  }
+
   .jobsPage {
     padding: 4px 4px 24px;
   }

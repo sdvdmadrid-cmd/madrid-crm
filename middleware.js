@@ -26,7 +26,7 @@ const LEGAL_COOKIE_NAME = "cf_legal";
 
 const AUTH_FLOW_BYPASS_PREFIXES = ["/auth", "/verify-email"];
 
-/** Bill pay to utilities/lenders is not live — contractors collect via Invoices + Stripe. */
+/** Legacy bill-pay network disabled — use /expenses (Bills & Expenses tracker). */
 const DISABLED_BILL_PAY_PAGE_PREFIXES = ["/bill-payments", "/payment-methods"];
 const DISABLED_PUBLIC_BILL_PAY_PREFIX = "/public/bill-payments";
 const DISABLED_BILL_PAY_API_PREFIX = "/api/bill-payments";
