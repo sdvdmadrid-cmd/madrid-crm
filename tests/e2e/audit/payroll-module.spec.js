@@ -99,6 +99,27 @@ test.describe("Payroll module audit", () => {
     await expect(page).toHaveURL(/\/payroll\/employees/);
   });
 
+  test("add employee form shows guided sections and pay preview", async ({ page }) => {
+    const payrollNav = page.getByRole("navigation", { name: /Payroll sections/i });
+    await payrollNav.getByRole("link", { name: /^Employees$/i }).click();
+    await expect(page.getByTestId("payroll-employee-form")).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: /Personal information/i })).toBeVisible();
+    await expect(page.getByLabel(/Social Security Number/i)).toBeVisible();
+    await expect(page.getByLabel(/Hire date \(first day of work\)/i)).toBeVisible();
+    await expect(page.getByRole("group", { name: /Pay type/i })).toBeVisible();
+
+    await page.getByLabel(/Hourly rate/i).fill("25");
+    await expect(page.getByTestId("payroll-pay-preview")).toContainText("$52,000.00");
+    await expect(page.getByTestId("payroll-pay-preview")).toContainText("$1,000.00");
+
+    await expect(page.getByLabel(/Routing number/i)).toHaveCount(0);
+    await page.getByText(/Pay by direct deposit/i).click();
+    await expect(page.getByLabel(/Routing number/i)).toBeVisible();
+
+    await expect(page.getByText(/Advanced payroll settings/i)).toBeVisible();
+  });
+
   test("API: employee, hours, calculate Jorge 7×$25", async ({ page }) => {
     const stamp = Date.now();
     const api = page.request;

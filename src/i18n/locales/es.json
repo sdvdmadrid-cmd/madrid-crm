@@ -550,7 +550,49 @@
       "editTitle": "Editar empleado",
       "rosterTitle": "Lista de empleados",
       "historyTitle": "Historial de nomina",
-      "saved": "Empleado guardado."
+      "saved": "Empleado guardado.",
+      "formIntro": "Empieza con lo basico. Puedes omitir impuestos y deposito directo hasta que ejecutes nomina.",
+      "errors": {
+        "nameRequired": "Nombre y apellido son obligatorios."
+      },
+      "sections": {
+        "personal": "Informacion personal",
+        "address": "Direccion",
+        "compensation": "Pago y compensacion",
+        "payment": "Como recibe el pago",
+        "advanced": "Ajustes avanzados de nomina"
+      },
+      "hints": {
+        "email": "Para recibos de pago y documentos fiscales.",
+        "phone": "Opcional — util para contacto.",
+        "dateOfBirth": "Requerido para algunos formularios fiscales.",
+        "socialSecurityNumber": "Cifrado y almacenado de forma segura.",
+        "hireDate": "Primer dia de trabajo en tu negocio.",
+        "address": "Usada en recibos e impuestos estatales.",
+        "taxForm": "W-2 para empleados. 1099 para contratistas.",
+        "filingStatus": "Del W-4 — afecta retencion federal.",
+        "payType": "Elige como se paga a esta persona.",
+        "hourlyRate": "Pago por hora antes de impuestos.",
+        "annualSalary": "Salario anual antes de impuestos.",
+        "directDeposit": "Activa para pagar por transferencia bancaria.",
+        "routingNumber": "Numero de 9 digitos del banco.",
+        "accountNumber": "Cifrado al guardar.",
+        "advanced": "La mayoria puede dejar los valores predeterminados.",
+        "w4ExtraWithholding": "Retencion federal extra por periodo.",
+        "stateWithholdingExtra": "Retencion estatal extra por periodo.",
+        "ptoBalance": "Horas de PTO acumuladas.",
+        "sickBalance": "Horas de enfermedad acumuladas."
+      },
+      "placeholders": {
+        "street": "123 Calle Principal"
+      },
+      "preview": {
+        "title": "Vista previa de pago",
+        "note": "Pago bruto estimado antes de impuestos. Por hora asume 40 horas por semana.",
+        "grossAnnual": "Pago bruto anual",
+        "weekly": "Pago semanal est.",
+        "biweekly": "Pago quincenal est."
+      }
     },
     "runs": {
       "title": "Corridas de pago",
@@ -577,11 +619,21 @@
       "addressZip": "Codigo postal",
       "state": "Estado",
       "ssn": "SSN (cifrado)",
+      "socialSecurityNumber": "Numero de Seguro Social",
       "taxForm": "Formulario fiscal",
+      "payType": "Tipo de pago",
       "hourly": "Por hora",
       "salary": "Salario",
       "hourlyRate": "Tarifa por hora ($)",
+      "hourlyRateLabel": "Tarifa por hora",
       "annualSalary": "Salario anual ($)",
+      "annualSalaryLabel": "Salario anual",
+      "filingStatus": "Estado civil federal",
+      "directDepositEnabled": "Pagar por deposito directo",
+      "accountType": "Tipo de cuenta",
+      "checking": "Corriente",
+      "savings": "Ahorros",
+      "w4ExtraWithholding": "Retencion federal extra ($/periodo)",
       "rate": "Tarifa",
       "filingSingle": "Soltero",
       "filingMarried": "Casado",

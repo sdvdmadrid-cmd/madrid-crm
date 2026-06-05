@@ -233,6 +233,191 @@
   margin-top: 16px;
 }
 
+.formIntro {
+  margin: -8px 0 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.formSection {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.formSection:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--text-heading);
+}
+
+.sectionHint {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.formGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formFieldWide {
+  grid-column: 1 / -1;
+  max-width: 320px;
+}
+
+.formLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.requiredMark {
+  color: #fca5a5;
+}
+
+.helperText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.addressBlock {
+  display: grid;
+  gap: 12px;
+}
+
+.payTypeFieldset {
+  margin: 16px 0;
+  padding: 0;
+  border: none;
+}
+
+.payTypeOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.payTypeOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.payTypeOption:has(input:checked) {
+  border-color: rgba(45, 212, 168, 0.55);
+  background: rgba(45, 212, 168, 0.1);
+}
+
+.payPreview {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 212, 168, 0.25);
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.payPreviewTitle {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: var(--text-heading);
+}
+
+.payPreviewGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin-top: 12px;
+}
+
+.payPreviewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payPreviewLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.payPreviewValue {
+  font-size: 1.15rem;
+  color: var(--text-heading);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.toggleRow strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-heading);
+}
+
+.advancedDetails {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px 16px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.advancedSummary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-heading);
+  padding: 14px 0;
+  list-style: none;
+}
+
+.advancedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedSummary::before {
+  content: "▸ ";
+  color: var(--accent);
+}
+
+.advancedDetails[open] .advancedSummary::before {
+  content: "▾ ";
+}
+
 @media (max-width: 760px) {
   .page {
     padding: 12px;
@@ -249,5 +434,21 @@
 
   .tableWrap {
     margin: 0 -8px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formFieldWide {
+    max-width: none;
+  }
+
+  .payTypeOptions {
+    flex-direction: column;
+  }
+
+  .payTypeOption {
+    width: 100%;
   }
 }
