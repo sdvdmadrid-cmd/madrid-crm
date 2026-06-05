@@ -3,7 +3,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 
-export function useAppointments() {
+/**
+ * @param {{ from?: string, to?: string }} [range] - YYYY-MM-DD bounds (inclusive) for calendar month loads
+ */
+export function useAppointments(range = {}) {
+  const from = range.from || "";
+  const to = range.to || "";
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -12,16 +17,22 @@ export function useAppointments() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/appointments");
+      const params = new URLSearchParams();
+      if (from && to) {
+        params.set("from", from);
+        params.set("to", to);
+      }
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const res = await apiFetch(`/api/appointments${qs}`);
       const data = await getJsonOrThrow(res, "Failed to fetch appointments");
-      setAppointments(data || []);
+      setAppointments(Array.isArray(data) ? data : data?.data || []);
     } catch (err) {
       console.error("[useAppointments] fetch error", err);
       setError(err.message || "Failed to load appointments");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [from, to]);
 
   useEffect(() => {
     fetch();
@@ -59,7 +70,7 @@ export function useAppointments() {
         });
         const result = await getJsonOrThrow(res, "Failed to update appointment");
         setAppointments((prev) =>
-          prev.map((apt) => (apt._id === id ? result.data : apt))
+          prev.map((apt) => (apt._id === id ? result.data : apt)),
         );
         return result.data;
       } catch (err) {

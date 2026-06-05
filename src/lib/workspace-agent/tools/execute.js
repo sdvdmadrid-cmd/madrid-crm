@@ -21,6 +21,28 @@ import { normalizeUuid } from "@/lib/supabase-db";
 import { isPastYmd, isValidYmd } from "@/lib/local-date";
 import { validateAppointmentLocationPayload } from "@/lib/appointment-address";
 import {
+  aiCalculateEmployeePaycheck,
+  aiCreateInvoiceForJob,
+  aiFindMissingHours,
+  aiGetJobPayrollCost,
+  aiGetLaborCostByProject,
+  aiGetMaterialCostByProject,
+  aiGetMonthlyProfitReport,
+  aiGetOutstandingInvoices,
+  aiGetPayrollCostsThisMonth,
+  aiGetPayrollReport,
+  aiGetProjectProfitSummary,
+  aiListLosingJobs,
+  aiRunPayrollForWeek,
+  aiSearchPayrollEmployees,
+  computePayPeriod,
+} from "@/lib/payroll-ai-tools";
+import {
+  guardAiToolExecution,
+  logAiToolExecution,
+} from "@/lib/ai-tool-guard.js";
+import { assertTenantClient } from "@/lib/tenant-fk-validation.js";
+import {
   estimateRefInvoiceNumber,
   isMissingEstimateIdColumnError,
 } from "@/lib/contract-estimate-link";
@@ -164,6 +186,34 @@ function buildScopeFromItems(items, fallbackNote) {
  * @returns {Promise<object>} JSON-serializable result for the model
  */
 export async function executeWorkspaceTool(toolName, args, ctx) {
+  const guard = guardAiToolExecution(toolName, args);
+  if (guard) {
+    await logAiToolExecution({ toolName, args, ctx, result: guard, durationMs: 0 });
+    return guard;
+  }
+
+  const started = Date.now();
+  let result;
+  let thrown = null;
+  try {
+    result = await executeWorkspaceToolImpl(toolName, args, ctx);
+  } catch (err) {
+    thrown = err;
+    result = { ok: false, error: err?.message || "Tool failed" };
+  }
+  await logAiToolExecution({
+    toolName,
+    args,
+    ctx,
+    result,
+    error: thrown?.message || null,
+    durationMs: Date.now() - started,
+  });
+  if (thrown) throw thrown;
+  return result;
+}
+
+async function executeWorkspaceToolImpl(toolName, args, ctx) {
   const tenantId = ctx.tenantDbId;
   const userId = ctx.userId;
   const actions = [];
@@ -650,6 +700,79 @@ export async function executeWorkspaceTool(toolName, args, ctx) {
         summary: `Opened ${entity} PDF`,
       });
       return { ok: true, pdfPath: path, actions };
+    }
+    case "searchPayrollEmployees": {
+      const rows = await aiSearchPayrollEmployees(tenantId, args.query || "");
+      return { ok: true, employees: rows };
+    }
+    case "calculateEmployeePaycheck": {
+      return aiCalculateEmployeePaycheck({
+        tenantDbId: tenantId,
+        employeeName: args.employeeName,
+        hoursRegular: args.hoursRegular,
+        hourlyRate: args.hourlyRate,
+      });
+    }
+    case "runPayrollForPeriod": {
+      const result = await aiRunPayrollForWeek(
+        tenantId,
+        ctx.role,
+        ctx.userId,
+        args.scheduleType || "weekly",
+      );
+      actions.push({
+        type: "navigate",
+        payload: { path: `/payroll/runs/${result.runId}` },
+        summary: "Opened calculated pay run",
+      });
+      return { ...result, actions };
+    }
+    case "getPayrollReport": {
+      return aiGetPayrollReport(tenantId, {
+        reportType: args.reportType || "ytd",
+        startDate: args.startDate,
+        endDate: args.endDate,
+        employeeName: args.employeeName,
+      });
+    }
+    case "findEmployeesMissingHours": {
+      const period = computePayPeriod({
+        scheduleType: args.scheduleType || "weekly",
+        anchorDate: new Date(),
+      });
+      return aiFindMissingHours(tenantId, period.periodStart, period.periodEnd);
+    }
+    case "getJobPayrollCost": {
+      return aiGetJobPayrollCost(tenantId, args.jobSearch || "");
+    }
+    case "getLaborCostByProject": {
+      return aiGetLaborCostByProject(tenantId);
+    }
+    case "getProjectProfitSummary": {
+      return aiGetProjectProfitSummary(tenantId, args.jobSearch || "");
+    }
+    case "getMaterialCostByProject": {
+      return aiGetMaterialCostByProject(tenantId);
+    }
+    case "listLosingJobs": {
+      return aiListLosingJobs(tenantId);
+    }
+    case "createInvoiceForJob": {
+      return aiCreateInvoiceForJob(
+        tenantId,
+        ctx.userId,
+        args.jobSearch || "",
+        args.billingType || "full",
+      );
+    }
+    case "getMonthlyProfitReport": {
+      return aiGetMonthlyProfitReport(tenantId);
+    }
+    case "getOutstandingInvoices": {
+      return aiGetOutstandingInvoices(tenantId);
+    }
+    case "getPayrollCostsThisMonth": {
+      return aiGetPayrollCostsThisMonth(tenantId);
     }
     default:
       return { ok: false, error: `Unknown tool: ${toolName}` };

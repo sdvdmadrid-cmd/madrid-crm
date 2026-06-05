@@ -1,4 +1,7 @@
-import { getSessionFromRequest } from "@/lib/auth";
+import {
+  getAuthenticatedTenantContext,
+  unauthenticatedResponse,
+} from "@/lib/tenant";
 
 const DETAILS_API_BASE =
   "https://maps.googleapis.com/maps/api/place/details/json";
@@ -11,13 +14,8 @@ const DETAILS_API_BASE =
  * Requires an authenticated session.
  */
 export async function GET(request) {
-  const session = getSessionFromRequest(request);
-  if (!session) {
-    return Response.json(
-      { success: false, error: "Unauthenticated" },
-      { status: 401 },
-    );
-  }
+  const { authenticated } = await getAuthenticatedTenantContext(request);
+  if (!authenticated) return unauthenticatedResponse();
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {

@@ -662,3 +662,27 @@
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
+
+@media (max-width: 760px) {
+  .page {
+    padding: 12px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .listGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .lineItemsTableWrap {
+    margin: 0 -8px;
+  }
+}

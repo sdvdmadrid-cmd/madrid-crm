@@ -364,7 +364,7 @@ function LeadCard({
 export default function LeadInboxPage() {
   const router = useRouter();
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [convertingId, setConvertingId] = useState("");

@@ -7,12 +7,13 @@ import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import ContractorTrustStrip from "@/components/workspace/ContractorTrustStrip";
 import styles from "./PaymentsReadinessBanner.module.css";
 
-export default function PaymentsReadinessBanner() {
+export default function PaymentsReadinessBanner({ connectStatus = null, skipFetch = false }) {
   const { t } = useTranslation();
-  const [status, setStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(connectStatus);
+  const [loading, setLoading] = useState(!connectStatus && !skipFetch);
 
   const load = useCallback(async () => {
+    if (skipFetch || connectStatus) return;
     try {
       setLoading(true);
       const res = await apiFetch("/api/payments/connect/status");
@@ -23,11 +24,16 @@ export default function PaymentsReadinessBanner() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [skipFetch, connectStatus]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (connectStatus) {
+      setStatus(connectStatus);
+      setLoading(false);
+      return;
+    }
+    if (!skipFetch) load();
+  }, [load, connectStatus, skipFetch]);
 
   if (loading) {
     return (

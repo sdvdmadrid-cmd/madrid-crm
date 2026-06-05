@@ -9,6 +9,7 @@ import {
   runOperationsAgent,
   shouldRunOperationsAgent,
 } from "./operations-agent.js";
+import { executeWorkspaceTool } from "./tools/execute.js";
 import { resolveAgentMessage } from "./slash-commands.js";
 import { generateHeroCopyPatches } from "./hero-copy.js";
 import { patchRequiresConfirmation, isHeroOnlyPatch } from "./patch-risk.js";
@@ -58,6 +59,52 @@ export async function runWorkspaceAgentTurn({
   }
 
   if (confirmPlan && typeof confirmPlan === "object") {
+    if (confirmPlan.type === "ai_tool" && confirmPlan.toolName) {
+      const result = await executeWorkspaceTool(
+        confirmPlan.toolName,
+        { ...(confirmPlan.args || {}), confirmed: true },
+        {
+          tenantDbId: tenantId,
+          userId,
+          role: context?.authUser?.role || context?.role,
+        },
+      );
+      const summaries = Array.isArray(confirmPlan.summaries)
+        ? confirmPlan.summaries
+        : result.preview
+          ? [result.preview]
+          : [];
+      if (!result.ok) {
+        return {
+          answer: result.error || result.message || "Action was not completed.",
+          actions: [],
+          summaries: [],
+          plan: null,
+          requiresConfirmation: false,
+          patches: null,
+          source: "confirmed_ai_tool",
+        };
+      }
+      return {
+        answer: mergeAnswer([
+          "Action completed.",
+          summaries.length ? `**Done:**\n${summaries.map((s) => `• ${s}`).join("\n")}` : "",
+          result.invoice?.invoiceNumber
+            ? `Invoice ${result.invoice.invoiceNumber} created.`
+            : "",
+          result.estimate?.estimateNumber
+            ? `Estimate ${result.estimate.estimateNumber} created.`
+            : "",
+        ]),
+        actions: result.actions || [],
+        summaries,
+        plan: null,
+        requiresConfirmation: false,
+        patches: null,
+        source: "confirmed_ai_tool",
+      };
+    }
+
     const actions = Array.isArray(confirmPlan.actions) ? confirmPlan.actions : [];
     const summaries = Array.isArray(confirmPlan.summaries)
       ? confirmPlan.summaries
@@ -116,8 +163,8 @@ export async function runWorkspaceAgentTurn({
         answer: ops.answer,
         actions: agentMode ? ops.actions || [] : [],
         summaries: safeSummaries(ops.summaries),
-        plan: null,
-        requiresConfirmation: false,
+        plan: ops.plan || null,
+        requiresConfirmation: Boolean(ops.requiresConfirmation),
         patches: null,
         source: ops.source || "operations_agent",
       };

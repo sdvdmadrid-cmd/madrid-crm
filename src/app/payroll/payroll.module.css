@@ -1,0 +1,253 @@
+.page {
+  --text: var(--fb-text, #e8ecf4);
+  --text-muted: var(--fb-text-muted, #b4c2d8);
+  --text-heading: var(--fb-text-heading, #f4f6fb);
+  --border: var(--fb-border-strong, rgba(148, 163, 184, 0.2));
+  --accent: var(--fb-accent-emerald, #2dd4a8);
+  padding: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  color: var(--text);
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  color: var(--text-heading);
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+}
+
+.navRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 24px 0;
+}
+
+.navLink,
+.navLinkActive {
+  padding: 10px 16px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.navLink {
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.navLinkActive {
+  background: linear-gradient(135deg, #6366f1, #0f766e);
+  color: #fff;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(28, 35, 50, 0.72);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.cardTitle {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  color: var(--text-heading);
+}
+
+.grid2 {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.field,
+.fieldSelect,
+.fieldTextarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.fieldTextarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.btnPrimary,
+.btnGhost,
+.btnDanger {
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+}
+
+.btnPrimary {
+  background: linear-gradient(135deg, #6366f1, #0f766e);
+  color: #fff;
+}
+
+.btnGhost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btnDanger {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.table th {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.error {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+}
+
+.success {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+}
+
+.fieldCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.linkBtn {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.linkBtn:hover {
+  text-decoration: underline;
+}
+
+.statGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-bottom: 16px;
+}
+
+.statCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.statValue {
+  margin-top: 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-heading);
+}
+
+.badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 12px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .statGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tableWrap {
+    margin: 0 -8px;
+  }
+}

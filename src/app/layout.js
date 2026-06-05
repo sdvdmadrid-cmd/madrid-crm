@@ -4,6 +4,7 @@ import AuthShell from "@/components/AuthShell";
 import InstantNavigation from "@/components/InstantNavigation";
 import I18nProvider from "@/components/I18nProvider";
 import MarketingScripts from "@/components/MarketingScripts";
+import ClientErrorReporter from "@/components/ClientErrorReporter";
 
 const APP_BASE_URL = String(
   process.env.APP_BASE_URL || process.env.APP_URL || "https://fieldbaseapp.net",
@@ -93,6 +94,7 @@ export default function RootLayout({ children }) {
         <MarketingScripts />
         <InstantNavigation />
         <I18nProvider>
+          <ClientErrorReporter />
           <AuthShell>{children}</AuthShell>
         </I18nProvider>
       </body>

@@ -98,6 +98,24 @@ export async function runOperationsAgent({
         result = { ok: false, error: err?.message || "Tool failed" };
       }
 
+      if (result?.requiresConfirmation) {
+        return {
+          handled: true,
+          answer: result.message || "Confirmation required.",
+          requiresConfirmation: true,
+          plan: {
+            type: "ai_tool",
+            toolName: name,
+            args,
+            title: "Confirm action",
+            summaries: result.preview ? [result.preview] : [],
+          },
+          actions: [],
+          summaries: result.preview ? [result.preview] : [],
+          source: "operations_agent",
+        };
+      }
+
       if (Array.isArray(result.actions)) {
         collectedActions.push(...result.actions);
       }

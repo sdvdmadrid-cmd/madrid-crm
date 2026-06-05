@@ -4,6 +4,7 @@ export const JOB_FILE_MAX_BYTES = 10 * 1024 * 1024;
 export const JOB_FILE_ACCEPTED_MIME_TYPES = {
   photo: new Set(["image/jpeg", "image/png"]),
   document: new Set(["application/pdf"]),
+  receipt: new Set(["image/jpeg", "image/png", "application/pdf"]),
 };
 
 export const JOB_FILE_EXTENSION_BY_MIME = {
@@ -12,7 +13,7 @@ export const JOB_FILE_EXTENSION_BY_MIME = {
   "application/pdf": "pdf",
 };
 
-export const JOB_FILE_TYPE_VALUES = new Set(["photo", "document"]);
+export const JOB_FILE_TYPE_VALUES = new Set(["photo", "document", "receipt"]);
 
 export function sanitizeFileName(name) {
   return String(name || "file")
@@ -44,9 +45,10 @@ export function getJobFileValidationError(fileType, file) {
   const mimeType = String(file.type || "").toLowerCase();
   const allowedTypes = JOB_FILE_ACCEPTED_MIME_TYPES[fileType];
   if (!allowedTypes || !allowedTypes.has(mimeType)) {
-    return fileType === "photo"
-      ? "Photos must be JPG or PNG"
-      : "Documents must be PDF";
+    if (fileType === "photo" || fileType === "receipt") {
+      return "Photos/receipts must be JPG or PNG (PDF also allowed for receipts)";
+    }
+    return "Documents must be PDF";
   }
 
   return "";

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { filterAndRankRecords } from "@/lib/record-search";
+import { validateContactFields } from "@/lib/field-validation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
@@ -120,6 +120,15 @@ export default function ClientsPageClient() {
     const name = String(form.name || "").trim();
     if (!name) {
       setError(t("clients.errors.nameRequired"));
+      return;
+    }
+
+    const contactErrors = validateContactFields({
+      email: form.email,
+      phone: form.phone,
+    });
+    if (contactErrors.email || contactErrors.phone) {
+      setError(contactErrors.email || contactErrors.phone);
       return;
     }
 

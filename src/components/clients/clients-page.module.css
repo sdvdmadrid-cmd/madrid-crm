@@ -89,3 +89,19 @@
   overflow-y: auto;
   padding: 16px 22px 22px;
 }
+
+@media (max-width: 760px) {
+  .page {
+    padding: 12px;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchInput {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}

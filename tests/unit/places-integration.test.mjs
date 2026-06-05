@@ -19,10 +19,20 @@ test("active address forms import PlacesAutocomplete", () => {
   for (const file of [
     "src/components/clients/ClientForm.js",
     "src/app/estimates/new/page.js",
+    "src/components/calendar/AppointmentModal.jsx",
+    "src/app/jobs/page.js",
   ]) {
     const src = readFileSync(path.join(root, file), "utf8");
     assert.match(src, /PlacesAutocomplete/);
   }
+});
+
+test("payroll employees use AddressFieldsGroup with Places", () => {
+  const src = readFileSync(
+    path.join(root, "src/components/payroll/PayrollEmployeesClient.jsx"),
+    "utf8",
+  );
+  assert.match(src, /AddressFieldsGroup/);
 });
 
 test("AddressAutocomplete is legacy client-side maps only (not wired in CRM forms)", () => {
@@ -45,7 +55,7 @@ test("API routes read GOOGLE_PLACES_API_KEY", () => {
   ]) {
     const src = readFileSync(path.join(root, file), "utf8");
     assert.match(src, /GOOGLE_PLACES_API_KEY/);
-    assert.match(src, /getSessionFromRequest/);
+    assert.match(src, /getAuthenticatedTenantContext/);
   }
 });
 
