@@ -77,22 +77,23 @@ export async function GET(request) {
     /* ignore */
   }
 
-  // AI spend last 30 days, plus rough RPS from audit log timestamps
+  // AI spend: single RPC aggregate instead of scanning thousands of audit rows.
   let aiSpendUsd = 0;
   let aiRequests30d = 0;
   let aiRequests24h = 0;
   let recentActionsPerMin = 0;
   try {
-    const { data: aiRows } = await supabaseAdmin
-      .from("audit_logs")
-      .select("metadata, created_at")
-      .eq("action", "ai.request.completed")
-      .gte("created_at", thirtyDaysAgoIso)
-      .limit(10000);
-    for (const row of aiRows || []) {
-      aiRequests30d += 1;
-      aiSpendUsd += Number(row?.metadata?.estimatedCostUsd || 0);
-      if (row.created_at && row.created_at >= oneDayAgoIso) aiRequests24h += 1;
+    const { data: aiSummary, error: aiError } = await supabaseAdmin.rpc(
+      "get_owner_ai_usage_summary",
+      {
+        p_since: thirtyDaysAgoIso,
+        p_day_since: oneDayAgoIso,
+      },
+    );
+    if (!aiError && aiSummary) {
+      aiRequests30d = Number(aiSummary.requests30d || 0);
+      aiRequests24h = Number(aiSummary.requests24h || 0);
+      aiSpendUsd = Number(aiSummary.spendUsd30d || 0);
     }
   } catch {
     /* ignore */
