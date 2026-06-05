@@ -3,6 +3,7 @@ import {
   buildJobFilePath,
   getJobFileValidationError,
   JOB_FILES_BUCKET,
+  normalizePhotoStage,
 } from "@/lib/job-files";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -62,6 +63,9 @@ function serializeJobFile(row, signedUrl = "") {
     fileType: row.file_type || "document",
     name: row.name || "",
     size: Number(row.size || 0),
+    photoStage: row.photo_stage || null,
+    caption: row.caption || "",
+    takenAt: row.taken_at || row.created_at || null,
     createdAt: row.created_at || null,
     signedUrl,
   };
@@ -84,21 +88,35 @@ export async function GET(request, { params }) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const limit = Math.min(40, Math.max(1, Number(searchParams.get("limit") || 12)));
     const requestedType = String(searchParams.get("type") || "").trim().toLowerCase();
+    const photoStage = String(searchParams.get("photoStage") || "").trim().toLowerCase();
+    const page = Math.max(1, Number(searchParams.get("page") || 1));
+    const limit = Math.min(
+      requestedType === "photo" ? 120 : 40,
+      Math.max(1, Number(searchParams.get("limit") || (requestedType === "photo" ? 120 : 12))),
+    );
 
     let query = supabaseAdmin
       .from(JOB_FILES)
-      .select("id, user_id, job_id, file_url, file_path, file_type, name, size, created_at", {
-        count: "exact",
-      })
+      .select(
+        "id, user_id, job_id, file_url, file_path, file_type, name, size, photo_stage, caption, taken_at, created_at",
+        { count: "exact" },
+      )
       .eq("job_id", jobId)
       .eq("user_id", userId)
+      .order("taken_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 
     if (requestedType === "photo" || requestedType === "document") {
       query = query.eq("file_type", requestedType);
+    }
+
+    if (
+      photoStage === "before" ||
+      photoStage === "progress" ||
+      photoStage === "completion"
+    ) {
+      query = query.eq("photo_stage", photoStage);
     }
 
     const from = (page - 1) * limit;
@@ -185,6 +203,20 @@ export async function POST(request, { params }) {
       return jsonResponse({ success: false, error: validationError }, 400);
     }
 
+    const photoStage =
+      fileType === "photo"
+        ? normalizePhotoStage(formData.get("photoStage"))
+        : null;
+    const caption =
+      fileType === "photo" ? String(formData.get("caption") || "").trim().slice(0, 500) : "";
+    const takenAtRaw = String(formData.get("takenAt") || "").trim();
+    const takenAt =
+      fileType === "photo" && takenAtRaw
+        ? new Date(takenAtRaw).toISOString()
+        : fileType === "photo"
+          ? new Date().toISOString()
+          : null;
+
     const filePath = buildJobFilePath({
       userId,
       jobId,
@@ -214,8 +246,13 @@ export async function POST(request, { params }) {
         file_type: fileType,
         name: String(file.name || "file"),
         size: Number(file.size || 0),
+        photo_stage: photoStage,
+        caption,
+        taken_at: takenAt,
       })
-      .select("id, user_id, job_id, file_url, file_path, file_type, name, size, created_at")
+      .select(
+        "id, user_id, job_id, file_url, file_path, file_type, name, size, photo_stage, caption, taken_at, created_at",
+      )
       .single();
 
     if (insertError) {

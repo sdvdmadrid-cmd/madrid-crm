@@ -1,0 +1,194 @@
+.expensesPage {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 20px;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.6rem;
+  color: #f8fafc;
+}
+
+.subtitle {
+  margin: 6px 0 0;
+  color: #94a3b8;
+  max-width: 720px;
+}
+
+.tabRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tabBtn,
+.tabBtnActive {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.75);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tabBtnActive {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(59, 130, 246, 0.2);
+  color: #eff6ff;
+}
+
+.card {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.cardTitle {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: #e2e8f0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.formGrid label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.formGrid input,
+.formGrid select,
+.formGrid textarea {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+}
+
+.formGrid textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.btnPrimary,
+.btnGhost {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btnPrimary {
+  background: rgba(59, 130, 246, 0.85);
+  color: #fff;
+  border-color: rgba(59, 130, 246, 0.9);
+}
+
+.btnGhost {
+  background: rgba(30, 41, 59, 0.75);
+  color: #e2e8f0;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  text-align: left;
+  color: #e2e8f0;
+}
+
+.table th {
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.muted {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.error {
+  color: #fca5a5;
+  font-size: 14px;
+}
+
+.success {
+  color: #86efac;
+  font-size: 14px;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badgeOpen {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
+}
+
+.badgePaid {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.badgeOverdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+@media (max-width: 760px) {
+  .expensesPage {
+    padding: 12px 8px 32px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1081,10 +1081,22 @@ export default function JobsPage() {
                           })}
                         </button>
                         <Link
+                          href={`/jobs/${job._id}/daily-reports`}
+                          className={jobStyles.btnFileLink}
+                        >
+                          {t("jobs.workspace.dailyReports")}
+                        </Link>
+                        <Link
+                          href={`/jobs/${job._id}/photos`}
+                          className={jobStyles.btnFileLink}
+                        >
+                          {t("jobs.workspace.photos")}
+                        </Link>
+                        <Link
                           href={`/jobs/${job._id}/financial`}
                           className={jobStyles.btnFileLink}
                         >
-                          Financial
+                          {t("jobs.workspace.financial")}
                         </Link>
                         <button
                           type="button"

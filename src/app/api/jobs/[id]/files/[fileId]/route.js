@@ -1,5 +1,5 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
-import { JOB_FILES_BUCKET } from "@/lib/job-files";
+import { JOB_FILES_BUCKET, normalizePhotoStage } from "@/lib/job-files";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -46,6 +46,89 @@ async function resolveAuthorizedJob({ id, tenantDbId, role }) {
   }
 
   return data;
+}
+
+function serializeJobFile(row, signedUrl = "") {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    jobId: row.job_id,
+    fileType: row.file_type || "document",
+    name: row.name || "",
+    photoStage: row.photo_stage || null,
+    caption: row.caption || "",
+    takenAt: row.taken_at || row.created_at || null,
+    createdAt: row.created_at || null,
+    signedUrl,
+  };
+}
+
+export async function PATCH(request, { params }) {
+  const csrfResponse = enforceSameOriginForMutation(request);
+  if (csrfResponse) return csrfResponse;
+
+  try {
+    const { tenantDbId, role, userId, authenticated } =
+      await getAuthenticatedTenantContext(request);
+    if (!authenticated) return unauthenticatedResponse();
+    if (!canWrite(role)) return forbiddenResponse();
+
+    const { id: jobId, fileId } = await params;
+    if (!jobId || !fileId) {
+      return jsonResponse({ success: false, error: "Invalid parameters" }, 400);
+    }
+
+    const job = await resolveAuthorizedJob({ id: jobId, tenantDbId, role });
+    if (!job) {
+      return jsonResponse({ success: false, error: "Job not found" }, 404);
+    }
+
+    const body = await request.json();
+    const updateRow = {};
+
+    if ("caption" in body) {
+      updateRow.caption = String(body.caption || "").trim().slice(0, 500);
+    }
+    if ("photoStage" in body) {
+      updateRow.photo_stage = normalizePhotoStage(body.photoStage);
+    }
+    if ("takenAt" in body && body.takenAt) {
+      updateRow.taken_at = new Date(body.takenAt).toISOString();
+    }
+
+    if (!Object.keys(updateRow).length) {
+      return jsonResponse({ success: false, error: "No updates provided" }, 400);
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from(JOB_FILES)
+      .update(updateRow)
+      .eq("id", fileId)
+      .eq("job_id", jobId)
+      .eq("user_id", userId)
+      .eq("file_type", "photo")
+      .select(
+        "id, user_id, job_id, file_url, file_path, file_type, name, size, photo_stage, caption, taken_at, created_at",
+      )
+      .maybeSingle();
+
+    if (updateError) throw new Error(updateError.message);
+    if (!updated) {
+      return jsonResponse({ success: false, error: "Photo not found" }, 404);
+    }
+
+    const { data: signedData } = await supabaseAdmin.storage
+      .from(JOB_FILES_BUCKET)
+      .createSignedUrl(updated.file_path, 3600);
+
+    return jsonResponse({
+      success: true,
+      data: serializeJobFile(updated, signedData?.signedUrl || ""),
+    });
+  } catch (error) {
+    console.error("[api/jobs/:id/files/:fileId][PATCH] error", error);
+    return jsonResponse({ success: false, error: "Unable to update photo" }, 500);
+  }
 }
 
 export async function DELETE(request, { params }) {

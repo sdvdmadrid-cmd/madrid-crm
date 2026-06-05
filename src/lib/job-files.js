@@ -15,6 +15,15 @@ export const JOB_FILE_EXTENSION_BY_MIME = {
 
 export const JOB_FILE_TYPE_VALUES = new Set(["photo", "document", "receipt"]);
 
+export const JOB_PHOTO_STAGES = ["before", "progress", "completion"];
+
+export function normalizePhotoStage(value, fallback = "progress") {
+  const stage = String(value || "").trim().toLowerCase();
+  if (JOB_PHOTO_STAGES.includes(stage)) return stage;
+  const fb = String(fallback || "progress").trim().toLowerCase();
+  return JOB_PHOTO_STAGES.includes(fb) ? fb : "progress";
+}
+
 export function sanitizeFileName(name) {
   return String(name || "file")
     .trim()

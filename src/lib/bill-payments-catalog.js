@@ -1,6 +1,7 @@
 /**
- * Bill pay categories — broad coverage for contractor and consumer bills.
- * Providers live in `bill_providers` (DB); this drives UI filters.
+ * @deprecated Legacy bill-pay network categories. FieldBase OS uses
+ * `vendor-constants.js` (tenant vendors) and `/expenses` tracker mode.
+ * Do not seed or require predefined suppliers (SiteOne, utilities, etc.).
  */
 
 export const BILL_PAY_CATEGORIES = [
