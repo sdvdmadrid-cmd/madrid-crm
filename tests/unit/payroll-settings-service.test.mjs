@@ -37,6 +37,19 @@ describe("payroll-settings-service", () => {
     assert.equal(resolved.autoSplitApplied, false);
   });
 
+  it("skips auto-split when tenant disables it", () => {
+    const resolved = resolveRunItemHours({
+      hoursRegular: 90,
+      hoursOvertime: 0,
+      standardWeeklyHours: 40,
+      scheduleType: "biweekly",
+      autoSplitOvertime: false,
+    });
+    assert.equal(resolved.hoursRegular, 90);
+    assert.equal(resolved.hoursOvertime, 0);
+    assert.equal(resolved.autoSplitApplied, false);
+  });
+
   it("applies tenant default work state when employee is missing one", () => {
     const employee = applyEmployeeSettingsDefaults(
       { firstName: "Sam", workState: "" },

@@ -158,6 +158,7 @@ export async function calculatePayrollRun({
       hoursOvertime: item.hours_overtime,
       standardWeeklyHours: settings.standardWeeklyHours,
       scheduleType: run.schedule_type || settings.defaultPaySchedule,
+      autoSplitOvertime: settings.autoSplitOvertime !== false,
     });
     const taxTables = taxTablesForEmployee(taxTablesBase, settings, employee);
 

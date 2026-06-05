@@ -107,6 +107,38 @@ export default function PayrollRunDetailClient({ runId }) {
     ]);
   };
 
+  const importTimeEntries = async () => {
+    setWorking("import-time");
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch(`/api/payroll/runs/${runId}/import-time`, {
+        method: "POST",
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || "Unable to import time entries");
+      }
+      const data = payload.data || {};
+      const count = data.importedCount || 0;
+      if (data.autoSplitOvertime && data.autoSplitCount > 0) {
+        setNotice(
+          t("payroll.runs.timeImportedWithSplit", {
+            count,
+            split: data.autoSplitCount,
+          }),
+        );
+      } else {
+        setNotice(t("payroll.runs.timeImported", { count }));
+      }
+      await loadRun();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setWorking("");
+    }
+  };
+
   const saveLines = async () => {
     setWorking("save");
     setError("");
@@ -460,6 +492,17 @@ export default function PayrollRunDetailClient({ runId }) {
             </div>
           ))}
           <div className={styles.formActions}>
+            <button
+              type="button"
+              className={styles.btnGhost}
+              data-testid="payroll-import-time"
+              disabled={working === "import-time"}
+              onClick={importTimeEntries}
+            >
+              {working === "import-time"
+                ? t("payroll.actions.working")
+                : t("payroll.runs.importTime")}
+            </button>
             <button type="button" className={styles.btnGhost} onClick={addEmployeeRow}>
               {t("payroll.runs.addEmployeeLine")}
             </button>

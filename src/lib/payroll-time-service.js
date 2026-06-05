@@ -1,11 +1,22 @@
 import "server-only";
 
-import { PAYROLL_TABLES } from "./payroll-constants.js";
+import { PAYROLL_TABLES, MUTABLE_RUN_STATUSES } from "./payroll-constants.js";
 import { roundMoney } from "./payroll-money.js";
-import { aggregateTimeForPayRun, computeHoursFromClock } from "./payroll-time-utils.js";
+import { getPayrollSettingsForTenant } from "./payroll-settings-service.js";
+import {
+  aggregateTimeForPayRun,
+  buildRunLineFromTimeEntries,
+  computeHoursFromClock,
+  groupTimeEntriesByEmployee,
+} from "./payroll-time-utils.js";
 import { supabaseAdmin } from "./supabase-admin.js";
+import { scopeByTenant } from "./tenant-scope.js";
 
-export { aggregateTimeForPayRun } from "./payroll-time-utils.js";
+export {
+  aggregateTimeForPayRun,
+  buildRunLineFromTimeEntries,
+  groupTimeEntriesByEmployee,
+} from "./payroll-time-utils.js";
 
 export function serializeTimeEntry(row = {}) {
   return {
@@ -188,4 +199,102 @@ export async function approveTimeEntry({ tenantDbId, entryId }) {
 
   if (error) throw new Error(error.message);
   return serializeTimeEntry(data);
+}
+
+export async function importTimeEntriesForRun({ tenantDbId, role, runId }) {
+  const { data: run, error: runError } = await scopeByTenant(
+    supabaseAdmin.from(PAYROLL_TABLES.RUNS).select("*").eq("id", runId).maybeSingle(),
+    { tenantDbId, role },
+  );
+  if (runError) throw new Error(runError.message);
+  if (!run) throw new Error("Pay run not found.");
+  if (!MUTABLE_RUN_STATUSES.has(String(run.status || "").toLowerCase())) {
+    throw new Error("This pay run is locked and cannot be modified.");
+  }
+
+  const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
+  const scheduleType = run.schedule_type || settings.defaultPaySchedule || "biweekly";
+  const periodStart = run.period_start;
+  const periodEnd = run.period_end;
+
+  const { data: timeEntries, error: entriesError } = await supabaseAdmin
+    .from(PAYROLL_TABLES.TIME_ENTRIES)
+    .select("*")
+    .eq("tenant_id", tenantDbId)
+    .in("status", ["submitted", "approved"])
+    .gte("created_at", `${periodStart}T00:00:00Z`)
+    .lte("created_at", `${periodEnd}T23:59:59Z`);
+
+  if (entriesError) throw new Error(entriesError.message);
+
+  const { data: employees, error: employeesError } = await supabaseAdmin
+    .from(PAYROLL_TABLES.EMPLOYEES)
+    .select("id, hourly_rate")
+    .eq("tenant_id", tenantDbId)
+    .eq("status", "active");
+
+  if (employeesError) throw new Error(employeesError.message);
+
+  const rateByEmployee = new Map(
+    (employees || []).map((emp) => [emp.id, Number(emp.hourly_rate || 0)]),
+  );
+
+  const grouped = groupTimeEntriesByEmployee(
+    (timeEntries || []).map((entry) => ({
+      employeeId: entry.employee_id,
+      hours: entry.hours,
+      entryType: entry.entry_type,
+      hourlyRate: entry.hourly_rate,
+    })),
+  );
+
+  const now = new Date().toISOString();
+  let importedCount = 0;
+  let autoSplitCount = 0;
+  const lines = [];
+
+  for (const [employeeId, entries] of grouped) {
+    const line = buildRunLineFromTimeEntries(entries, settings, scheduleType);
+    const totalHours =
+      line.hoursRegular + line.hoursOvertime + line.ptoHours + line.sickHours;
+    if (totalHours <= 0) continue;
+
+    const hourlyRate = line.hourlyRate || rateByEmployee.get(employeeId) || 0;
+    const itemRow = {
+      tenant_id: tenantDbId,
+      run_id: runId,
+      employee_id: employeeId,
+      hours_regular: line.hoursRegular,
+      hours_overtime: line.hoursOvertime,
+      pto_hours: line.ptoHours,
+      sick_hours: line.sickHours,
+      hourly_rate: hourlyRate,
+      updated_at: now,
+      created_at: now,
+    };
+
+    await supabaseAdmin.from(PAYROLL_TABLES.RUN_ITEMS).upsert(itemRow, {
+      onConflict: "run_id,employee_id",
+    });
+
+    importedCount += 1;
+    if (line.autoSplitApplied) autoSplitCount += 1;
+    lines.push({
+      employeeId,
+      ...line,
+      hourlyRate,
+    });
+  }
+
+  await supabaseAdmin
+    .from(PAYROLL_TABLES.RUNS)
+    .update({ updated_at: now })
+    .eq("id", runId);
+
+  return {
+    importedCount,
+    autoSplitCount,
+    autoSplitOvertime: settings.autoSplitOvertime !== false,
+    lines,
+  };
 }

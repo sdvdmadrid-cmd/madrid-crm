@@ -625,6 +625,9 @@
       "calculated": "Payroll calculated.",
       "approved": "Pay run approved.",
       "finalized": "Pay run finalized.",
+      "importTime": "Import from time tracking",
+      "timeImported": "Imported hours for {{count}} employee(s).",
+      "timeImportedWithSplit": "Imported hours for {{count}} employee(s). Overtime auto-split applied to {{split}} line(s).",
       "notFound": "Pay run not found.",
       "backToList": "Back to pay runs",
       "achExported": "ACH file downloaded.",
@@ -685,14 +688,16 @@
         "defaultWorkState": "Primary work state",
         "defaultPaySchedule": "How often you pay employees",
         "standardWeeklyHours": "Standard weekly hours",
-        "payWeekStartDay": "Work week starts on"
+        "payWeekStartDay": "Work week starts on",
+        "autoSplitOvertime": "Automatically split overtime when importing hours"
       },
       "hints": {
         "employerLegalName": "Shown on pay stubs and tax forms for your company.",
         "defaultWorkState": "Default state for new employees and state tax setup.",
         "defaultPaySchedule": "Used for pay previews and suggested pay run dates.",
         "standardWeeklyHours": "Used to estimate annual pay for hourly employees (example: 40 for full-time).",
-        "payWeekStartDay": "First day of your payroll work week."
+        "payWeekStartDay": "First day of your payroll work week.",
+        "autoSplitOvertime": "When enabled, hours above your standard weekly threshold are moved to overtime on import and calculate. Turn off to keep all hours as regular unless marked overtime in time tracking."
       },
       "placeholders": {
         "employerLegalName": "Madrid Landscaping LLC"

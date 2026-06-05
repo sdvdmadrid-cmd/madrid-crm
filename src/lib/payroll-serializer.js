@@ -106,6 +106,7 @@ export function serializePayrollRunItem(row = {}, employee = null) {
 }
 
 export function serializePayrollSettings(row = {}) {
+  const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
   return {
     tenantId: row.tenant_id || "",
     employerLegalName: row.employer_legal_name || "",
@@ -116,7 +117,8 @@ export function serializePayrollSettings(row = {}) {
     defaultWorkState: row.default_work_state || "",
     futaRate: Number(row.futa_rate ?? 0.006),
     sutaRate: Number(row.suta_rate ?? 0.027),
-    metadata: row.metadata || {},
+    autoSplitOvertime: metadata.autoSplitOvertime !== false,
+    metadata,
     updatedAt: row.updated_at || null,
   };
 }
