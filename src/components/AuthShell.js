@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,7 +10,10 @@ import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
-import AiBubbleClient from "@/components/AiBubbleClient";
+const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
+  ssr: false,
+  loading: () => null,
+});
 import { WebsiteBuilderAiProvider } from "@/contexts/WebsiteBuilderAiContext";
 import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";

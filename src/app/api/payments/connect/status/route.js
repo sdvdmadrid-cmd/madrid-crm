@@ -1,3 +1,8 @@
+import {
+  getApiResponseCache,
+  isApiResponseCacheEnabled,
+  setApiResponseCache,
+} from "@/lib/api-response-cache";
 import { getConnectStatusForTenant } from "@/lib/stripe-connect";
 import {
   canManageSensitive,
@@ -7,6 +12,12 @@ import {
 } from "@/lib/tenant";
 
 export const runtime = "nodejs";
+
+const CACHE_TTL_SECONDS = 90;
+
+function cacheKey(tenantId) {
+  return `connect-status:${tenantId}`;
+}
 
 export async function GET(request) {
   try {
@@ -18,15 +29,34 @@ export async function GET(request) {
       return forbiddenResponse();
     }
 
-    const status = await getConnectStatusForTenant(context.tenantDbId);
+    const key = cacheKey(context.tenantDbId);
+    const cached = await getApiResponseCache(key);
+    if (cached) {
+      return new Response(JSON.stringify(cached), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Cache": isApiResponseCacheEnabled() ? "HIT-REDIS" : "HIT-MEMORY",
+          "Cache-Control": "private, max-age=60",
+        },
+      });
+    }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: status,
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
-    );
+    const status = await getConnectStatusForTenant(context.tenantDbId);
+    const payload = {
+      success: true,
+      data: status,
+    };
+    await setApiResponseCache(key, payload, CACHE_TTL_SECONDS);
+
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Cache": "MISS",
+        "Cache-Control": "private, max-age=60",
+      },
+    });
   } catch (error) {
     console.error("[api/payments/connect/status] error", error);
     return new Response(

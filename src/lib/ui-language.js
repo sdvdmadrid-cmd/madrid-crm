@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 // Ensure i18next is initialized (safe to import multiple times)
 import "@/i18n";
-import i18n from "@/i18n";
+import i18n, { ensureLocaleLoaded } from "@/i18n";
 
 export const SUPPORTED_UI_LANGUAGES = ["en", "es", "pl"];
 export const UI_LANGUAGE_STORAGE_KEY = "ui-language";
@@ -15,8 +15,9 @@ export function resolveUiLanguage(lang) {
 }
 
 /** @param {string} lang */
-export function applyUiLanguage(lang) {
+export async function applyUiLanguage(lang) {
   const resolved = resolveUiLanguage(lang);
+  await ensureLocaleLoaded(resolved);
   i18n.changeLanguage(resolved);
   if (typeof window !== "undefined") {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, resolved);
@@ -26,16 +27,16 @@ export function applyUiLanguage(lang) {
 }
 
 /**
- * Kept for  backward compatibility.
+ * Kept for backward compatibility.
  * Returns the current language from the global i18next instance so all
  * components that call this hook react instantly when any other component
  * calls i18n.changeLanguage().
  */
 export function useStoredUiLanguage() {
-  const { i18n } = useTranslation();
-  const lang = resolveUiLanguage(i18n.language);
+  const { i18n: i18nInstance } = useTranslation();
+  const lang = resolveUiLanguage(i18nInstance.language);
   const setLanguage = useCallback((newLang) => {
-    applyUiLanguage(newLang);
+    void applyUiLanguage(newLang);
   }, []);
   return [lang, setLanguage];
 }

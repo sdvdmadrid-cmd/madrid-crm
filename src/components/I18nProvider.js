@@ -21,7 +21,7 @@ export default function I18nProvider({ children }) {
     }
 
     // English by default; only Spanish or Polish when the user picks them in the sidebar.
-    applyUiLanguage(getStoredUiLanguage());
+    void applyUiLanguage(getStoredUiLanguage());
   }, []);
 
   return <I18nextProvider i18n={i18n}>{children}</I18nextProvider>;

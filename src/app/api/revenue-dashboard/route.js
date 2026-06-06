@@ -1,3 +1,9 @@
+import {
+  deleteApiResponseCache,
+  getApiResponseCache,
+  isApiResponseCacheEnabled,
+  setApiResponseCache,
+} from "@/lib/api-response-cache";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -5,38 +11,10 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
-const cache = new Map();
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_SECONDS = 120;
 
 function cacheKey(tenantId, role, limit) {
-  return `${tenantId || "all"}:${role || "worker"}:${limit}`;
-}
-
-function getCached(key) {
-  const entry = cache.get(key);
-  if (!entry) {
-    return null;
-  }
-
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return null;
-  }
-
-  return entry.data;
-}
-
-const MAX_CACHE_SIZE = 2000;
-
-function setCached(key, data) {
-  if (cache.size >= MAX_CACHE_SIZE) {
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
-  }
-  cache.set(key, {
-    data,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+  return `revenue-dashboard:${tenantId || "all"}:${role || "worker"}:${limit}`;
 }
 
 function toPositiveInt(value, fallback = 14, max = 90) {
@@ -74,7 +52,7 @@ export async function GET(request) {
         ? requestedContractorId
         : tenantDbId;
     const key = cacheKey(contractorFilter, role, limit);
-    const cached = getCached(key);
+    const cached = await getApiResponseCache(key);
 
     if (cached) {
       return new Response(JSON.stringify(cached), {
@@ -82,7 +60,7 @@ export async function GET(request) {
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "private, max-age=30",
-          "X-Cache": "HIT",
+          "X-Cache": isApiResponseCacheEnabled() ? "HIT-REDIS" : "HIT-MEMORY",
         },
       });
     }
@@ -110,7 +88,7 @@ export async function GET(request) {
         : [],
     };
 
-    setCached(key, payload);
+    await setApiResponseCache(key, payload, CACHE_TTL_SECONDS);
 
     return new Response(JSON.stringify(payload), {
       status: 200,
@@ -151,7 +129,7 @@ export async function DELETE(request) {
       String(role || "").toLowerCase() === "super_admin"
         ? requestedContractorId
         : tenantDbId;
-    cache.delete(cacheKey(contractorFilter, role, limit));
+    await deleteApiResponseCache(cacheKey(contractorFilter, role, limit));
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
