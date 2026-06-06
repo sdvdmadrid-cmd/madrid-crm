@@ -1,0 +1,64 @@
+.moduleShell {
+  padding: 24px 28px 40px;
+  min-height: 60vh;
+}
+
+.headerBlock {
+  margin-bottom: 24px;
+}
+
+.titleBar {
+  height: 32px;
+  width: min(280px, 70%);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.subtitleBar {
+  height: 16px;
+  width: min(420px, 85%);
+  border-radius: 8px;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metricCard {
+  height: 120px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border, #e5e7eb);
+}
+
+.listPanel {
+  height: 360px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border, #e5e7eb);
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 16px;
+}
+
+.dashboardHero {
+  height: 180px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border, #e5e7eb);
+}
+
+.dashboardSide {
+  height: 180px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border, #e5e7eb);
+}
+
+@media (max-width: 900px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+}

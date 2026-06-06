@@ -35,12 +35,11 @@ test("payroll employees use AddressFieldsGroup with Places", () => {
   assert.match(src, /AddressFieldsGroup/);
 });
 
-test("AddressAutocomplete is legacy client-side maps only (not wired in CRM forms)", () => {
-  const legacy = readFileSync(
-    path.join(root, "src/components/AddressAutocomplete.jsx"),
-    "utf8",
+test("legacy AddressAutocomplete client-side maps component was removed", () => {
+  assert.equal(
+    existsSync(path.join(root, "src/components/AddressAutocomplete.jsx")),
+    false,
   );
-  assert.match(legacy, /NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/);
   const clientForm = readFileSync(
     path.join(root, "src/components/clients/ClientForm.js"),
     "utf8",
