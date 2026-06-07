@@ -1,7 +1,6 @@
 ﻿import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthShell from "@/components/AuthShell";
-import InstantNavigation from "@/components/InstantNavigation";
 import I18nProvider from "@/components/I18nProvider";
 import MarketingScripts from "@/components/MarketingScripts";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
@@ -92,7 +91,6 @@ export default function RootLayout({ children }) {
     >
       <body className="min-h-full flex flex-col">
         <MarketingScripts />
-        <InstantNavigation />
         <I18nProvider>
           <ClientErrorReporter />
           <AuthShell>{children}</AuthShell>

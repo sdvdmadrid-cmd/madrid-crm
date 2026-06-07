@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { logEmailAttempt, normalizeRecipients, sendEmail } from "@/lib/email";
@@ -164,6 +165,67 @@ async function findExistingClient(tenantId, email, phone) {
   }
 
   return null;
+}
+
+async function runWebsiteLeadSideEffects({
+  tenantId,
+  canonicalSlug,
+  leadId,
+  nowIso,
+  cleanName,
+  cleanEmail,
+  cleanPhone,
+  cleanServiceNeeded,
+  cleanDescription,
+  cleanBudgetRange,
+  cleanTimeline,
+  cleanContactPreference,
+  fullAddress,
+  confirmLocale,
+}) {
+  try {
+    await notifyContractorOfWebsiteLead({
+      tenantId,
+      leadName: cleanName,
+      leadEmail: cleanEmail,
+      leadPhone: cleanPhone,
+      serviceNeeded: cleanServiceNeeded,
+      description: cleanDescription,
+      slug: canonicalSlug,
+      budgetRange: cleanBudgetRange,
+      timeline: cleanTimeline,
+      contactPreference: cleanContactPreference,
+      address: fullAddress,
+    });
+
+    if (isInngestEnabled()) {
+      const { emails } = await resolveContractorNotificationTargets(tenantId);
+      await sendInngestEvent(INNGEST_EVENTS.WEBSITE_LEAD, {
+        tenantId,
+        slug: canonicalSlug,
+        leadId: leadId || `${canonicalSlug}-${nowIso}`,
+        contractorEmails: emails,
+        leadData: {
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          message: cleanDescription,
+          serviceNeeded: cleanServiceNeeded,
+        },
+      });
+    }
+
+    await sendWebsiteLeadClientConfirmation({
+      locale: confirmLocale,
+      email: cleanEmail,
+      phone: cleanPhone,
+      name: cleanName,
+      serviceNeeded: cleanServiceNeeded,
+      slug: canonicalSlug,
+    });
+  } catch (error) {
+    console.warn("[contact] lead side effects failed", error?.message || error);
+  }
 }
 
 export async function POST(request, { params }) {
@@ -455,47 +517,24 @@ export async function POST(request, { params }) {
       companyProfile?.documentLanguage ||
       "en";
 
-    await notifyContractorOfWebsiteLead({
-      tenantId: website.tenantId,
-      leadName: cleanName,
-      leadEmail: cleanEmail,
-      leadPhone: cleanPhone,
-      serviceNeeded: cleanServiceNeeded,
-      description: cleanDescription,
-      slug: canonicalSlug,
-      budgetRange: cleanBudgetRange,
-      timeline: cleanTimeline,
-      contactPreference: cleanContactPreference,
-      address: fullAddress,
-    }).catch((error) => {
-      console.warn("contractor lead notification failed", error?.message || error);
-    });
-
-    if (isInngestEnabled()) {
-      const { emails } = await resolveContractorNotificationTargets(website.tenantId);
-      await sendInngestEvent(INNGEST_EVENTS.WEBSITE_LEAD, {
+    after(() =>
+      runWebsiteLeadSideEffects({
         tenantId: website.tenantId,
-        slug: canonicalSlug,
-        leadId: leadId || `${canonicalSlug}-${nowIso}`,
-        contractorEmails: emails,
-        leadData: {
-          name: cleanName,
-          email: cleanEmail,
-          phone: cleanPhone,
-          message: cleanDescription,
-          serviceNeeded: cleanServiceNeeded,
-        },
-      });
-    }
-
-    await sendWebsiteLeadClientConfirmation({
-      locale: confirmLocale,
-      email: cleanEmail,
-      phone: cleanPhone,
-      name: cleanName,
-      serviceNeeded: cleanServiceNeeded,
-      slug: canonicalSlug,
-    });
+        canonicalSlug,
+        leadId,
+        nowIso,
+        cleanName,
+        cleanEmail,
+        cleanPhone,
+        cleanServiceNeeded,
+        cleanDescription,
+        cleanBudgetRange,
+        cleanTimeline,
+        cleanContactPreference,
+        fullAddress,
+        confirmLocale,
+      }),
+    );
 
     return publicWebsiteJson(
       {

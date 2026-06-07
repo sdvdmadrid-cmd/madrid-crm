@@ -181,6 +181,40 @@ const PUBLIC_PATHS = [
   "/legal-required",
 ];
 
+const AUTH_ENTRY_PREFIXES = [
+  "/login",
+  "/sign-in",
+  "/register",
+  "/reset-password",
+  "/verify-email",
+];
+
+const PUBLIC_FAST_PATH_PREFIXES = [
+  "/sites/",
+  "/site/",
+  "/quote/",
+  "/estimate/",
+  "/legal",
+  "/public/",
+  "/api/site/",
+  "/api/public/",
+  "/api/health",
+  "/api/payments/webhooks",
+  "/api/email/webhooks",
+  "/api/email/inbound",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/register",
+  "/api/auth/sync",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/verify-email",
+  "/api/auth/resend-verification",
+  "/_next/",
+  "/favicon.ico",
+  "/robots.txt",
+];
+
 // Paths that are authenticated but bypass the legal acceptance check
 const LEGAL_BYPASS_PREFIXES = [
   "/legal",
@@ -221,13 +255,41 @@ function isAuthFlowBypassPath(pathname) {
   );
 }
 
+function isStaticAssetPath(pathname) {
+  if (!pathname || isApiPath(pathname)) return false;
+  return /\.(?:ico|png|jpg|jpeg|svg|webp|avif|gif|txt|xml|json|webmanifest|css|js|map)$/i.test(pathname);
+}
+
 function isAuthHydrationApiPath(pathname) {
   return pathname === "/api/auth/me" || pathname === "/api/auth/sync";
 }
 
-function isStaticAssetPath(pathname) {
-  if (!pathname || isApiPath(pathname)) return false;
-  return /\.(?:ico|png|jpg|jpeg|svg|webp|avif|gif|txt|xml|json|webmanifest|css|js|map)$/i.test(pathname);
+function isAuthEntryPath(pathname) {
+  return AUTH_ENTRY_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+/** Public routes that never need JWT / Supabase hydration in middleware. */
+function isMiddlewarePublicFastPath(pathname) {
+  if (isStaticAssetPath(pathname)) return true;
+  if (isAuthEntryPath(pathname)) return false;
+  if (pathname === "/") return true;
+  return PUBLIC_FAST_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(prefix),
+  );
+}
+
+function tryPublicFastPath(request) {
+  const { pathname } = request.nextUrl;
+  if (!isMiddlewarePublicFastPath(pathname)) return null;
+
+  if (pathname === "/" || pathname === "") {
+    const slug = resolveWebsiteSlugFromHost(request);
+    if (slug) return null;
+  }
+
+  return attachDeployHeaders(NextResponse.next());
 }
 
 function isLegalBypassPath(pathname) {
@@ -408,6 +470,11 @@ export async function middleware(request) {
       });
     }
     return attachDeployHeaders(NextResponse.next());
+  }
+
+  const publicFastResponse = tryPublicFastPath(request);
+  if (publicFastResponse) {
+    return publicFastResponse;
   }
 
   const response = attachDeployHeaders(NextResponse.next());
@@ -681,5 +748,7 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|favicon.ico|robots.txt|public|api/public).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|public|api/public).*)",
+  ],
 };

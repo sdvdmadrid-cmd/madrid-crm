@@ -27,6 +27,12 @@ import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { listEstimatesForTenant } from "@/lib/estimates-list-server";
+import {
+  applyUnpaginatedSafetyLimit,
+  getListPaginationParams,
+  scopeByTenant,
+} from "@/lib/tenant-scope";
 import {
   canWrite,
   forbiddenResponse,
@@ -168,16 +174,33 @@ export async function GET(request) {
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
 
-    let query = supabaseAdmin
-      .from(ESTIMATES_TABLE)
-      .select("*")
-      .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(250);
+    const { searchParams } = new URL(request.url);
+    const { paginate, page, limit, from, to } =
+      getListPaginationParams(searchParams);
 
-    if ((role || "").toLowerCase() !== "super_admin") {
-      query = query.eq("tenant_id", tenantDbId);
+    if (paginate) {
+      const payload = await listEstimatesForTenant({
+        tenantDbId,
+        role,
+        page,
+        limit,
+      });
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
+
+    let query = scopeByTenant(
+      supabaseAdmin
+        .from(ESTIMATES_TABLE)
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false }),
+      { tenantDbId, role },
+    );
+
+    query = applyUnpaginatedSafetyLimit(query, paginate);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
