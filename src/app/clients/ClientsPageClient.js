@@ -22,16 +22,16 @@ import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import pageStyles from "@/components/clients/clients-page.module.css";
 import ws from "@/styles/workspace-dark.module.css";
 
-export default function ClientsPageClient() {
+export default function ClientsPageClient({ initialList = null }) {
   const searchParams = useSearchParams();
   const { t } = useTranslation();
   const { capabilities } = useCurrentUserAccess();
-  const [clients, setClients] = useState([]);
+  const [clients, setClients] = useState(initialList?.data ?? []);
   const [form, setForm] = useState(EMPTY_CLIENT_FORM);
   const [selectedId, setSelectedId] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [highlightedClientId, setHighlightedClientId] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!initialList);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [importOpen, setImportOpen] = useState(false);
@@ -41,8 +41,8 @@ export default function ClientsPageClient() {
   const [clientDetails, setClientDetails] = useState(null);
   const [detailsWarnings, setDetailsWarnings] = useState([]);
   const [clientSearch, setClientSearch] = useState("");
-  const [listPage, setListPage] = useState(1);
-  const [listTotal, setListTotal] = useState(0);
+  const [listPage, setListPage] = useState(initialList?.page ?? 1);
+  const [listTotal, setListTotal] = useState(initialList?.total ?? 0);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const displayedClients = useMemo(() => {
@@ -93,8 +93,9 @@ export default function ClientsPageClient() {
   }, [clients.length, fetchClients, listPage, listTotal, loading, loadingMore]);
 
   useEffect(() => {
+    if (initialList) return;
     fetchClients();
-  }, [fetchClients]);
+  }, [fetchClients, initialList]);
 
   const closeForm = () => {
     setForm(EMPTY_CLIENT_FORM);

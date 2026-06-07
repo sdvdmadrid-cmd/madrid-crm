@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
@@ -10,6 +11,22 @@ import jobStyles from "@/app/jobs/jobs.module.css";
 import "@/i18n";
 
 const STAGE_FILTERS = ["all", "before", "progress", "completion"];
+
+function JobPhotoImage({ src, alt, className, width = 480, height = 360, priority = false }) {
+  if (!src) return null;
+  return (
+    <Image
+      src={src}
+      alt={alt || ""}
+      width={width}
+      height={height}
+      sizes="(max-width: 768px) 50vw, 240px"
+      className={className}
+      loading={priority ? "eager" : "lazy"}
+      unoptimized
+    />
+  );
+}
 
 function formatDateTime(value) {
   if (!value) return "";
@@ -330,7 +347,11 @@ export default function JobPhotosClient({ jobId }) {
                 onClick={() => openPhoto(photo)}
               >
                 {photo.signedUrl ? (
-                  <img src={photo.signedUrl} alt={photo.caption || photo.name} loading="lazy" />
+                  <JobPhotoImage
+                    src={photo.signedUrl}
+                    alt={photo.caption || photo.name}
+                    className={jobStyles.photoThumbImage}
+                  />
                 ) : (
                   <div className={jobStyles.filesPanelMuted}>{photo.name}</div>
                 )}
@@ -359,7 +380,13 @@ export default function JobPhotosClient({ jobId }) {
                     onClick={() => openPhoto(photo)}
                   >
                     {photo.signedUrl ? (
-                      <img src={photo.signedUrl} alt="" loading="lazy" />
+                      <JobPhotoImage
+                        src={photo.signedUrl}
+                        alt=""
+                        width={96}
+                        height={96}
+                        className={jobStyles.photoTimelineThumb}
+                      />
                     ) : null}
                     <div>
                       <strong>{stageLabel(photo.photoStage)}</strong>
@@ -391,10 +418,13 @@ export default function JobPhotosClient({ jobId }) {
               ×
             </button>
             {selectedPhoto.signedUrl ? (
-              <img
+              <JobPhotoImage
                 src={selectedPhoto.signedUrl}
                 alt={selectedPhoto.caption || selectedPhoto.name}
                 className={jobStyles.photoLightboxImage}
+                width={1280}
+                height={960}
+                priority
               />
             ) : null}
             <div className={jobStyles.photoLightboxForm}>

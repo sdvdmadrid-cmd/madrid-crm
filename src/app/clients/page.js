@@ -1,7 +1,8 @@
 ﻿import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
-import { Suspense } from "react";
+import { listClientsForTenant } from "@/lib/clients-list-server";
+import { normalizeAppRole } from "@/lib/access-control";
 import ClientsPageClient from "./ClientsPageClient";
 
 const SESSION_COOKIE_NAME =
@@ -18,9 +19,16 @@ export default async function ClientsPage() {
     redirect("/login?next=/clients");
   }
 
-  return (
-    <Suspense fallback={null}>
-      <ClientsPageClient />
-    </Suspense>
-  );
+  let initialList = null;
+  try {
+    initialList = await listClientsForTenant({
+      tenantDbId: session.tenantDbId,
+      role: normalizeAppRole(session.role),
+      page: 1,
+    });
+  } catch (error) {
+    console.error("[clients/page] initial list prefetch failed", error);
+  }
+
+  return <ClientsPageClient initialList={initialList} />;
 }

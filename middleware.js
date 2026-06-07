@@ -62,7 +62,6 @@ function resolveDisabledBillPayTarget(pathname) {
 
 const RL_WINDOW_MS  = 60_000; // 1 minute sliding window
 const RL_WRITE_LIMIT = 50;    // POST/PUT/PATCH/DELETE per user per window
-const RL_READ_LIMIT  = 300;   // GET per user per window
 const RL_STORE = new Map();   // fallback in-memory store
 
 // Paths exempt from rate limiting (webhooks, async jobs)
@@ -627,16 +626,19 @@ export async function middleware(request) {
   }
 
   // Sesión válida, continuar
-  // ── Rate limiting (except webhooks) ──
+  // ── Rate limiting on mutations only (GETs defer to route handlers + DB) ──
   if (isApiPath(pathname) && !isRateLimitExempt(pathname)) {
-    const userId = String(session?.userId || session?.sub || "anon");
     const method = request.method || "GET";
-    const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
-    const limit = isWrite ? RL_WRITE_LIMIT : RL_READ_LIMIT;
-    const key = rateLimitKey(userId, pathname);
-    const allowed = await checkRateLimit(key, limit);
-    if (!allowed) {
-      return rateLimitedResponse();
+    const isWrite = ["POST", "PUT", "PATCH", "DELETE"].includes(
+      method.toUpperCase(),
+    );
+    if (isWrite) {
+      const userId = String(session?.userId || session?.sub || "anon");
+      const key = rateLimitKey(userId, pathname);
+      const allowed = await checkRateLimit(key, RL_WRITE_LIMIT);
+      if (!allowed) {
+        return rateLimitedResponse();
+      }
     }
   }
 

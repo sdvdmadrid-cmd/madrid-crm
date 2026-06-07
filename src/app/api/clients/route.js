@@ -4,6 +4,7 @@ import {
   createClientErrorResponse,
   serializeClient,
 } from "@/lib/client-records";
+import { listClientsForTenant } from "@/lib/clients-list-server";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
@@ -44,6 +45,19 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const { paginate, page, limit, from, to } =
       getListPaginationParams(searchParams);
+
+    if (paginate) {
+      const payload = await listClientsForTenant({
+        tenantDbId,
+        role,
+        page,
+        limit,
+      });
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     let query = scopeByTenant(
       supabaseAdmin

@@ -2,7 +2,11 @@ import { getTenantContext } from "@/lib/tenant";
 import { cookies } from "next/headers";
 import { buildSessionCookie, createSessionToken, getSessionFromRequest } from "@/lib/auth";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
-import { enrichAuthMeData } from "@/lib/auth-me-workspace";
+import { enrichAuthMeData, authReconcileCacheKey, AUTH_RECONCILE_CACHE_TTL_SECONDS } from "@/lib/auth-me-workspace";
+import {
+  getApiResponseCache,
+  setApiResponseCache,
+} from "@/lib/api-response-cache";
 import {
   buildAppSessionFromSupabaseUser,
   reconcileUserRoleOnLogin,
@@ -93,12 +97,6 @@ export async function GET(request) {
       });
     }
 
-    const cookieStore = await cookies();
-    const supabase = createSupabaseRouteHandlerClient(cookieStore);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     let responseBody = {
       userId: session.userId,
       tenantId: session.tenantId,
@@ -117,49 +115,70 @@ export async function GET(request) {
 
     let setCookieHeader = null;
 
-    if (user?.id) {
-      // Dev-login pins tenant CRM role for E2E; skip operator reconcile overwriting admin.
-      if (
-        appSession?.devProfile &&
-        String(appSession.devProfile).toLowerCase() !== "super_admin"
-      ) {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            data: await enrichAuthMeData(responseBody),
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
+    if (
+      appSession?.devProfile &&
+      String(appSession.devProfile).toLowerCase() !== "super_admin"
+    ) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: await enrichAuthMeData(responseBody),
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "private, max-age=30",
           },
+        },
+      );
+    }
+
+    const reconcileKey = authReconcileCacheKey(session.userId);
+    const recentlyReconciled = await getApiResponseCache(reconcileKey);
+
+    if (!recentlyReconciled) {
+      const cookieStore = await cookies();
+      const supabase = createSupabaseRouteHandlerClient(cookieStore);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.id) {
+        const reconciled = await reconcileUserRoleOnLogin(user);
+        const profile = await resolveProfileForUser(reconciled, {
+          tenantId: session.tenantDbId || reconciled.id,
+          role: session.role,
+        });
+        const refreshedSession = buildAppSessionFromSupabaseUser(
+          reconciled,
+          null,
+          profile,
         );
+        if (refreshedSession.role !== session.role) {
+          const token = createSessionToken(refreshedSession);
+          setCookieHeader = buildSessionCookie(token);
+          responseBody = {
+            userId: refreshedSession.userId,
+            tenantId: refreshedSession.tenantId,
+            tenantDbId: refreshedSession.tenantDbId,
+            email: refreshedSession.email,
+            name: refreshedSession.name,
+            companyName: refreshedSession.companyName || "",
+            role: refreshedSession.role,
+            capabilities: getRoleCapabilities(
+              normalizeAppRole(refreshedSession.role),
+            ),
+            businessType: refreshedSession.businessType || "",
+            industry: refreshedSession.businessType || "",
+            isSubscribed: refreshedSession.isSubscribed === true,
+            trialEndDate: refreshedSession.trialEndDate || null,
+            complimentaryAccess: refreshedSession.complimentaryAccess === true,
+          };
+        }
       }
 
-      const reconciled = await reconcileUserRoleOnLogin(user);
-      const profile = await resolveProfileForUser(reconciled, {
-        tenantId: session.tenantDbId || reconciled.id,
-        role: session.role,
-      });
-      const appSession = buildAppSessionFromSupabaseUser(reconciled, null, profile);
-      if (appSession.role !== session.role) {
-        const token = createSessionToken(appSession);
-        setCookieHeader = buildSessionCookie(token);
-        responseBody = {
-          userId: appSession.userId,
-          tenantId: appSession.tenantId,
-          tenantDbId: appSession.tenantDbId,
-          email: appSession.email,
-          name: appSession.name,
-          companyName: appSession.companyName || "",
-          role: appSession.role,
-          capabilities: getRoleCapabilities(normalizeAppRole(appSession.role)),
-          businessType: appSession.businessType || "",
-          industry: appSession.businessType || "",
-          isSubscribed: appSession.isSubscribed === true,
-          trialEndDate: appSession.trialEndDate || null,
-          complimentaryAccess: appSession.complimentaryAccess === true,
-        };
-      }
+      await setApiResponseCache(reconcileKey, true, AUTH_RECONCILE_CACHE_TTL_SECONDS);
     }
 
     return new Response(
@@ -171,6 +190,7 @@ export async function GET(request) {
         status: 200,
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "private, max-age=30",
           ...(setCookieHeader ? { "Set-Cookie": setCookieHeader } : {}),
         },
       },
