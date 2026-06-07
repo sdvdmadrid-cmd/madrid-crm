@@ -5,17 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import LoginAccessPanel from "@/components/auth/LoginAccessPanel";
+import InstantNavigation from "@/components/InstantNavigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
-const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
-  ssr: false,
-  loading: () => null,
-});
-import { WebsiteBuilderAiProvider } from "@/contexts/WebsiteBuilderAiContext";
-import CrmNavBar from "@/components/crm/CrmNavBar";
 import PublicPageShell from "@/components/PublicPageShell";
 import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
@@ -29,6 +23,25 @@ import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 import { useStoredUiLanguage } from "@/lib/ui-language";
 import { buildPublicWebsitePath } from "@/lib/public-website-routing";
 import { usePublishedWebsiteStatus } from "@/hooks/usePublishedWebsiteStatus";
+
+const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
+  ssr: false,
+  loading: () => null,
+});
+const LoginAccessPanel = dynamic(
+  () => import("@/components/auth/LoginAccessPanel"),
+  { loading: () => null },
+);
+const CrmNavBar = dynamic(() => import("@/components/crm/CrmNavBar"), {
+  loading: () => null,
+});
+const WebsiteBuilderAiProvider = dynamic(
+  () =>
+    import("@/contexts/WebsiteBuilderAiContext").then((mod) => ({
+      default: mod.WebsiteBuilderAiProvider,
+    })),
+  { loading: ({ children }) => children },
+);
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -176,13 +189,6 @@ export default function AuthShell({ children }) {
   const [resetPasswordForm, setResetPasswordForm] =
     useState(initialResetPassword);
   const [submitting, setSubmitting] = useState(false);
-  const [platformFlags, setPlatformFlags] = useState({
-    featureWebsiteBuilder: true,
-    featureEstimateBuilder: true,
-    featureAiDescription: true,
-    featureAiInvoiceAssistant: true,
-    featureAdminAiAssistant: true,
-  });
   const websiteStatus = usePublishedWebsiteStatus(
     Boolean(authUser) &&
       String(authUser?.role || "").toLowerCase() !== "super_admin",
@@ -252,30 +258,6 @@ export default function AuthShell({ children }) {
     pathname,
     router,
   ]);
-
-  useEffect(() => {
-    if (isPublicPage) return;
-
-    let cancelled = false;
-
-    const loadFlags = async () => {
-      try {
-        const res = await apiFetch("/api/feature-flags", { suppressUnauthorizedEvent: true });
-        if (!res.ok) return;
-        const payload = await res.json().catch(() => null);
-        if (!payload?.success || !payload?.data || cancelled) return;
-        setPlatformFlags((prev) => ({ ...prev, ...payload.data }));
-      } catch {
-        // Non-blocking: keep defaults when flags endpoint is unavailable.
-      }
-    };
-
-    loadFlags();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isPublicPage]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -1427,14 +1409,7 @@ export default function AuthShell({ children }) {
 
   const isWebsiteBuilderRoute = Boolean(pathname?.startsWith("/website"));
 
-  return (
-    <AuthSessionProvider
-      authUser={authUser}
-      authChecked={authChecked}
-      refreshSession={fetchMe}
-    >
-    <TenantWorkspaceProvider initialWorkspace={authUser?.workspace ?? null}>
-    <WebsiteBuilderAiProvider>
+  const shellBody = (
     <div
       className="auth-shell"
       style={{
@@ -1926,6 +1901,8 @@ export default function AuthShell({ children }) {
         <AppFooter />
       </div>
 
+      {authUser ? <InstantNavigation /> : null}
+
       {authUser ? (
         <AiBubbleClient
           authUser={authUser}
@@ -1958,8 +1935,21 @@ export default function AuthShell({ children }) {
       `}</style>
 
     </div>
-    </WebsiteBuilderAiProvider>
-    </TenantWorkspaceProvider>
+  );
+
+  return (
+    <AuthSessionProvider
+      authUser={authUser}
+      authChecked={authChecked}
+      refreshSession={fetchMe}
+    >
+      <TenantWorkspaceProvider initialWorkspace={authUser?.workspace ?? null}>
+        {isWebsiteBuilderRoute ? (
+          <WebsiteBuilderAiProvider>{shellBody}</WebsiteBuilderAiProvider>
+        ) : (
+          shellBody
+        )}
+      </TenantWorkspaceProvider>
     </AuthSessionProvider>
   );
 }

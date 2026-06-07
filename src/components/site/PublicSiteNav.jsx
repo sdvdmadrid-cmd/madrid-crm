@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getPublicSiteCopy } from "@/lib/public-site-copy";
 import { PUBLIC_SITE_NAV_LINKS, parseInPageHash } from "@/lib/public-site-navigation";
 
@@ -31,7 +32,7 @@ export default function PublicSiteNav({
       <Link href={`/sites/${slug}`} className="s-logo">
         <div className="s-logo-icon" style={{ background: themeColor }}>
           {logoUrl ? (
-            <img src={logoUrl} alt="" />
+            <Image src={logoUrl} alt="" width={64} height={64} unoptimized />
           ) : (
             <svg viewBox="0 0 24 24" fill="none" style={{ width: 18, height: 18 }}>
               <path

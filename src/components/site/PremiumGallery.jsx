@@ -2,6 +2,7 @@
 
 
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import BeforeAfterCompare from "@/components/site/BeforeAfterCompare";
@@ -94,32 +95,23 @@ function GalleryTile({ photo, index, onOpen, hideFailedPlaceholder = false, onLo
 
         {status === "loading" ? <div className="ps-gallery-skeleton" aria-hidden /> : null}
 
-        <img
-
+        <Image
           src={src}
-
           alt={photo.alt || `Project ${index + 1}`}
-
+          fill
+          sizes="(max-width: 720px) 50vw, 33vw"
+          unoptimized={src.startsWith("data:")}
           loading="lazy"
-
-          decoding="async"
-
           onLoad={() => setStatus("loaded")}
-
           onError={() => {
             setStatus("error");
           }}
-
           className={status === "loaded" ? "ps-loaded" : ""}
-
           style={{
-
+            objectFit: "cover",
             opacity: status === "loaded" ? 1 : 0,
-
             transition: "opacity 0.4s ease",
-
           }}
-
         />
 
         <span className="ps-gallery-expand-hint" aria-hidden>
@@ -282,7 +274,15 @@ function Lightbox({ photos, index, onClose, onNav }) {
 
         ) : null}
 
-        <img src={photo.src} alt={photo.alt || ""} className="ps-lightbox-img" draggable={false} />
+        <Image
+          src={photo.src}
+          alt={photo.alt || ""}
+          className="ps-lightbox-img"
+          width={1600}
+          height={1200}
+          unoptimized={String(photo.src || "").startsWith("data:")}
+          draggable={false}
+        />
 
         {photos.length > 1 ? (
 

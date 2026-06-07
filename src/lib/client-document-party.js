@@ -13,6 +13,13 @@ function toText(value) {
   return String(value ?? "").trim();
 }
 
+/** estimates.client_id may be legacy bigint — never write UUIDs into that column. */
+function resolveEstimateDbClientId(existingId) {
+  const existing = toText(existingId);
+  if (existing && /^\d+$/.test(existing)) return existing;
+  return null;
+}
+
 export function partyFieldsFromClient(client = {}, overrides = {}) {
   return buildInvoicePartyDbFields(client, overrides);
 }
@@ -145,7 +152,7 @@ export async function attachFreshPartyToEstimateDbRow(
 
   return {
     ...row,
-    client_id: toText(row.client_id) || client.id,
+    client_id: resolveEstimateDbClientId(row.client_id),
     notes: stringifyEstimateNotes({
       address: toText(parsed.address) || party.property_address,
       noteText: parsed.noteText,

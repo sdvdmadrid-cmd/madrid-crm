@@ -66,7 +66,7 @@ describe("client-document-party", () => {
       notes: JSON.stringify({ noteText: "Scope work" }),
     });
 
-    assert.equal(row.client_id, "client-uuid-1");
+    assert.equal(row.client_id, null);
     const parsed = parseEstimateNotes(row.notes);
     assert.equal(parsed.clientUuid, "client-uuid-1");
     assert.match(parsed.address, /100 Oak St/);
