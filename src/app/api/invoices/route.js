@@ -30,50 +30,13 @@ import {
   resolveClientForInvoiceParty,
 } from "@/lib/invoice-party";
 import { normalizeInvoiceLineItemsForSave } from "@/lib/invoice-line-items";
-import { normalizeBaseNumber } from "@/lib/quote-numbering";
+import { listInvoicesForTenant, serializeInvoiceRow } from "@/lib/invoices-list-server";
 
 const INVOICES = "invoices";
 
-function serialize(doc) {
-  const amount = Number(
-    doc.amount ?? (Number(doc.total_cents || 0) / 100 || 0),
-  );
-  const base = {
-    _id: doc.id,
-    id: doc.id,
-    tenantId: doc.tenant_id || "",
-    userId: doc.user_id || null,
-    invoiceNumber: doc.invoice_number || "",
-    invoiceTitle: doc.invoice_title || "",
-    quoteId: doc.quote_id || null,
-    quoteNumber: doc.quote_number || "",
-    jobId: doc.job_id || "",
-    clientId: doc.client_id || "",
-    clientName: doc.client_name || "",
-    clientEmail: doc.client_email || "",
-    clientPhone: doc.client_phone || "",
-    clientAddress: doc.client_address || "",
-    propertyAddress: doc.property_address || "",
-    amount: amount ? String(amount) : "",
-    dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
-    lineItems: Array.isArray(doc.items) ? doc.items : [],
-    notes: doc.notes || "",
-    preferredPaymentMethod: normalizePaymentMethod(
-      doc.preferred_payment_method,
-    ),
-    payments: Array.isArray(doc.payments) ? doc.payments : [],
-    paidAmount: Number(doc.paid_amount || 0),
-    balanceDue: Number(doc.balance_due || 0),
-    status: doc.status || "Unpaid",
-    createdAt: doc.created_at || null,
-    updatedAt: doc.updated_at || null,
-  };
+import { normalizeBaseNumber } from "@/lib/quote-numbering";
 
-  return {
-    ...base,
-    ...computeInvoicePaymentState(base),
-  };
-}
+const serialize = serializeInvoiceRow;
 
 /**
  * Allocate the next INV-#### for this tenant. Uses MAX(numeric
@@ -118,6 +81,19 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const { paginate, page, limit, from, to } =
       getListPaginationParams(searchParams);
+
+    if (paginate) {
+      const payload = await listInvoicesForTenant({
+        tenantDbId,
+        role,
+        page,
+        limit,
+      });
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     let query = scopeByTenant(
       supabaseAdmin

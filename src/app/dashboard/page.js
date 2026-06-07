@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { apiFetch } from "@/lib/client-auth";
+import { useCachedApiFetch } from "@/hooks/useCachedApiFetch";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import GettingStartedChecklist from "@/components/workspace/GettingStartedChecklist";
 import PaymentsReadinessBanner from "@/components/workspace/PaymentsReadinessBanner";
@@ -78,95 +78,63 @@ export default function RevenueDashboardPage() {
   const { t } = useTranslation();
   const router = useRouter();
   const { authUser } = useCurrentUserAccess();
-  const [loading, setLoading] = useState(true);
   const userName = String(authUser?.name || "").trim();
-  const [metrics, setMetrics] = useState(null);
-  const [metricsError, setMetricsError] = useState("");
-  const [revenueData, setRevenueData] = useState({
-    totalRevenue: 0,
-    totalPayments: 0,
-    recentPayments: [],
+  const sessionReady = Boolean(authUser?.userId);
+  const cacheScope = authUser?.userId || "anon";
+
+  const {
+    data: metricsPayload,
+    loading: metricsLoading,
+    error: metricsFetchError,
+  } = useCachedApiFetch(`dashboard:metrics:${cacheScope}`, "/api/dashboard-metrics", {
+    ttlMs: 120_000,
+    enabled: sessionReady,
   });
-  const [revenueUnavailable, setRevenueUnavailable] = useState(false);
-  const [paymentsOnboarded, setPaymentsOnboarded] = useState(false);
-  const [connectStatus, setConnectStatus] = useState(null);
+
+  const {
+    data: revenuePayload,
+    loading: revenueLoading,
+  } = useCachedApiFetch(
+    `dashboard:revenue:10:${cacheScope}`,
+    "/api/revenue-dashboard?limit=10",
+    { ttlMs: 120_000, enabled: sessionReady },
+  );
+
+  const {
+    data: connectPayload,
+    loading: connectLoading,
+  } = useCachedApiFetch(
+    `dashboard:connect:${cacheScope}`,
+    "/api/payments/connect/status",
+    { ttlMs: 90_000,
+      enabled: sessionReady,
+    },
+  );
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadDashboard() {
-      setLoading(true);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12_000);
-
-      let requests;
-      try {
-        requests = await Promise.allSettled([
-          apiFetch("/api/dashboard-metrics", { signal: controller.signal, suppressUnauthorizedEvent: true }),
-          apiFetch("/api/revenue-dashboard?limit=10", { signal: controller.signal, suppressUnauthorizedEvent: true }),
-          apiFetch("/api/payments/connect/status", {
-            signal: controller.signal,
-            suppressUnauthorizedEvent: true,
-          }),
-        ]);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-
-      if (cancelled) return;
-
-      const [metricsResult, revenueResult, connectResult] = requests;
-
-      const sessionRole = String(authUser?.role || "").toLowerCase();
-      if (sessionRole === "super_admin") {
-        router.replace("/owner/overview");
-        return;
-      }
-
-      if (metricsResult.status === "fulfilled" && metricsResult.value.ok) {
-        const payload = await metricsResult.value.json().catch(() => null);
-        setMetrics(payload || null);
-        setMetricsError("");
-      } else {
-        setMetrics(null);
-        setMetricsError(
-          metricsResult.status === "rejected"
-            ? "Unable to load dashboard metrics."
-            : "Dashboard metrics unavailable.",
-        );
-      }
-
-      if (connectResult?.status === "fulfilled" && connectResult.value.ok) {
-        const connectPayload = await connectResult.value.json().catch(() => null);
-        setConnectStatus(connectPayload?.data || null);
-        setPaymentsOnboarded(Boolean(connectPayload?.data?.onboarded));
-      }
-
-      if (revenueResult.status === "fulfilled" && revenueResult.value.ok) {
-        const payload = await revenueResult.value.json().catch(() => null);
-        setRevenueData({
-          totalRevenue: Number(payload?.totalRevenue || 0),
-          totalPayments: Number(payload?.totalPayments || 0),
-          recentPayments: Array.isArray(payload?.recentPayments)
-            ? payload.recentPayments
-            : [],
-        });
-        setRevenueUnavailable(false);
-      } else {
-        setRevenueUnavailable(true);
-        setRevenueData({ totalRevenue: 0, totalPayments: 0, recentPayments: [] });
-      }
-
-      setLoading(false);
+    if (String(authUser?.role || "").toLowerCase() === "super_admin") {
+      router.replace("/owner/overview");
     }
+  }, [authUser?.role, router]);
 
-    loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router, authUser?.role, authUser?.userId]);
+  const loading = sessionReady && (metricsLoading || revenueLoading || connectLoading) && !metricsPayload;
+  const metrics = metricsPayload || null;
+  const metricsError = metricsFetchError
+    ? "Unable to load dashboard metrics."
+    : metricsPayload ? "" : metricsLoading ? "" : "Dashboard metrics unavailable.";
+  const revenueData = useMemo(
+    () => ({
+      totalRevenue: Number(revenuePayload?.totalRevenue || 0),
+      totalPayments: Number(revenuePayload?.totalPayments || 0),
+      recentPayments: Array.isArray(revenuePayload?.recentPayments)
+        ? revenuePayload.recentPayments
+        : [],
+    }),
+    [revenuePayload],
+  );
+  const revenueUnavailable = sessionReady && !revenueLoading && !revenuePayload;
+  const connectStatus = connectPayload?.data || null;
+  const paymentsOnboarded = Boolean(connectStatus?.onboarded);
 
   const activeJobs = metrics?.jobs?.active ?? 0;
   const pendingEstimates = metrics?.estimateRequests?.newCount ?? 0;
