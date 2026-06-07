@@ -1,4 +1,5 @@
 import { attachFreshPartyToJobDbRow } from "@/lib/client-document-party";
+import { listJobsForTenant, serializeJobRow } from "@/lib/jobs-list-server";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -14,40 +15,7 @@ import { getListPaginationParams, scopeByTenant, applyUnpaginatedSafetyLimit } f
 
 const JOBS = "jobs";
 
-const serialize = (doc) => ({
-  _id: doc.id,
-  id: doc.id,
-  tenantId: doc.tenant_id || "",
-  userId: doc.user_id || null,
-  title: doc.title || "",
-  description: doc.description || "",
-  clientId: doc.client_id || "",
-  clientName: doc.client_name || "",
-  service: doc.service || "",
-  status: doc.status || "Pending",
-  price: doc.price || "",
-  dueDate: doc.due_date || "",
-  taxState: doc.tax_state || "",
-  downPaymentPercent: doc.down_payment_percent || "0",
-  scopeDetails: doc.scope_details || "",
-  squareMeters: doc.square_meters || "",
-  complexity: doc.complexity || "standard",
-  materialsIncluded:
-    typeof doc.materials_included === "boolean" ? doc.materials_included : true,
-  travelMinutes: doc.travel_minutes || "",
-  urgency: doc.urgency || "flexible",
-  estimateSnapshot: doc.estimate_snapshot || null,
-  laborCostTotal: Number(doc.labor_cost_total || 0),
-  laborHoursTotal: Number(doc.labor_hours_total || 0),
-  laborBurdenTotal: Number(doc.labor_burden_total || 0),
-  quoteToken: doc.quote_token || null,
-  quoteSharedAt: doc.quote_shared_at || null,
-  quoteSentAt: doc.quote_sent_at || null,
-  quoteSentTo: doc.quote_sent_to || "",
-  invoiced: typeof doc.invoiced === "boolean" ? doc.invoiced : false,
-  createdAt: doc.created_at || null,
-  updatedAt: doc.updated_at || null,
-});
+const serialize = serializeJobRow;
 
 function buildInsertRow(body, tenantId, userId) {
   const now = new Date().toISOString();
@@ -92,6 +60,26 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const { paginate, page, limit, from, to } =
       getListPaginationParams(searchParams);
+
+    if (paginate) {
+      const payload = await listJobsForTenant({
+        tenantDbId,
+        role,
+        page,
+        limit,
+      });
+      trackMarketingEvent("jobs_view", {
+        tenantId: tenantDbId,
+        role,
+        page: payload.page,
+        limit: payload.limit,
+        total: payload.total,
+      });
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     let query = scopeByTenant(
       supabaseAdmin

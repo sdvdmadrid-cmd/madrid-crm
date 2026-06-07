@@ -4,12 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/client-auth";
 import { formatLocalDate, parseYmdToLocalDate, todayLocalYmd } from "@/lib/local-date";
 
-// ─── Client-side in-memory cache (survives re-renders, cleared on page refresh)
 const clientCache = new Map();
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
-const MAX_WEATHER_IN_FLIGHT = 4;
+const CACHE_TTL_MS = 15 * 60 * 1000;
 const MAX_APPOINTMENT_WEATHER = 12;
 const MAX_CALENDAR_DAY_WEATHER = 8;
+const BATCH_FLUSH_MS = 40;
 
 function getCached(key) {
   const entry = clientCache.get(key);
@@ -25,87 +24,116 @@ function setClientCache(key, data) {
   clientCache.set(key, { ts: Date.now(), data });
 }
 
-// Stable map key
 export function weatherKey(location, date) {
   if (!location || !date) return null;
   return `${String(location).toLowerCase().trim()}::${date}`;
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useWeather(
   appointments,
   { calendarDays = [], defaultLocation = "", forecastDates = [] } = {},
 ) {
   const [weatherMap, setWeatherMap] = useState(new Map());
-  const fetchingRef = useRef(new Set());
-  const queueRef = useRef([]);
-  const activeRef = useRef(0);
+  const pendingBatchRef = useRef(new Map());
+  const batchTimerRef = useRef(null);
+  const inflightBatchRef = useRef(null);
 
-  const fetchOne = useCallback(async (location, date) => {
-    const key = weatherKey(location, date);
-    if (!key || fetchingRef.current.has(key)) return;
+  const applyResults = useCallback((entries) => {
+    if (!entries || entries.length === 0) return;
+    setWeatherMap((prev) => {
+      const next = new Map(prev);
+      for (const [key, data] of entries) {
+        next.set(key, data);
+      }
+      return next;
+    });
+  }, []);
 
-    const cached = getCached(key);
-    if (cached !== undefined) {
-      setWeatherMap((prev) => {
-        if (prev.get(key) === cached) return prev;
-        const next = new Map(prev);
-        next.set(key, cached);
-        return next;
-      });
+  const flushBatch = useCallback(async () => {
+    if (inflightBatchRef.current) {
+      await inflightBatchRef.current;
       return;
     }
 
-    fetchingRef.current.add(key);
-    try {
-      const params = new URLSearchParams({ location, date });
-      const res = await apiFetch(`/api/weather?${params}`);
-      if (!res.ok) {
-        setClientCache(key, null);
-        setWeatherMap((prev) => {
-          const next = new Map(prev);
-          next.set(key, null);
-          return next;
-        });
-        return;
-      }
-      const data = await res.json();
-      setClientCache(key, data);
-      setWeatherMap((prev) => {
-        const next = new Map(prev);
-        next.set(key, data);
-        return next;
-      });
-    } catch (err) {
-      console.warn("[useWeather] failed for", key, err.message);
-    } finally {
-      fetchingRef.current.delete(key);
-    }
-  }, []);
+    const items = [...pendingBatchRef.current.values()];
+    pendingBatchRef.current.clear();
+    if (items.length === 0) return;
 
-  const pumpQueue = useCallback(() => {
-    while (activeRef.current < MAX_WEATHER_IN_FLIGHT && queueRef.current.length > 0) {
-      const { location, date } = queueRef.current.shift();
-      const key = weatherKey(location, date);
-      if (!key || fetchingRef.current.has(key) || getCached(key) !== undefined) {
-        continue;
+    const uncached = items.filter((item) => {
+      const key = weatherKey(item.location, item.date);
+      return key && getCached(key) === undefined;
+    });
+
+    for (const item of items) {
+      const key = weatherKey(item.location, item.date);
+      const cached = key ? getCached(key) : undefined;
+      if (key && cached !== undefined) {
+        applyResults([[key, cached]]);
       }
-      activeRef.current += 1;
-      fetchOne(location, date).finally(() => {
-        activeRef.current -= 1;
-        pumpQueue();
-      });
     }
-  }, [fetchOne]);
+
+    if (uncached.length === 0) return;
+
+    inflightBatchRef.current = (async () => {
+      try {
+        const res = await apiFetch("/api/weather/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: uncached }),
+        });
+        if (!res.ok) {
+          for (const item of uncached) {
+            const key = weatherKey(item.location, item.date);
+            if (!key) continue;
+            setClientCache(key, null);
+            applyResults([[key, null]]);
+          }
+          return;
+        }
+        const payload = await res.json();
+        const results = payload?.results || {};
+        const entries = [];
+        for (const item of uncached) {
+          const key = weatherKey(item.location, item.date);
+          const resultKey = key;
+          const clientKey = `${String(item.location).toLowerCase().trim()}::${item.date}`;
+          const data = results[clientKey] ?? results[resultKey] ?? null;
+          if (key) {
+            setClientCache(key, data);
+            entries.push([key, data]);
+          }
+        }
+        applyResults(entries);
+      } catch (err) {
+        console.warn("[useWeather] batch failed", err.message);
+      } finally {
+        inflightBatchRef.current = null;
+      }
+    })();
+
+    await inflightBatchRef.current;
+  }, [applyResults]);
 
   const enqueueWeather = useCallback(
     (location, date) => {
       const key = weatherKey(location, date);
       if (!key) return;
-      queueRef.current.push({ location, date });
-      pumpQueue();
+
+      const cached = getCached(key);
+      if (cached !== undefined) {
+        applyResults([[key, cached]]);
+        return;
+      }
+
+      pendingBatchRef.current.set(key, { location, date });
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+      }
+      batchTimerRef.current = setTimeout(() => {
+        void flushBatch();
+      }, BATCH_FLUSH_MS);
     },
-    [pumpQueue],
+    [applyResults, flushBatch],
   );
 
   useEffect(() => {
@@ -153,6 +181,13 @@ export function useWeather(
       enqueueWeather(defaultLocation, date);
     }
   }, [defaultLocation, enqueueWeather, forecastDates]);
+
+  useEffect(
+    () => () => {
+      if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
+    },
+    [],
+  );
 
   const getWeather = useCallback(
     (location, date) => {

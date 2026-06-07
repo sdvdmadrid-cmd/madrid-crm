@@ -20,7 +20,7 @@ test("active address forms import PlacesAutocomplete", () => {
     "src/components/clients/ClientForm.js",
     "src/app/estimates/new/page.js",
     "src/components/calendar/AppointmentModal.jsx",
-    "src/app/jobs/page.js",
+    "src/app/jobs/JobsPageClient.js",
   ]) {
     const src = readFileSync(path.join(root, file), "utf8");
     assert.match(src, /PlacesAutocomplete/);
