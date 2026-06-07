@@ -439,7 +439,7 @@ export default function EstimatesPageClient({ initialList = null }) {
   ];
 
   return (
-    <div className={`${ws.page} ${ws.pageFullBleed}`}>
+    <main className={`${ws.page} ${ws.pageFullBleed}`}>
       <div className={ws.topBar}>
         <div>
           <h1 className={ws.title}>{t("estimatesPage.title")}</h1>
@@ -1110,6 +1110,6 @@ export default function EstimatesPageClient({ initialList = null }) {
           </>
         ) : null}
       </div>
-    </div>
+    </main>
   );
 }

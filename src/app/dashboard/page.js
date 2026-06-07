@@ -374,7 +374,7 @@ export default function RevenueDashboardPage() {
                 <p className={styles.metricHint}>{t("dashboardControl.metrics.revenueHint")}</p>
               </article>
 
-              <Link href="/jobs" className={`${styles.metricHero} ${styles.metricLink}`} data-testid="dashboard-metric-active-jobs">
+              <Link href="/jobs" className={`${styles.metricHero} ${styles.metricLink}`} data-testid="dashboard-metric-active-jobs" data-disable-instant-nav="true">
                 <div className={styles.metricHead}>
                   <BriefcaseIcon />
                   <p className={styles.metricLabel}>{t("dashboardControl.metrics.activeJobs")}</p>
@@ -387,6 +387,7 @@ export default function RevenueDashboardPage() {
                 href="/lead-inbox"
                 className={`${styles.metricHero} ${styles.metricLink}`}
                 data-testid="dashboard-metric-inbox"
+                data-disable-instant-nav="true"
               >
                 <div className={styles.metricHead}>
                   <ClockIcon />
