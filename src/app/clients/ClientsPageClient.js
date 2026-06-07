@@ -11,6 +11,7 @@ import {
   getClientsListMeta,
   normalizeClientsListPayload,
 } from "@/lib/clients-list-response";
+import { filterAndRankRecords } from "@/lib/record-search";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientFormModal from "@/components/clients/ClientFormModal";

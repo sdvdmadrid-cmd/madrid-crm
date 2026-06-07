@@ -58,3 +58,11 @@ test("public site gallery uses next/image", () => {
   assert.match(src, /from "next\/image"/);
   assert.doesNotMatch(src, /<img\s/);
 });
+
+test("clients page client imports record search helper", () => {
+  const src = readFileSync(
+    path.join(root, "src/app/clients/ClientsPageClient.js"),
+    "utf8",
+  );
+  assert.match(src, /filterAndRankRecords/);
+});
