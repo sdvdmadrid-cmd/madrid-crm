@@ -343,6 +343,26 @@ export default function EstimatesPageClient({ initialList = null }) {
     setPendingStatusAction(null);
   }
 
+  const openEstimateDetail = useCallback(async (estimate) => {
+    setContractEstimate(null);
+    setContractPrintBody("");
+    setContractSavedId("");
+    setContractMessage("");
+    setSelectedEstimate(estimate);
+    if (!estimate?.id) return;
+    try {
+      const response = await apiFetch(`/api/estimates/${estimate.id}`, {
+        suppressUnauthorizedEvent: true,
+      });
+      const payload = await getJsonOrThrow(response, "Unable to load estimate.");
+      if (payload?.data) {
+        setSelectedEstimate(payload.data);
+      }
+    } catch {
+      // Keep list snapshot when detail refresh fails.
+    }
+  }, []);
+
   async function convertEstimateToJob(estimate) {
     if (!estimate?.id) return;
     setConvertingId(estimate.id);
@@ -541,13 +561,7 @@ export default function EstimatesPageClient({ initialList = null }) {
                       <button
                         key={estimate.id}
                         type="button"
-                        onClick={() => {
-                          setContractEstimate(null);
-                          setContractPrintBody("");
-                          setContractSavedId("");
-                          setContractMessage("");
-                          setSelectedEstimate(estimate);
-                        }}
+                        onClick={() => openEstimateDetail(estimate)}
                         className={est.estimateCard}
                       >
                         <div className={est.cardClient}>
