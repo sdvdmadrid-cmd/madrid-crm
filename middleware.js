@@ -210,6 +210,7 @@ const PUBLIC_FAST_PATH_PREFIXES = [
   "/api/auth/reset-password",
   "/api/auth/verify-email",
   "/api/auth/resend-verification",
+  "/api/auth/dev-login",
   "/_next/",
   "/favicon.ico",
   "/robots.txt",
