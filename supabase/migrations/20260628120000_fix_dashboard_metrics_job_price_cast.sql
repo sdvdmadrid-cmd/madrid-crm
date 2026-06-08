@@ -1,6 +1,6 @@
 begin;
 
--- Support mixed tenant_id column types (uuid vs text) across legacy deployments.
+-- jobs.price is text in production; parse safely and keep tenant_id::text casts.
 create or replace function public.get_dashboard_metrics(
   p_tenant_id uuid
 )

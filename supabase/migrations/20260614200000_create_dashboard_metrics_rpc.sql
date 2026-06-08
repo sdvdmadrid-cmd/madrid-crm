@@ -9,6 +9,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_tenant text := p_tenant_id::text;
   v_clients_total integer := 0;
   v_clients_won integer := 0;
   v_clients_estimate_sent integer := 0;
@@ -33,70 +34,79 @@ begin
   end if;
 
   select count(*)::int into v_clients_total
-  from public.clients where tenant_id = p_tenant_id;
+  from public.clients where tenant_id::text = v_tenant;
 
   select count(*)::int into v_clients_won
   from public.clients
-  where tenant_id = p_tenant_id and lead_status = 'won';
+  where tenant_id::text = v_tenant and lead_status = 'won';
 
   select count(*)::int into v_clients_estimate_sent
   from public.clients
-  where tenant_id = p_tenant_id and estimate_sent is true;
+  where tenant_id::text = v_tenant and estimate_sent is true;
 
   select count(*)::int into v_jobs_total
-  from public.jobs where tenant_id = p_tenant_id;
+  from public.jobs where tenant_id::text = v_tenant;
 
   select count(*)::int into v_jobs_active
   from public.jobs
-  where tenant_id = p_tenant_id and status in ('Active', 'In Progress');
+  where tenant_id::text = v_tenant and status in ('Active', 'In Progress');
 
   select count(*)::int into v_jobs_pending_draft
   from public.jobs
-  where tenant_id = p_tenant_id and status in ('Pending', 'Draft');
+  where tenant_id::text = v_tenant and status in ('Pending', 'Draft');
 
   select count(*)::int into v_jobs_pending_invoice
   from public.jobs
-  where tenant_id = p_tenant_id
+  where tenant_id::text = v_tenant
     and status = 'Completed'
     and coalesce(invoiced, false) = false;
 
   select count(*)::int into v_invoices_total
-  from public.invoices where tenant_id = p_tenant_id;
+  from public.invoices where tenant_id::text = v_tenant;
 
   select count(*)::int into v_invoices_unpaid
   from public.invoices
-  where tenant_id = p_tenant_id and status in ('Unpaid', 'Sent');
+  where tenant_id::text = v_tenant and status in ('Unpaid', 'Sent');
 
   select count(*)::int into v_invoices_draft
   from public.invoices
-  where tenant_id = p_tenant_id and status = 'Draft';
+  where tenant_id::text = v_tenant and status = 'Draft';
 
   select count(*)::int into v_invoices_overdue
   from public.invoices
-  where tenant_id = p_tenant_id and status in ('Overdue', 'Past Due');
+  where tenant_id::text = v_tenant and status in ('Overdue', 'Past Due');
 
   select count(*)::int into v_contracts_total
-  from public.contracts where tenant_id = p_tenant_id;
+  from public.contracts where tenant_id::text = v_tenant;
 
   select count(*)::int into v_contracts_active
   from public.contracts
-  where tenant_id = p_tenant_id and status <> 'Cancelled';
+  where tenant_id::text = v_tenant and status <> 'Cancelled';
 
   select count(*)::int into v_estimate_requests_total
-  from public.estimate_requests where tenant_id = p_tenant_id;
+  from public.estimate_requests where tenant_id::text = v_tenant;
 
   select count(*)::int into v_estimate_requests_new
   from public.estimate_requests
-  where tenant_id = p_tenant_id and status = 'new';
+  where tenant_id::text = v_tenant and status = 'new';
 
   select count(*)::int into v_website_leads_new
   from public.contractor_website_leads
-  where tenant_id = p_tenant_id and status = 'new';
+  where tenant_id::text = v_tenant and status = 'new';
 
-  select coalesce(sum(coalesce(price, 0)), 0)::numeric(14,2)
+  select coalesce(sum(
+    coalesce(
+      case
+        when nullif(trim(price), '') ~ '^-?[0-9]+(\.[0-9]+)?$'
+          then nullif(trim(price), '')::numeric
+        else 0
+      end,
+      0
+    )
+  ), 0)::numeric(14,2)
   into v_total_revenue
   from public.jobs
-  where tenant_id = p_tenant_id;
+  where tenant_id::text = v_tenant;
 
   select coalesce(
     sum(coalesce(balance_due, amount, 0)),
@@ -104,7 +114,7 @@ begin
   )::numeric(14,2)
   into v_outstanding
   from public.invoices
-  where tenant_id = p_tenant_id
+  where tenant_id::text = v_tenant
     and coalesce(balance_due, 0) > 0;
 
   return jsonb_build_object(
