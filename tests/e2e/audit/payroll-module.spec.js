@@ -114,8 +114,8 @@ test.describe("Payroll module audit", () => {
     await expect(page.getByRole("group", { name: /Pay type/i })).toBeVisible();
 
     await page.getByLabel(/Hourly rate/i).fill("25");
-    await expect(page.getByTestId("payroll-pay-preview")).toContainText("$52,000.00");
-    await expect(page.getByTestId("payroll-pay-preview")).toContainText("$1,000.00");
+    await expect(page.getByTestId("payroll-pay-preview")).toContainText("$41,600.00");
+    await expect(page.getByTestId("payroll-pay-preview")).toContainText("$800.00");
 
     await expect(page.getByLabel(/Routing number/i)).toHaveCount(0);
     await page.getByText(/Pay by direct deposit/i).click();

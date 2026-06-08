@@ -171,14 +171,14 @@ export default function AppointmentModal({
       setForm(nextForm);
       const parsed = parseLocationToAddressParts(nextForm.location);
       const hasGeo =
-        typeof appointment?.latitude === "number" &&
-        typeof appointment?.longitude === "number";
+        typeof existingAppointment?.latitude === "number" &&
+        typeof existingAppointment?.longitude === "number";
       setAddress({
         ...parsed,
-        latitude: hasGeo ? appointment.latitude : null,
-        longitude: hasGeo ? appointment.longitude : null,
-        placeId: appointment?.addressPlaceId || "",
-        verified: Boolean(hasGeo && appointment?.addressPlaceId),
+        latitude: hasGeo ? existingAppointment.latitude : null,
+        longitude: hasGeo ? existingAppointment.longitude : null,
+        placeId: existingAppointment?.addressPlaceId || "",
+        verified: Boolean(hasGeo && existingAppointment?.addressPlaceId),
       });
       setIsEditMode(false);
     } else {

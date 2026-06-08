@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
+const { devLogin } = require("../helpers/auth");
 
 const MOBILE = { width: 390, height: 844 };
 
@@ -7,11 +8,7 @@ test.describe("Mobile workflow shells @audit", () => {
   test.use({ viewport: MOBILE });
 
   test.beforeEach(async ({ page }) => {
-    await page.goto("/login");
-    await page.getByLabel(/email/i).fill(process.env.E2E_EMAIL || "owner@madrid.test");
-    await page.getByLabel(/password/i).fill(process.env.E2E_PASSWORD || "test-password-1");
-    await page.getByRole("button", { name: /sign in|log in/i }).click();
-    await page.waitForURL(/\/(dashboard|jobs|clients)/, { timeout: 30_000 });
+    await devLogin(page);
   });
 
   test("dashboard loads on iPhone viewport", async ({ page }) => {

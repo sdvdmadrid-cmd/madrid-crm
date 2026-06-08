@@ -55,7 +55,6 @@ export function usePublishedWebsiteStatus(enabled = true) {
     const cached = readCache();
     if (cached?.loaded) {
       setStatus(cached);
-      return;
     }
 
     let cancelled = false;
