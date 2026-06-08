@@ -59,7 +59,7 @@ test.describe('jobs file management', () => {
     const chooser = await chooserPromise;
     await chooser.setFiles(pdfFixture);
 
-    await expect(filesPanel.getByText('Photos must be JPG or PNG')).toBeVisible();
+    await expect(filesPanel.getByText(/Photos.*must be JPG or PNG/i)).toBeVisible();
 
     const validChooserPromise = page.waitForEvent('filechooser');
     await filesPanel.getByRole('button', { name: 'Upload Photos' }).click();

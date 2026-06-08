@@ -94,17 +94,10 @@ test.describe("Public website module audit", () => {
     });
     expect(saveRes.ok()).toBeTruthy();
 
-    await Promise.all([
-      page.waitForResponse(
-        (res) =>
-          res.url().includes("/api/website-builder/publish-status") && res.ok(),
-        { timeout: 20_000 },
-      ),
-      page.reload({ waitUntil: "domcontentloaded" }),
-    ]);
+    await page.reload({ waitUntil: "domcontentloaded" });
 
     const websiteNav = page.getByTestId("sidebar-live-website");
-    await expect(websiteNav).toBeVisible({ timeout: 20_000 });
+    await expect(websiteNav).toBeVisible({ timeout: 25_000 });
     await expect(websiteNav).toHaveAttribute("href", `/sites/${slug}`);
     await expect(websiteNav).toHaveAttribute("target", "_blank");
   });

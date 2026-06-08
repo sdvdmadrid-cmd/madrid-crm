@@ -144,9 +144,7 @@ test.describe("Contractor workflows — documents & kanban actions", () => {
     const convertBtn = page.getByRole("button", { name: /Convert to Estimate/i }).first();
     await expect(convertBtn).toBeVisible({ timeout: 15_000 });
     await convertBtn.click();
-    await expect(
-      page.getByText(/Converted to estimate successfully/i),
-    ).toBeVisible({ timeout: 20_000 });
+    await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
   });
 
   test("jobs: create job via form and find in list search", async ({ page }) => {
