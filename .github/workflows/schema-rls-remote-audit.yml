@@ -1,0 +1,44 @@
+# Weekly live-database RLS audit (requires SUPABASE_DB_PASSWORD repository secret).
+name: Schema RLS Remote Audit
+
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: Remote public-schema RLS audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Link Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: npx supabase link --project-ref fhcbnupmdpphzdafmmgd --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Run remote RLS audit
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: npm run audit:schema-rls -- --remote-only --json-out=schema-rls-report.json
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-rls-report
+          path: schema-rls-report.json

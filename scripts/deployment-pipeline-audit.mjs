@@ -198,6 +198,28 @@ async function main() {
     warn("Vercel CLI", "vercel ls skipped (CLI not auth)");
   }
 
+  try {
+    execSync("npm run security:check:ci", { stdio: "pipe", encoding: "utf8" });
+    pass("Migration RLS security lint");
+  } catch (e) {
+    fail("Migration RLS security lint", String(e.stderr || e.stdout || e.message).slice(0, 200));
+  }
+
+  if (process.env.SUPABASE_DB_PASSWORD) {
+    try {
+      execSync("npm run audit:schema-rls -- --remote-only", {
+        stdio: "pipe",
+        encoding: "utf8",
+        env: process.env,
+      });
+      pass("Remote Supabase RLS audit");
+    } catch (e) {
+      fail("Remote Supabase RLS audit", String(e.stderr || e.stdout || e.message).slice(0, 200));
+    }
+  } else {
+    warn("Remote Supabase RLS audit", "SUPABASE_DB_PASSWORD not set in environment");
+  }
+
   const failed = results.filter((r) => !r.ok);
   console.log(`\nSummary: ${results.length - failed.length}/${results.length} passed`);
   if (failed.length) {

@@ -40,10 +40,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint migration RLS (full history)
-        run: npm run validate:migrations-rls
+      - name: Schema security check (migrations RLS lint)
+        run: npm run security:check:ci
 
-      - name: Lint migration RLS (changed files on PR)
+      - name: Schema security check (changed migration files)
         if: github.event_name == 'pull_request'
         run: npm run validate:migrations-rls:changed
 

@@ -1,0 +1,28 @@
+{
+  "$schema": "./rls-exceptions.schema.json",
+  "description": "Tables exempt from policy-count checks. serviceRoleOnly = RLS on, zero policies (API uses service role). publicAccessApproved = intentional anon/authenticated PostgREST access.",
+  "serviceRoleOnly": [
+    "auth_rate_limits",
+    "estimate_items",
+    "estimate_revisions",
+    "stripe_webhook_events"
+  ],
+  "publicAccessApproved": [
+    {
+      "table": "contractor_websites",
+      "reason": "Published marketing sites readable via anon policy"
+    },
+    {
+      "table": "contractor_website_leads",
+      "reason": "Public lead capture insert policy"
+    },
+    {
+      "table": "estimate_requests",
+      "reason": "Public website estimate request funnel"
+    },
+    {
+      "table": "subscription_plans",
+      "reason": "Authenticated plan catalog"
+    }
+  ]
+}

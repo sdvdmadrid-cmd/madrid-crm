@@ -42,6 +42,17 @@ if (lint.status !== 0) {
   process.exit(lint.status || 1);
 }
 
+const audit = spawnSync("node", ["scripts/audit-public-schema-rls.mjs"], {
+  shell: true,
+  stdio: "inherit",
+  cwd: root,
+  env: process.env,
+});
+if (audit.status !== 0) {
+  console.error("[migrations] Schema RLS audit failed — fix database or exceptions before db push.");
+  process.exit(audit.status || 1);
+}
+
 const which = spawnSync("npx", ["supabase", "--version"], { shell: true, encoding: "utf8" });
 if (which.status !== 0) {
   console.error("[migrations] Supabase CLI not available. Install: npm i -D supabase");

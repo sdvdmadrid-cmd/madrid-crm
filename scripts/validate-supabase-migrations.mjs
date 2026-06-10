@@ -115,11 +115,26 @@ if (rlsQuery.status === 0) {
     }
     process.exit(1);
   }
-  console.log("[validate] Remote RLS audit OK — no public tables with RLS disabled.");
+  console.log("[validate] Remote RLS disabled check OK — no public tables with RLS off.");
 } else {
   console.warn(
-    "[validate] Skipped remote RLS audit (supabase db query unavailable in this environment).",
+    "[validate] Skipped remote RLS disabled check (supabase db query unavailable).",
   );
+}
+
+const fullAudit = spawnSync(
+  "node",
+  ["scripts/audit-public-schema-rls.mjs", "--remote-only"],
+  { shell: true, encoding: "utf8", cwd: root, env: process.env },
+);
+
+if (fullAudit.status === 0) {
+  console.log("[validate] Full remote schema RLS audit OK.");
+} else if (String(process.env.SUPABASE_DB_PASSWORD || "").trim()) {
+  console.error((fullAudit.stdout || "") + (fullAudit.stderr || ""));
+  process.exit(fullAudit.status || 1);
+} else {
+  console.warn("[validate] Skipped full remote schema RLS audit (no SUPABASE_DB_PASSWORD).");
 }
 
 process.exit(0);
