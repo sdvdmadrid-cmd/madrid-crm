@@ -16,6 +16,8 @@
     "db:migrate": "node scripts/apply-supabase-migrations.mjs",
     "db:setup": "node scripts/supabase-cli-setup.mjs",
     "db:validate": "node scripts/validate-supabase-migrations.mjs",
+    "validate:migrations-rls": "node scripts/validate-migration-rls.mjs",
+    "validate:migrations-rls:changed": "node scripts/validate-migration-rls.mjs --changed",
     "db:apply-connect": "node -e \"console.log('Paste scripts/apply-connect-columns-only.sql in Supabase SQL Editor, or run: SUPABASE_DB_PASSWORD=*** npx supabase db query --linked -f scripts/apply-connect-columns-only.sql')\"",
     "stripe:check": "node scripts/check-stripe-key.mjs",
     "verify:prod": "node scripts/verify-production.mjs",

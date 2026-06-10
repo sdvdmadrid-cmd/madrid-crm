@@ -1,0 +1,48 @@
+-- COPY THIS PATTERN for every new public table (required by CI: validate:migrations-rls).
+-- Rename file to YYYYMMDDHHMMSS_your_feature.sql before committing.
+
+begin;
+
+create table if not exists public.example_items (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null,
+  label text not null default '',
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists example_items_tenant_idx
+  on public.example_items (tenant_id);
+
+-- REQUIRED: enable RLS in the same migration file as CREATE TABLE
+alter table public.example_items enable row level security;
+alter table public.example_items force row level security;
+
+create policy example_items_tenant_select
+  on public.example_items
+  for select
+  to authenticated
+  using (public.is_tenant_member(tenant_id));
+
+create policy example_items_tenant_insert
+  on public.example_items
+  for insert
+  to authenticated
+  with check (public.is_tenant_member(tenant_id));
+
+create policy example_items_tenant_update
+  on public.example_items
+  for update
+  to authenticated
+  using (public.is_tenant_member(tenant_id))
+  with check (public.is_tenant_member(tenant_id));
+
+create policy example_items_tenant_delete
+  on public.example_items
+  for delete
+  to authenticated
+  using (public.is_tenant_member(tenant_id) and public.is_admin_profile());
+
+notify pgrst, 'reload schema';
+
+commit;

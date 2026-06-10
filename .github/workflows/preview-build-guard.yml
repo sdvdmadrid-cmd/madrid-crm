@@ -40,5 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint migration RLS (full history)
+        run: npm run validate:migrations-rls
+
+      - name: Lint migration RLS (changed files on PR)
+        if: github.event_name == 'pull_request'
+        run: npm run validate:migrations-rls:changed
+
       - name: Build
         run: npm run build

@@ -32,6 +32,16 @@ const files = fs
 
 console.log(`[migrations] Found ${files.length} SQL files.`);
 
+const lint = spawnSync("node", ["scripts/validate-migration-rls.mjs"], {
+  shell: true,
+  stdio: "inherit",
+  cwd: root,
+});
+if (lint.status !== 0) {
+  console.error("[migrations] RLS lint failed — fix migrations before db push.");
+  process.exit(lint.status || 1);
+}
+
 const which = spawnSync("npx", ["supabase", "--version"], { shell: true, encoding: "utf8" });
 if (which.status !== 0) {
   console.error("[migrations] Supabase CLI not available. Install: npm i -D supabase");
