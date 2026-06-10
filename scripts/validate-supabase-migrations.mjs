@@ -38,17 +38,20 @@ if (list.status !== 0) {
 
 console.log(list.stdout);
 
-const remoteApplied = new Set();
-for (const line of list.stdout.split(/\r?\n/)) {
-  const match = line.match(/\|\s*(\d{14,})\s*\|/);
-  if (match) remoteApplied.add(match[1]);
-}
-
 const localVersions = localFiles.map((f) => f.split("_")[0]);
-const missingOnRemote = localVersions.filter((v) => {
-  const row = list.stdout.includes(v);
-  return !row;
-});
+const missingOnRemote = [];
+
+for (const line of list.stdout.split(/\r?\n/)) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("Local") || trimmed.startsWith("---")) continue;
+  const parts = trimmed.split("|").map((p) => p.trim());
+  if (parts.length < 2) continue;
+  const localVer = parts[0];
+  const remoteVer = parts[1] || "";
+  if (/^\d{14,}$/.test(localVer) && localVer !== remoteVer) {
+    missingOnRemote.push(localVer);
+  }
+}
 
 const checks = [
   { table: "contractor_reviews", column: null },
@@ -70,7 +73,7 @@ if (url && key) {
 }
 
 if (missingOnRemote.length) {
-  console.error("\n[validate] Local migrations not found in remote list output:");
+  console.error("\n[validate] Local migrations not applied on remote:");
   for (const v of missingOnRemote.slice(0, 10)) {
     const file = localFiles.find((f) => f.startsWith(v));
     console.error(`  - ${file || v}`);
@@ -81,5 +84,42 @@ if (missingOnRemote.length) {
   process.exit(1);
 }
 
-console.log("\n[validate] All local migration versions appear on remote.");
+console.log("\n[validate] All local migration versions are applied on remote.");
+
+// Remote RLS audit (requires linked DB)
+const rlsQuery = spawnSync(
+  "npx",
+  [
+    "supabase",
+    "db",
+    "query",
+    "--linked",
+    "-f",
+    join(root, "scripts", "sql", "audit-public-rls-disabled.sql"),
+    "-o",
+    "csv",
+  ],
+  { shell: true, encoding: "utf8", cwd: root },
+);
+
+if (rlsQuery.status === 0) {
+  const rows = (rlsQuery.stdout || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const dataRows = rows.slice(1);
+  if (dataRows.length) {
+    console.error("\n[validate] FAIL — public tables without RLS on remote:");
+    for (const row of dataRows) {
+      console.error(`  - ${row}`);
+    }
+    process.exit(1);
+  }
+  console.log("[validate] Remote RLS audit OK — no public tables with RLS disabled.");
+} else {
+  console.warn(
+    "[validate] Skipped remote RLS audit (supabase db query unavailable in this environment).",
+  );
+}
+
 process.exit(0);
