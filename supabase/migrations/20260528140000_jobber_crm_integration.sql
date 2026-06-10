@@ -1,4 +1,6 @@
 -- Jobber CRM integration: external IDs, relational child tables, integration metadata.
+-- SECURITY: tables below MUST enable RLS in the same migration (see _example_public_table_with_rls.sql.example).
+-- Historical gap (no RLS block) fixed in 20260629120000; CI + DB event trigger prevent recurrence.
 
 alter table if exists public.integrations
   add column if not exists metadata jsonb not null default '{}'::jsonb;

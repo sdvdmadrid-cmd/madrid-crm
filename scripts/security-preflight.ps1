@@ -228,6 +228,35 @@ if ($RunLint) {
   }
 }
 
+try {
+  Write-Host "Running schema security check (migration RLS)..." -ForegroundColor Cyan
+  npm run security:check:ci | Out-Host
+  if ($LASTEXITCODE -eq 0) {
+    Add-Pass "Migration RLS security lint passed"
+  } else {
+    Add-Fail "Migration RLS security lint failed"
+  }
+} catch {
+  Add-Fail "Migration RLS security lint command failed"
+}
+
+$dbPassword = Get-ConfigValue "SUPABASE_DB_PASSWORD"
+if (-not [string]::IsNullOrWhiteSpace($dbPassword)) {
+  try {
+    Write-Host "Running remote Supabase RLS audit..." -ForegroundColor Cyan
+    npm run audit:schema-rls -- --remote-only | Out-Host
+    if ($LASTEXITCODE -eq 0) {
+      Add-Pass "Remote Supabase RLS audit passed"
+    } else {
+      Add-Fail "Remote Supabase RLS audit failed"
+    }
+  } catch {
+    Add-Fail "Remote Supabase RLS audit command failed"
+  }
+} else {
+  Add-Warn "SUPABASE_DB_PASSWORD not set — skipped live database RLS audit"
+}
+
 if ($RunBuild) {
   try {
     Write-Host "Running build..." -ForegroundColor Cyan

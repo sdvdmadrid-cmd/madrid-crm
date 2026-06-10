@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["serviceRoleOnly", "publicAccessApproved"],
+  "properties": {
+    "serviceRoleOnly": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z_][a-z0-9_]*$" }
+    },
+    "publicAccessApproved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["table", "reason"],
+        "properties": {
+          "table": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

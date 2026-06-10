@@ -22,13 +22,20 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Wait for Vercel production deploy
-        run: sleep 120
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Schema security check (block deploy if migrations unsafe)
+        run: npm run security:check:ci
+
+      - name: Wait for Vercel production deploy
+        run: sleep 120
 
       - name: Run deployment pipeline audit
         env:
