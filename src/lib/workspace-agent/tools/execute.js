@@ -42,6 +42,7 @@ import {
   logAiToolExecution,
 } from "@/lib/ai-tool-guard.js";
 import { assertTenantClient } from "@/lib/tenant-fk-validation.js";
+import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
 import {
   estimateRefInvoiceNumber,
   isMissingEstimateIdColumnError,
@@ -215,6 +216,10 @@ export async function executeWorkspaceTool(toolName, args, ctx) {
 
 async function executeWorkspaceToolImpl(toolName, args, ctx) {
   const tenantId = ctx.tenantDbId;
+  const insertTenantId = requireTenantIdForInsert(
+    tenantId,
+    "workspace-agent executeWorkspaceTool",
+  );
   const userId = ctx.userId;
   const actions = [];
 
@@ -369,7 +374,7 @@ async function executeWorkspaceToolImpl(toolName, args, ctx) {
       const { data, error } = await supabaseAdmin
         .from("estimates")
         .insert({
-          tenant_id: tenantId,
+          tenant_id: insertTenantId,
           user_id: userId,
           created_by: userId,
           estimate_number: estimateNumber,

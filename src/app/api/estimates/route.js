@@ -39,6 +39,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
 
 const ESTIMATES_TABLE = "estimates";
 
@@ -249,9 +250,14 @@ export async function POST(request) {
       return jsonResponse({ success: false, error: "Client name is required" }, 400);
     }
 
+    const insertTenantId = requireTenantIdForInsert(
+      tenantDbId,
+      "api/estimates POST",
+    );
+
     const mappedWithParty = await attachFreshPartyToEstimateDbRow(
       supabaseAdmin,
-      tenantDbId,
+      insertTenantId,
       mapped,
     );
 
@@ -267,7 +273,7 @@ export async function POST(request) {
       const estimateNumber =
         attempt === 0 && userProvidedNumber
           ? userProvidedNumber
-          : await nextEstimateNumber(tenantDbId);
+          : await nextEstimateNumber(insertTenantId);
 
       const insertResult = await supabaseAdmin
         .from(ESTIMATES_TABLE)
@@ -275,7 +281,7 @@ export async function POST(request) {
           ...mappedWithParty,
           estimate_number: estimateNumber,
           currency: "USD",
-          tenant_id: tenantDbId,
+          tenant_id: insertTenantId,
           user_id: userId || null,
           created_by: userId || null,
           created_at: nowIso,

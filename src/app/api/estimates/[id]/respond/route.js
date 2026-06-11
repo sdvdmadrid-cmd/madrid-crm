@@ -25,6 +25,7 @@ import {
 } from "@/lib/estimate-respond-sanitizers";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
+import { rowHasTenantId } from "@/lib/tenant-row-guard";
 
 const ESTIMATES_TABLE = "estimates";
 const ALLOWED_ACTIONS = new Set(["approved", "declined", "changes_requested"]);
@@ -122,6 +123,10 @@ export async function POST(request, { params }) {
     .single();
 
   if (fetchErr || !existing) return json({ success: false, error: "Not found" }, 404);
+
+  if (!rowHasTenantId(existing)) {
+    return json({ success: false, error: "Not found" }, 404);
+  }
 
   const access = verifyEstimatePublicAccess(existing, token);
   if (!access.ok) {

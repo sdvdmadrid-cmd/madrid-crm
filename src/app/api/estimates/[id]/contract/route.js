@@ -9,6 +9,7 @@ import {
   resolveInsertTenant,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { rowHasTenantId } from "@/lib/tenant-row-guard";
 import {
   estimateRefInvoiceNumber,
   isMissingEstimateIdColumnError,
@@ -101,6 +102,9 @@ export async function POST(request, { params }) {
     const { data: estimate, error: fetchError } = await query;
     if (fetchError) throw new Error(fetchError.message);
     if (!estimate) {
+      return jsonResponse({ success: false, error: "Estimate not found" }, 404);
+    }
+    if (!rowHasTenantId(estimate)) {
       return jsonResponse({ success: false, error: "Estimate not found" }, 404);
     }
 

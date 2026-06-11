@@ -108,3 +108,34 @@ Execution reports: `.local-secrets/backups/` (gitignored).
 
 - Probe slug tenants `probe-2076316237`, `probe-2094290103` — 0 CRM rows; mailinator auth users may be purged manually if desired.
 - E2E tenant audit_logs (72 rows) — optional Stage 1b if Playwright no longer needs history.
+- **Legacy orphan rows** — 1 estimate + 3 payments with `tenant_id IS NULL` remain in production (pre-multi-tenant); app hardening (Phase B) blocks mutation and excludes them from platform aggregates. Optional Phase C: schema `NOT NULL` migration + row delete after backup.
+
+---
+
+## Phase B — Application hardening (2026-06-04)
+
+**Status:** Completed (PR pending merge)
+
+| Change | Purpose |
+|--------|---------|
+| `src/lib/tenant-row-guard.js` | Shared `requireTenantIdForInsert`, `rowHasTenantId`, `filterRowsWithTenantId` |
+| Estimate GET/PATCH/respond/duplicate/contract/convert-to-job | Return 404 for orphan rows (no `tenant_id`) |
+| `POST /api/estimates`, lead-inbox convert | Insert-time `requireTenantIdForInsert` |
+| `resolveInsertTenant` | No caller fallback — derived rows require source tenant |
+| `stripe-payments.js` | Payment inserts require invoice tenant via `paymentTenantIdFromInvoice` |
+| `platform-overview.js` | Exclude null-tenant rows from Owner Command Center aggregates |
+| `scripts/cleanup/verify-tenant-insert-paths.mjs` | CI-style static check for unguarded insert paths |
+
+**Initiative status:** Owner Command Center data cleanup **complete**. Stages 1 + 2+ committed; Phase B app deploy closes the loop. No additional production data cleanup in Phase B.
+
+---
+
+## Initiative completion checklist
+
+| Item | Status |
+|------|--------|
+| Stage 1 E2E tenant CRM purge | Done |
+| Stage 2+ verified test tenant purge | Done |
+| Protected tenants verified | Done |
+| Phase B application hardening | Done (deploy app) |
+| Production NULL-tenant row cleanup | Deferred (optional Phase C) |

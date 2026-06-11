@@ -12,6 +12,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
 
 function clean(value, max = 200) {
   return String(value || "").trim().slice(0, max);
@@ -54,6 +55,11 @@ export async function POST(request) {
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
+
+    const insertTenantId = requireTenantIdForInsert(
+      tenantDbId,
+      "api/lead-inbox/convert",
+    );
 
     const body = sanitizePayloadDeep(await request.json());
     const leadId = clean(body.leadId, 64);
@@ -203,7 +209,7 @@ export async function POST(request) {
       const { data: insertedEstimate, error: estimateError } = await supabaseAdmin
         .from("estimates")
         .insert({
-          tenant_id: tenantDbId,
+          tenant_id: insertTenantId,
           user_id: userId || null,
           created_by: userId || null,
           client_name: clientName,

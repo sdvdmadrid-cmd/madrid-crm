@@ -9,6 +9,8 @@
 // from "@/lib/tenant" alongside the auth helpers — that module just
 // re-exports `resolveInsertTenant` from here.
 
+import { hasResolvableTenantId } from "./tenant-row-guard.js";
+
 /**
  * Resolve the tenant_id to stamp onto a row that is being derived from
  * an existing row.
@@ -23,26 +25,23 @@
  * filtered by their own tenant_id at read time, so `sourceTenantId ===
  * callerTenantId` always holds and the resolved value is identical.
  *
- * We fall back to `callerTenantId` only when the source has no tenant
- * (legacy / pre-multi-tenant rows, or test fixtures). If neither is
- * present, we throw — silently writing `tenant_id: null` produces rows
- * that no contractor will ever see, which is worse than a 500.
+ * We no longer fall back to `callerTenantId` when the source row lacks a
+ * tenant — that would stamp the wrong tenant on a derived record and mask
+ * orphan data. If the source has no tenant, we throw.
  *
  * @param {object} args
  * @param {string|number|null|undefined} args.sourceTenantId — the
  *   tenant of the source row this derived insert is based on.
- * @param {string|number|null|undefined} args.callerTenantId — the
- *   tenant of the authenticated caller (i.e. `tenantDbId` from
- *   `getAuthenticatedTenantContext`).
+ * @param {string|number|null|undefined} args.callerTenantId — retained for
+ *   call-site compatibility; not used when source tenant is missing.
  * @returns {string} the tenant_id to write on the new row.
- * @throws if neither tenant id can be resolved.
+ * @throws if source tenant id cannot be resolved.
  */
-export function resolveInsertTenant({ sourceTenantId, callerTenantId } = {}) {
-  const source = String(sourceTenantId || "").trim();
-  if (source) return source;
-  const caller = String(callerTenantId || "").trim();
-  if (caller) return caller;
+export function resolveInsertTenant({ sourceTenantId } = {}) {
+  if (hasResolvableTenantId(sourceTenantId)) {
+    return String(sourceTenantId).trim();
+  }
   throw new Error(
-    "resolveInsertTenant: neither source nor caller tenant id was provided",
+    "resolveInsertTenant: source row is missing tenant_id; cannot create derived record",
   );
 }

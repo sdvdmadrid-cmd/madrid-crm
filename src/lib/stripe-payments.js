@@ -25,12 +25,17 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
 
 const CLIENTS = "clients";
 const INVOICES = "invoices";
 const JOBS = "jobs";
 const PAYMENTS = "payments";
 const PUBLIC_BILLING_NAME = String(process.env.PUBLIC_BILLING_NAME || "FieldBase").trim();
+
+function paymentTenantIdFromInvoice(invoice, contextLabel) {
+  return requireTenantIdForInsert(invoice?.tenant_id, contextLabel);
+}
 
 function getStatementDescriptorSuffix() {
   return PUBLIC_BILLING_NAME.replace(/[^A-Za-z0-9 .*-]/g, "").slice(0, 22) || "FieldBase";
@@ -487,14 +492,18 @@ export async function recordManualInvoicePayment({ access, body }) {
   const completedAt = payment.date
     ? `${payment.date}T12:00:00.000Z`
     : nowIso;
+  const paymentTenantId = paymentTenantIdFromInvoice(
+    access.invoice,
+    "stripe-payments manual payment",
+  );
 
   const { error: insertError } = await supabaseAdmin
     .schema("public")
     .from(PAYMENTS)
     .insert({
       id: paymentId,
-      tenant_id: access.invoice.tenant_id,
-      contractor_id: access.invoice.tenant_id,
+      tenant_id: paymentTenantId,
+      contractor_id: paymentTenantId,
       user_id: access.context.userId || null,
       invoice_id: access.invoice.id,
       job_id: access.invoice.job_id || null,
@@ -583,14 +592,18 @@ export async function createStripeCheckoutSessionForAccess({
 
   const paymentId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
+  const paymentTenantId = paymentTenantIdFromInvoice(
+    access.invoice,
+    "stripe-payments checkout session",
+  );
 
   const { error: insertError } = await supabaseAdmin
     .schema("public")
     .from(PAYMENTS)
     .insert({
       id: paymentId,
-      tenant_id: access.invoice.tenant_id,
-      contractor_id: access.invoice.tenant_id,
+      tenant_id: paymentTenantId,
+      contractor_id: paymentTenantId,
       user_id: access.context.userId || null,
       invoice_id: access.invoice.id,
       job_id: access.invoice.job_id || null,

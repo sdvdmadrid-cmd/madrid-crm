@@ -16,6 +16,7 @@ import { runEstimateApprovalHandoff } from "@/lib/estimate-approval-handoff";
 import { enforceSignedQuoteLockForEstimatePatch } from "@/lib/quote-signature-lock";
 import { deliverEstimateNotifications } from "@/lib/estimate-notifications";
 import { recordEstimateRevision } from "@/lib/estimate-revisions";
+import { rowHasTenantId } from "@/lib/tenant-row-guard";
 import {
   serializeEstimateBase,
   toNumber,
@@ -201,6 +202,9 @@ export async function GET(request, { params }) {
     if (!data) {
       return jsonResponse({ success: false, error: "Estimate not found" }, 404);
     }
+    if (!rowHasTenantId(data)) {
+      return jsonResponse({ success: false, error: "Estimate not found" }, 404);
+    }
 
     const serialized = serializeEstimate(data);
     const enriched = await enrichEstimateWithPartyInfo(
@@ -263,6 +267,9 @@ export async function PATCH(request, { params }) {
     const { data: existing, error: existingError } = await existingQuery;
     if (existingError) throw new Error(existingError.message);
     if (!existing) {
+      return jsonResponse({ success: false, error: "Estimate not found" }, 404);
+    }
+    if (!rowHasTenantId(existing)) {
       return jsonResponse({ success: false, error: "Estimate not found" }, 404);
     }
 

@@ -13,6 +13,7 @@ import {
   resolveInsertTenant,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { rowHasTenantId } from "@/lib/tenant-row-guard";
 
 const ESTIMATES_TABLE = "estimates";
 
@@ -110,6 +111,9 @@ export async function POST(request, { params }) {
     const { data: source, error: readError } = await query;
     if (readError) throw new Error(readError.message);
     if (!source) return json({ success: false, error: "Estimate not found" }, 404);
+    if (!rowHasTenantId(source)) {
+      return json({ success: false, error: "Estimate not found" }, 404);
+    }
 
     const nowIso = new Date().toISOString();
 

@@ -9,6 +9,7 @@ import {
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
 } from "@/lib/tenant";
+import { requireTenantIdForInsert, rowHasTenantId } from "@/lib/tenant-row-guard";
 
 const ESTIMATES_TABLE = "estimates";
 const JOBS_TABLE = "jobs";
@@ -63,6 +64,9 @@ export async function POST(request, { params }) {
     const { data: estimate, error: readError } = await query;
     if (readError) throw new Error(readError.message);
     if (!estimate) return json({ success: false, error: "Estimate not found" }, 404);
+    if (!rowHasTenantId(estimate)) {
+      return json({ success: false, error: "Estimate not found" }, 404);
+    }
 
     const status = normalizeEstimateStatusToken(estimate.status);
     if (status !== "approved") {
@@ -97,7 +101,10 @@ export async function POST(request, { params }) {
     }
 
     const nowIso = new Date().toISOString();
-    const insertTenantId = String(estimate.tenant_id || tenantDbId || "").trim();
+    const insertTenantId = requireTenantIdForInsert(
+      estimate.tenant_id,
+      "api/estimates/:id/convert-to-job",
+    );
     const jobRow = buildJobInsertFromEstimate(estimate, {
       tenantId: insertTenantId,
       userId,
