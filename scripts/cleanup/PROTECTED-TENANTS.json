@@ -1,0 +1,38 @@
+{
+  "description": "Production tenants that must never be deleted or modified by cleanup scripts.",
+  "updated": "2026-06-11",
+  "real_businesses": [
+    {
+      "tenant_id": "d38fec7b-adac-4b7f-a46d-2ccadab6e452",
+      "email": "sdvdmadrid@gmail.com",
+      "company": "Madrid Landscaping",
+      "legacy_slug_ids": ["sdvdmadrid-1"]
+    },
+    {
+      "tenant_id": "ebb368d8-248d-4986-8fdd-56a4da7a33d8",
+      "email": "madridsan84@yahoo.com",
+      "company": "JMS ENTERPRICES LLC",
+      "legacy_slug_ids": ["madridsan84"]
+    },
+    {
+      "tenant_id": "6785ddd8-d0a7-4afd-a97e-1ad9f8e377a4",
+      "email": "susymadrid75@gmail.com",
+      "company": "Susy cleaning services",
+      "legacy_slug_ids": ["susymadrid75"]
+    }
+  ],
+  "platform_operators": [
+    {
+      "tenant_id": "f2b3986e-5727-4731-b702-ec3575f1b804",
+      "email": "owner@fieldbaseapp.net",
+      "note": "Platform super_admin — preserve auth"
+    }
+  ],
+  "e2e_shell_preserved": [
+    {
+      "tenant_id": "8354b6d2-0c6c-4a95-a16d-3bbb6908c943",
+      "email": "admin@fieldbase.local",
+      "note": "Playwright dev-login; CRM cleared Stage 1; profile/audit_logs kept"
+    }
+  ]
+}
