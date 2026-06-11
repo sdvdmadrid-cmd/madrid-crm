@@ -344,7 +344,7 @@ test.describe("Payments module audit", () => {
   });
 
   test.describe("Contractor visibility & navigation", () => {
-    test("dashboard surfaces payments readiness banner", async ({ page }) => {
+    test("dashboard surfaces payments readiness or operational mode", async ({ page }) => {
       await devLogin(page, { profile: "admin", redirect: "/dashboard" });
       await expect(page.getByRole("heading", { name: /Command Center/i })).toBeVisible({
         timeout: 15_000,
@@ -352,9 +352,16 @@ test.describe("Payments module audit", () => {
       await expect(
         page.getByRole("link", { name: /Collect payment/i }),
       ).toBeVisible({ timeout: 15_000 });
-      await expect(
-        page.getByText(/Connect payouts|Turn on card payments|Your payout account is active/i).first(),
-      ).toBeVisible();
+
+      const onboarding = page.getByTestId("dashboard-onboarding");
+      const operational = page.getByTestId("dashboard-operational");
+      if (await onboarding.isVisible()) {
+        await expect(
+          page.getByText(/Connect payouts|Turn on card payments|Your payout account is active/i).first(),
+        ).toBeVisible();
+      } else {
+        await expect(operational).toBeVisible();
+      }
     });
 
     test("invoices page shows get-paid guide for contractors", async ({ page }) => {

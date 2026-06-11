@@ -8,6 +8,10 @@ import { useCachedApiFetch } from "@/hooks/useCachedApiFetch";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import GettingStartedChecklist from "@/components/workspace/GettingStartedChecklist";
 import PaymentsReadinessBanner from "@/components/workspace/PaymentsReadinessBanner";
+import {
+  isPlatformActivated,
+  shouldShowDashboardOnboarding,
+} from "@/lib/dashboard-activation";
 import { FIELDBASE_PILLARS } from "@/lib/fieldbase-pillars";
 import styles from "./page.module.css";
 
@@ -136,6 +140,28 @@ export default function RevenueDashboardPage() {
   const connectStatus = connectPayload?.data || null;
   const paymentsOnboarded = Boolean(connectStatus?.onboarded);
 
+  const activatedFromCoreMetrics = isPlatformActivated(metrics);
+  const { data: estimatesPayload } = useCachedApiFetch(
+    `dashboard:estimates-total:${cacheScope}`,
+    "/api/estimates?paginate=1&page=1&limit=1",
+    {
+      ttlMs: 120_000,
+      enabled: sessionReady && Boolean(metricsPayload) && !activatedFromCoreMetrics,
+    },
+  );
+  const estimatesTotal = Number(estimatesPayload?.total ?? 0);
+  const showOnboarding = useMemo(() => {
+    if (!sessionReady) return false;
+    if (metricsLoading && !metricsPayload) return false;
+    return shouldShowDashboardOnboarding(metrics, { estimatesTotal });
+  }, [
+    sessionReady,
+    metricsLoading,
+    metricsPayload,
+    metrics,
+    estimatesTotal,
+  ]);
+
   const activeJobs = metrics?.jobs?.active ?? 0;
   const pendingEstimates = metrics?.estimateRequests?.newCount ?? 0;
   const newWebsiteLeads = metrics?.leadInbox?.newCount ?? 0;
@@ -185,37 +211,41 @@ export default function RevenueDashboardPage() {
     },
   ];
 
-  const activityItems = revenueData.recentPayments.slice(0, 6).map((item, index) => ({
-    id: `${item.day || item.created_at || index}`,
-    title: t("dashboardControl.activity.paymentRecorded", {
-      amount: formatCurrency(item.totalRevenue || item.amount || 0),
-    }),
-    time: formatDate(item.day || item.created_at, t("dashboardControl.activity.unknownDate")),
-    status: "paid",
-  }));
+  const activityItems = useMemo(() => {
+    const items = revenueData.recentPayments.slice(0, 6).map((item, index) => ({
+      id: `${item.day || item.created_at || index}`,
+      title: t("dashboardControl.activity.paymentRecorded", {
+        amount: formatCurrency(item.totalRevenue || item.amount || 0),
+      }),
+      time: formatDate(item.day || item.created_at, t("dashboardControl.activity.unknownDate")),
+      status: "paid",
+    }));
 
-  if (activityItems.length === 0) {
-    activityItems.push(
-      {
-        id: "a1",
-        title: t("dashboardControl.activity.estimateAwaitingApproval"),
-        time: t("dashboardControl.activity.today"),
-        status: "pending",
-      },
-      {
-        id: "a2",
-        title: t("dashboardControl.activity.invoiceReminderScheduled"),
-        time: t("dashboardControl.activity.today"),
-        status: "pending",
-      },
-      {
-        id: "a3",
-        title: t("dashboardControl.activity.paymentReceivedCompletedJob"),
-        time: t("dashboardControl.activity.yesterday"),
-        status: "paid",
-      },
-    );
-  }
+    if (items.length === 0 && showOnboarding) {
+      items.push(
+        {
+          id: "a1",
+          title: t("dashboardControl.activity.estimateAwaitingApproval"),
+          time: t("dashboardControl.activity.today"),
+          status: "pending",
+        },
+        {
+          id: "a2",
+          title: t("dashboardControl.activity.invoiceReminderScheduled"),
+          time: t("dashboardControl.activity.today"),
+          status: "pending",
+        },
+        {
+          id: "a3",
+          title: t("dashboardControl.activity.paymentReceivedCompletedJob"),
+          time: t("dashboardControl.activity.yesterday"),
+          status: "paid",
+        },
+      );
+    }
+
+    return items;
+  }, [revenueData.recentPayments, showOnboarding, t]);
 
   const clientCount = Number(metrics?.clients?.total || 0);
   const invoiceCount = Number(metrics?.invoices?.total || 0);
@@ -255,7 +285,9 @@ export default function RevenueDashboardPage() {
               ? t("dashboardControl.subtitleWithName", { name: userName })
               : t("dashboardControl.subtitle")}
           </p>
-          <p className={styles.workflowGuide}>{t("dashboardControl.workflowGuide")}</p>
+          {showOnboarding ? (
+            <p className={styles.workflowGuide}>{t("dashboardControl.workflowGuide")}</p>
+          ) : null}
         </div>
         <div className={styles.quickActions}>
           <Link href="/estimates/new" className={styles.primaryAction}>
@@ -321,31 +353,37 @@ export default function RevenueDashboardPage() {
         </div>
       </header>
 
-      <PaymentsReadinessBanner connectStatus={connectStatus} skipFetch />
-      <GettingStartedChecklist steps={gettingStartedSteps} />
+      {showOnboarding ? (
+        <div data-testid="dashboard-onboarding">
+          <PaymentsReadinessBanner connectStatus={connectStatus} skipFetch />
+          <GettingStartedChecklist steps={gettingStartedSteps} />
+          <section className={styles.pillarsGrid} aria-label={t("dashboardControl.pillars.ariaLabel")}>
+            {FIELDBASE_PILLARS.map((pillar) => (
+              <article key={pillar.id} className={styles.pillarCard}>
+                <div
+                  className={styles.pillarAccent}
+                  style={{ background: pillar.accent }}
+                />
+                <p className={styles.pillarTag}>{t(pillar.taglineKey)}</p>
+                <h2 className={styles.pillarTitle}>{t(pillar.titleKey)}</h2>
+                <p className={styles.pillarDesc}>{t(pillar.descKey)}</p>
+                <div className={styles.pillarLinks}>
+                  {pillar.links.map((link) => (
+                    <Link key={link.href} href={link.href} className={styles.pillarLink}>
+                      {t(link.labelKey)}
+                    </Link>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </section>
+        </div>
+      ) : null}
 
-      <section className={styles.pillarsGrid} aria-label={t("dashboardControl.pillars.ariaLabel")}>
-        {FIELDBASE_PILLARS.map((pillar) => (
-          <article key={pillar.id} className={styles.pillarCard}>
-            <div
-              className={styles.pillarAccent}
-              style={{ background: pillar.accent }}
-            />
-            <p className={styles.pillarTag}>{t(pillar.taglineKey)}</p>
-            <h2 className={styles.pillarTitle}>{t(pillar.titleKey)}</h2>
-            <p className={styles.pillarDesc}>{t(pillar.descKey)}</p>
-            <div className={styles.pillarLinks}>
-              {pillar.links.map((link) => (
-                <Link key={link.href} href={link.href} className={styles.pillarLink}>
-                  {t(link.labelKey)}
-                </Link>
-              ))}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <div className={styles.grid12}>
+      <div
+        className={styles.grid12}
+        data-testid={showOnboarding ? undefined : "dashboard-operational"}
+      >
         <section className={`${styles.panel} ${styles.span12}`}>
           {loading ? (
             <div className={styles.metricSkeletonGrid}>
@@ -441,15 +479,19 @@ export default function RevenueDashboardPage() {
             </div>
           </div>
           <div className={styles.activityList}>
-            {activityItems.map((item) => (
-              <article key={item.id} className={styles.activityRow}>
-                <span className={`${styles.statusDot} ${styles[`status_${item.status}`]}`} />
-                <div className={styles.activityTextWrap}>
-                  <p className={styles.activityTitle}>{item.title}</p>
-                  <p className={styles.activityMeta}>{item.time}</p>
-                </div>
-              </article>
-            ))}
+            {activityItems.length === 0 ? (
+              <p className={styles.activityMeta}>{t("dashboardControl.activity.empty")}</p>
+            ) : (
+              activityItems.map((item) => (
+                <article key={item.id} className={styles.activityRow}>
+                  <span className={`${styles.statusDot} ${styles[`status_${item.status}`]}`} />
+                  <div className={styles.activityTextWrap}>
+                    <p className={styles.activityTitle}>{item.title}</p>
+                    <p className={styles.activityMeta}>{item.time}</p>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </section>
 

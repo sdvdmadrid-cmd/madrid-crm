@@ -82,7 +82,8 @@
       "paymentReceivedCompletedJob": "Payment received for completed job",
       "today": "Today",
       "yesterday": "Yesterday",
-      "unknownDate": "Unknown date"
+      "unknownDate": "Unknown date",
+      "empty": "No recent payments yet."
     },
     "workspace": {
       "clientsTitle": "Clients",
