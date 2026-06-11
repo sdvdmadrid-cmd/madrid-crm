@@ -13,13 +13,21 @@ test.describe("Dashboard module audit", () => {
     await expect(page.getByTestId("dashboard-shell")).toBeVisible({ timeout: 20_000 });
   });
 
-  test("layout — metrics, pillars, workspace modules", async ({ page }) => {
+  test("layout — metrics, workspace modules, onboarding when applicable", async ({ page }) => {
     await expect(page.getByTestId("dashboard-metric-active-jobs")).toBeVisible();
     await expect(page.getByTestId("dashboard-metric-inbox")).toBeVisible();
     await expect(page.getByRole("link", { name: "New Estimate", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Add Client", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /Clients/i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /Lead inbox/i }).first()).toBeVisible();
+
+    const onboarding = page.getByTestId("dashboard-onboarding");
+    const operational = page.getByTestId("dashboard-operational");
+    if (await onboarding.isVisible()) {
+      await expect(onboarding).toBeVisible();
+    } else {
+      await expect(operational).toBeVisible();
+    }
   });
 
   test("secondary actions live under More actions", async ({ page }) => {
