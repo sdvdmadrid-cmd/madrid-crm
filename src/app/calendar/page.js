@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 
 const Calendar = dynamic(() => import("@/components/calendar/Calendar"), {
@@ -12,5 +13,15 @@ const Calendar = dynamic(() => import("@/components/calendar/Calendar"), {
 });
 
 export default function CalendarPage() {
-  return <Calendar />;
+  return (
+    <Suspense
+      fallback={
+        <main style={{ padding: 24, opacity: 0.85 }} aria-busy="true">
+          Loading calendar…
+        </main>
+      }
+    >
+      <Calendar />
+    </Suspense>
+  );
 }

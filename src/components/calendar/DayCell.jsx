@@ -34,12 +34,13 @@ function DayCell({
     expandedEvents ? dayAppointments.length : 2,
   );
 
-  const allowDrop = isCurrentMonth && Boolean(onReschedule);
+  const allowDrop = Boolean(onReschedule);
 
   return (
     <div
-      onClick={() => isCurrentMonth && !expandedEvents && onClick(date)}
+      onClick={() => !expandedEvents && onClick(date)}
       data-testid={dateKey ? `calendar-day-${dateKey}` : undefined}
+      data-is-current-month={isCurrentMonth ? "true" : "false"}
       onDragOver={(e) => {
         if (!allowDrop || !draggingAppointmentId) return;
         e.preventDefault();
@@ -101,7 +102,7 @@ function DayCell({
           return (
             <div
               key={apt._id}
-              draggable={isCurrentMonth}
+              draggable
               onDragStart={(e) => {
                 e.stopPropagation();
                 e.dataTransfer.setData("application/appointment-id", apt._id);

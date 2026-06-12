@@ -26,12 +26,14 @@
 |-------|-----|
 | No at-a-glance view of today's jobs | **Today's schedule** strip with quick open + add |
 | E2E / automation gaps | `data-testid`: `calendar-shell`, `calendar-today-strip` |
-| Day cells untested | Reuse `calendar-day-{YYYY-MM-DD}` |
+| Day cells untested | Reuse `calendar-day-{YYYY-MM-DD}`; padding days use `data-is-current-month="false"` |
 
 ### Fix before production-ready
 
 | Issue | Ledger | Notes |
 |-------|--------|-------|
+| ~~Padding-month days not clickable~~ | — | **Fixed 2026-06-12** — all grid days open scheduler |
+| ~~Narrow ±1 month fetch window~~ | — | **Fixed 2026-06-12** — ±3 months + refetch after save |
 | Weather panel dominates mobile viewport | — | Collapse weather by default on small screens |
 | AI scheduling errors unclear when feature off | B-006 | Platform feature flag |
 | Job ↔ appointment sync | — | Separate jobs calendar integration |
