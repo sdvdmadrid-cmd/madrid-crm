@@ -147,7 +147,7 @@ export async function PATCH(request, { params }) {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
-    if (!canDelete(role)) return forbiddenResponse();
+    if (!canWrite(role)) return forbiddenResponse();
 
     const { id } = await params;
     if (!id) return badId();
@@ -223,7 +223,7 @@ export async function DELETE(request, { params }) {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
-    if (!canWrite(role)) return forbiddenResponse();
+    if (!canDelete(role)) return forbiddenResponse();
 
     const { id } = await params;
     if (!id) return badId();

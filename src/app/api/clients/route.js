@@ -11,6 +11,7 @@ import { logSupabaseError } from "@/lib/supabase-db";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
+  canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -41,8 +42,10 @@ export async function GET(request) {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
+    if (!canRead(role)) return forbiddenResponse();
 
     const { searchParams } = new URL(request.url);
+    const search = String(searchParams.get("search") || searchParams.get("q") || "").trim();
     const { paginate, page, limit, from, to } =
       getListPaginationParams(searchParams);
 
@@ -52,6 +55,7 @@ export async function GET(request) {
         role,
         page,
         limit,
+        search,
       });
       return new Response(JSON.stringify(payload), {
         status: 200,

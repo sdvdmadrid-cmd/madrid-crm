@@ -1,7 +1,9 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import WeatherBadge from "./WeatherBadge";
+
+const COLLAPSED_EVENT_LIMIT = 3;
 
 function DayCell({
   day,
@@ -10,8 +12,12 @@ function DayCell({
   isCurrentMonth,
   isToday,
   dayAppointments = [],
+  scheduledJobs = [],
+  scheduledEstimates = [],
   onClick,
   onEventClick,
+  onJobClick,
+  onEstimateClick,
   onReschedule,
   draggingAppointmentId = "",
   onDragStart,
@@ -29,10 +35,26 @@ function DayCell({
     Cancelled: "bg-rose-50/90 text-rose-700 border-rose-200/90",
   };
 
-  const visibleAppointments = dayAppointments.slice(
+  const calendarItems = useMemo(() => {
+    const items = [];
+    for (const apt of dayAppointments) {
+      items.push({ kind: "appointment", key: `apt-${apt._id}`, data: apt });
+    }
+    for (const job of scheduledJobs) {
+      const id = job._id || job.id;
+      items.push({ kind: "job", key: `job-${id}`, data: job });
+    }
+    for (const est of scheduledEstimates) {
+      items.push({ kind: "estimate", key: `est-${est.id}`, data: est });
+    }
+    return items;
+  }, [dayAppointments, scheduledJobs, scheduledEstimates]);
+
+  const visibleItems = calendarItems.slice(
     0,
-    expandedEvents ? dayAppointments.length : 2,
+    expandedEvents ? calendarItems.length : COLLAPSED_EVENT_LIMIT,
   );
+  const hiddenCount = Math.max(0, calendarItems.length - COLLAPSED_EVENT_LIMIT);
 
   const allowDrop = Boolean(onReschedule);
 
@@ -64,7 +86,6 @@ function DayCell({
         ${dropHighlight ? "ring-2 ring-emerald-400/70 bg-emerald-50/40" : ""}
       `}
     >
-      {/* Day number + day-level weather */}
       <div className="flex items-center justify-between mb-1.5 sm:mb-2">
         <span
           className={`
@@ -92,65 +113,131 @@ function DayCell({
         })()}
       </div>
 
-      {/* Appointments */}
       <div className="space-y-1.5 sm:space-y-2">
-        {visibleAppointments.map((apt) => {
-          const weather = getWeather
-            ? getWeather(apt.location, apt.date) ||
-              (getDayWeather ? getDayWeather(apt.date) : null)
-            : null;
+        {visibleItems.map((item) => {
+          if (item.kind === "appointment") {
+            const apt = item.data;
+            const weather = getWeather
+              ? getWeather(apt.location, apt.date) ||
+                (getDayWeather ? getDayWeather(apt.date) : null)
+              : null;
+            return (
+              <div
+                key={item.key}
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.setData("application/appointment-id", apt._id);
+                  e.dataTransfer.effectAllowed = "move";
+                  onDragStart?.(apt._id);
+                }}
+                onDragEnd={(e) => {
+                  e.stopPropagation();
+                  onDragEnd?.();
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEventClick(apt);
+                }}
+                className={`
+                  text-[11px] sm:text-xs px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl border cursor-grab active:cursor-grabbing
+                  hover:shadow-md hover:-translate-y-0.5 transition-all
+                  ${draggingAppointmentId === apt._id ? "opacity-50" : ""}
+                  ${statusColors[apt.status] || "bg-gray-100 text-gray-800 border-gray-200"}
+                `}
+                title={`${apt.title}${apt.location ? " · " + apt.location : ""} — drag to reschedule`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-[11px] sm:text-[12px] truncate leading-tight">
+                      {apt.time && (
+                        <span className="text-[10px] opacity-70 mr-1">{apt.time}</span>
+                      )}
+                      {apt.title}
+                    </div>
+                    {apt.clientName && (
+                      <div className="text-[9px] sm:text-[10px] opacity-70 truncate mt-0.5">
+                        {apt.clientName}
+                      </div>
+                    )}
+                  </div>
+                  {weather && <WeatherBadge weather={weather} compact />}
+                </div>
+                {apt.location && weather && (
+                  <div className="text-[9px] opacity-60 truncate mt-0.5 sm:mt-1">
+                    📍 {apt.location}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          if (item.kind === "job") {
+            const job = item.data;
+            const id = job._id || job.id;
+            const title = job.title || job.clientName || "Job";
+            return (
+              <div
+                key={item.key}
+                data-testid={id ? `calendar-job-${id}` : undefined}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onJobClick?.(job);
+                }}
+                className="text-[11px] sm:text-xs px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl border cursor-pointer
+                  bg-amber-50/95 text-amber-900 border-amber-200/90
+                  hover:shadow-md hover:-translate-y-0.5 transition-all"
+                title={`Job: ${title}`}
+              >
+                <div className="font-semibold text-[11px] sm:text-[12px] truncate leading-tight">
+                  <span className="text-[9px] uppercase tracking-wide opacity-70 mr-1">
+                    Job
+                  </span>
+                  {title}
+                </div>
+                {job.clientName && job.title ? (
+                  <div className="text-[9px] sm:text-[10px] opacity-70 truncate mt-0.5">
+                    {job.clientName}
+                  </div>
+                ) : null}
+              </div>
+            );
+          }
+
+          const est = item.data;
+          const label =
+            est.estimateNumber ||
+            est.clientName ||
+            "Site visit";
           return (
             <div
-              key={apt._id}
-              draggable
-              onDragStart={(e) => {
-                e.stopPropagation();
-                e.dataTransfer.setData("application/appointment-id", apt._id);
-                e.dataTransfer.effectAllowed = "move";
-                onDragStart?.(apt._id);
-              }}
-              onDragEnd={(e) => {
-                e.stopPropagation();
-                onDragEnd?.();
-              }}
+              key={item.key}
+              data-testid={est.id ? `calendar-estimate-${est.id}` : undefined}
               onClick={(e) => {
                 e.stopPropagation();
-                onEventClick(apt);
+                onEstimateClick?.(est);
               }}
-              className={`
-                text-[11px] sm:text-xs px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl border cursor-grab active:cursor-grabbing
-                hover:shadow-md hover:-translate-y-0.5 transition-all
-                ${draggingAppointmentId === apt._id ? "opacity-50" : ""}
-                ${statusColors[apt.status] || "bg-gray-100 text-gray-800 border-gray-200"}
-              `}
-              title={`${apt.title}${apt.location ? " · " + apt.location : ""} — drag to reschedule`}
+              className="text-[11px] sm:text-xs px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl border cursor-pointer
+                bg-violet-50/95 text-violet-900 border-violet-200/90
+                hover:shadow-md hover:-translate-y-0.5 transition-all"
+              title={`Estimate visit: ${label}`}
             >
-              <div className="flex items-center justify-between gap-1">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-[11px] sm:text-[12px] truncate leading-tight">
-                    {apt.time && (
-                      <span className="text-[10px] opacity-70 mr-1">{apt.time}</span>
-                    )}
-                    {apt.title}
-                  </div>
-                  {apt.clientName && (
-                    <div className="text-[9px] sm:text-[10px] opacity-70 truncate mt-0.5">
-                      {apt.clientName}
-                    </div>
-                  )}
-                </div>
-                {weather && <WeatherBadge weather={weather} compact />}
+              <div className="font-semibold text-[11px] sm:text-[12px] truncate leading-tight">
+                <span className="text-[9px] uppercase tracking-wide opacity-70 mr-1">
+                  Visit
+                </span>
+                {label}
               </div>
-              {apt.location && weather && (
-                <div className="text-[9px] opacity-60 truncate mt-0.5 sm:mt-1">
-                  📍 {apt.location}
+              {est.clientName && est.estimateNumber ? (
+                <div className="text-[9px] sm:text-[10px] opacity-70 truncate mt-0.5">
+                  {est.clientName}
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
 
-        {dayAppointments.length > 2 && !expandedEvents && (
+        {hiddenCount > 0 && !expandedEvents && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -158,11 +245,11 @@ function DayCell({
             }}
             className="text-xs text-blue-700 hover:text-blue-900 px-2 py-0.5 font-medium w-full text-left"
           >
-            +{dayAppointments.length - 2} more
+            +{hiddenCount} more
           </button>
         )}
 
-        {expandedEvents && dayAppointments.length > 2 && (
+        {expandedEvents && calendarItems.length > COLLAPSED_EVENT_LIMIT && (
           <button
             onClick={(e) => {
               e.stopPropagation();

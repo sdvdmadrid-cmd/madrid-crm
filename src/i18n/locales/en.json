@@ -1580,6 +1580,12 @@
       "edit": "Edit",
       "delete": "Delete"
     },
+    "schedule": {
+      "action": "Schedule Job",
+      "saving": "Scheduling…",
+      "prompt": "Enter schedule date (YYYY-MM-DD)",
+      "invalidDate": "Enter a valid date as YYYY-MM-DD."
+    },
     "materialsIncluded": "Include materials in the estimate",
     "empty": "No jobs to display.",
     "workspace": {

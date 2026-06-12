@@ -90,6 +90,9 @@ export function serializeEstimateBase(row) {
     serviceTitle: parsedNotes.serviceTitle || "",
     audit: parsedNotes.audit,
     estimateNumber: row?.estimate_number || "",
+    scheduledVisitDate: row?.scheduled_visit_date
+      ? String(row.scheduled_visit_date).slice(0, 10)
+      : "",
     jobId: row?.job_id || null,
     clientId: row?.client_id || null,
     createdAt: row?.created_at || null,

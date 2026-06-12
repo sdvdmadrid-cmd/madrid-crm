@@ -12,6 +12,7 @@ import {
   openPrintableHtmlDocument,
 } from "@/lib/print-html-document";
 import { filterAndRankRecords } from "@/lib/record-search";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   getClientsListMeta,
   normalizeClientsListPayload,
@@ -26,6 +27,7 @@ import {
   US_STATE_OPTIONS,
 } from "@/lib/estimate-pricing";
 import { requireNonEmptyString } from "@/lib/field-validation";
+import { isValidYmd } from "@/lib/local-date";
 import "@/i18n";
 import ws from "@/styles/workspace-dark.module.css";
 import jobStyles from "./jobs.module.css";
@@ -191,7 +193,7 @@ export default function JobsPageClient({ initialList = null }) {
     }));
   }, []);
 
-  const fetchJobs = useCallback(async ({ page = 1, append = false } = {}) => {
+  const fetchJobs = useCallback(async ({ page = 1, append = false, search = "" } = {}) => {
     if (append) {
       setLoadingMore(true);
     } else {
@@ -199,9 +201,12 @@ export default function JobsPageClient({ initialList = null }) {
     }
     setError("");
     try {
-      const res = await apiFetch(
-        `/api/jobs?limit=${JOBS_UI_PAGE_SIZE}&page=${page}`,
-      );
+      const params = new URLSearchParams({
+        limit: String(JOBS_UI_PAGE_SIZE),
+        page: String(page),
+      });
+      if (search) params.set("search", search);
+      const res = await apiFetch(`/api/jobs?${params.toString()}`);
       const payload = await getJsonOrThrow(res, t("jobs.errors.fetch"));
       const batch = normalizeClientsListPayload(payload);
       const meta = getClientsListMeta(payload, batch.length);
@@ -217,15 +222,53 @@ export default function JobsPageClient({ initialList = null }) {
     }
   }, [t]);
 
+  const [listSearch, setListSearch] = useState("");
+  const debouncedListSearch = useDebouncedValue(listSearch.trim(), 300);
+  const filterClientId = String(searchParams.get("clientId") || "").trim();
+  const visibleJobs = useMemo(() => {
+    let list = jobs;
+    if (filterClientId) {
+      list = list.filter(
+        (job) => String(job.clientId || "") === filterClientId,
+      );
+    }
+    if (listSearch.trim() && debouncedListSearch.length < 2) {
+      list = filterAndRankRecords(list, listSearch, (job) => [
+        job.title,
+        job.clientName,
+        job.service,
+        job.status,
+        job.scopeDetails,
+      ]);
+    }
+    return list;
+  }, [jobs, debouncedListSearch.length, filterClientId, listSearch]);
+
   const loadMoreJobs = useCallback(() => {
     if (loading || loadingMore || jobs.length >= listTotal) return;
-    fetchJobs({ page: listPage + 1, append: true });
-  }, [fetchJobs, jobs.length, listPage, listTotal, loading, loadingMore]);
+    fetchJobs({
+      page: listPage + 1,
+      append: true,
+      search: debouncedListSearch.length >= 2 ? debouncedListSearch : "",
+    });
+  }, [
+    debouncedListSearch,
+    fetchJobs,
+    jobs.length,
+    listPage,
+    listTotal,
+    loading,
+    loadingMore,
+  ]);
 
   useEffect(() => {
-    if (initialList) return;
-    fetchJobs();
-  }, [fetchJobs, initialList]);
+    if (initialList && debouncedListSearch.length < 2) return;
+    fetchJobs({
+      page: 1,
+      append: false,
+      search: debouncedListSearch.length >= 2 ? debouncedListSearch : "",
+    });
+  }, [debouncedListSearch, fetchJobs, initialList]);
 
   const resetForm = () => {
     setForm(initialJob);
@@ -469,6 +512,52 @@ export default function JobsPageClient({ initialList = null }) {
     }
   };
 
+  const [schedulingJobId, setSchedulingJobId] = useState("");
+
+  const scheduleJob = async (job) => {
+    const jobId = job?._id || job?.id;
+    if (!jobId) return;
+    const defaultDate =
+      job.dueDate || new Date().toISOString().slice(0, 10);
+    const raw = window.prompt(
+      t("jobs.schedule.prompt", {
+        defaultValue: "Enter schedule date (YYYY-MM-DD)",
+      }),
+      defaultDate,
+    );
+    const date = String(raw || "").trim();
+    if (!date) return;
+    if (!isValidYmd(date)) {
+      setError(
+        t("jobs.schedule.invalidDate", {
+          defaultValue: "Enter a valid date as YYYY-MM-DD.",
+        }),
+      );
+      return;
+    }
+    setSchedulingJobId(String(jobId));
+    setError("");
+    try {
+      const res = await apiFetch(`/api/jobs/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: date }),
+      });
+      const payload = await getJsonOrThrow(res, t("jobs.errors.saveFallback"));
+      const updated = payload?.data || payload;
+      setJobs((current) =>
+        current.map((row) =>
+          String(row._id || row.id) === String(jobId) ? updated : row,
+        ),
+      );
+      router.push(`/calendar?date=${encodeURIComponent(date)}`);
+    } catch (err) {
+      setError(err.message || t("jobs.errors.saveFallback"));
+    } finally {
+      setSchedulingJobId("");
+    }
+  };
+
   const editJob = (job) => {
     setForm({
       title: job.title || "",
@@ -498,9 +587,36 @@ export default function JobsPageClient({ initialList = null }) {
 
   useEffect(() => {
     const jobId = String(searchParams.get("jobId") || "").trim();
-    if (!jobId || jobs.length === 0) return;
+    if (!jobId) return;
+
     const match = jobs.find((job) => String(job._id || job.id) === jobId);
-    if (match) editJob(match);
+    if (match) {
+      editJob(match);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/jobs/${jobId}`);
+        if (!res.ok || cancelled) return;
+        const payload = await res.json();
+        const job = payload?.data || payload;
+        if (!job?._id && !job?.id) return;
+        setJobs((prev) => {
+          const id = String(job._id || job.id);
+          if (prev.some((row) => String(row._id || row.id) === id)) return prev;
+          return [job, ...prev];
+        });
+        editJob(job);
+      } catch {
+        /* deep link optional */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams, jobs]);
 
   const generateEstimate = async () => {
@@ -618,27 +734,6 @@ export default function JobsPageClient({ initialList = null }) {
       setDeleteJobModal((current) => ({ ...current, loading: false }));
     }
   };
-
-  const [listSearch, setListSearch] = useState("");
-  const filterClientId = String(searchParams.get("clientId") || "").trim();
-  const visibleJobs = useMemo(() => {
-    let list = jobs;
-    if (filterClientId) {
-      list = list.filter(
-        (job) => String(job.clientId || "") === filterClientId,
-      );
-    }
-    if (listSearch.trim()) {
-      list = filterAndRankRecords(list, listSearch, (job) => [
-        job.title,
-        job.clientName,
-        job.service,
-        job.status,
-        job.scopeDetails,
-      ]);
-    }
-    return list;
-  }, [jobs, filterClientId, listSearch]);
 
   return (
     <main className={`${ws.page} ${jobStyles.jobsPage}`}>
@@ -1137,6 +1232,17 @@ export default function JobsPageClient({ initialList = null }) {
                         >
                           {t("jobs.workspace.financial")}
                         </Link>
+                        <button
+                          type="button"
+                          onClick={() => scheduleJob(job)}
+                          disabled={schedulingJobId === String(job._id)}
+                          className={jobStyles.btnFileLink}
+                          data-testid={`schedule-job-${job._id}`}
+                        >
+                          {schedulingJobId === String(job._id)
+                            ? t("jobs.schedule.saving", { defaultValue: "Scheduling…" })
+                            : t("jobs.schedule.action", { defaultValue: "Schedule Job" })}
+                        </button>
                         <button
                           type="button"
                           onClick={() => editJob(job)}

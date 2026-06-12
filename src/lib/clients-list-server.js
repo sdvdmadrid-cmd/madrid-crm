@@ -8,6 +8,7 @@ import { CLIENTS_UI_PAGE_SIZE } from "@/lib/clients-list-response";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { scopeByTenant } from "@/lib/tenant-scope";
+import { applyListSearchOr } from "@/lib/list-search-server";
 
 const TABLE = "clients";
 
@@ -15,21 +16,24 @@ const TABLE = "clients";
  * Paginated clients list for server components (same shape as GET /api/clients).
  */
 export async function listClientsForTenant(
-  { tenantDbId, role, page = 1, limit = CLIENTS_UI_PAGE_SIZE } = {},
+  { tenantDbId, role, page = 1, limit = CLIENTS_UI_PAGE_SIZE, search = "" } = {},
 ) {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || CLIENTS_UI_PAGE_SIZE));
   const from = (safePage - 1) * safeLimit;
   const to = from + safeLimit - 1;
 
-  const query = scopeByTenant(
+  let query = scopeByTenant(
     supabaseAdmin
       .from(TABLE)
       .select(CLIENT_SELECT_COLUMNS, { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(from, to),
+      .order("created_at", { ascending: false }),
     { tenantDbId, role },
   );
+
+  query = applyListSearchOr(query, ["name", "company", "email", "phone", "address"], search);
+
+  query = query.range(from, to);
 
   const { data, count, error } = await query;
   if (error) {

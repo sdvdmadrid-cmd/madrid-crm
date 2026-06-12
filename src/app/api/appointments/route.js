@@ -4,6 +4,7 @@ import { assertSafeText } from "@/lib/input-sanitizer";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canWrite,
+  canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -102,6 +103,7 @@ export async function GET(request) {
     const { tenantDbId, role, authenticated } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
+    if (!canRead(role)) return forbiddenResponse();
 
     const { searchParams } = new URL(request.url);
     const { paginate, page, limit, from, to } =

@@ -18,6 +18,7 @@ import {
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import {
   canManageSensitive,
+  canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
   unauthenticatedResponse,
@@ -77,8 +78,12 @@ export async function GET(request) {
     if (!authenticated) {
       return unauthenticatedResponse();
     }
+    if (!canRead(role)) {
+      return forbiddenResponse();
+    }
 
     const { searchParams } = new URL(request.url);
+    const search = String(searchParams.get("search") || searchParams.get("q") || "").trim();
     const { paginate, page, limit, from, to } =
       getListPaginationParams(searchParams);
 
@@ -88,6 +93,7 @@ export async function GET(request) {
         role,
         page,
         limit,
+        search,
       });
       return new Response(JSON.stringify(payload), {
         status: 200,

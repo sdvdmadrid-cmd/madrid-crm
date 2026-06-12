@@ -33,22 +33,33 @@ const DEV_PROFILES = {
     role: "admin",
   },
   viewer: {
-    tenantId: process.env.DEV_VIEWER_TENANT_ID || "tenant-admin",
-    email: (process.env.DEV_VIEWER_EMAIL || "viewer@FieldBase.local")
+    tenantId: process.env.DEV_VIEWER_TENANT_ID || process.env.DEV_ADMIN_TENANT_ID || "tenant-admin",
+    email: (process.env.DEV_VIEWER_EMAIL || "viewer@fieldbase.local")
       .trim()
       .toLowerCase(),
-    password: String(process.env.DEV_VIEWER_PASSWORD || "").trim(),
+    password: String(
+      process.env.DEV_VIEWER_PASSWORD || process.env.DEV_ADMIN_PASSWORD || "",
+    ).trim(),
     name: process.env.DEV_VIEWER_NAME || "Viewer Dev",
     role: "viewer",
   },
   contractor: {
-    tenantId: process.env.DEV_CONTRACTOR_TENANT_ID || "tenant-admin",
+    tenantId:
+      process.env.DEV_CONTRACTOR_TENANT_ID ||
+      process.env.DEV_ADMIN_TENANT_ID ||
+      "tenant-admin",
     email: (
-      process.env.DEV_CONTRACTOR_EMAIL || "contractor@FieldBase.local"
+      process.env.DEV_CONTRACTOR_EMAIL ||
+      process.env.DEV_ADMIN_EMAIL ||
+      "contractor@fieldbase.local"
     )
       .trim()
       .toLowerCase(),
-    password: String(process.env.DEV_CONTRACTOR_PASSWORD || "").trim(),
+    password: String(
+      process.env.DEV_CONTRACTOR_PASSWORD ||
+        process.env.DEV_ADMIN_PASSWORD ||
+        "",
+    ).trim(),
     name: process.env.DEV_CONTRACTOR_NAME || "Contractor Dev",
     role: "contractor",
   },

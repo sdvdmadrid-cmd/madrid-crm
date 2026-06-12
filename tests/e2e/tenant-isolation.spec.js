@@ -62,6 +62,38 @@ test.describe("Tenant isolation", () => {
     const leadsJson = await leadsRes.json();
     const leads = Array.isArray(leadsJson?.data) ? leadsJson.data : [];
     assertRowsBelongToTenant(leads, tenantId, "lead-inbox");
+
+    const invoicesRes = await page.request.get("/api/invoices?limit=10&page=1");
+    expect(invoicesRes.ok()).toBeTruthy();
+    const invoicesJson = await invoicesRes.json();
+    const invoices = Array.isArray(invoicesJson?.data)
+      ? invoicesJson.data
+      : Array.isArray(invoicesJson)
+        ? invoicesJson
+        : [];
+    assertRowsBelongToTenant(invoices, tenantId, "invoices");
+
+    const estimatesRes = await page.request.get("/api/estimates?limit=10&page=1");
+    expect(estimatesRes.ok()).toBeTruthy();
+    const estimatesJson = await estimatesRes.json();
+    const estimates = Array.isArray(estimatesJson?.data)
+      ? estimatesJson.data
+      : Array.isArray(estimatesJson?.data?.data)
+        ? estimatesJson.data.data
+        : [];
+    assertRowsBelongToTenant(estimates, tenantId, "estimates");
+
+    const appointmentsRes = await page.request.get(
+      "/api/appointments?from=2020-01-01&to=2035-12-31",
+    );
+    expect(appointmentsRes.ok()).toBeTruthy();
+    const appointmentsJson = await appointmentsRes.json();
+    const appointments = Array.isArray(appointmentsJson)
+      ? appointmentsJson
+      : Array.isArray(appointmentsJson?.data)
+        ? appointmentsJson.data
+        : [];
+    assertRowsBelongToTenant(appointments, tenantId, "appointments");
   });
 
   test("foreign client id returns not found", async ({ page }) => {

@@ -12,6 +12,7 @@ import {
   normalizeClientsListPayload,
 } from "@/lib/clients-list-response";
 import { filterAndRankRecords } from "@/lib/record-search";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientFormModal from "@/components/clients/ClientFormModal";
@@ -42,11 +43,13 @@ export default function ClientsPageClient({ initialList = null }) {
   const [clientDetails, setClientDetails] = useState(null);
   const [detailsWarnings, setDetailsWarnings] = useState([]);
   const [clientSearch, setClientSearch] = useState("");
+  const debouncedClientSearch = useDebouncedValue(clientSearch.trim(), 300);
   const [listPage, setListPage] = useState(initialList?.page ?? 1);
   const [listTotal, setListTotal] = useState(initialList?.total ?? 0);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const displayedClients = useMemo(() => {
+    if (debouncedClientSearch.length >= 2) return clients;
     if (!clientSearch.trim()) return clients;
     return filterAndRankRecords(clients, clientSearch, (client) => [
       client.name,
@@ -60,9 +63,9 @@ export default function ClientsPageClient({ initialList = null }) {
       client.zip,
       client.notes,
     ]);
-  }, [clients, clientSearch]);
+  }, [clients, clientSearch, debouncedClientSearch]);
 
-  const fetchClients = useCallback(async ({ page = 1, append = false } = {}) => {
+  const fetchClients = useCallback(async ({ page = 1, append = false, search = "" } = {}) => {
     if (append) {
       setLoadingMore(true);
     } else {
@@ -70,9 +73,12 @@ export default function ClientsPageClient({ initialList = null }) {
     }
     setError("");
     try {
-      const res = await apiFetch(
-        `/api/clients?limit=${CLIENTS_UI_PAGE_SIZE}&page=${page}`,
-      );
+      const params = new URLSearchParams({
+        limit: String(CLIENTS_UI_PAGE_SIZE),
+        page: String(page),
+      });
+      if (search) params.set("search", search);
+      const res = await apiFetch(`/api/clients?${params.toString()}`);
       const payload = await getJsonOrThrow(res, t("clients.errors.fetch"));
       const batch = normalizeClientsListPayload(payload);
       const meta = getClientsListMeta(payload, batch.length);
@@ -90,13 +96,29 @@ export default function ClientsPageClient({ initialList = null }) {
 
   const loadMoreClients = useCallback(() => {
     if (loading || loadingMore || clients.length >= listTotal) return;
-    fetchClients({ page: listPage + 1, append: true });
-  }, [clients.length, fetchClients, listPage, listTotal, loading, loadingMore]);
+    fetchClients({
+      page: listPage + 1,
+      append: true,
+      search: debouncedClientSearch.length >= 2 ? debouncedClientSearch : "",
+    });
+  }, [
+    clients.length,
+    debouncedClientSearch,
+    fetchClients,
+    listPage,
+    listTotal,
+    loading,
+    loadingMore,
+  ]);
 
   useEffect(() => {
-    if (initialList) return;
-    fetchClients();
-  }, [fetchClients, initialList]);
+    if (initialList && debouncedClientSearch.length < 2) return;
+    fetchClients({
+      page: 1,
+      append: false,
+      search: debouncedClientSearch.length >= 2 ? debouncedClientSearch : "",
+    });
+  }, [debouncedClientSearch, fetchClients, initialList]);
 
   const closeForm = () => {
     setForm(EMPTY_CLIENT_FORM);

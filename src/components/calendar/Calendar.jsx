@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import "@/i18n";
 import WeatherLocationAutocomplete from "@/components/calendar/WeatherLocationAutocomplete";
@@ -9,6 +9,7 @@ import CalendarHeader from "./CalendarHeader";
 import DayCell from "./DayCell";
 import AppointmentModal from "./AppointmentModal";
 import { useAppointments } from "@/hooks/useAppointments";
+import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import { useWeather } from "@/hooks/useWeather";
 import { formatLocalDate, isValidYmd, parseYmdToLocalDate } from "@/lib/local-date";
 
@@ -133,6 +134,7 @@ function WeatherIcon({ variant = "default", isDay = true }) {
 
 export default function Calendar() {
   const { t } = useTranslation();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -165,6 +167,12 @@ export default function Calendar() {
     update,
     remove,
   } = useAppointments(appointmentRange);
+
+  const {
+    jobs: scheduledJobs,
+    estimates: scheduledEstimates,
+    refetch: refetchCalendarEvents,
+  } = useCalendarEvents(appointmentRange);
 
   const [defaultWeatherLocation, setDefaultWeatherLocation] = useState("");
   const [activeWeatherLocationLabel, setActiveWeatherLocationLabel] = useState("");
@@ -203,7 +211,7 @@ export default function Calendar() {
     return dates;
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dateParam = searchParams.get("date");
     if (!dateParam || !isValidYmd(dateParam)) return;
     const parsed = parseYmdToLocalDate(dateParam);
@@ -347,6 +355,33 @@ export default function Calendar() {
     }
     return map;
   }, [appointments]);
+
+  const jobsByDateKey = useMemo(() => {
+    const map = new Map();
+    for (const job of scheduledJobs) {
+      const rawDate = String(job.dueDate || "").trim();
+      const dateKey = isValidYmd(rawDate)
+        ? rawDate
+        : isValidYmd(rawDate.slice(0, 10))
+          ? rawDate.slice(0, 10)
+          : "";
+      if (!dateKey) continue;
+      if (!map.has(dateKey)) map.set(dateKey, []);
+      map.get(dateKey).push(job);
+    }
+    return map;
+  }, [scheduledJobs]);
+
+  const estimatesByDateKey = useMemo(() => {
+    const map = new Map();
+    for (const est of scheduledEstimates) {
+      const dateKey = String(est.scheduledVisitDate || "").trim();
+      if (!dateKey) continue;
+      if (!map.has(dateKey)) map.set(dateKey, []);
+      map.get(dateKey).push(est);
+    }
+    return map;
+  }, [scheduledEstimates]);
 
   const { getWeather, getDayWeather } = useWeather(appointments, {
     calendarDays,
@@ -538,6 +573,7 @@ export default function Calendar() {
       } else {
         await create(formData);
       }
+      await refetchCalendarEvents();
       const savedDate = parseYmdToLocalDate(formData.date);
       if (savedDate) {
         const sameMonth =
@@ -563,6 +599,16 @@ export default function Calendar() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleJobClick = (job) => {
+    const id = job._id || job.id;
+    if (id) router.push(`/jobs?jobId=${encodeURIComponent(id)}`);
+  };
+
+  const handleEstimateClick = (estimate) => {
+    const id = estimate._id || estimate.id;
+    if (id) router.push(`/estimates?estimateId=${encodeURIComponent(id)}`);
   };
 
   const handleRescheduleAppointment = async (appointmentId, newDateKey) => {
@@ -976,8 +1022,12 @@ export default function Calendar() {
                   isCurrentMonth={dayObj.isCurrentMonth}
                   isToday={isToday(dayObj.date)}
                   dayAppointments={appointmentsByDateKey.get(dateKey) || []}
+                  scheduledJobs={jobsByDateKey.get(dateKey) || []}
+                  scheduledEstimates={estimatesByDateKey.get(dateKey) || []}
                   onClick={handleDayClick}
                   onEventClick={handleEventClick}
+                  onJobClick={handleJobClick}
+                  onEstimateClick={handleEstimateClick}
                   onReschedule={handleRescheduleAppointment}
                   draggingAppointmentId={draggingAppointmentId}
                   onDragStart={(id) => setDraggingAppointmentId(id)}
