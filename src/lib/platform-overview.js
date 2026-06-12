@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { filterRowsWithTenantId, rowHasTenantId } from "@/lib/tenant-row-guard";
 
 function toTenantId(value) {
   return String(value || "default").trim() || "default";
@@ -76,10 +77,10 @@ export async function buildPlatformOverview() {
       readTenantRows("contracts", "tenant_id"),
     ]);
 
-    const clientsRows = clientsPack.rows;
-    const jobsRows = jobsPack.rows;
-    const invoicesRows = invoicesPack.rows;
-    const contractsRows = contractsPack.rows;
+    const clientsRows = filterRowsWithTenantId(clientsPack.rows);
+    const jobsRows = filterRowsWithTenantId(jobsPack.rows);
+    const invoicesRows = filterRowsWithTenantId(invoicesPack.rows);
+    const contractsRows = filterRowsWithTenantId(contractsPack.rows);
     const metricsTruncated =
       clientsPack.truncated ||
       jobsPack.truncated ||
@@ -230,8 +231,8 @@ async function readEstimateCountsByUser() {
   }
 
   return (data || []).reduce((acc, row) => {
-    const key = String(row.tenant_id || "");
-    if (!key) return acc;
+    if (!rowHasTenantId(row)) return acc;
+    const key = String(row.tenant_id).trim();
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
