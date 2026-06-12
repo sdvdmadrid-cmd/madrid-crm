@@ -1,6 +1,7 @@
 import {
   canDeleteRecords,
   canManageSensitiveData,
+  canReadTenantData,
   canSendExternalCommunications,
   canWriteOperationalData,
   getRoleCapabilities,
@@ -110,6 +111,10 @@ export async function getAuthenticatedTenantContext(request) {
     console.error("[tenant] Unexpected Supabase user resolution error", error);
     return fallback;
   }
+}
+
+export function canRead(role) {
+  return canReadTenantData(role);
 }
 
 export function canWrite(role) {

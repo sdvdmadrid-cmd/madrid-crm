@@ -9,6 +9,7 @@ import { serializeEstimateBase } from "@/lib/estimate-serializer";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { scopeByTenant } from "@/lib/tenant-scope";
+import { applyListSearchOr } from "@/lib/list-search-server";
 
 const ESTIMATES_TABLE = "estimates";
 
@@ -24,22 +25,29 @@ function serializeEstimate(row) {
 }
 
 export async function listEstimatesForTenant(
-  { tenantDbId, role, page = 1, limit = ESTIMATES_UI_PAGE_SIZE } = {},
+  { tenantDbId, role, page = 1, limit = ESTIMATES_UI_PAGE_SIZE, search = "" } = {},
 ) {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || ESTIMATES_UI_PAGE_SIZE));
   const from = (safePage - 1) * safeLimit;
   const to = from + safeLimit - 1;
 
-  const query = scopeByTenant(
+  let query = scopeByTenant(
     supabaseAdmin
       .from(ESTIMATES_TABLE)
       .select("*", { count: "exact" })
       .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .range(from, to),
+      .order("created_at", { ascending: false }),
     { tenantDbId, role },
   );
+
+  query = applyListSearchOr(
+    query,
+    ["client_name", "estimate_number", "status", "notes"],
+    search,
+  );
+
+  query = query.range(from, to);
 
   const { data, error, count } = await query;
   if (error) {

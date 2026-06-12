@@ -16,6 +16,7 @@ import {
   openPrintableHtmlDocument,
 } from "@/lib/print-html-document";
 import { filterAndRankRecords } from "@/lib/record-search";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   getClientsListMeta,
   normalizeClientsListPayload,
@@ -147,9 +148,10 @@ export default function InvoicesPageClient({ initialList = null }) {
   const [quoteLookup, setQuoteLookup] = useState(null);
   const [quoteLookupLoading, setQuoteLookupLoading] = useState(false);
   const [listSearch, setListSearch] = useState("");
+  const debouncedListSearch = useDebouncedValue(listSearch.trim(), 300);
 
   const filterClientId = String(searchParams.get("clientId") || "").trim();
-  const canEditInvoices = capabilities.canWriteOperationalData;
+  const canEditInvoices = capabilities.canManageSensitiveData;
   const canManageInvoicePayments = capabilities.canManageSensitiveData;
   const formSectionRef = useRef(null);
 
@@ -160,7 +162,7 @@ export default function InvoicesPageClient({ initialList = null }) {
         (invoice) => String(invoice.clientId || "") === filterClientId,
       );
     }
-    if (listSearch.trim()) {
+    if (listSearch.trim() && debouncedListSearch.length < 2) {
       list = filterAndRankRecords(list, listSearch, (invoice) => [
         invoice.invoiceNumber,
         invoice.clientName,
@@ -170,7 +172,7 @@ export default function InvoicesPageClient({ initialList = null }) {
       ]);
     }
     return list;
-  }, [invoices, filterClientId, listSearch]);
+  }, [debouncedListSearch.length, invoices, filterClientId, listSearch]);
 
   const mapUiError = (err, fallbackText) => {
     const raw = String(err?.message || "").trim();
@@ -297,7 +299,7 @@ export default function InvoicesPageClient({ initialList = null }) {
 
   const lastInvoiceFetchRef = useRef(0);
 
-  const fetchInvoices = useCallback(async ({ page = 1, append = false, force = false } = {}) => {
+  const fetchInvoices = useCallback(async ({ page = 1, append = false, force = false, search = "" } = {}) => {
     if (append) {
       setLoadingMore(true);
     } else {
@@ -305,9 +307,12 @@ export default function InvoicesPageClient({ initialList = null }) {
     }
     setError("");
     try {
-      const res = await apiFetch(
-        `/api/invoices?limit=${INVOICES_UI_PAGE_SIZE}&page=${page}`,
-      );
+      const params = new URLSearchParams({
+        limit: String(INVOICES_UI_PAGE_SIZE),
+        page: String(page),
+      });
+      if (search) params.set("search", search);
+      const res = await apiFetch(`/api/invoices?${params.toString()}`);
       const payload = await getJsonOrThrow(res, t("invoices.errors.fetch"));
       const batch = normalizeClientsListPayload(payload);
       const meta = getClientsListMeta(payload, batch.length);
@@ -328,8 +333,29 @@ export default function InvoicesPageClient({ initialList = null }) {
 
   const loadMoreInvoices = useCallback(() => {
     if (loading || loadingMore || invoices.length >= listTotal) return;
-    fetchInvoices({ page: listPage + 1, append: true });
-  }, [fetchInvoices, invoices.length, listPage, listTotal, loading, loadingMore]);
+    fetchInvoices({
+      page: listPage + 1,
+      append: true,
+      search: debouncedListSearch.length >= 2 ? debouncedListSearch : "",
+    });
+  }, [
+    debouncedListSearch,
+    fetchInvoices,
+    invoices.length,
+    listPage,
+    listTotal,
+    loading,
+    loadingMore,
+  ]);
+
+  useEffect(() => {
+    if (initialList && debouncedListSearch.length < 2) return;
+    fetchInvoices({
+      page: 1,
+      append: false,
+      search: debouncedListSearch.length >= 2 ? debouncedListSearch : "",
+    });
+  }, [debouncedListSearch, fetchInvoices, initialList]);
 
   useEffect(() => {
     const payment = searchParams.get("payment");
@@ -344,11 +370,8 @@ export default function InvoicesPageClient({ initialList = null }) {
       setPaymentNotice(t("invoices.guide.paymentCancelled"));
       setPaymentNoticeTone("info");
       router.replace("/invoices", { scroll: false });
-      return;
     }
-    if (initialList) return;
-    fetchInvoices();
-  }, [searchParams, router, fetchInvoices, t, initialList]);
+  }, [searchParams, router, fetchInvoices, t]);
 
   useEffect(() => {
     const onVisible = () => {

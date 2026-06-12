@@ -8,6 +8,7 @@ import { hydrateInvoiceDocsParty } from "@/lib/invoice-party";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { scopeByTenant } from "@/lib/tenant-scope";
+import { applyListSearchOr } from "@/lib/list-search-server";
 
 const INVOICES = "invoices";
 
@@ -53,7 +54,7 @@ export function serializeInvoiceRow(doc) {
 }
 
 export async function listInvoicesForTenant(
-  { tenantDbId, role, page = 1, limit = INVOICES_UI_PAGE_SIZE } = {},
+  { tenantDbId, role, page = 1, limit = INVOICES_UI_PAGE_SIZE, search = "" } = {},
 ) {
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(
@@ -63,14 +64,21 @@ export async function listInvoicesForTenant(
   const from = (safePage - 1) * safeLimit;
   const to = from + safeLimit - 1;
 
-  const query = scopeByTenant(
+  let query = scopeByTenant(
     supabaseAdmin
       .from(INVOICES)
       .select("*", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(from, to),
+      .order("created_at", { ascending: false }),
     { tenantDbId, role },
   );
+
+  query = applyListSearchOr(
+    query,
+    ["client_name", "invoice_number", "invoice_title", "status"],
+    search,
+  );
+
+  query = query.range(from, to);
 
   const { data, error, count } = await query;
   if (error) {

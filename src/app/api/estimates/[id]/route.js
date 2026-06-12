@@ -90,6 +90,10 @@ function buildUpdateRow(body = {}) {
   if ("clientName" in body) {
     next.client_name = String(body.clientName || "").trim();
   }
+  if ("scheduledVisitDate" in body) {
+    const raw = String(body.scheduledVisitDate || "").trim();
+    next.scheduled_visit_date = raw || null;
+  }
   if ("status" in body) {
     next.status = requestedStatus;
   }

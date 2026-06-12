@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { filterAndRankRecords } from "@/lib/record-search";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { isValidYmd } from "@/lib/local-date";
 import {
   getClientsListMeta,
   normalizeClientsListPayload,
@@ -81,6 +83,7 @@ export default function EstimatesPageClient({ initialList = null }) {
   const searchParams = useSearchParams();
   const filterClientId = String(searchParams.get("clientId") || "").trim();
   const [filterQuery, setFilterQuery] = useState("");
+  const debouncedFilterQuery = useDebouncedValue(filterQuery.trim(), 300);
   const [statusFilter, setStatusFilter] = useState("all");
   const [hideTestData, setHideTestData] = useState(true);
   const [estimates, setEstimates] = useState(initialList?.data ?? []);
@@ -95,6 +98,45 @@ export default function EstimatesPageClient({ initialList = null }) {
   const [sendingEmailId, setSendingEmailId] = useState("");
   const [duplicatingId, setDuplicatingId] = useState("");
   const [convertingId, setConvertingId] = useState("");
+  const [schedulingVisitId, setSchedulingVisitId] = useState("");
+
+  async function scheduleSiteVisit(estimate) {
+    if (!estimate?.id) return;
+    const defaultDate =
+      estimate.scheduledVisitDate || new Date().toISOString().slice(0, 10);
+    const raw = window.prompt(
+      "Enter site visit date (YYYY-MM-DD)",
+      defaultDate,
+    );
+    const date = String(raw || "").trim();
+    if (!date) return;
+    if (!isValidYmd(date)) {
+      setStatusMessage("Enter a valid date as YYYY-MM-DD.");
+      return;
+    }
+    setSchedulingVisitId(estimate.id);
+    setStatusMessage("");
+    try {
+      const response = await apiFetch(`/api/estimates/${estimate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledVisitDate: date }),
+      });
+      const payload = await getJsonOrThrow(response, "Unable to schedule site visit.");
+      const updated = payload?.data || payload;
+      setEstimates((current) =>
+        current.map((row) => (row.id === estimate.id ? { ...row, ...updated } : row)),
+      );
+      setSelectedEstimate((current) =>
+        current?.id === estimate.id ? { ...current, ...updated } : current,
+      );
+      router.push(`/calendar?date=${encodeURIComponent(date)}`);
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to schedule site visit.");
+    } finally {
+      setSchedulingVisitId("");
+    }
+  }
 
   // Contract generation modal state. Surfaces a small inline form so the
   // contractor can pick a category before we POST to the contract endpoint.
@@ -221,7 +263,7 @@ export default function EstimatesPageClient({ initialList = null }) {
       );
     }
 
-    if (filterQuery.trim()) {
+    if (filterQuery.trim() && debouncedFilterQuery.length < 2) {
       list = filterAndRankRecords(list, filterQuery, (row) => [
         row.clientName,
         row.estimateNumber,
@@ -232,7 +274,7 @@ export default function EstimatesPageClient({ initialList = null }) {
     }
 
     return list;
-  }, [estimates, filterClientId, filterQuery, hideTestData, statusFilter]);
+  }, [debouncedFilterQuery.length, estimates, filterClientId, filterQuery, hideTestData, statusFilter]);
 
   const kanbanColumns = useMemo(() => {
     const cols = { draft: [], sent: [], changes_requested: [], approved: [], declined: [] };
@@ -255,17 +297,21 @@ export default function EstimatesPageClient({ initialList = null }) {
     [kanbanColumns],
   );
 
-  const fetchEstimates = useCallback(async ({ page = 1, append = false } = {}) => {
+  const fetchEstimates = useCallback(async ({ page = 1, append = false, search = "" } = {}) => {
     if (append) {
       setLoadingMore(true);
     } else {
       setLoading(true);
     }
     try {
-      const response = await apiFetch(
-        `/api/estimates?limit=${ESTIMATES_UI_PAGE_SIZE}&page=${page}`,
-        { suppressUnauthorizedEvent: true },
-      );
+      const params = new URLSearchParams({
+        limit: String(ESTIMATES_UI_PAGE_SIZE),
+        page: String(page),
+      });
+      if (search) params.set("search", search);
+      const response = await apiFetch(`/api/estimates?${params.toString()}`, {
+        suppressUnauthorizedEvent: true,
+      });
       const payload = await getJsonOrThrow(response, "Unable to load estimates.");
       const batch = normalizeClientsListPayload(payload);
       const meta = getClientsListMeta(payload, batch.length);
@@ -291,17 +337,37 @@ export default function EstimatesPageClient({ initialList = null }) {
 
   const loadMoreEstimates = useCallback(() => {
     if (loading || loadingMore || estimates.length >= listTotal) return;
-    fetchEstimates({ page: listPage + 1, append: true });
-  }, [estimates.length, fetchEstimates, listPage, listTotal, loading, loadingMore]);
+    fetchEstimates({
+      page: listPage + 1,
+      append: true,
+      search: debouncedFilterQuery.length >= 2 ? debouncedFilterQuery : "",
+    });
+  }, [
+    debouncedFilterQuery,
+    estimates.length,
+    fetchEstimates,
+    listPage,
+    listTotal,
+    loading,
+    loadingMore,
+  ]);
 
   const loadEstimates = useCallback(() => {
-    fetchEstimates({ page: 1, append: false });
-  }, [fetchEstimates]);
+    fetchEstimates({
+      page: 1,
+      append: false,
+      search: debouncedFilterQuery.length >= 2 ? debouncedFilterQuery : "",
+    });
+  }, [debouncedFilterQuery, fetchEstimates]);
 
   useEffect(() => {
-    if (initialList) return;
-    fetchEstimates();
-  }, [fetchEstimates, initialList]);
+    if (initialList && debouncedFilterQuery.length < 2) return;
+    fetchEstimates({
+      page: 1,
+      append: false,
+      search: debouncedFilterQuery.length >= 2 ? debouncedFilterQuery : "",
+    });
+  }, [debouncedFilterQuery, fetchEstimates, initialList]);
 
   async function updateEstimateStatus(estimate, nextStatus) {
     if (!estimate?.id) return;
@@ -362,6 +428,41 @@ export default function EstimatesPageClient({ initialList = null }) {
       // Keep list snapshot when detail refresh fails.
     }
   }, []);
+
+  useEffect(() => {
+    const estimateId = String(searchParams.get("estimateId") || "").trim();
+    if (!estimateId) return;
+
+    const match = estimates.find((row) => String(row.id) === estimateId);
+    if (match) {
+      void openEstimateDetail(match);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiFetch(`/api/estimates/${estimateId}`, {
+          suppressUnauthorizedEvent: true,
+        });
+        if (!response.ok || cancelled) return;
+        const payload = await getJsonOrThrow(response, "Unable to load estimate.");
+        const estimate = payload?.data || payload;
+        if (!estimate?.id) return;
+        setEstimates((prev) => {
+          if (prev.some((row) => row.id === estimate.id)) return prev;
+          return [estimate, ...prev];
+        });
+        if (!cancelled) await openEstimateDetail(estimate);
+      } catch {
+        /* deep link optional */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, estimates, openEstimateDetail]);
 
   async function convertEstimateToJob(estimate) {
     if (!estimate?.id) return;
@@ -867,6 +968,20 @@ export default function EstimatesPageClient({ initialList = null }) {
                           : "Convert to Job"}
                       </button>
                     ) : null}
+                    <button
+                      type="button"
+                      onClick={() => scheduleSiteVisit(selectedEstimate)}
+                      disabled={schedulingVisitId === selectedEstimate.id}
+                      className={ws.btnSecondary}
+                      data-testid="schedule-site-visit"
+                      style={{ width: "100%", marginBottom: 8 }}
+                    >
+                      {schedulingVisitId === selectedEstimate.id
+                        ? "Scheduling visit…"
+                        : selectedEstimate.scheduledVisitDate
+                          ? `Reschedule visit (${selectedEstimate.scheduledVisitDate})`
+                          : "Schedule site visit"}
+                    </button>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <button
                         type="button"
