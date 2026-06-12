@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import "@/i18n";
 import WeatherLocationAutocomplete from "@/components/calendar/WeatherLocationAutocomplete";
@@ -9,7 +10,31 @@ import DayCell from "./DayCell";
 import AppointmentModal from "./AppointmentModal";
 import { useAppointments } from "@/hooks/useAppointments";
 import { useWeather } from "@/hooks/useWeather";
-import { formatLocalDate, parseYmdToLocalDate } from "@/lib/local-date";
+import { formatLocalDate, isValidYmd, parseYmdToLocalDate } from "@/lib/local-date";
+
+const APPOINTMENT_RANGE_PAD_MONTHS = 3;
+
+/** Default date when adding from the today strip while viewing a future month. */
+function scheduleAnchorDate(viewedDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (
+    viewedDate.getFullYear() === today.getFullYear() &&
+    viewedDate.getMonth() === today.getMonth()
+  ) {
+    return new Date(today);
+  }
+  const firstOfViewed = new Date(
+    viewedDate.getFullYear(),
+    viewedDate.getMonth(),
+    1,
+  );
+  firstOfViewed.setHours(0, 0, 0, 0);
+  if (firstOfViewed >= today) {
+    return firstOfViewed;
+  }
+  return new Date(today);
+}
 
 function guessLocationFromTimezone() {
   try {
@@ -108,18 +133,24 @@ function WeatherIcon({ variant = "default", isDay = true }) {
 
 export default function Calendar() {
   const { t } = useTranslation();
+  const searchParams = useSearchParams();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [draggingAppointmentId, setDraggingAppointmentId] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
 
   const appointmentRange = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const fromDate = new Date(year, month - 1, 1);
-    const toDate = new Date(year, month + 2, 0);
+    const fromDate = new Date(year, month - APPOINTMENT_RANGE_PAD_MONTHS, 1);
+    const toDate = new Date(
+      year,
+      month + APPOINTMENT_RANGE_PAD_MONTHS + 1,
+      0,
+    );
     return {
       from: formatLocalDate(fromDate),
       to: formatLocalDate(toDate),
@@ -171,6 +202,13 @@ export default function Calendar() {
     }
     return dates;
   }, []);
+
+  useEffect(() => {
+    const dateParam = searchParams.get("date");
+    if (!dateParam || !isValidYmd(dateParam)) return;
+    const parsed = parseYmdToLocalDate(dateParam);
+    if (parsed) setCurrentDate(parsed);
+  }, [searchParams]);
 
   useEffect(() => {
     import("@/lib/client-auth").then(({ apiFetch }) => {
@@ -294,7 +332,14 @@ export default function Calendar() {
   const appointmentsByDateKey = useMemo(() => {
     const map = new Map();
     for (const apt of appointments) {
-      const aptDate = parseYmdToLocalDate(apt.date);
+      const rawDate = String(apt.date || "").trim();
+      const dateKey = isValidYmd(rawDate)
+        ? rawDate
+        : isValidYmd(rawDate.slice(0, 10))
+          ? rawDate.slice(0, 10)
+          : "";
+      if (!dateKey) continue;
+      const aptDate = parseYmdToLocalDate(dateKey);
       if (!aptDate) continue;
       const key = formatLocalDate(aptDate);
       if (!map.has(key)) map.set(key, []);
@@ -467,6 +512,13 @@ export default function Calendar() {
   };
 
   const handleDayClick = (date) => {
+    const isSameMonth =
+      date.getFullYear() === currentDate.getFullYear() &&
+      date.getMonth() === currentDate.getMonth();
+    if (!isSameMonth) {
+      setCurrentDate(new Date(date.getFullYear(), date.getMonth(), 1));
+    }
+    setSaveNotice("");
     setSelectedDate(date);
     setEditingAppointment(null);
     setIsModalOpen(true);
@@ -485,6 +537,25 @@ export default function Calendar() {
         await update(editingAppointment._id, formData);
       } else {
         await create(formData);
+      }
+      const savedDate = parseYmdToLocalDate(formData.date);
+      if (savedDate) {
+        const sameMonth =
+          savedDate.getFullYear() === currentDate.getFullYear() &&
+          savedDate.getMonth() === currentDate.getMonth();
+        if (!sameMonth) {
+          setCurrentDate(
+            new Date(savedDate.getFullYear(), savedDate.getMonth(), 1),
+          );
+          setSaveNotice(
+            t("calendar.savedOtherMonth", {
+              date: formData.date,
+              defaultValue: `Appointment saved for ${formData.date}. Navigated to that month.`,
+            }),
+          );
+        } else {
+          setSaveNotice("");
+        }
       }
       setIsModalOpen(false);
       setEditingAppointment(null);
@@ -604,6 +675,15 @@ export default function Calendar() {
         </div>
       )}
 
+      {saveNotice ? (
+        <div
+          className="px-6 py-3 bg-blue-50 border-b border-blue-200"
+          data-testid="calendar-save-notice"
+        >
+          <p className="text-sm text-blue-800">{saveNotice}</p>
+        </div>
+      ) : null}
+
       {!loading ? (
         <div
           className="relative z-10 px-3 sm:px-6 md:px-8 pt-2 flex-none"
@@ -616,7 +696,7 @@ export default function Calendar() {
               </p>
               <button
                 type="button"
-                onClick={() => handleDayClick(new Date())}
+                onClick={() => handleDayClick(scheduleAnchorDate(currentDate))}
                 className="text-xs font-semibold text-blue-700 hover:text-blue-900"
               >
                 {t("calendar.addToday", { defaultValue: "Add appointment" })}

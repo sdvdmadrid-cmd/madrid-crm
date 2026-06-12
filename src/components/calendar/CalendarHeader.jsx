@@ -32,6 +32,7 @@ export default function CalendarHeader({
           onClick={onPrevMonth}
           className="h-9 w-9 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-lg sm:rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/15 hover:border-white/30 transition-all"
           aria-label={t("calendar.prevMonth")}
+          data-testid="calendar-prev-month"
         >
           <span className="text-lg leading-none">❮</span>
         </button>
@@ -47,6 +48,7 @@ export default function CalendarHeader({
           onClick={onNextMonth}
           className="h-9 w-9 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-lg sm:rounded-xl border border-white/20 bg-white/5 text-white hover:bg-white/15 hover:border-white/30 transition-all"
           aria-label={t("calendar.nextMonth")}
+          data-testid="calendar-next-month"
         >
           <span className="text-lg leading-none">❯</span>
         </button>

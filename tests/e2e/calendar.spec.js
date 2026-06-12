@@ -10,6 +10,31 @@ function addDaysYmd(base, delta) {
   return ymdFromParts(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+async function expectAppointmentOnDay(page, dateYmd, title) {
+  const cell = page.getByTestId(`calendar-day-${dateYmd}`);
+  await expect(cell).toBeVisible({ timeout: 15_000 });
+  const moreBtn = cell.getByRole('button', { name: /^\+\d+ more$/ });
+  if (await moreBtn.isVisible().catch(() => false)) {
+    await moreBtn.click();
+  }
+  await expect
+    .poll(
+      async () => cell.getByText(title).isVisible().catch(() => false),
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+}
+
+function futureDate(monthsAhead, dayOffset = 0) {
+  const base = new Date();
+  const day = Math.min(28, 12 + monthsAhead * 3 + dayOffset);
+  const d = new Date(base.getFullYear(), base.getMonth() + monthsAhead, day);
+  if (d <= base) {
+    d.setDate(base.getDate() + 1);
+  }
+  return ymdFromParts(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 test.describe('calendar date safety and weather forecast', () => {
   async function expectCalendarLoaded(page) {
     await expect.poll(() => {
@@ -111,9 +136,16 @@ test.describe('calendar date safety and weather forecast', () => {
     );
     await page.getByTestId('appointment-save-button').click();
     expect((await updateResponse).ok()).toBeTruthy();
+    await page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/appointments') &&
+        response.request().method() === 'GET',
+    );
 
-    await expect(page.getByText(uniqueTitle).first()).toBeVisible({ timeout: 20_000 });
-    await page.getByText(uniqueTitle).first().click();
+    await page.goto(`/calendar?date=${futureUpdated}`, { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+    await expectAppointmentOnDay(page, futureUpdated, uniqueTitle);
+    await page.getByTestId(`calendar-day-${futureUpdated}`).getByText(uniqueTitle).click();
     await page.getByTestId('appointment-edit-button').click();
     await expect(page.getByTestId('appointment-date-input')).toHaveValue(futureUpdated);
   });
@@ -139,5 +171,124 @@ test.describe('calendar date safety and weather forecast', () => {
     expect(res.status()).toBe(400);
     const body = await res.json();
     expect(body?.error).toContain('Cannot schedule in the past');
+  });
+});
+
+test.describe('calendar multi-month scheduling', () => {
+  async function expectCalendarLoaded(page) {
+    await expect(page.getByTestId('calendar-shell')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('calendar-forecast-strip')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid^="calendar-day-"]').first()).toBeVisible({
+      timeout: 20_000,
+    });
+  }
+
+  async function saveMinimalAppointment(page, { title, dateYmd }) {
+    await page.getByTestId('appointment-title-input').fill(title);
+    await page.getByPlaceholder('Client', { exact: true }).fill('Playwright Client');
+    await page.getByTestId('appointment-date-input').fill(dateYmd);
+    await page.locator('input[type="time"]').first().fill('09:30');
+    const createResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/appointments') &&
+        response.request().method() === 'POST',
+    );
+    const refetchResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/appointments') &&
+        response.request().method() === 'GET',
+    );
+    await page.getByTestId('appointment-save-button').click();
+    const createRes = await createResponse;
+    expect(createRes.ok()).toBeTruthy();
+    await refetchResponse;
+    await expect(page.getByTestId('appointment-title-input')).not.toBeVisible({
+      timeout: 15_000,
+    });
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await devLogin(page, { profile: 'admin', redirect: '/calendar' });
+    await page.goto('/calendar', { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+  });
+
+  test('navigates forward and backward across months', async ({ page }) => {
+    const heading = page.locator('header h1').first();
+    const initial = (await heading.textContent())?.trim();
+    await page.getByTestId('calendar-next-month').click();
+    const next = (await heading.textContent())?.trim();
+    expect(next).not.toBe(initial);
+    await page.getByTestId('calendar-prev-month').click();
+    await expect(heading).toHaveText(initial || '');
+  });
+
+  test('opens modal when clicking a padding-month grid day', async ({ page }) => {
+    const paddingDay = page.locator('[data-is-current-month="false"]').first();
+    await expect(paddingDay).toBeVisible();
+    const testId = await paddingDay.getAttribute('data-testid');
+    expect(testId).toMatch(/^calendar-day-/);
+    await paddingDay.click({ position: { x: 8, y: 8 } });
+    await expect(page.getByTestId('appointment-date-input')).toBeVisible();
+  });
+
+  async function openDayAndSave(page, { title, dateYmd }) {
+    await page.goto(`/calendar?date=${dateYmd}`, { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+    await expect(page.getByTestId(`calendar-day-${dateYmd}`)).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.getByTestId(`calendar-day-${dateYmd}`).click({ position: { x: 8, y: 8 } });
+    await expect(page.getByTestId('appointment-date-input')).toBeVisible();
+    await saveMinimalAppointment(page, { title, dateYmd });
+    await expectAppointmentOnDay(page, dateYmd, title);
+  }
+
+  test('creates appointment in current month and persists after refresh', async ({ page }) => {
+    test.setTimeout(60_000);
+    const stamp = Date.now();
+    const dateYmd = futureDate(0);
+    const title = `PW Multi current ${stamp}`;
+    await openDayAndSave(page, { title, dateYmd });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto(`/calendar?date=${dateYmd}`, { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+    await expectAppointmentOnDay(page, dateYmd, title);
+  });
+
+  test('creates appointment next month and persists after refresh', async ({ page }) => {
+    test.setTimeout(60_000);
+    const stamp = Date.now();
+    const dateYmd = futureDate(1);
+    const title = `PW Multi next ${stamp}`;
+    await openDayAndSave(page, { title, dateYmd });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto(`/calendar?date=${dateYmd}`, { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+    await expectAppointmentOnDay(page, dateYmd, title);
+  });
+
+  test('creates appointment 3 months ahead and persists after refresh', async ({ page }) => {
+    test.setTimeout(60_000);
+    const stamp = Date.now();
+    const dateYmd = futureDate(3);
+    const title = `PW Multi three ${stamp}`;
+    await openDayAndSave(page, { title, dateYmd });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto(`/calendar?date=${dateYmd}`, { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+    await expectAppointmentOnDay(page, dateYmd, title);
+  });
+
+  test('creates appointment 12 months ahead and persists after refresh', async ({ page }) => {
+    test.setTimeout(60_000);
+    const stamp = Date.now();
+    const dateYmd = futureDate(12);
+    const title = `PW Multi twelve ${stamp}`;
+    await openDayAndSave(page, { title, dateYmd });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto(`/calendar?date=${dateYmd}`, { waitUntil: 'domcontentloaded' });
+    await expectCalendarLoaded(page);
+    await expectAppointmentOnDay(page, dateYmd, title);
   });
 });

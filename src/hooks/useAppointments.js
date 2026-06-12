@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 
 /**
@@ -12,9 +12,13 @@ export function useAppointments(range = {}) {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const hasLoadedOnceRef = useRef(false);
+  const fetchGenerationRef = useRef(0);
 
   const fetch = useCallback(async () => {
-    setLoading(true);
+    const generation = ++fetchGenerationRef.current;
+    const silent = hasLoadedOnceRef.current;
+    if (!silent) setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams();
@@ -25,12 +29,17 @@ export function useAppointments(range = {}) {
       const qs = params.toString() ? `?${params.toString()}` : "";
       const res = await apiFetch(`/api/appointments${qs}`);
       const data = await getJsonOrThrow(res, "Failed to fetch appointments");
+      if (generation !== fetchGenerationRef.current) return;
       setAppointments(Array.isArray(data) ? data : data?.data || []);
     } catch (err) {
+      if (generation !== fetchGenerationRef.current) return;
       console.error("[useAppointments] fetch error", err);
       setError(err.message || "Failed to load appointments");
     } finally {
-      setLoading(false);
+      if (generation === fetchGenerationRef.current) {
+        if (!silent) setLoading(false);
+        hasLoadedOnceRef.current = true;
+      }
     }
   }, [from, to]);
 
@@ -48,15 +57,23 @@ export function useAppointments(range = {}) {
           body: JSON.stringify(appointmentData),
         });
         const result = await getJsonOrThrow(res, "Failed to create appointment");
-        setAppointments((prev) => [result.data, ...prev]);
-        return result.data;
+        const created = result.data;
+        if (created?._id || created?.id) {
+          setAppointments((prev) => {
+            const id = created._id || created.id;
+            if (prev.some((row) => (row._id || row.id) === id)) return prev;
+            return [...prev, created];
+          });
+        }
+        await fetch();
+        return created;
       } catch (err) {
         const message = err.message || "Failed to create appointment";
         setError(message);
         throw err;
       }
     },
-    []
+    [fetch],
   );
 
   const update = useCallback(
@@ -69,17 +86,22 @@ export function useAppointments(range = {}) {
           body: JSON.stringify(appointmentData),
         });
         const result = await getJsonOrThrow(res, "Failed to update appointment");
-        setAppointments((prev) =>
-          prev.map((apt) => (apt._id === id ? result.data : apt)),
-        );
-        return result.data;
+        const updated = result.data;
+        if (updated?._id || updated?.id) {
+          const id = updated._id || updated.id;
+          setAppointments((prev) =>
+            prev.map((row) => ((row._id || row.id) === id ? updated : row)),
+          );
+        }
+        await fetch();
+        return updated;
       } catch (err) {
         const message = err.message || "Failed to update appointment";
         setError(message);
         throw err;
       }
     },
-    []
+    [fetch],
   );
 
   const remove = useCallback(
@@ -89,14 +111,14 @@ export function useAppointments(range = {}) {
         await apiFetch(`/api/appointments/${id}`, {
           method: "DELETE",
         });
-        setAppointments((prev) => prev.filter((apt) => apt._id !== id));
+        await fetch();
       } catch (err) {
         const message = err.message || "Failed to delete appointment";
         setError(message);
         throw err;
       }
     },
-    []
+    [fetch],
   );
 
   return {
