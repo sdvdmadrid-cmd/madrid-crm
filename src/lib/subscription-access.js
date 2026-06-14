@@ -6,6 +6,10 @@ import {
   resolveSubscriptionAccess,
   subscriptionRequiredApiResponse,
 } from "@/lib/subscription-access-core";
+import {
+  getApiResponseCache,
+  setApiResponseCache,
+} from "@/lib/api-response-cache";
 
 export {
   resolveSubscriptionAccess,
@@ -43,6 +47,108 @@ export async function fetchStripeSubscriptionStatus(tenantDbId, fallbackUserId =
   }
 
   return null;
+}
+
+/**
+ * Backup path when webhooks lag: if DB shows no access, pull live Stripe subscription,
+ * upsert contractor_subscriptions, and repair auth metadata. Cached briefly per user.
+ */
+export async function ensurePaidAccessFromStripe(context = {}) {
+  const tenantDbId = String(context.tenantDbId || "").trim();
+  const userId = String(context.userId || "").trim();
+  const email = String(context.email || "").trim();
+  const role = context.role;
+  const trialEndDate = context.trialEndDate || null;
+  const complimentaryAccess = context.complimentaryAccess === true;
+
+  let stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
+    tenantDbId,
+    userId,
+  );
+
+  let access = resolveSubscriptionAccess({
+    role,
+    isSubscribed: context.isSubscribed === true,
+    trialEndDate,
+    complimentaryAccess,
+    stripeSubscriptionStatus,
+  });
+
+  if (access.hasBusinessAccess) {
+    return {
+      access,
+      stripeSubscriptionStatus: stripeSubscriptionStatus || "",
+      isSubscribed: true,
+      reconciled: false,
+    };
+  }
+
+  const cacheKey = `stripe_reconcile:${userId || tenantDbId}`;
+  const recentlyReconciled = await getApiResponseCache(cacheKey);
+  if (recentlyReconciled) {
+    return {
+      access,
+      stripeSubscriptionStatus: stripeSubscriptionStatus || "",
+      isSubscribed: false,
+      reconciled: false,
+    };
+  }
+
+  try {
+    console.log("[subscription-access] Stripe backup reconcile start", {
+      tenantDbId,
+      userId,
+    });
+    const { reconcileTenantSubscriptionFromStripe } = await import(
+      "@/lib/subscription-stripe-sync"
+    );
+    const result = await reconcileTenantSubscriptionFromStripe({
+      tenantDbId,
+      userId,
+      email,
+    });
+    await setApiResponseCache(cacheKey, true, STRIPE_RECONCILE_CACHE_TTL_SECONDS);
+
+    if (result.activated) {
+      stripeSubscriptionStatus = result.stripeSubscriptionStatus || "active";
+      access = resolveSubscriptionAccess({
+        role,
+        isSubscribed: true,
+        trialEndDate,
+        complimentaryAccess,
+        stripeSubscriptionStatus,
+      });
+      console.log("[subscription-access] Stripe backup reconcile SUCCESS", {
+        tenantDbId,
+        userId,
+        hasBusinessAccess: access.hasBusinessAccess,
+      });
+      return {
+        access,
+        stripeSubscriptionStatus,
+        isSubscribed: true,
+        reconciled: true,
+      };
+    }
+
+    console.warn("[subscription-access] Stripe backup reconcile no activation", {
+      tenantDbId,
+      userId,
+      reason: result.reason || null,
+    });
+  } catch (error) {
+    console.warn(
+      "[subscription-access] Stripe backup reconcile failed",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
+  return {
+    access,
+    stripeSubscriptionStatus: stripeSubscriptionStatus || "",
+    isSubscribed: false,
+    reconciled: false,
+  };
 }
 
 /** Load live Stripe subscription from DB and repair auth metadata when paid. */

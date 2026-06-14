@@ -6,7 +6,7 @@ import {
   reconcileUserRoleOnLogin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
-import { hydrateSessionSubscriptionFields } from "@/lib/subscription-access";
+import { hydrateSessionSubscriptionFields, ensurePaidAccessFromStripe } from "@/lib/subscription-access";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
@@ -85,12 +85,33 @@ export async function POST(request) {
     userId: reconciledUser.id,
     userMetadata: reconciledUser.user_metadata,
   });
-  const appSession = buildAppSessionFromSupabaseUser(
+
+  let appSession = buildAppSessionFromSupabaseUser(
     reconciledUser,
     null,
     profile,
     { stripeSubscriptionStatus },
   );
+
+  if (!appSession.hasBusinessAccess && appSession.role !== "super_admin") {
+    const ensured = await ensurePaidAccessFromStripe({
+      tenantDbId,
+      userId: reconciledUser.id,
+      email: reconciledUser.email,
+      role: appSession.role,
+      isSubscribed: appSession.isSubscribed,
+      trialEndDate: appSession.trialEndDate,
+      complimentaryAccess: appSession.complimentaryAccess,
+    });
+    if (ensured.access.hasBusinessAccess) {
+      appSession = buildAppSessionFromSupabaseUser(
+        reconciledUser,
+        null,
+        profile,
+        { stripeSubscriptionStatus: ensured.stripeSubscriptionStatus },
+      );
+    }
+  }
   const token = createSessionToken(appSession);
 
   return new Response(

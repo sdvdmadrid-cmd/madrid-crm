@@ -5,6 +5,7 @@ import { isLogoutGuardCookieSet } from "@/lib/auth-logout-guard.js";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import { enrichAuthMeData, authReconcileCacheKey, AUTH_RECONCILE_CACHE_TTL_SECONDS } from "@/lib/auth-me-workspace";
 import {
+  ensurePaidAccessFromStripe,
   fetchStripeSubscriptionStatus,
   hydrateSessionSubscriptionFields,
   resolveSubscriptionAccess,
@@ -23,11 +24,11 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
 async function attachSubscriptionAccessFields(base = {}) {
-  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
+  let stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
     base.tenantDbId,
     base.userId,
   );
-  const access = resolveSubscriptionAccess({
+  let access = resolveSubscriptionAccess({
     role: base.role,
     isSubscribed: base.isSubscribed === true,
     trialEndDate: base.trialEndDate || null,
@@ -35,9 +36,28 @@ async function attachSubscriptionAccessFields(base = {}) {
     stripeSubscriptionStatus,
   });
 
+  if (!access.hasBusinessAccess && base.role !== "super_admin") {
+    const ensured = await ensurePaidAccessFromStripe({
+      tenantDbId: base.tenantDbId,
+      userId: base.userId,
+      email: base.email,
+      role: base.role,
+      isSubscribed: base.isSubscribed === true,
+      trialEndDate: base.trialEndDate || null,
+      complimentaryAccess: base.complimentaryAccess === true,
+    });
+    if (ensured.reconciled && ensured.access.hasBusinessAccess) {
+      stripeSubscriptionStatus = ensured.stripeSubscriptionStatus;
+      access = ensured.access;
+    }
+  }
+
   return {
     ...base,
     stripeSubscriptionStatus,
+    isSubscribed: access.hasBusinessAccess
+      ? true
+      : base.isSubscribed === true,
     hasBusinessAccess: access.hasBusinessAccess,
     subscriptionState: access.state,
   };
@@ -207,7 +227,7 @@ export async function GET(request) {
       );
     }
 
-    const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
+    let stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
       responseBody.tenantDbId,
       responseBody.userId,
     );
@@ -220,10 +240,27 @@ export async function GET(request) {
       },
     }).catch(() => {});
 
-    const subscriptionAccess = resolveSubscriptionAccess({
+    let subscriptionAccess = resolveSubscriptionAccess({
       ...responseBody,
       stripeSubscriptionStatus,
     });
+
+    if (!subscriptionAccess.hasBusinessAccess && responseBody.role !== "super_admin") {
+      const ensured = await ensurePaidAccessFromStripe({
+        tenantDbId: responseBody.tenantDbId,
+        userId: responseBody.userId,
+        email: responseBody.email,
+        role: responseBody.role,
+        isSubscribed: responseBody.isSubscribed === true,
+        trialEndDate: responseBody.trialEndDate || null,
+        complimentaryAccess: responseBody.complimentaryAccess === true,
+      });
+      if (ensured.reconciled && ensured.access.hasBusinessAccess) {
+        subscriptionAccess = ensured.access;
+        stripeSubscriptionStatus = ensured.stripeSubscriptionStatus;
+      }
+    }
+
     const paidOrStripeActive =
       stripeSubscriptionStatus === "active" || stripeSubscriptionStatus === "trialing";
     const effectiveIsSubscribed =

@@ -1,12 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import { EXPIRED_TRIAL_SUBSCRIBE_PATH } from "@/lib/subscription-routes";
 import styles from "./subscriptions.module.css";
+
+const ACTIVATION_POLL_MS = 2500;
+const ACTIVATION_MAX_ATTEMPTS = 12;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("REQUEST_TIMEOUT")), ms);
+    }),
+  ]);
+}
 
 function SubscriptionsPageInner() {
   const router = useRouter();
@@ -20,6 +32,8 @@ function SubscriptionsPageInner() {
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
+  const [activatingAccess, setActivatingAccess] = useState(false);
+  const checkoutActivationStartedRef = useRef(false);
   const planDisplay = {
     title: "FieldBase subscription",
     price: "$35/month",
@@ -64,11 +78,70 @@ function SubscriptionsPageInner() {
   useEffect(() => {
     const checkout = searchParams.get("checkout");
     if (checkout === "success") {
-      setNotice("Subscription checkout completed. Your access will update shortly.");
+      setNotice("Payment received. Activating your subscription…");
     } else if (checkout === "cancelled") {
       setError("Checkout was cancelled. You can try again when you are ready.");
     }
   }, [searchParams]);
+
+  const activateAfterCheckout = useCallback(async () => {
+    setActivatingAccess(true);
+    setNotice("Payment received. Activating your subscription…");
+    setError(null);
+
+    for (let attempt = 0; attempt < ACTIVATION_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        if (attempt === 0 || attempt % 2 === 0) {
+          const reconcileRes = await withTimeout(
+            apiFetch("/api/subscriptions/reconcile", {
+              method: "POST",
+              cache: "no-store",
+            }),
+            15000,
+          );
+          if (reconcileRes.ok) {
+            const reconcilePayload = await reconcileRes.json();
+            if (reconcilePayload?.data?.hasBusinessAccess) {
+              setNotice("Subscription active. Redirecting to your workspace…");
+              router.replace("/dashboard");
+              return;
+            }
+          }
+        }
+
+        const meRes = await withTimeout(
+          apiFetch("/api/auth/me", { cache: "no-store" }),
+          15000,
+        );
+        if (meRes.ok) {
+          const mePayload = await meRes.json();
+          if (mePayload?.data?.hasBusinessAccess) {
+            setNotice("Subscription active. Redirecting to your workspace…");
+            router.replace("/dashboard");
+            return;
+          }
+        }
+
+        await fetchSubscriptionData();
+      } catch (err) {
+        console.warn("[subscriptions] activation poll failed:", err?.message || err);
+      }
+      await new Promise((resolve) => setTimeout(resolve, ACTIVATION_POLL_MS));
+    }
+
+    setActivatingAccess(false);
+    setNotice("");
+    setError(
+      "Payment received. Access is still syncing — refresh this page or try again in a moment.",
+    );
+  }, [fetchSubscriptionData, router]);
+
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "success") return;
+    if (checkoutActivationStartedRef.current) return;
+    checkoutActivationStartedRef.current = true;
+    void activateAfterCheckout();
+  }, [searchParams, activateAfterCheckout]);
 
   const handleStartCheckout = useCallback(async () => {
     try {
@@ -216,6 +289,11 @@ function SubscriptionsPageInner() {
         <div data-testid="subscriptions-page">
         {error && <div className={styles.errorBanner}>{error}</div>}
         {notice && <div className={styles.successBanner}>{notice}</div>}
+        {activatingAccess && (
+          <div className={styles.successBanner} data-testid="subscriptions-activating">
+            Activating subscription…
+          </div>
+        )}
 
         {isComplimentary && (
           <div className={styles.card} style={{ marginBottom: "1rem" }}>

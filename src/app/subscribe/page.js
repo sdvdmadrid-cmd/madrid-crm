@@ -2,7 +2,7 @@ import SubscribeErrorBoundary from "@/components/subscribe/SubscribeErrorBoundar
 import SubscribePageClient from "./SubscribePageClient";
 
 export const metadata = {
-  title: "Trial Expired — Subscribe",
+  title: "Subscribe — FieldBase",
   robots: { index: false, follow: false },
 };
 

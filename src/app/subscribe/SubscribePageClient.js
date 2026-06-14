@@ -265,7 +265,7 @@ export default function SubscribePageClient() {
         <p className={styles.message}>
           Your 15-day free trial has ended.
           <br />
-          To continue using ContractorFlow, please choose a subscription plan.
+          To continue using FieldBase, please choose a subscription plan.
         </p>
 
         <section className={styles.planCard} data-testid="subscribe-plan-card">

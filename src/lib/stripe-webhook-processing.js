@@ -838,8 +838,18 @@ export async function processStripeWebhookEvent(event) {
     );
   }
 
-  if (response && response.status < 500) {
-    await recordStripeWebhookEvent(event);
+  if (response && response.status >= 200 && response.status < 300) {
+    try {
+      const body = await response.clone().json();
+      if (body?.success === true) {
+        await recordStripeWebhookEvent(event);
+      }
+    } catch (parseError) {
+      console.warn(
+        "[stripe-webhook-processing] could not parse webhook response",
+        parseError instanceof Error ? parseError.message : parseError,
+      );
+    }
   }
   return response;
 }
