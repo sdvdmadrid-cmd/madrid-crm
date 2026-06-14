@@ -3,9 +3,10 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import InstantNavigation from "@/components/InstantNavigation";
+import LoginAccessPanel from "@/components/auth/LoginAccessPanel";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import {
   clearClientLoggedOut,
@@ -31,15 +32,12 @@ import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 import { useStoredUiLanguage } from "@/lib/ui-language";
 import { buildPublicWebsitePath } from "@/lib/public-website-routing";
 import { usePublishedWebsiteStatus } from "@/hooks/usePublishedWebsiteStatus";
+import { performAuthHardNavigate } from "@/lib/auth-nav";
 
 const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
   ssr: false,
   loading: () => null,
 });
-const LoginAccessPanel = dynamic(
-  () => import("@/components/auth/LoginAccessPanel"),
-  { loading: () => <AuthBootShell dark={false} /> },
-);
 const CrmNavBar = dynamic(() => import("@/components/crm/CrmNavBar"), {
   loading: () => null,
 });
@@ -213,7 +211,7 @@ export default function AuthShell({ children }) {
       const now = Date.now();
       if (
         lastAuthNavRef.current.target === destination &&
-        now - lastAuthNavRef.current.at < 1500
+        now - lastAuthNavRef.current.at < 400
       ) {
         return;
       }
@@ -253,7 +251,7 @@ export default function AuthShell({ children }) {
 
   const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setHasMounted(true);
   }, []);
 
@@ -291,10 +289,10 @@ export default function AuthShell({ children }) {
     }
   }, [hasMounted]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hasMounted || !authChecked || !authUser) return;
     if (!isDedicatedLoginPage && !isRegisterPage) return;
-    safeAuthReplace(resolveAuthRedirect(authUser));
+    performAuthHardNavigate(resolveAuthRedirect(authUser));
   }, [
     hasMounted,
     authChecked,
@@ -302,7 +300,6 @@ export default function AuthShell({ children }) {
     isDedicatedLoginPage,
     isRegisterPage,
     resolveAuthRedirect,
-    safeAuthReplace,
   ]);
 
   useEffect(() => {
@@ -312,15 +309,16 @@ export default function AuthShell({ children }) {
     safeAuthReplace("/owner/overview");
   }, [hasMounted, authChecked, authUser, pathname, safeAuthReplace]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hasMounted || !authChecked || authUser) return;
     if (isRegisterPage) {
-      router.replace("/login?mode=register");
+      performAuthHardNavigate("/login?mode=register");
       return;
     }
-    if (isPublicPage) return;
-    if (isAuthEntryPage) return;
-    safeAuthReplace(buildLoginRedirectPath(pathname, { currentPath: pathname }));
+    if (isPublicPage || isAuthEntryPage) return;
+    performAuthHardNavigate(
+      buildLoginRedirectPath(pathname, { currentPath: pathname }),
+    );
   }, [
     hasMounted,
     authChecked,
@@ -329,7 +327,6 @@ export default function AuthShell({ children }) {
     isAuthEntryPage,
     isRegisterPage,
     pathname,
-    safeAuthReplace,
   ]);
 
   useEffect(() => {
@@ -687,8 +684,11 @@ export default function AuthShell({ children }) {
   useEffect(() => {
     if (!hasMounted) return;
 
-    if (isPublicPage) {
+    if (isPublicPage || isAuthEntryPage) {
       setAuthChecked(true);
+      if (isAuthEntryPage) {
+        authBootstrappedRef.current = true;
+      }
       return;
     }
 
@@ -709,7 +709,7 @@ export default function AuthShell({ children }) {
     return () => {
       active = false;
     };
-  }, [hasMounted, isPublicPage, fetchMe]);
+  }, [hasMounted, isPublicPage, isAuthEntryPage, fetchMe]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -807,17 +807,16 @@ export default function AuthShell({ children }) {
       }
       setLoginFailedAttempts(0);
       clearClientLoggedOut();
-      setAuthUser(payload.data);
-      authBootstrappedRef.current = true;
-      const destination = sanitizeRedirectPath(
-        payload.redirectTo || resolveAuthRedirect(payload.data),
-        {
-          role: payload.data?.role,
-          currentPath: pathname || "",
-        },
-      ) || resolveAuthRedirect(payload.data);
-      safeAuthReplace(destination);
-      router.refresh();
+      const destination =
+        sanitizeRedirectPath(
+          payload.redirectTo || resolveAuthRedirect(payload.data),
+          {
+            role: payload.data?.role,
+            currentPath: pathname || "",
+          },
+        ) || resolveAuthRedirect(payload.data);
+      performAuthHardNavigate(destination);
+      return;
     } catch (err) {
       setError(err.message || t("auth.authError"));
     } finally {
@@ -1010,46 +1009,26 @@ export default function AuthShell({ children }) {
     setSubmitting(true);
     setError("");
     setNotice("");
-    try {
-      try {
-        await apiFetch("/api/auth/logout", {
-          method: "POST",
-          suppressUnauthorizedEvent: true,
-        });
-      } catch {
-        // Still clear client state when the API is unreachable.
-      }
 
-      try {
-        await supabase.auth.signOut();
-      } catch {
-        // Cookie logout is authoritative; Supabase sign-out is best-effort.
-      }
-
-      authBootstrappedRef.current = false;
-      markClientLoggedOut();
-      setAuthUser(null);
-      setLoginForm(initialLogin);
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem("user-industry");
-        window.dispatchEvent(new CustomEvent("auth:logout"));
-      }
-      router.replace("/login");
-      router.refresh();
-    } finally {
-      setSubmitting(false);
+    authBootstrappedRef.current = false;
+    markClientLoggedOut();
+    setAuthUser(null);
+    setLoginForm(initialLogin);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("user-industry");
+      window.dispatchEvent(new CustomEvent("auth:logout"));
     }
+
+    void apiFetch("/api/auth/logout", {
+      method: "POST",
+      suppressUnauthorizedEvent: true,
+    }).catch(() => {});
+    void supabase.auth.signOut().catch(() => {});
+
+    performAuthHardNavigate("/login");
   };
 
-  if (!hasMounted || !authChecked) {
-    return <AuthBootShell dark={isPremiumWorkspace} />;
-  }
-
-  if (!authUser) {
-    if (!isAuthEntryPage) {
-      return <AuthBootShell dark={isPremiumWorkspace} />;
-    }
-
+  if (!authUser && isAuthEntryPage) {
     return (
       <LoginAccessPanel
         error={error}
@@ -1095,6 +1074,14 @@ export default function AuthShell({ children }) {
         }}
       />
     );
+  }
+
+  if (!hasMounted || !authChecked) {
+    return <AuthBootShell dark={isPremiumWorkspace} />;
+  }
+
+  if (!authUser) {
+    return <AuthBootShell dark={isPremiumWorkspace} />;
   }
 
   if (isAuthEntryPage && authUser) {

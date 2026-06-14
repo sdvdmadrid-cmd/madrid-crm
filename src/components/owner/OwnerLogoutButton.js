@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
 import { markClientLoggedOut } from "@/lib/auth-logout-guard.js";
+import { performAuthHardNavigate } from "@/lib/auth-nav";
 import { supabase } from "@/lib/supabase";
 import styles from "./OwnerShell.module.css";
 
@@ -19,32 +19,23 @@ function clearOwnerClientState() {
 }
 
 export default function OwnerLogoutButton({ variant = "sidebar" }) {
-  const router = useRouter();
   const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleLogout() {
+  function handleLogout() {
     if (submitting) return;
     setSubmitting(true);
-    try {
-      await apiFetch("/api/auth/logout", {
-        method: "POST",
-        suppressUnauthorizedEvent: true,
-      });
-    } catch {
-      // Still clear client state when the API is unreachable.
-    }
-
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // Cookie logout is authoritative; Supabase sign-out is best-effort.
-    }
 
     clearOwnerClientState();
     markClientLoggedOut();
-    router.replace("/login");
-    router.refresh();
+
+    void apiFetch("/api/auth/logout", {
+      method: "POST",
+      suppressUnauthorizedEvent: true,
+    }).catch(() => {});
+    void supabase.auth.signOut().catch(() => {});
+
+    performAuthHardNavigate("/login");
   }
 
   const className =
