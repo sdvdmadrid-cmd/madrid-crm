@@ -8,7 +8,9 @@ import {
   buildEmployeeInsertRow,
   serializePayrollEmployee,
 } from "@/lib/payroll-serializer";
-import { listEmployeePayrollHistory } from "@/lib/payroll-service";
+import {
+  findEmployeeByCreateIdempotencyKey,
+} from "@/lib/payroll-service";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import { getPayrollSettingsForTenant } from "@/lib/payroll-settings-service.js";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -74,8 +76,26 @@ export async function POST(request) {
     if (!canWrite(role)) return forbiddenResponse();
 
     const body = await request.json();
+    const idempotencyKey = String(
+      request.headers.get("Idempotency-Key") || body.idempotencyKey || "",
+    ).trim();
+
+    if (idempotencyKey) {
+      const existing = await findEmployeeByCreateIdempotencyKey({
+        tenantDbId,
+        role,
+        idempotencyKey,
+      });
+      if (existing) {
+        return json({ success: true, data: existing, idempotentReplay: true });
+      }
+    }
+
     const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
     const row = buildEmployeeInsertRow(body, tenantDbId, userId);
+    if (idempotencyKey) {
+      row.create_idempotency_key = idempotencyKey;
+    }
     if (!row.work_state && settings.defaultWorkState) {
       row.work_state = String(settings.defaultWorkState).toUpperCase();
     }
@@ -119,7 +139,22 @@ export async function POST(request) {
       .select("*")
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (
+        idempotencyKey &&
+        /duplicate key|unique constraint/i.test(error.message || "")
+      ) {
+        const replay = await findEmployeeByCreateIdempotencyKey({
+          tenantDbId,
+          role,
+          idempotencyKey,
+        });
+        if (replay) {
+          return json({ success: true, data: replay, idempotentReplay: true });
+        }
+      }
+      throw new Error(error.message);
+    }
 
     return json({ success: true, data: serializePayrollEmployee(data) });
   } catch (error) {

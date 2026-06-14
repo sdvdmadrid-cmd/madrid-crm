@@ -443,3 +443,36 @@ export async function deletePayrollEmployeePermanently({
 
   return { id, deleted: true };
 }
+
+export async function countEmployeePayrollHistory({ tenantDbId, role, employeeId }) {
+  const id = String(employeeId || "").trim();
+  if (!id) return 0;
+  const { count, error } = await scopeByTenant(
+    supabaseAdmin
+      .from(PAYROLL_TABLES.RUN_ITEMS)
+      .select("id", { count: "exact", head: true })
+      .eq("employee_id", id),
+    { tenantDbId, role },
+  );
+  if (error) throw new Error(error.message);
+  return Number(count || 0);
+}
+
+export async function findEmployeeByCreateIdempotencyKey({
+  tenantDbId,
+  role,
+  idempotencyKey,
+}) {
+  const key = String(idempotencyKey || "").trim();
+  if (!key) return null;
+  const { data, error } = await scopeByTenant(
+    supabaseAdmin
+      .from(PAYROLL_TABLES.EMPLOYEES)
+      .select("*")
+      .eq("create_idempotency_key", key)
+      .maybeSingle(),
+    { tenantDbId, role },
+  );
+  if (error) throw new Error(error.message);
+  return data ? serializePayrollEmployee(data) : null;
+}

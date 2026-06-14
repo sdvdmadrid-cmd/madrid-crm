@@ -9,6 +9,7 @@ import {
   serializePayrollEmployee,
 } from "@/lib/payroll-serializer";
 import {
+  countEmployeePayrollHistory,
   deletePayrollEmployeePermanently,
   listEmployeePayrollHistory,
 } from "@/lib/payroll-service";
@@ -53,6 +54,11 @@ export async function GET(request, { params }) {
     if (!data) return json({ success: false, error: "Employee not found" }, 404);
 
     const payload = serializePayrollEmployee(data);
+    payload.payrollHistoryCount = await countEmployeePayrollHistory({
+      tenantDbId,
+      role,
+      employeeId: id,
+    });
     if (includeHistory) {
       payload.payrollHistory = await listEmployeePayrollHistory({
         tenantDbId,
