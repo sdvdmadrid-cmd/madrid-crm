@@ -127,6 +127,9 @@ export default function AuthShell({ children }) {
   const isResetPasswordPage = pathname === "/reset-password";
   const isAuthEntryPage =
     isDedicatedLoginPage || isRegisterPage || isResetPasswordPage;
+  const isSubscribePage =
+    pathname === EXPIRED_TRIAL_SUBSCRIBE_PATH ||
+    pathname?.startsWith(`${EXPIRED_TRIAL_SUBSCRIBE_PATH}/`);
   const isVerifyEmailPage = pathname === "/verify-email";
   const [trialExpiredParam, setTrialExpiredParam] = useState(false);
   const [loginFailedAttempts, setLoginFailedAttempts] = useState(0);
@@ -253,10 +256,6 @@ export default function AuthShell({ children }) {
     performAuthHardNavigate(EXPIRED_TRIAL_SUBSCRIBE_PATH);
   }, [authUser, pathname]);
 
-  const isSubscribePage =
-    pathname === EXPIRED_TRIAL_SUBSCRIBE_PATH ||
-    pathname?.startsWith(`${EXPIRED_TRIAL_SUBSCRIBE_PATH}/`);
-
   const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
 
   useLayoutEffect(() => {
@@ -323,7 +322,7 @@ export default function AuthShell({ children }) {
       performAuthHardNavigate("/login?mode=register");
       return;
     }
-    if (isPublicPage || isAuthEntryPage) return;
+    if (isPublicPage || isAuthEntryPage || isSubscribePage) return;
     performAuthHardNavigate(
       buildLoginRedirectPath(pathname, { currentPath: pathname }),
     );
@@ -333,6 +332,7 @@ export default function AuthShell({ children }) {
     authUser,
     isPublicPage,
     isAuthEntryPage,
+    isSubscribePage,
     isRegisterPage,
     pathname,
   ]);
@@ -692,9 +692,9 @@ export default function AuthShell({ children }) {
   useEffect(() => {
     if (!hasMounted) return;
 
-    if (isPublicPage || isAuthEntryPage) {
+    if (isPublicPage || isAuthEntryPage || isSubscribePage) {
       setAuthChecked(true);
-      if (isAuthEntryPage) {
+      if (isAuthEntryPage || isSubscribePage) {
         authBootstrappedRef.current = true;
       }
       return;
@@ -717,7 +717,7 @@ export default function AuthShell({ children }) {
     return () => {
       active = false;
     };
-  }, [hasMounted, isPublicPage, isAuthEntryPage, fetchMe]);
+  }, [hasMounted, isPublicPage, isAuthEntryPage, isSubscribePage, fetchMe]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -1085,27 +1085,7 @@ export default function AuthShell({ children }) {
   }
 
   if (isSubscribePage) {
-    if (!authUser && authChecked) {
-      performAuthHardNavigate(
-        buildLoginRedirectPath(EXPIRED_TRIAL_SUBSCRIBE_PATH),
-      );
-      return (
-        <div
-          style={{ minHeight: "100vh", background: "#f4f5f7" }}
-          aria-busy="true"
-        />
-      );
-    }
-    if (authUser) {
-      return children;
-    }
-    return (
-      <div
-        style={{ minHeight: "100vh", background: "#f4f5f7" }}
-        aria-busy="true"
-        aria-label="Loading"
-      />
-    );
+    return children;
   }
 
   if (authUser && shouldRestrictForSubscription(authUser) && !isSubscriptionExemptPage(pathname)) {

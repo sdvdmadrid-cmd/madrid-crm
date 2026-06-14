@@ -94,7 +94,45 @@
   cursor: not-allowed;
 }
 
-.loading {
+.planCard {
+  margin-bottom: 24px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.planName {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.planPrice {
+  margin: 0 0 14px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.planFeatures {
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.planLoading {
+  margin: 0;
   color: #64748b;
   font-size: 0.95rem;
+}
+
+.planNotice {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
 }

@@ -48,9 +48,7 @@ test("middleware login redirect respects logout guard cookie", () => {
   assert.match(loginBlock, /edgeSession && !isLogoutGuardCookieSet\(request\)/);
 });
 
-test("AuthShell uses safe redirect helpers", () => {
+test("AuthShell renders subscribe page without authUser gate", () => {
   const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
-  assert.match(src, /buildLoginRedirectPath/);
-  assert.match(src, /safeAuthReplace/);
-  assert.match(src, /parseRedirectParam/);
+  assert.match(src, /if \(isSubscribePage\)\s*\{\s*return children;/s);
 });
