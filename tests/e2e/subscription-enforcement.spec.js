@@ -13,20 +13,31 @@ async function devLoginAs(page, profile, redirect = "/dashboard") {
 test.describe("Subscription enforcement", () => {
   test.setTimeout(90_000);
 
-  test("expired trial user is redirected from dashboard to subscriptions", async ({
+  test("expired trial user is redirected from dashboard to subscribe page", async ({
     page,
   }) => {
     await devLoginAs(page, "expired_trial", "/dashboard");
-    await expect(page).toHaveURL(/\/subscriptions/, { timeout: 45_000 });
-    await expect(page.url()).toContain("trial_expired=1");
-    await expect(page.getByTestId("subscriptions-page")).toBeVisible({
+    await expect(page).toHaveURL(/\/subscribe/, { timeout: 45_000 });
+    await expect(page.getByTestId("subscribe-page")).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByRole("heading", { name: "Trial Expired" })).toBeVisible();
+  });
+
+  test("expired trial user cannot access protected pages", async ({ page }) => {
+    await devLoginAs(page, "expired_trial", "/subscribe");
+    await expect(page).toHaveURL(/\/subscribe/, { timeout: 45_000 });
+
+    await page.goto("/clients", { waitUntil: "commit" });
+    await expect(page).toHaveURL(/\/subscribe/, { timeout: 45_000 });
+
+    await page.goto("/settings", { waitUntil: "commit" });
+    await expect(page).toHaveURL(/\/subscribe/, { timeout: 45_000 });
   });
 
   test("expired trial user cannot access business APIs", async ({ page }) => {
-    await devLoginAs(page, "expired_trial", "/subscriptions");
-    await expect(page).toHaveURL(/\/subscriptions/, { timeout: 45_000 });
+    await devLoginAs(page, "expired_trial", "/subscribe");
+    await expect(page).toHaveURL(/\/subscribe/, { timeout: 45_000 });
 
     const clientsRes = await page.request.get(`${ORIGIN}/api/clients`, {
       headers: ORIGIN_HEADERS,
@@ -41,18 +52,15 @@ test.describe("Subscription enforcement", () => {
     expect(currentRes.ok()).toBeTruthy();
   });
 
-  test("subscribe now links to subscriptions checkout flow", async ({ page }) => {
-    await devLoginAs(page, "expired_trial", "/subscriptions");
-    await expect(page.getByTestId("subscriptions-page")).toBeVisible({
+  test("subscribe now starts Stripe checkout flow", async ({ page }) => {
+    await devLoginAs(page, "expired_trial", "/subscribe");
+    await expect(page.getByTestId("subscribe-now-btn")).toBeVisible({
       timeout: 15_000,
     });
 
-    await page.goto("/subscriptions?subscribe=1", { waitUntil: "domcontentloaded" });
-    await expect(page.getByTestId("subscriptions-start-checkout")).toBeVisible();
-
     const checkoutRes = await page.request.post(`${ORIGIN}/api/subscriptions/checkout`, {
       headers: { ...ORIGIN_HEADERS, "Content-Type": "application/json" },
-      data: { source: "app" },
+      data: { source: "expired_trial" },
     });
 
     if (checkoutRes.ok()) {
@@ -64,6 +72,17 @@ test.describe("Subscription enforcement", () => {
       expect([503, 500]).toContain(checkoutRes.status());
       expect(payload.error).toBeTruthy();
     }
+  });
+
+  test("logout works from subscribe page", async ({ page }) => {
+    await devLoginAs(page, "expired_trial", "/subscribe");
+    await expect(page.getByTestId("subscribe-logout-btn")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await page.getByTestId("subscribe-logout-btn").click();
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    await expect(page.locator("#login-email")).toBeVisible({ timeout: 15_000 });
   });
 
   test("admin dev profile retains business access", async ({ page }) => {

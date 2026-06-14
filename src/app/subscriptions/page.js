@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
+import { EXPIRED_TRIAL_SUBSCRIBE_PATH } from "@/lib/subscription-routes";
 import styles from "./subscriptions.module.css";
 
-export default function SubscriptionsPage() {
+function SubscriptionsPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState(null);
   const [invoices, setInvoices] = useState([]);
@@ -48,6 +50,12 @@ export default function SubscriptionsPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("trial_expired") === "1") {
+      router.replace(EXPIRED_TRIAL_SUBSCRIBE_PATH);
+    }
+  }, [router, searchParams]);
 
   useEffect(() => {
     fetchSubscriptionData();
@@ -385,5 +393,19 @@ export default function SubscriptionsPage() {
         )}
         </div>
     </PremiumPageShell>
+  );
+}
+
+export default function SubscriptionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <PremiumPageShell title="FieldBase subscription" subtitle="Loading subscription…">
+          <div className={`fb-shimmer ${styles.loadingCard}`}>Loading subscription…</div>
+        </PremiumPageShell>
+      }
+    >
+      <SubscriptionsPageInner />
+    </Suspense>
   );
 }

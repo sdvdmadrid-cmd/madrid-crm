@@ -52,10 +52,18 @@ describe("subscription-access-core", () => {
     assert.equal(access.state, SUBSCRIPTION_STATES.ACTIVE);
   });
 
-  it("allows billing/settings paths when restricted", () => {
+  it("allows subscribe/legal paths when restricted", () => {
     assert.equal(
       isSubscriptionBypassPath(
-        "/subscriptions",
+        "/subscribe",
+        SUBSCRIPTION_ALLOWED_API_PREFIXES,
+        SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
+      ),
+      true,
+    );
+    assert.equal(
+      isSubscriptionBypassPath(
+        "/legal-required",
         SUBSCRIPTION_ALLOWED_API_PREFIXES,
         SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
       ),
@@ -67,7 +75,7 @@ describe("subscription-access-core", () => {
         SUBSCRIPTION_ALLOWED_API_PREFIXES,
         SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
       ),
-      true,
+      false,
     );
     assert.equal(
       isSubscriptionBypassPath(

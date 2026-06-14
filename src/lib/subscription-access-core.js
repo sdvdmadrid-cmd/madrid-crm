@@ -92,8 +92,7 @@ export function resolveSubscriptionAccess(input = {}, nowMs = Date.now()) {
 }
 
 export const SUBSCRIPTION_ALLOWED_PAGE_PREFIXES = [
-  "/subscriptions",
-  "/settings",
+  "/subscribe",
   "/legal-required",
   "/legal",
 ];

@@ -798,18 +798,18 @@ export async function middleware(request) {
         return subscriptionRequiredApiResponse();
       }
       const url = request.nextUrl.clone();
-      url.pathname = "/subscriptions";
-      url.searchParams.set("trial_expired", "1");
-      if (pathname !== "/dashboard") {
-        url.searchParams.set("next", pathname);
-      }
+      url.pathname = "/subscribe";
+      url.search = "";
       if (AUTH_DEBUG) {
         console.info("[middleware] redirect subscription required", {
           pathname,
           state: subscriptionAccess.state,
-          redirectDestination: `${url.pathname}${url.search}`,
+          redirectDestination: url.pathname,
         });
       }
+      console.log("Trial expired:", session?.userId || session?.sub || "unknown");
+      console.log("Subscription active:", subscriptionAccess.hasBusinessAccess);
+      console.log("Redirecting to /subscribe");
       return NextResponse.redirect(url);
     }
   }
