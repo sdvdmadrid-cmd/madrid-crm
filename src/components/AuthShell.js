@@ -322,7 +322,7 @@ export default function AuthShell({ children }) {
       performAuthHardNavigate("/login?mode=register");
       return;
     }
-    if (isPublicPage || isAuthEntryPage || isSubscribePage) return;
+    if (isPublicPage || isAuthEntryPage || isSubscribePage || isOwnerCommandCenter) return;
     performAuthHardNavigate(
       buildLoginRedirectPath(pathname, { currentPath: pathname }),
     );
@@ -333,6 +333,7 @@ export default function AuthShell({ children }) {
     isPublicPage,
     isAuthEntryPage,
     isSubscribePage,
+    isOwnerCommandCenter,
     isRegisterPage,
     pathname,
   ]);
@@ -700,6 +701,10 @@ export default function AuthShell({ children }) {
       return;
     }
 
+    if (isOwnerCommandCenter) {
+      setAuthChecked(true);
+    }
+
     if (authBootstrappedRef.current) return;
 
     let active = true;
@@ -717,7 +722,7 @@ export default function AuthShell({ children }) {
     return () => {
       active = false;
     };
-  }, [hasMounted, isPublicPage, isAuthEntryPage, isSubscribePage, fetchMe]);
+  }, [hasMounted, isPublicPage, isAuthEntryPage, isSubscribePage, isOwnerCommandCenter, fetchMe]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -1088,6 +1093,14 @@ export default function AuthShell({ children }) {
     return children;
   }
 
+  if (isOwnerCommandCenter) {
+    return (
+      <div className="auth-shell-owner-root" style={{ minHeight: "100vh" }}>
+        {children}
+      </div>
+    );
+  }
+
   if (authUser && shouldRestrictForSubscription(authUser) && !isSubscriptionExemptPage(pathname)) {
     return (
       <div
@@ -1108,14 +1121,6 @@ export default function AuthShell({ children }) {
 
   if (isAuthEntryPage && authUser) {
     return <AuthBootShell dark={false} />;
-  }
-
-  if (isOwnerCommandCenter) {
-    return (
-      <div className="auth-shell-owner-root" style={{ minHeight: "100vh" }}>
-        {children}
-      </div>
-    );
   }
 
   // ─── SVG icon helpers ────────────────────────────────────────────────────
