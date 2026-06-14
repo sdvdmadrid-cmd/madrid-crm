@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { buildLoginRedirectPath } from "@/lib/auth-redirect";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 
 const SESSION_COOKIE_NAME =
@@ -14,7 +15,7 @@ export default async function WebsiteBuilderLayout({ children }) {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/website");
+    redirect(buildLoginRedirectPath("/website"));
   }
 
   const enabled = await isPlatformFeatureEnabled("feature_website_builder", true);

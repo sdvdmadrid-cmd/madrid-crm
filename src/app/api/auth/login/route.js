@@ -131,7 +131,10 @@ export async function POST(request) {
     );
 
     const token = createSessionToken(sessionUser);
-    const redirectTo = resolvePostLoginPath(sessionUser);
+    const redirectTo = resolvePostLoginPath(
+      sessionUser,
+      body.redirect || body.next || "",
+    );
 
     const headers = new Headers({ "Content-Type": "application/json" });
     headers.append("Set-Cookie", buildSessionCookie(token));

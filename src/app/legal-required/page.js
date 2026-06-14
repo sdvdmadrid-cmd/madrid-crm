@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { apiFetch } from "@/lib/client-auth";
+import { sanitizeRedirectPath } from "@/lib/auth-redirect";
 
 export default function LegalRequiredPage() {
   return (
@@ -325,9 +326,5 @@ function LegalRequiredInner() {
 }
 
 function normalizeSafeRedirect(path) {
-  const unsafe = ["/legal-required", "/login", "/register"];
-  if (!path || typeof path !== "string") return "/dashboard";
-  if (!path.startsWith("/")) return "/dashboard";
-  if (unsafe.includes(path)) return "/dashboard";
-  return path;
+  return sanitizeRedirectPath(path) || "/dashboard";
 }

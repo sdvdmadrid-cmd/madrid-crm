@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { buildLoginRedirectPath } from "@/lib/auth-redirect";
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === "production"
@@ -15,7 +16,7 @@ export default async function PlatformFeedbackRedirectPage() {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/owner/support");
+    redirect(buildLoginRedirectPath("/owner/support"));
   }
 
   const role = String(session.role || "").toLowerCase();

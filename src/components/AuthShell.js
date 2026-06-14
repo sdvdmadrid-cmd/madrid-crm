@@ -20,9 +20,12 @@ import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { TenantWorkspaceProvider } from "@/context/TenantWorkspaceContext";
 import {
+  buildLoginRedirectPath,
   isOwnerCommandCenterPath,
   isTenantContractorAppPath,
+  parseRedirectParam,
   resolvePostLoginPath,
+  sanitizeRedirectPath,
 } from "@/lib/auth-redirect";
 import { isPremiumWorkspacePath } from "@/lib/premium-workspace-routes";
 import { useStoredUiLanguage } from "@/lib/ui-language";
@@ -185,6 +188,7 @@ export default function AuthShell({ children }) {
   const [authChecked, setAuthChecked] = useState(false);
   const [authHydrating, setAuthHydrating] = useState(!isPublicPage);
   const authBootstrappedRef = useRef(false);
+  const lastAuthNavRef = useRef({ target: "", at: 0 });
   const [authUser, setAuthUser] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -201,11 +205,37 @@ export default function AuthShell({ children }) {
       String(authUser?.role || "").toLowerCase() !== "super_admin",
   );
 
-  const resolveAuthRedirect = useCallback((user) => {
-    if (typeof window === "undefined") return "/dashboard";
-    const params = new URLSearchParams(window.location.search);
-    return resolvePostLoginPath(user, params.get("redirect") || "");
-  }, []);
+  const safeAuthReplace = useCallback(
+    (target) => {
+      const destination = String(target || "").trim();
+      if (!destination || !destination.startsWith("/")) return;
+
+      const now = Date.now();
+      if (
+        lastAuthNavRef.current.target === destination &&
+        now - lastAuthNavRef.current.at < 1500
+      ) {
+        return;
+      }
+      lastAuthNavRef.current = { target: destination, at: now };
+      router.replace(destination);
+    },
+    [router],
+  );
+
+  const resolveAuthRedirect = useCallback(
+    (user) => {
+      if (typeof window === "undefined") {
+        return resolvePostLoginPath(user);
+      }
+      const params = new URLSearchParams(window.location.search);
+      const redirectParam = parseRedirectParam(params);
+      return resolvePostLoginPath(user, redirectParam, {
+        currentPath: pathname || "",
+      });
+    },
+    [pathname],
+  );
 
   useEffect(() => {
     if (!authUser || authUser.hasBusinessAccess !== false) return;
@@ -228,6 +258,23 @@ export default function AuthShell({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!hasMounted || !isDedicatedLoginPage) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const raw = parseRedirectParam(params);
+    if (!raw) return;
+
+    const sanitized = sanitizeRedirectPath(raw);
+    if (raw === sanitized) return;
+
+    const nextUrl = sanitized
+      ? `/login?redirect=${encodeURIComponent(sanitized)}`
+      : "/login";
+    window.history.replaceState({}, "", nextUrl);
+  }, [hasMounted, isDedicatedLoginPage]);
+
+  useEffect(() => {
     if (!hasMounted) return;
     if (isAuthEntryPage) {
       setAuthChecked(true);
@@ -247,7 +294,7 @@ export default function AuthShell({ children }) {
   useEffect(() => {
     if (!hasMounted || !authChecked || !authUser) return;
     if (!isDedicatedLoginPage && !isRegisterPage) return;
-    router.replace(resolveAuthRedirect(authUser));
+    safeAuthReplace(resolveAuthRedirect(authUser));
   }, [
     hasMounted,
     authChecked,
@@ -255,15 +302,15 @@ export default function AuthShell({ children }) {
     isDedicatedLoginPage,
     isRegisterPage,
     resolveAuthRedirect,
-    router,
+    safeAuthReplace,
   ]);
 
   useEffect(() => {
     if (!hasMounted || !authChecked || !authUser) return;
     if (String(authUser.role || "").toLowerCase() !== "super_admin") return;
     if (!isTenantContractorAppPath(pathname)) return;
-    router.replace("/owner/overview");
-  }, [hasMounted, authChecked, authUser, pathname, router]);
+    safeAuthReplace("/owner/overview");
+  }, [hasMounted, authChecked, authUser, pathname, safeAuthReplace]);
 
   useEffect(() => {
     if (!hasMounted || !authChecked || authUser) return;
@@ -273,8 +320,7 @@ export default function AuthShell({ children }) {
     }
     if (isPublicPage) return;
     if (isAuthEntryPage) return;
-    const target = `${pathname}${window.location.search}`;
-    router.replace(`/login?redirect=${encodeURIComponent(target)}`);
+    safeAuthReplace(buildLoginRedirectPath(pathname, { currentPath: pathname }));
   }, [
     hasMounted,
     authChecked,
@@ -283,7 +329,7 @@ export default function AuthShell({ children }) {
     isAuthEntryPage,
     isRegisterPage,
     pathname,
-    router,
+    safeAuthReplace,
   ]);
 
   useEffect(() => {
@@ -405,20 +451,6 @@ export default function AuthShell({ children }) {
 
     run();
   }, [isPublicPage, pathname]);
-
-  useEffect(() => {
-    if (!authUser) return;
-    if (!isDedicatedLoginPage && !isResetPasswordPage) return;
-    if (typeof window === "undefined") return;
-
-    router.replace(resolveAuthRedirect(authUser));
-  }, [
-    authUser,
-    isDedicatedLoginPage,
-    isResetPasswordPage,
-    resolveAuthRedirect,
-    router,
-  ]);
 
   const detectMobileViewport = useCallback(() => {
     if (typeof window === "undefined") return false;
@@ -776,9 +808,15 @@ export default function AuthShell({ children }) {
       setLoginFailedAttempts(0);
       clearClientLoggedOut();
       setAuthUser(payload.data);
-      const destination =
-        payload.redirectTo || resolveAuthRedirect(payload.data);
-      router.replace(destination);
+      authBootstrappedRef.current = true;
+      const destination = sanitizeRedirectPath(
+        payload.redirectTo || resolveAuthRedirect(payload.data),
+        {
+          role: payload.data?.role,
+          currentPath: pathname || "",
+        },
+      ) || resolveAuthRedirect(payload.data);
+      safeAuthReplace(destination);
       router.refresh();
     } catch (err) {
       setError(err.message || t("auth.authError"));

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSessionToken } from "@/lib/auth";
+import { sanitizeRedirectPath, resolvePostLoginPath } from "@/lib/auth-redirect";
 import {
   buildAppSessionFromSupabaseUser,
   getRequestOrigin,
@@ -7,12 +8,12 @@ import {
 } from "@/lib/supabase-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-function getSafeRedirectPath(value) {
-  const raw = String(value || "").trim();
-  if (!raw.startsWith("/")) return "/dashboard";
-  if (raw.startsWith("//")) return "/dashboard";
-  if (raw.startsWith("/auth/")) return "/dashboard";
-  return raw;
+function getSafeRedirectPath(value, user) {
+  const sanitized = sanitizeRedirectPath(value, {
+    role: user?.role,
+  });
+  if (sanitized) return sanitized;
+  return resolvePostLoginPath(user || {});
 }
 
 import { verifyEmailConfirmToken } from "@/lib/auth";
@@ -77,7 +78,7 @@ export async function GET(request) {
   const vt = String(url.searchParams.get("vt") || "").trim();
   const authError = String(url.searchParams.get("error") || "").trim();
   const origin = getRequestOrigin(request) || url.origin;
-  const target = new URL(getSafeRedirectPath(url.searchParams.get("next")), origin);
+  const target = new URL(getSafeRedirectPath(url.searchParams.get("next"), null), origin);
 
   if (AUTH_DEBUG) {
     console.info("[auth/callback] entry", {

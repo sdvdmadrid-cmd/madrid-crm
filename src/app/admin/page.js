@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { buildLoginRedirectPath } from "@/lib/auth-redirect";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function AdminPage() {
   const role = String(session?.role || "").toLowerCase();
 
   if (!session || role !== "super_admin") {
-    redirect("/login?redirect=/owner/overview");
+    redirect(buildLoginRedirectPath("/owner/overview"));
   }
 
   redirect("/owner/overview");
