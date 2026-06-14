@@ -63,6 +63,21 @@ const DEV_PROFILES = {
     name: process.env.DEV_CONTRACTOR_NAME || "Contractor Dev",
     role: "contractor",
   },
+  expired_trial: {
+    tenantId: process.env.DEV_EXPIRED_TRIAL_TENANT_ID || "tenant-expired-trial",
+    email: (process.env.DEV_EXPIRED_TRIAL_EMAIL || "expired.trial@fieldbase.local")
+      .trim()
+      .toLowerCase(),
+    password: String(
+      process.env.DEV_EXPIRED_TRIAL_PASSWORD ||
+        process.env.DEV_ADMIN_PASSWORD ||
+        "",
+    ).trim(),
+    name: process.env.DEV_EXPIRED_TRIAL_NAME || "Expired Trial Dev",
+    role: "owner",
+    isSubscribed: false,
+    trialEndDate: "2020-01-01T00:00:00.000Z",
+  },
 };
 
 function getConfiguredProfile(profileName) {
@@ -144,8 +159,11 @@ async function ensureDevUser(profileName) {
     },
     user_metadata: {
       name: profile.name,
-      status: "active",
-      isSubscribed: true,
+      status: profile.isSubscribed === false ? "expired" : "active",
+      isSubscribed: profile.isSubscribed !== false,
+      trialEndDate:
+        profile.trialEndDate ||
+        (profile.isSubscribed === false ? "2020-01-01T00:00:00.000Z" : null),
     },
   };
 

@@ -12,6 +12,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -107,9 +108,11 @@ function buildUpdateRow(body) {
 
 export async function GET(request, { params }) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
 
@@ -164,9 +167,11 @@ export async function PATCH(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
 
@@ -264,9 +269,11 @@ export async function DELETE(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
 

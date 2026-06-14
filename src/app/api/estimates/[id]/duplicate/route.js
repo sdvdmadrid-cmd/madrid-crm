@@ -10,6 +10,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   resolveInsertTenant,
   unauthenticatedResponse,
 } from "@/lib/tenant";
@@ -91,9 +92,11 @@ export async function POST(request, { params }) {
   if (csrfResponse) return csrfResponse;
 
   try {
-    const { tenantDbId, userId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, userId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
     const { id } = await params;

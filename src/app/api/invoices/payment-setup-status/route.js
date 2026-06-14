@@ -12,6 +12,7 @@ import { isSuperAdminRole } from "@/lib/access-control";
 import {
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -19,7 +20,9 @@ export const runtime = "nodejs";
 
 export async function GET(request) {
   const context = await getAuthenticatedTenantContext(request);
-  if (!context.authenticated) {
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+      if (!context.authenticated) {
     return unauthenticatedResponse();
   }
   // Platform Stripe env / webhook diagnostics — not for contractor accounts.

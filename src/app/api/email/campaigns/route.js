@@ -4,6 +4,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -50,8 +51,10 @@ async function resolveRecipients(tenantId, role, clientIds, directRecipients) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, authenticated  } = context;
     if (!authenticated) return unauthenticatedResponse();
 
     const url = new URL(request.url);
@@ -94,8 +97,10 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const { tenantDbId, role, userId, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, userId, authenticated  } = context;
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 

@@ -3,6 +3,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";

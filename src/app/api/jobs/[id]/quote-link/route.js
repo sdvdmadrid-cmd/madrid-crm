@@ -5,6 +5,7 @@ import {
   canSendExternal,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -12,8 +13,10 @@ const JOBS = "jobs";
 
 export async function POST(request, { params }) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, authenticated  } = context;
     if (!authenticated) {
       return unauthenticatedResponse();
     }

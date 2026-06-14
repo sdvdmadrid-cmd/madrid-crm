@@ -5,6 +5,7 @@ import {
   canDelete,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -16,9 +17,11 @@ function json(data, status = 200) {
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canDelete(role)) return forbiddenResponse();
 
     const groups = await findDuplicateEmployeeGroups({ tenantDbId, role });
@@ -46,9 +49,11 @@ export async function POST(request) {
   if (csrf) return csrf;
 
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canDelete(role)) return forbiddenResponse();
 
     const body = await request.json().catch(() => ({}));

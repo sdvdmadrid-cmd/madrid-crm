@@ -1,10 +1,14 @@
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 import { resolveWeatherDay } from "@/lib/weather-service";
 import { isValidYmd } from "@/lib/local-date";
 
 export async function GET(request) {
-  const { authenticated } = await getAuthenticatedTenantContext(request);
-  if (!authenticated) return unauthenticatedResponse();
+  const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated  } = context;
+      if (!authenticated) return unauthenticatedResponse();
 
   const { searchParams } = new URL(request.url);
   const location = (searchParams.get("location") || "").trim();

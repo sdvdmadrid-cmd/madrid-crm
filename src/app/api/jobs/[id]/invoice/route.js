@@ -4,6 +4,7 @@ import {
   canManageSensitive,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -14,9 +15,11 @@ export async function POST(request, { params }) {
   if (csrf) return csrf;
 
   try {
-    const { authenticated, tenantDbId, role, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canManageSensitive(role)) return forbiddenResponse();
 
     const { id: jobId } = await params;

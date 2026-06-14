@@ -2,6 +2,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { supabaseAdmin } from "@/lib/supabase-admin";

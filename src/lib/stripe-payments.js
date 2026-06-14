@@ -1101,3 +1101,82 @@ export async function getSubscriptionInvoices(tenantId, limit = 12) {
 
   return data || [];
 }
+
+/**
+ * Create a Stripe Checkout session for FieldBase SaaS subscription (post-trial).
+ */
+export async function createSubscriptionCheckoutSession({
+  tenantId,
+  planId,
+  email,
+  name,
+  userId,
+  origin,
+  trialDays = 0,
+  source = "app",
+}) {
+  const stripe = requireStripeClient();
+
+  const { data: plan, error: planError } = await supabaseAdmin
+    .from("subscription_plans")
+    .select("*")
+    .eq("id", planId)
+    .single();
+
+  if (planError || !plan) {
+    throw new Error("Subscription plan not found");
+  }
+
+  const stripeCustomerId = await getOrCreateStripeCustomer(tenantId, email, name);
+  const priceInCents = Math.round(Number(plan.price_monthly || 0) * 100);
+
+  const product = await stripe.products.create({
+    name: plan.name,
+    description: plan.description || undefined,
+    metadata: { plan_id: planId },
+  });
+
+  const successUrl = `${origin}/subscriptions?checkout=success`;
+  const cancelUrl = `${origin}/subscriptions?checkout=cancelled`;
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    customer: stripeCustomerId,
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product: product.id,
+          unit_amount: priceInCents,
+          recurring: { interval: "month", interval_count: 1 },
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    allow_promotion_codes: true,
+    billing_address_collection: "auto",
+    metadata: {
+      tenant_id: tenantId,
+      plan_id: planId,
+      user_id: userId || "",
+      source: source || "app",
+    },
+    subscription_data: {
+      ...(Number(trialDays) > 0 ? { trial_period_days: Number(trialDays) } : {}),
+      metadata: {
+        tenant_id: tenantId,
+        plan_id: planId,
+        user_id: userId || "",
+        source: source || "app",
+      },
+    },
+  });
+
+  return {
+    sessionId: session.id,
+    url: session.url || "",
+    customerId: stripeCustomerId,
+  };
+}

@@ -28,6 +28,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -183,9 +184,11 @@ function jsonResponse(payload, status = 200) {
 
 export async function GET(request, { params }) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const { id } = await params;
     if (!id) {
@@ -242,9 +245,11 @@ export async function PATCH(request, { params }) {
   let logUserId = null;
 
   try {
-    const { tenantDbId, userId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, userId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
     logTenantId = tenantDbId || null;
     logUserId = userId || null;

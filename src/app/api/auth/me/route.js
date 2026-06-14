@@ -4,6 +4,10 @@ import { buildSessionCookie, createSessionToken, getSessionFromRequest } from "@
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import { enrichAuthMeData, authReconcileCacheKey, AUTH_RECONCILE_CACHE_TTL_SECONDS } from "@/lib/auth-me-workspace";
 import {
+  fetchStripeSubscriptionStatus,
+  resolveSubscriptionAccess,
+} from "@/lib/subscription-access";
+import {
   getApiResponseCache,
   setApiResponseCache,
 } from "@/lib/api-response-cache";
@@ -15,6 +19,28 @@ import {
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+
+async function attachSubscriptionAccessFields(base = {}) {
+  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(base.tenantDbId);
+  const access = resolveSubscriptionAccess({
+    role: base.role,
+    isSubscribed: base.isSubscribed === true,
+    trialEndDate: base.trialEndDate || null,
+    complimentaryAccess: base.complimentaryAccess === true,
+    stripeSubscriptionStatus,
+  });
+
+  return {
+    ...base,
+    stripeSubscriptionStatus,
+    hasBusinessAccess: access.hasBusinessAccess,
+    subscriptionState: access.state,
+  };
+}
+
+async function buildAuthMePayload(base = {}) {
+  return enrichAuthMeData(await attachSubscriptionAccessFields(base));
+}
 
 export async function GET(request) {
   try {
@@ -58,13 +84,16 @@ export async function GET(request) {
         role: user.app_metadata?.role,
       });
 
-      const appSession = buildAppSessionFromSupabaseUser(user, null, profile);
+      const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(profile?.tenantId || user.id);
+      const appSession = buildAppSessionFromSupabaseUser(user, null, profile, {
+        stripeSubscriptionStatus,
+      });
       const token = createSessionToken(appSession);
 
         return new Response(
           JSON.stringify({
             success: true,
-            data: await enrichAuthMeData({
+            data: await buildAuthMePayload({
               userId: appSession.userId,
               tenantId: appSession.tenantId,
               tenantDbId: appSession.tenantDbId,
@@ -122,7 +151,7 @@ export async function GET(request) {
       return new Response(
         JSON.stringify({
           success: true,
-          data: await enrichAuthMeData(responseBody),
+          data: await buildAuthMePayload(responseBody),
         }),
         {
           status: 200,
@@ -132,6 +161,36 @@ export async function GET(request) {
           },
         },
       );
+    }
+
+    const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
+      responseBody.tenantDbId,
+    );
+    const subscriptionAccess = resolveSubscriptionAccess({
+      ...responseBody,
+      stripeSubscriptionStatus,
+    });
+    responseBody = {
+      ...responseBody,
+      stripeSubscriptionStatus,
+      hasBusinessAccess: subscriptionAccess.hasBusinessAccess,
+      subscriptionState: subscriptionAccess.state,
+    };
+
+    const sessionNeedsRefresh =
+      appSession?.hasBusinessAccess !== subscriptionAccess.hasBusinessAccess ||
+      appSession?.isSubscribed !== responseBody.isSubscribed ||
+      appSession?.stripeSubscriptionStatus !== stripeSubscriptionStatus;
+
+    if (sessionNeedsRefresh && appSession) {
+      const token = createSessionToken({
+        ...appSession,
+        isSubscribed: responseBody.isSubscribed,
+        stripeSubscriptionStatus,
+        hasBusinessAccess: subscriptionAccess.hasBusinessAccess,
+        subscriptionState: subscriptionAccess.state,
+      });
+      setCookieHeader = buildSessionCookie(token);
     }
 
     const reconcileKey = authReconcileCacheKey(session.userId);
@@ -150,12 +209,21 @@ export async function GET(request) {
           tenantId: session.tenantDbId || reconciled.id,
           role: session.role,
         });
+        const refreshedStripeStatus = await fetchStripeSubscriptionStatus(
+          session.tenantDbId || reconciled.id,
+        );
         const refreshedSession = buildAppSessionFromSupabaseUser(
           reconciled,
           null,
           profile,
+          { stripeSubscriptionStatus: refreshedStripeStatus },
         );
-        if (refreshedSession.role !== session.role) {
+        const roleChanged = refreshedSession.role !== session.role;
+        const accessChanged =
+          refreshedSession.hasBusinessAccess !== appSession?.hasBusinessAccess ||
+          refreshedSession.isSubscribed !== appSession?.isSubscribed;
+
+        if (roleChanged || accessChanged) {
           const token = createSessionToken(refreshedSession);
           setCookieHeader = buildSessionCookie(token);
           responseBody = {
@@ -174,6 +242,9 @@ export async function GET(request) {
             isSubscribed: refreshedSession.isSubscribed === true,
             trialEndDate: refreshedSession.trialEndDate || null,
             complimentaryAccess: refreshedSession.complimentaryAccess === true,
+            stripeSubscriptionStatus: refreshedStripeStatus,
+            hasBusinessAccess: refreshedSession.hasBusinessAccess,
+            subscriptionState: refreshedSession.subscriptionState,
           };
         }
       }
@@ -184,7 +255,7 @@ export async function GET(request) {
     return new Response(
       JSON.stringify({
         success: true,
-        data: await enrichAuthMeData(responseBody),
+        data: await buildAuthMePayload(responseBody),
       }),
       {
         status: 200,

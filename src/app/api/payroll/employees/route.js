@@ -20,6 +20,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -31,9 +32,11 @@ function json(data, status = 200) {
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const url = new URL(request.url);
     const status = url.searchParams.get("status") || "active";
@@ -70,9 +73,11 @@ export async function POST(request) {
   if (csrf) return csrf;
 
   try {
-    const { authenticated, tenantDbId, role, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
     const body = await request.json();

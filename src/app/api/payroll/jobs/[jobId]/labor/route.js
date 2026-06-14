@@ -1,6 +1,7 @@
 import { getJobLaborSummary } from "@/lib/payroll-job-costing";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -8,9 +9,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request, { params }) {
   try {
-    const { authenticated, tenantDbId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const { jobId } = await params;
     const summary = await getJobLaborSummary(tenantDbId, jobId);

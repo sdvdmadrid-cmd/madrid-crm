@@ -4,6 +4,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -43,9 +44,11 @@ export async function GET(request) {
   try {
     if (!hasAuthCredentials(request)) return unauthenticatedResponse();
 
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     let query = supabaseAdmin
       .from(TABLE)
@@ -76,9 +79,11 @@ export async function POST(request) {
   try {
     if (!hasAuthCredentials(request)) return unauthenticatedResponse();
 
-    const { tenantDbId, role, userId, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, userId, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
     const body = sanitizePayloadDeep(await request.json());

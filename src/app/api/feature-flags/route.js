@@ -6,6 +6,7 @@ import {
 import { getPlatformFeatureFlagMap } from "@/lib/platform-feature-flags";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 

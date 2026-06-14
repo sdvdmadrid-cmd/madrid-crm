@@ -1,6 +1,7 @@
 import { computeBillStatus, createNotification, maybeCreateNextRecurringBill } from "@/lib/bill-payments";
 import { updateConnectProfileByAccountId } from "@/lib/stripe-connect-storage";
 import { requireWebhookPaymentResources, syncInvoicePaymentSummary } from "@/lib/stripe-payments";
+import { syncUserSubscriptionMetadata } from "@/lib/subscription-access";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logSupabaseError } from "@/lib/supabase-db";
 
@@ -111,19 +112,24 @@ async function handleConnectAccountUpdated(account) {
 
 async function handleSubscriptionEvent(event) {
   try {
-    if (event.type === "customer.subscription.updated") {
+    if (
+      event.type === "customer.subscription.updated" ||
+      event.type === "customer.subscription.created"
+    ) {
       const subscription = event.data.object;
       const metadata = subscription.metadata || {};
       const tenantId = String(metadata.tenant_id || "");
+      const userId = String(metadata.user_id || "");
+      const planId = String(metadata.plan_id || "");
+      const status = String(subscription.status || "").toLowerCase();
 
-      if (!tenantId) {
-        return null;
-      }
-
-      const { error: updateError } = await supabaseAdmin
-        .from(CONTRACTOR_SUBSCRIPTIONS)
-        .update({
-          status: subscription.status,
+      if (tenantId) {
+        const row = {
+          tenant_id: tenantId,
+          plan_id: planId || null,
+          stripe_subscription_id: subscription.id,
+          stripe_customer_id: String(subscription.customer || ""),
+          status,
           current_period_start: subscription.current_period_start
             ? new Date(subscription.current_period_start * 1000).toISOString()
             : null,
@@ -131,16 +137,45 @@ async function handleSubscriptionEvent(event) {
             ? new Date(subscription.current_period_end * 1000).toISOString()
             : null,
           updated_at: new Date().toISOString(),
-        })
-        .eq("stripe_subscription_id", subscription.id);
+        };
 
-      if (updateError) {
-        logSupabaseError(
-          "[stripe-webhook-processing][customer.subscription.updated]",
-          updateError,
-          { subscriptionId: subscription.id, tenantId },
-        );
+        const { data: existing } = await supabaseAdmin
+          .from(CONTRACTOR_SUBSCRIPTIONS)
+          .select("id")
+          .eq("stripe_subscription_id", subscription.id)
+          .maybeSingle();
+
+        if (existing?.id) {
+          await supabaseAdmin
+            .from(CONTRACTOR_SUBSCRIPTIONS)
+            .update(row)
+            .eq("id", existing.id);
+        } else if (planId) {
+          await supabaseAdmin.from(CONTRACTOR_SUBSCRIPTIONS).insert(row);
+        } else {
+          const { error: updateError } = await supabaseAdmin
+            .from(CONTRACTOR_SUBSCRIPTIONS)
+            .update(row)
+            .eq("stripe_subscription_id", subscription.id);
+          if (updateError) {
+            logSupabaseError(
+              "[stripe-webhook-processing][customer.subscription.updated]",
+              updateError,
+              { subscriptionId: subscription.id, tenantId },
+            );
+          }
+        }
       }
+
+      if (userId && metadata.source !== "bill-payments") {
+        const active = status === "active" || status === "trialing";
+        await syncUserSubscriptionMetadata({
+          userId,
+          isSubscribed: active,
+          status: active ? "active" : status === "past_due" ? "past_due" : "expired",
+        });
+      }
+
       return null;
     }
 
@@ -201,6 +236,12 @@ async function handleSubscriptionEvent(event) {
         } catch (metaError) {
           console.error("[stripe-webhook-processing] failed to clear billPaymentsSubscribed", metaError);
         }
+      } else if (userId) {
+        await syncUserSubscriptionMetadata({
+          userId,
+          isSubscribed: false,
+          status: "expired",
+        });
       }
 
       return null;
@@ -521,6 +562,18 @@ export async function processStripeWebhookEvent(event) {
   ) {
     await handleSubscriptionEvent(event);
     return jsonResponse({ success: true, eventType: event.type });
+  }
+
+  if (event.type.startsWith("checkout.session.")) {
+    const session = event.data.object;
+    if (String(session?.mode || "") === "subscription") {
+      return jsonResponse({
+        success: true,
+        eventType: event.type,
+        ignored: true,
+        reason: "Subscription checkout handled via customer.subscription events",
+      });
+    }
   }
 
   if (event.type.startsWith("payment_intent.")) {

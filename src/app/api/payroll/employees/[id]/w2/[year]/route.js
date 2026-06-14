@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin.js";
 import { scopeByTenant } from "@/lib/tenant-scope.js";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -16,9 +17,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request, { params }) {
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const { id, year } = await params;
     const taxYear = Number(year) || new Date.getFullYear();

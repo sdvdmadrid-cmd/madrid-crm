@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createSessionToken } from "@/lib/auth";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -20,6 +21,8 @@ function buildOauthCookie(value, maxAgeSeconds = 600) {
 
 export async function GET(request) {
   const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
   if (!context?.authenticated || !context.userId) {
     return unauthenticatedResponse();
   }

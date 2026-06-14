@@ -4,14 +4,17 @@ import {
   canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canRead(role)) return forbiddenResponse();
 
     const { searchParams } = new URL(request.url);

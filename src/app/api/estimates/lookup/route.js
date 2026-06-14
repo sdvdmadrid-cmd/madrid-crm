@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -12,8 +13,11 @@ import {
  */
 export async function GET(request) {
   try {
-    const { tenantDbId, authenticated } = await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const { searchParams } = new URL(request.url);
     const rawQ = String(searchParams.get("q") || "").trim();

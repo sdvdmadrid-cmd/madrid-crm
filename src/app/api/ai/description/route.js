@@ -3,6 +3,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
@@ -27,8 +28,11 @@ export async function POST(request) {
       );
     }
 
-    const { role, authenticated, tenantDbId, userId } = await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { role, authenticated, tenantDbId, userId  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
 

@@ -1,5 +1,6 @@
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -14,7 +15,10 @@ const DETAILS_API_BASE =
  * Requires an authenticated session.
  */
 export async function GET(request) {
-  const { authenticated } = await getAuthenticatedTenantContext(request);
+  const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { authenticated  } = context;
   if (!authenticated) return unauthenticatedResponse();
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;

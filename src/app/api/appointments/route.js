@@ -7,6 +7,7 @@ import {
   canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant, applyUnpaginatedSafetyLimit } from "@/lib/tenant-scope";
@@ -100,9 +101,11 @@ function validateAppointmentBody(body) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canRead(role)) return forbiddenResponse();
 
     const { searchParams } = new URL(request.url);
@@ -172,9 +175,11 @@ export async function POST(request) {
     const csrfBlock = applyMutationCsrfGuard(request);
     if (csrfBlock) return csrfBlock;
 
-    const { tenantDbId, role, userId, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, userId, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
     const body = await request.json();

@@ -5,7 +5,8 @@ import { buildW2PdfBuffer, build1099PdfBuffer, pdfFilenameForW2 } from "@/lib/pa
 import { serializePayrollEmployee, serializePayrollSettings } from "@/lib/payroll-serializer.js";
 import { PAYROLL_TABLES } from "@/lib/payroll-constants.js";
 import { supabaseAdmin } from "@/lib/supabase-admin.js";
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +25,11 @@ async function getLinkedEmployee(tenantDbId, userId) {
 
 export async function GET(request, { params }) {
   try {
-    const { authenticated, tenantDbId, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const employeeRow = await getLinkedEmployee(tenantDbId, userId);
     if (!employeeRow) {

@@ -1,4 +1,5 @@
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";

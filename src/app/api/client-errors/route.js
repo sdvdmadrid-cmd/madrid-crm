@@ -1,6 +1,7 @@
 import { writeSecurityAudit } from "@/lib/security-audit";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -12,9 +13,11 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request) {
   try {
-    const { authenticated, tenantDbId, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const body = await request.json().catch(() => ({}));
     const message = String(body.message || "Client error").slice(0, 500);

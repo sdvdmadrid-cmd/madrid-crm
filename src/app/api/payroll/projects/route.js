@@ -1,13 +1,16 @@
 import { listProjectPlSummaries } from "@/lib/project-pl.js";
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const url = new URL(request.url);
     const search = url.searchParams.get("search") || "";

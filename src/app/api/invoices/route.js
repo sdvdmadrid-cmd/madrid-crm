@@ -21,6 +21,7 @@ import {
   canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { getListPaginationParams, scopeByTenant, applyUnpaginatedSafetyLimit } from "@/lib/tenant-scope";
@@ -73,9 +74,11 @@ async function nextInvoiceNumber(tenantId) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
     if (!canRead(role)) {
@@ -166,9 +169,11 @@ export async function POST(request) {
     const csrfBlock = applyMutationCsrfGuard(request);
     if (csrfBlock) return csrfBlock;
 
-    const { tenantDbId, role, userId, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, userId, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
     if (!canManageSensitive(role)) {

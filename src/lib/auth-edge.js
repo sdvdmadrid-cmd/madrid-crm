@@ -30,6 +30,21 @@ function decodeBase64UrlJson(input) {
   }
 }
 
+/** Decode JWT payload without signature verification (middleware fallback only). */
+export function decodeSessionPayloadUnsafe(token) {
+  if (!token || typeof token !== "string") {
+    return null;
+  }
+
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  const payload = decodeBase64UrlJson(parts[1]);
+  return payload && typeof payload === "object" ? payload : null;
+}
+
 export async function verifyEdgeSessionToken(token) {
   const resolved = resolveSessionSecret();
   const sessionSecret = resolved.value;
