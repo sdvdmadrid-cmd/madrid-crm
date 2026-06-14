@@ -48,6 +48,16 @@ test("middleware login redirect respects logout guard cookie", () => {
   assert.match(loginBlock, /edgeSession && !isLogoutGuardCookieSet\(request\)/);
 });
 
+test("AuthShell renders owner command center without authUser gate", () => {
+  const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
+  const ownerBlock = src.slice(
+    src.indexOf("if (isSubscribePage)"),
+    src.indexOf("if (authUser && shouldRestrictForSubscription"),
+  );
+  assert.match(ownerBlock, /if \(isOwnerCommandCenter\)/);
+  assert.match(ownerBlock, /auth-shell-owner-root/);
+});
+
 test("AuthShell renders subscribe page without authUser gate", () => {
   const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
   assert.match(src, /if \(isSubscribePage\)\s*\{\s*return children;/s);
