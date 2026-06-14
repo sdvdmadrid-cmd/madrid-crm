@@ -63,7 +63,19 @@ export async function reconcileTenantSubscriptionFromStripe({
     const match = (list?.data || []).find(
       (customer) => String(customer?.metadata?.tenant_id || "") === tenantId,
     );
-    customerId = String(match?.id || list?.data?.[0]?.id || "");
+    customerId = String(match?.id || "");
+  }
+
+  if (!customerId) {
+    const { supabaseAdmin } = await import("@/lib/supabase-admin");
+    const { data: subRow } = await supabaseAdmin
+      .from("contractor_subscriptions")
+      .select("stripe_customer_id")
+      .eq("tenant_id", tenantId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    customerId = String(subRow?.stripe_customer_id || "");
   }
 
   if (!customerId) {

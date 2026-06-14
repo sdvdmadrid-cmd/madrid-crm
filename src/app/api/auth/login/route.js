@@ -13,7 +13,10 @@ import {
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
 import { resolvePostLoginPath } from "@/lib/auth-redirect";
-import { hydrateSessionSubscriptionFields } from "@/lib/subscription-access";
+import {
+  ensurePaidAccessFromStripe,
+  hydrateSessionSubscriptionFields,
+} from "@/lib/subscription-access";
 import { writeSecurityAudit } from "@/lib/security-audit";
 
 export async function POST(request) {
@@ -132,12 +135,32 @@ export async function POST(request) {
       userMetadata: reconciledUser.user_metadata,
     });
 
-    const sessionUser = buildAppSessionFromSupabaseUser(
+    let sessionUser = buildAppSessionFromSupabaseUser(
       reconciledUser,
       data.session,
       profile,
       { stripeSubscriptionStatus },
     );
+
+    if (!sessionUser.hasBusinessAccess && sessionUser.role !== "super_admin") {
+      const ensured = await ensurePaidAccessFromStripe({
+        tenantDbId,
+        userId: reconciledUser.id,
+        email: reconciledUser.email,
+        role: sessionUser.role,
+        isSubscribed: sessionUser.isSubscribed,
+        trialEndDate: sessionUser.trialEndDate,
+        complimentaryAccess: sessionUser.complimentaryAccess,
+      });
+      if (ensured.access.hasBusinessAccess) {
+        sessionUser = buildAppSessionFromSupabaseUser(
+          reconciledUser,
+          data.session,
+          profile,
+          { stripeSubscriptionStatus: ensured.stripeSubscriptionStatus },
+        );
+      }
+    }
 
     const token = createSessionToken(sessionUser);
     const redirectTo = resolvePostLoginPath(
