@@ -1,6 +1,7 @@
 import { getTenantContext } from "@/lib/tenant";
 import { cookies } from "next/headers";
 import { buildSessionCookie, createSessionToken, getSessionFromRequest } from "@/lib/auth";
+import { isLogoutGuardCookieSet } from "@/lib/auth-logout-guard.js";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import { enrichAuthMeData, authReconcileCacheKey, AUTH_RECONCILE_CACHE_TTL_SECONDS } from "@/lib/auth-me-workspace";
 import {
@@ -55,6 +56,16 @@ export async function GET(request) {
     const appSession = getSessionFromRequest(request);
 
     if (!session?.authenticated) {
+      if (isLogoutGuardCookieSet(request)) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Unauthenticated" }),
+          {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
       const cookieStore = await cookies();
       const supabase = createSupabaseRouteHandlerClient(cookieStore);
       const {

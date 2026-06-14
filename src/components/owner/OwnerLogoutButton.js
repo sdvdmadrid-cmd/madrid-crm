@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
+import { markClientLoggedOut } from "@/lib/auth-logout-guard.js";
 import { supabase } from "@/lib/supabase";
 import styles from "./OwnerShell.module.css";
 
@@ -41,7 +42,8 @@ export default function OwnerLogoutButton({ variant = "sidebar" }) {
     }
 
     clearOwnerClientState();
-    router.replace("/");
+    markClientLoggedOut();
+    router.replace("/login");
     router.refresh();
   }
 

@@ -7,6 +7,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import InstantNavigation from "@/components/InstantNavigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import {
+  clearClientLoggedOut,
+  isClientLoggedOut,
+  markClientLoggedOut,
+} from "@/lib/auth-logout-guard.js";
 import { supabase } from "@/lib/supabase";
 import "@/i18n";
 import AppFooter from "@/components/site/AppFooter";
@@ -30,7 +35,7 @@ const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
 });
 const LoginAccessPanel = dynamic(
   () => import("@/components/auth/LoginAccessPanel"),
-  { loading: () => null },
+  { loading: () => <AuthBootShell dark={false} /> },
 );
 const CrmNavBar = dynamic(() => import("@/components/crm/CrmNavBar"), {
   loading: () => null,
@@ -113,6 +118,8 @@ export default function AuthShell({ children }) {
   const isDedicatedLoginPage = pathname === "/login";
   const isRegisterPage = pathname === "/register";
   const isResetPasswordPage = pathname === "/reset-password";
+  const isAuthEntryPage =
+    isDedicatedLoginPage || isRegisterPage || isResetPasswordPage;
   const isVerifyEmailPage = pathname === "/verify-email";
   const [trialExpiredParam, setTrialExpiredParam] = useState(false);
   const [loginFailedAttempts, setLoginFailedAttempts] = useState(0);
@@ -221,6 +228,13 @@ export default function AuthShell({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!hasMounted) return;
+    if (isAuthEntryPage) {
+      setAuthChecked(true);
+    }
+  }, [hasMounted, isAuthEntryPage]);
+
+  useEffect(() => {
     if (!hasMounted || typeof window === "undefined") return;
 
     if ("serviceWorker" in navigator) {
@@ -258,7 +272,7 @@ export default function AuthShell({ children }) {
       return;
     }
     if (isPublicPage) return;
-    if (isDedicatedLoginPage || isResetPasswordPage) return;
+    if (isAuthEntryPage) return;
     const target = `${pathname}${window.location.search}`;
     router.replace(`/login?redirect=${encodeURIComponent(target)}`);
   }, [
@@ -266,9 +280,8 @@ export default function AuthShell({ children }) {
     authChecked,
     authUser,
     isPublicPage,
-    isDedicatedLoginPage,
+    isAuthEntryPage,
     isRegisterPage,
-    isResetPasswordPage,
     pathname,
     router,
   ]);
@@ -292,6 +305,11 @@ export default function AuthShell({ children }) {
     // Only sync when Supabase has an ACTIVE session — never call sync with null to
     // avoid any chance of wiping the app cookie set by the server callback.
     const syncServerSession = async (trigger, event, session) => {
+      if (isClientLoggedOut()) {
+        setAuthHydrating(false);
+        return;
+      }
+
       if (AUTH_DEBUG) {
         console.info("[auth:onAuthStateChange] event", {
           pathname,
@@ -591,6 +609,10 @@ export default function AuthShell({ children }) {
   }, [isDedicatedLoginPage, isResetPasswordPage]);
 
   const fetchMe = useCallback(async () => {
+    if (isClientLoggedOut()) {
+      setAuthUser(null);
+      return;
+    }
     try {
       const res = await apiFetch("/api/auth/me", {
         cache: "no-store",
@@ -681,6 +703,7 @@ export default function AuthShell({ children }) {
 
     const onLogout = () => {
       authBootstrappedRef.current = false;
+      markClientLoggedOut();
       setAuthUser(null);
       setSubmitting(false);
       setError("");
@@ -751,6 +774,7 @@ export default function AuthShell({ children }) {
         return;
       }
       setLoginFailedAttempts(0);
+      clearClientLoggedOut();
       setAuthUser(payload.data);
       const destination =
         payload.redirectTo || resolveAuthRedirect(payload.data);
@@ -965,13 +989,14 @@ export default function AuthShell({ children }) {
       }
 
       authBootstrappedRef.current = false;
+      markClientLoggedOut();
       setAuthUser(null);
       setLoginForm(initialLogin);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("user-industry");
         window.dispatchEvent(new CustomEvent("auth:logout"));
       }
-      router.replace("/");
+      router.replace("/login");
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -983,7 +1008,7 @@ export default function AuthShell({ children }) {
   }
 
   if (!authUser) {
-    if (!isDedicatedLoginPage && !isResetPasswordPage) {
+    if (!isAuthEntryPage) {
       return <AuthBootShell dark={isPremiumWorkspace} />;
     }
 
@@ -1034,8 +1059,8 @@ export default function AuthShell({ children }) {
     );
   }
 
-  if (isDedicatedLoginPage || isResetPasswordPage) {
-    return <AuthBootShell />;
+  if (isAuthEntryPage && authUser) {
+    return <AuthBootShell dark={false} />;
   }
 
   if (isOwnerCommandCenter) {

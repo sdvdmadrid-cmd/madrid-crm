@@ -1,4 +1,4 @@
-import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { buildSessionCookie, clearLogoutGuardCookie, createSessionToken } from "@/lib/auth";
 import {
   checkLoginRateLimit,
   clearLoginRateLimit,
@@ -133,15 +133,17 @@ export async function POST(request) {
     const token = createSessionToken(sessionUser);
     const redirectTo = resolvePostLoginPath(sessionUser);
 
+    const headers = new Headers({ "Content-Type": "application/json" });
+    headers.append("Set-Cookie", buildSessionCookie(token));
+    headers.append("Set-Cookie", clearLogoutGuardCookie());
+
     return new Response(
       JSON.stringify({ success: true, data: sessionUser, redirectTo }),
       {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": buildSessionCookie(token),
+        status: 200,
+        headers,
       },
-    });
+    );
   } catch (error) {
     const rawMessage =
       error instanceof Error ? String(error.message || "") : "";
