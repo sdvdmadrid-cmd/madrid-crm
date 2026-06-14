@@ -570,7 +570,9 @@ export async function middleware(request) {
         hasConfirmedSupabaseUser,
       });
     }
-    if (edgeSession || hasConfirmedSupabaseUser) {
+    // Only redirect when the authoritative app session cookie is valid.
+    // A leftover Supabase browser session after logout must not skip the login page.
+    if (edgeSession) {
       const url = request.nextUrl.clone();
       const sessionRole = String(edgeSession?.role || "").toLowerCase();
       url.pathname =
@@ -580,7 +582,6 @@ export async function middleware(request) {
           pathname,
           redirectDestination: url.pathname,
           hasEdgeSession: Boolean(edgeSession),
-          hasConfirmedSupabaseUser,
         });
       }
       return NextResponse.redirect(url);
