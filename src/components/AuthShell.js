@@ -680,6 +680,7 @@ export default function AuthShell({ children }) {
     if (typeof window === "undefined") return;
 
     const onLogout = () => {
+      authBootstrappedRef.current = false;
       setAuthUser(null);
       setSubmitting(false);
       setError("");
@@ -948,10 +949,22 @@ export default function AuthShell({ children }) {
     setError("");
     setNotice("");
     try {
-      await apiFetch("/api/auth/logout", {
-        method: "POST",
-        suppressUnauthorizedEvent: true,
-      });
+      try {
+        await apiFetch("/api/auth/logout", {
+          method: "POST",
+          suppressUnauthorizedEvent: true,
+        });
+      } catch {
+        // Still clear client state when the API is unreachable.
+      }
+
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Cookie logout is authoritative; Supabase sign-out is best-effort.
+      }
+
+      authBootstrappedRef.current = false;
       setAuthUser(null);
       setLoginForm(initialLogin);
       if (typeof window !== "undefined") {
