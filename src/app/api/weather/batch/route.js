@@ -1,13 +1,17 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 import { resolveWeatherBatch, weatherPairKey } from "@/lib/weather-service";
 
 export async function POST(request) {
   const csrfBlock = enforceSameOriginForMutation(request);
   if (csrfBlock) return csrfBlock;
 
-  const { authenticated } = await getAuthenticatedTenantContext(request);
-  if (!authenticated) return unauthenticatedResponse();
+  const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated  } = context;
+      if (!authenticated) return unauthenticatedResponse();
 
   let body;
   try {

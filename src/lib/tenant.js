@@ -15,6 +15,45 @@ import {
   normalizeAuthUser,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
+import {
+  isSubscriptionBypassPath,
+  SUBSCRIPTION_ALLOWED_API_PREFIXES,
+  SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
+} from "@/lib/subscription-access-core";
+import { requireBusinessAccess } from "@/lib/subscription-access";
+
+function isBusinessApiPath(request) {
+  try {
+    const pathname = new URL(request.url).pathname;
+    if (!pathname.startsWith("/api/")) return false;
+    return !isSubscriptionBypassPath(
+      pathname,
+      SUBSCRIPTION_ALLOWED_API_PREFIXES,
+      SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function enforceBusinessAccessForRequest(request, context) {
+  if (!request || !context?.authenticated || !isBusinessApiPath(request)) {
+    return context;
+  }
+  const { blocked } = await requireBusinessAccess(context);
+  if (blocked) {
+    return { ...context, subscriptionBlockedResponse: blocked };
+  }
+  return context;
+}
+
+export function getSubscriptionBlockedResponse(context) {
+  return context?.subscriptionBlockedResponse || null;
+}
+
+export function rejectIfSubscriptionBlocked(context) {
+  return getSubscriptionBlockedResponse(context);
+}
 
 export function getTenantContext(request) {
   const session = getSessionFromRequest(request);
@@ -75,11 +114,11 @@ export async function getAuthenticatedTenantContext(request) {
         "[tenant] Failed to resolve Supabase user from request",
         error,
       );
-      return fallback;
+      return enforceBusinessAccessForRequest(request, fallback);
     }
 
     if (!user?.id) {
-      return fallback;
+      return enforceBusinessAccessForRequest(request, fallback);
     }
 
     const profile = await resolveProfileForUser(user, {
@@ -89,27 +128,30 @@ export async function getAuthenticatedTenantContext(request) {
     const normalized = normalizeAuthUser(user, profile);
     const capabilities = getRoleCapabilities(normalized.role);
 
-    return applyComplimentarySessionFields({
-      tenantId: normalized.tenantId || fallback.tenantId,
-      tenantDbId: normalized.tenantDbId || fallback.tenantDbId || user.id,
-      role: normalized.role || fallback.role,
-      userId: user.id,
-      email: normalized.email || fallback.email,
-      name: normalized.name || fallback.name || "",
-      businessType: normalized.businessType || fallback.businessType || "",
-      isSubscribed: normalized.isSubscribed === true,
-      billPaymentsSubscribed: normalized.billPaymentsSubscribed === true,
-      trialEndDate: normalized.trialEndDate || null,
-      isAdmin: capabilities.isAdmin,
-      isSuperAdmin: isSuperAdminRole(normalized.role),
-      authenticated: true,
-      supabaseUser: user,
-      profile,
-      capabilities,
-    });
+    return enforceBusinessAccessForRequest(
+      request,
+      applyComplimentarySessionFields({
+        tenantId: normalized.tenantId || fallback.tenantId,
+        tenantDbId: normalized.tenantDbId || fallback.tenantDbId || user.id,
+        role: normalized.role || fallback.role,
+        userId: user.id,
+        email: normalized.email || fallback.email,
+        name: normalized.name || fallback.name || "",
+        businessType: normalized.businessType || fallback.businessType || "",
+        isSubscribed: normalized.isSubscribed === true,
+        billPaymentsSubscribed: normalized.billPaymentsSubscribed === true,
+        trialEndDate: normalized.trialEndDate || null,
+        isAdmin: capabilities.isAdmin,
+        isSuperAdmin: isSuperAdminRole(normalized.role),
+        authenticated: true,
+        supabaseUser: user,
+        profile,
+        capabilities,
+      }),
+    );
   } catch (error) {
     console.error("[tenant] Unexpected Supabase user resolution error", error);
-    return fallback;
+    return enforceBusinessAccessForRequest(request, fallback);
   }
 }
 

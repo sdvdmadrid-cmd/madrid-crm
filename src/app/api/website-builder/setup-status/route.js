@@ -1,4 +1,5 @@
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 import { WEBSITE_MEDIA_BUCKET } from "@/lib/website-media-storage";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 

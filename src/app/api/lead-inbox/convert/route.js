@@ -10,6 +10,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
@@ -51,9 +52,11 @@ export async function POST(request) {
     const csrfBlock = applyMutationCsrfGuard(request);
     if (csrfBlock) return csrfBlock;
 
-    const { tenantDbId, role, userId, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, userId, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
     const insertTenantId = requireTenantIdForInsert(

@@ -38,6 +38,7 @@ import {
   canRead,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
@@ -172,9 +173,11 @@ async function nextEstimateNumber(tenantId) {
 
 export async function GET(request) {
   try {
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canRead(role)) return forbiddenResponse();
 
     const { searchParams } = new URL(request.url);
@@ -238,9 +241,11 @@ export async function POST(request) {
   let logUserId = null;
 
   try {
-    const { tenantDbId, userId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, userId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
     logTenantId = tenantDbId || null;
     logUserId = userId || null;

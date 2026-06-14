@@ -5,6 +5,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -69,8 +70,10 @@ export async function GET(request) {
       return unauthenticatedResponse();
     }
 
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, authenticated  } = context;
     if (!authenticated) {
       return unauthenticatedResponse();
     }

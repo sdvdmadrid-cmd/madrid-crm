@@ -6,6 +6,7 @@ import {
 } from "@/lib/google-calendar";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 

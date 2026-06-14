@@ -4,6 +4,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -11,8 +12,11 @@ export async function POST(request) {
   try {
     const csrfBlock = applyMutationCsrfGuard(request);
     if (csrfBlock) return csrfBlock;
-    const { role, authenticated } = await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { role, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
 

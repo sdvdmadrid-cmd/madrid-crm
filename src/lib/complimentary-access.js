@@ -38,6 +38,8 @@ export function applyComplimentarySessionFields(fields = {}) {
     billPaymentsSubscribed: true,
     trialEndDate: null,
     complimentaryAccess: true,
+    hasBusinessAccess: true,
+    subscriptionState: "complimentary",
   };
 }
 

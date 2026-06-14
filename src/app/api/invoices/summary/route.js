@@ -5,6 +5,7 @@ import {
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -41,9 +42,11 @@ async function loadInvoiceSummaryRows(tenantDbId, role, scope) {
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const scope = new URL(request.url).searchParams.get("scope") || "tenant";
     const cacheKey = summaryCacheKey(tenantDbId, role, scope);

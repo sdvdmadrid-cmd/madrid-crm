@@ -22,6 +22,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -33,9 +34,11 @@ function json(data, status = 200) {
 
 export async function GET(request, { params }) {
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const { id } = await params;
     const url = new URL(request.url);
@@ -79,9 +82,11 @@ export async function PATCH(request, { params }) {
   if (csrf) return csrf;
 
   try {
-    const { authenticated, tenantDbId, role, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
     const { id } = await params;
@@ -140,9 +145,11 @@ export async function DELETE(request, { params }) {
   if (csrf) return csrf;
 
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
     if (!canDelete(role)) return forbiddenResponse();
 
     const { id } = await params;

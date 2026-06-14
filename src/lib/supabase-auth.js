@@ -5,6 +5,7 @@ import { normalizeAppRole } from "@/lib/access-control";
 import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { getSessionFromRequest } from "@/lib/auth";
 import { applyComplimentarySessionFields } from "@/lib/complimentary-access";
+import { resolveSubscriptionAccess } from "@/lib/subscription-access-core";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
 
 let supabaseAdminClientPromise = null;
@@ -225,9 +226,10 @@ export function buildAppSessionFromSupabaseUser(
   user,
   authSession = null,
   profile = null,
+  subscriptionFields = {},
 ) {
   const normalized = normalizeAuthUser(user, profile);
-  return applyComplimentarySessionFields({
+  const base = applyComplimentarySessionFields({
     userId: normalized.id,
     tenantId: normalized.tenantId,
     tenantDbId: normalized.tenantDbId,
@@ -240,9 +242,18 @@ export function buildAppSessionFromSupabaseUser(
     isSubscribed: normalized.isSubscribed,
     billPaymentsSubscribed: normalized.billPaymentsSubscribed,
     trialEndDate: normalized.trialEndDate,
+    complimentaryAccess: normalized.complimentaryAccess,
+    stripeSubscriptionStatus: subscriptionFields.stripeSubscriptionStatus || "",
     supabaseAccessToken: authSession?.access_token || null,
     supabaseRefreshToken: authSession?.refresh_token || null,
   });
+
+  const access = resolveSubscriptionAccess(base);
+  return {
+    ...base,
+    hasBusinessAccess: access.hasBusinessAccess,
+    subscriptionState: access.state,
+  };
 }
 
 export async function getSupabaseUserFromRequest(request) {

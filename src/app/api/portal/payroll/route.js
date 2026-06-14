@@ -1,4 +1,5 @@
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PAYROLL_TABLES } from "@/lib/payroll-constants.js";
 import { serializePayrollEmployee } from "@/lib/payroll-serializer.js";
@@ -24,9 +25,11 @@ async function getLinkedEmployee(tenantDbId, userId) {
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const employee = await getLinkedEmployee(tenantDbId, userId);
     if (!employee) {
@@ -62,9 +65,11 @@ export async function PATCH(request) {
   if (csrf) return csrf;
 
   try {
-    const { authenticated, tenantDbId, userId } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, userId  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const employee = await getLinkedEmployee(tenantDbId, userId);
     if (!employee) {

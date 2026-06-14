@@ -1,14 +1,17 @@
 import { upcomingPayPeriods, PAYROLL_SCHEDULES } from "@/lib/payroll-calendar.js";
 import { getPayrollSettingsForTenant } from "@/lib/payroll-settings-service.js";
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
-    const { authenticated, tenantDbId, role } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated, tenantDbId, role  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const settings = await getPayrollSettingsForTenant({ tenantDbId, role });
     const url = new URL(request.url);

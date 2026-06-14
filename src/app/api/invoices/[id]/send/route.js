@@ -21,6 +21,7 @@ import {
   canManageSensitive,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -93,9 +94,11 @@ function buildInvoiceEmailTemplate({
 
 export async function POST(request, { params }) {
   try {
-    const { tenantDbId, role, userId, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) {
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, userId, authenticated  } = context;
+        if (!authenticated) {
       return unauthenticatedResponse();
     }
     if (!canManageSensitive(role)) {

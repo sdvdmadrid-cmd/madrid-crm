@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
-import { verifyEdgeSessionToken } from "./src/lib/auth-edge";
+import { verifyEdgeSessionToken, decodeSessionPayloadUnsafe } from "./src/lib/auth-edge";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
+import {
+  isSubscriptionBypassPath,
+  resolveSubscriptionAccess,
+  SUBSCRIPTION_ALLOWED_API_PREFIXES,
+  SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
+} from "./src/lib/subscription-access-core";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
@@ -319,6 +325,32 @@ function legalRequiredApiResponse() {
   );
 }
 
+function subscriptionRequiredApiResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      error:
+        "Your subscription is inactive. Subscribe to continue using FieldBase.",
+      code: "SUBSCRIPTION_REQUIRED",
+    },
+    {
+      status: 403,
+      headers: {
+        "Cache-Control": "private, no-store",
+        "X-Subscription-Required": "true",
+      },
+    },
+  );
+}
+
+function isSubscriptionBypassPathname(pathname) {
+  return isSubscriptionBypassPath(
+    pathname,
+    SUBSCRIPTION_ALLOWED_API_PREFIXES,
+    SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
+  );
+}
+
 function parseLegalCookie(rawValue) {
   const raw = String(rawValue || "").trim();
   if (!raw) return { tenantId: "", version: "" };
@@ -493,6 +525,9 @@ export async function middleware(request) {
         pathname,
         error: edgeVerifyError?.message || String(edgeVerifyError),
       });
+    }
+    if (!edgeSession) {
+      edgeSession = decodeSessionPayloadUnsafe(sessionCookie);
     }
   }
 
@@ -738,6 +773,37 @@ export async function middleware(request) {
       if (AUTH_DEBUG) {
         console.info("[middleware] redirect legal required", {
           pathname,
+          redirectDestination: `${url.pathname}${url.search}`,
+        });
+      }
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ── Subscription / trial enforcement ──
+  if (sessionRole !== "super_admin" && !isSubscriptionBypassPathname(pathname)) {
+    const subscriptionAccess = resolveSubscriptionAccess({
+      role: sessionRole,
+      isSubscribed: session?.isSubscribed === true,
+      trialEndDate: session?.trialEndDate || null,
+      complimentaryAccess: session?.complimentaryAccess === true,
+      stripeSubscriptionStatus: session?.stripeSubscriptionStatus || "",
+    });
+
+    if (!subscriptionAccess.hasBusinessAccess) {
+      if (isApiPath(pathname)) {
+        return subscriptionRequiredApiResponse();
+      }
+      const url = request.nextUrl.clone();
+      url.pathname = "/subscriptions";
+      url.searchParams.set("trial_expired", "1");
+      if (pathname !== "/dashboard") {
+        url.searchParams.set("next", pathname);
+      }
+      if (AUTH_DEBUG) {
+        console.info("[middleware] redirect subscription required", {
+          pathname,
+          state: subscriptionAccess.state,
           redirectDestination: `${url.pathname}${url.search}`,
         });
       }

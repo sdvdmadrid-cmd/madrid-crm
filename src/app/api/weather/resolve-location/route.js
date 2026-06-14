@@ -1,4 +1,5 @@
-import { getAuthenticatedTenantContext, unauthenticatedResponse } from "@/lib/tenant";
+import { getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse, unauthenticatedResponse } from "@/lib/tenant";
 
 const DEFAULT_FALLBACK_LOCATION = "Chicago, IL";
 
@@ -60,8 +61,11 @@ async function searchLocations(name, count = 6) {
 }
 
 export async function GET(request) {
-  const { authenticated } = await getAuthenticatedTenantContext(request);
-  if (!authenticated) return unauthenticatedResponse();
+  const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { authenticated  } = context;
+      if (!authenticated) return unauthenticatedResponse();
 
   const { searchParams } = new URL(request.url);
   const location = String(searchParams.get("location") || "").trim();

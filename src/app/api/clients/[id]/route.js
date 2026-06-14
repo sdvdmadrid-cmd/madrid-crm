@@ -13,6 +13,7 @@ import {
   canWrite,
   forbiddenResponse,
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -57,8 +58,10 @@ export async function GET(request, { params }) {
       return unauthenticatedResponse();
     }
 
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, authenticated  } = context;
     if (!authenticated) return unauthenticatedResponse();
 
     const { id } = await params;
@@ -102,8 +105,10 @@ export async function PATCH(request, { params }) {
       return unauthenticatedResponse();
     }
 
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, authenticated  } = context;
     if (!authenticated) return unauthenticatedResponse();
     if (!canWrite(role)) return forbiddenResponse();
 
@@ -168,8 +173,10 @@ export async function DELETE(request, { params }) {
       return unauthenticatedResponse();
     }
 
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+const { tenantDbId, role, authenticated  } = context;
     if (!authenticated) return unauthenticatedResponse();
     if (!canDelete(role)) return forbiddenResponse();
 

@@ -1,32 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import styles from "./subscriptions.module.css";
 
 export default function SubscriptionsPage() {
+  const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [creatingSubscription, setCreatingSubscription] = useState(false);
+  const [startingCheckout, setStartingCheckout] = useState(false);
   const [cancellingSubscription, setCancellingSubscription] = useState(false);
   const [openingBillingPortal, setOpeningBillingPortal] = useState(false);
   const planDisplay = {
     title: "FieldBase subscription",
     price: "$35/month",
-    trial: "one free month trial",
-    cta: "Start free trial",
-    creating: "Creating subscription…",
+    trial: "15-day free trial on signup",
+    cta: "Subscribe now",
+    creating: "Starting checkout…",
   };
 
-  useEffect(() => {
-    fetchSubscriptionData();
-  }, []);
-
-  async function fetchSubscriptionData() {
+  const fetchSubscriptionData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -47,28 +47,52 @@ export default function SubscriptionsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function handleCreateSubscription() {
+  useEffect(() => {
+    fetchSubscriptionData();
+  }, [fetchSubscriptionData]);
+
+  useEffect(() => {
+    const checkout = searchParams.get("checkout");
+    if (checkout === "success") {
+      setNotice("Subscription checkout completed. Your access will update shortly.");
+    } else if (checkout === "cancelled") {
+      setError("Checkout was cancelled. You can try again when you are ready.");
+    }
+  }, [searchParams]);
+
+  const handleStartCheckout = useCallback(async () => {
     try {
-      setCreatingSubscription(true);
+      setStartingCheckout(true);
       setError(null);
+      setNotice(null);
 
-      const res = await apiFetch("/api/subscriptions/create", {
+      const res = await apiFetch("/api/subscriptions/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source: "app" }),
       });
-      await getJsonOrThrow(res, "Failed to create subscription");
-
-      await fetchSubscriptionData();
+      const data = await getJsonOrThrow(res, "Failed to start checkout");
+      const redirectUrl = String(data.url || "").trim();
+      if (!redirectUrl) {
+        throw new Error("Stripe did not return a checkout URL");
+      }
+      window.location.assign(redirectUrl);
     } catch (err) {
-      console.error("Error creating subscription:", err);
-      setError(err.message);
+      console.error("Error starting checkout:", err);
+      setError(err.message || "Unable to start checkout");
     } finally {
-      setCreatingSubscription(false);
+      setStartingCheckout(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (searchParams.get("subscribe") !== "1") return;
+    if (subscription) return;
+    handleStartCheckout();
+  }, [loading, searchParams, subscription, handleStartCheckout]);
 
   async function handleCancelSubscription() {
     if (!confirm("Are you sure you want to cancel your subscription?")) {
@@ -183,6 +207,7 @@ export default function SubscriptionsPage() {
     >
         <div data-testid="subscriptions-page">
         {error && <div className={styles.errorBanner}>{error}</div>}
+        {notice && <div className={styles.successBanner}>{notice}</div>}
 
         {isComplimentary && (
           <div className={styles.card} style={{ marginBottom: "1rem" }}>
@@ -197,29 +222,29 @@ export default function SubscriptionsPage() {
         {!subscription ? (
           <div className={styles.card}>
             <div className={styles.noSubscriptionContent}>
-              <h2>No tienes una suscripción activa</h2>
+              <h2>No active subscription</h2>
               <p>
-                Suscríbete hoy por <strong>{planDisplay.price}</strong> y disfruta de{" "}
-                <strong>{planDisplay.trial}</strong>.
+                Subscribe for <strong>{planDisplay.price}</strong> to restore full access to
+                clients, jobs, estimates, invoices, payroll, and calendar.
               </p>
 
               <div className={styles.features}>
-                <h3>Incluye:</h3>
+                <h3>Includes:</h3>
                 <ul>
-                  <li>Clientes, trabajos y estimados</li>
-                  <li>Facturas con enlace de pago en línea (Stripe)</li>
-                  <li>Envío de facturas por email</li>
-                  <li>Registro de pagos en efectivo, cheque o transferencia</li>
-                  <li>Soporte prioritario</li>
+                  <li>Clients, jobs, and estimates</li>
+                  <li>Invoices with online payment links (Stripe)</li>
+                  <li>Payroll and calendar</li>
+                  <li>Priority support</li>
                 </ul>
               </div>
 
               <button
                 className={styles.buttonPrimary}
-                onClick={handleCreateSubscription}
-                disabled={creatingSubscription}
+                onClick={handleStartCheckout}
+                disabled={startingCheckout || creatingSubscription}
+                data-testid="subscriptions-start-checkout"
               >
-                {creatingSubscription
+                {startingCheckout || creatingSubscription
                   ? planDisplay.creating
                   : planDisplay.cta}
               </button>

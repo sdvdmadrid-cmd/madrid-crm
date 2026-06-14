@@ -2,6 +2,7 @@ import { loadClientDetailsBundle } from "@/lib/client-details-data";
 import { createClientErrorResponse } from "@/lib/client-records";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -41,9 +42,11 @@ export async function GET(request, { params }) {
       return unauthenticatedResponse();
     }
 
-    const { tenantDbId, role, authenticated } =
-      await getAuthenticatedTenantContext(request);
-    if (!authenticated) return unauthenticatedResponse();
+    const context = await getAuthenticatedTenantContext(request);
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+    const { tenantDbId, role, authenticated  } = context;
+        if (!authenticated) return unauthenticatedResponse();
 
     const { id } = await params;
     if (!id) return badId();

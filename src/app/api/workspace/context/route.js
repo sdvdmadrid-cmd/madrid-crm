@@ -1,6 +1,7 @@
 import { buildWorkspaceContext } from "@/lib/platform-tenant";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -8,7 +9,9 @@ export const runtime = "nodejs";
 
 export async function GET(request) {
   const context = await getAuthenticatedTenantContext(request);
-  if (!context.authenticated) {
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+      if (!context.authenticated) {
     return unauthenticatedResponse();
   }
 

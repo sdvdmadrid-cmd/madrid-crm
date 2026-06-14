@@ -8,6 +8,7 @@ import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
   getAuthenticatedTenantContext,
+  getSubscriptionBlockedResponse,
   unauthenticatedResponse,
 } from "@/lib/tenant";
 
@@ -203,7 +204,9 @@ async function fetchDashboardMetrics(tenantId) {
 export async function GET(request) {
   try {
     const context = await getAuthenticatedTenantContext(request);
-    if (!context?.authenticated) {
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+        if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
     const { tenantDbId } = context;
@@ -249,7 +252,9 @@ export async function DELETE(request) {
   if (csrfResponse) return csrfResponse;
   try {
     const context = await getAuthenticatedTenantContext(request);
-    if (!context?.authenticated) {
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+        if (!context?.authenticated) {
       return unauthenticatedResponse();
     }
 

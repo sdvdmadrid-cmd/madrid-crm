@@ -200,6 +200,20 @@ export default function AuthShell({ children }) {
     return resolvePostLoginPath(user, params.get("redirect") || "");
   }, []);
 
+  useEffect(() => {
+    if (!authUser || authUser.hasBusinessAccess !== false) return;
+    if (authUser.complimentaryAccess || authUser.role === "super_admin") return;
+
+    const allowedPrefixes = ["/subscriptions", "/settings", "/legal-required", "/legal"];
+    const currentPath = pathname || "";
+    const allowed = allowedPrefixes.some(
+      (prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`),
+    );
+    if (allowed) return;
+
+    router.replace("/subscriptions?trial_expired=1");
+  }, [authUser, pathname, router]);
+
   const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
 
   useEffect(() => {
@@ -1129,6 +1143,10 @@ export default function AuthShell({ children }) {
     String(authUser?.role || "").toLowerCase() === "super_admin";
   const normalizedRole = String(authUser?.role || "").toLowerCase();
   const isContractorRole = normalizedRole === "contractor";
+  const subscriptionRestricted =
+    authUser?.hasBusinessAccess === false &&
+    authUser?.complimentaryAccess !== true &&
+    !isSuperAdminRole;
 
   // ─── Nav groups ──────────────────────────────────────────────────────────
   const mainNavItems = isSuperAdminRole
@@ -1382,12 +1400,23 @@ export default function AuthShell({ children }) {
 
   // Defensive guard: keep Website Builder only in Secondary for contractor/admin users
   // and prevent accidental duplicate entries across nav groups.
+  const effectiveMainNavItems = subscriptionRestricted
+    ? [
+        {
+          href: "/subscriptions",
+          label: t("sidebar.subscriptions"),
+          iconKey: "subscriptions",
+        },
+      ]
+    : mainNavItems;
+  const effectiveSecondaryNavItems = subscriptionRestricted ? [] : secondaryNavItems;
+
   const normalizedMainNavItems = isSuperAdminRole
-    ? mainNavItems
-    : mainNavItems.filter(
+    ? effectiveMainNavItems
+    : effectiveMainNavItems.filter(
         (item) => item.href !== "/website-builder" && item.href !== "/website",
       );
-  const normalizedSecondaryNavItems = secondaryNavItems.filter(
+  const normalizedSecondaryNavItems = effectiveSecondaryNavItems.filter(
     (item, index, arr) =>
       arr.findIndex((candidate) => candidate.href === item.href) === index,
   );
@@ -1894,6 +1923,7 @@ export default function AuthShell({ children }) {
         <TrialBanner
           authUser={authUser}
           trialExpired={trialExpiredParam}
+          subscriptionRestricted={subscriptionRestricted}
           t={t}
         />
         <CrmNavBar />
@@ -1955,7 +1985,7 @@ export default function AuthShell({ children }) {
 }
 
 // ─── Trial banner ────────────────────────────────────────────────────────────
-function TrialBanner({ authUser, trialExpired, t }) {
+function TrialBanner({ authUser, trialExpired, subscriptionRestricted, t }) {
   if (
     !authUser ||
     authUser.isSubscribed ||
@@ -1968,7 +1998,10 @@ function TrialBanner({ authUser, trialExpired, t }) {
   const trialEnd = authUser.trialEndDate
     ? new Date(authUser.trialEndDate).getTime()
     : null;
-  const isExpired = trialExpired || (trialEnd !== null && now > trialEnd);
+  const isExpired =
+    subscriptionRestricted ||
+    trialExpired ||
+    (trialEnd !== null && now > trialEnd);
   const daysLeft =
     trialEnd !== null && !isExpired
       ? Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)))
@@ -2003,7 +2036,8 @@ function TrialBanner({ authUser, trialExpired, t }) {
     >
       <span>{message}</span>
       <Link
-        href="/workspace-owner"
+        href="/subscriptions?subscribe=1"
+        data-testid="trial-subscribe-now"
         style={{
           background: isExpired ? "#ef4444" : "#f59e0b",
           color: "#fff",

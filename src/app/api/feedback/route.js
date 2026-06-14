@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
+import { getSubscriptionBlockedResponse } from "@/lib/tenant";
 
 const FEEDBACK_TABLE = "product_feedback";
 const FEEDBACK_TYPES = new Set(["suggestion", "issue", "improvement"]);
@@ -32,7 +33,9 @@ function normalizeScreenshotDataUrl(value) {
 export async function POST(request) {
   try {
     const context = await getAuthenticatedTenantContext(request);
-    if (!context?.authenticated || !context?.userId || !context?.tenantDbId) {
+    const subscriptionBlocked = getSubscriptionBlockedResponse(context);
+    if (subscriptionBlocked) return subscriptionBlocked;
+        if (!context?.authenticated || !context?.userId || !context?.tenantDbId) {
       return new Response(
         JSON.stringify({ success: false, error: "Unauthenticated" }),
         { status: 401, headers: { "Content-Type": "application/json" } },
