@@ -22,6 +22,10 @@ test.describe("Subscription enforcement", () => {
       timeout: 15_000,
     });
     await expect(page.getByRole("heading", { name: "Trial Expired" })).toBeVisible();
+    await expect(page.getByTestId("subscribe-plan-card")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText("Contractor Pro")).toBeVisible();
   });
 
   test("expired trial user cannot access protected pages", async ({ page }) => {
