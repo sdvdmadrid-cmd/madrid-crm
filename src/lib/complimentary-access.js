@@ -28,7 +28,11 @@ export function isComplimentaryTenant(tenantDbId) {
 
 /** Normalize session / auth/me fields for complimentary tenants. */
 export function applyComplimentarySessionFields(fields = {}) {
-  if (!isComplimentaryTenant(fields.tenantDbId)) {
+  const complimentary =
+    fields.complimentaryAccess === true ||
+    isComplimentaryTenant(fields.tenantDbId);
+
+  if (!complimentary) {
     return fields;
   }
 

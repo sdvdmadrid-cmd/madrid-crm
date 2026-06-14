@@ -25,7 +25,7 @@ export default async function OwnerTenantsPage() {
       >
         <h2 className="text-xl font-semibold">Tenant command center</h2>
         <p className="mt-2 text-sm text-slate-300">
-          Every contractor account: extend trials, reset passwords, export CSV, and inspect workload.
+          Every tenant account (owners, contractors, team): extend trials, grant subscriptions, reset passwords, and inspect workload.
         </p>
       </div>
 

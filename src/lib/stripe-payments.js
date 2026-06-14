@@ -1138,7 +1138,7 @@ export async function createSubscriptionCheckoutSession({
 
   const isExpiredTrialFlow = source === "expired_trial";
   const successUrl = isExpiredTrialFlow
-    ? `${origin}/subscriptions?checkout=success`
+    ? `${origin}/subscribe?checkout=success`
     : `${origin}/subscriptions?checkout=success`;
   const cancelUrl = isExpiredTrialFlow
     ? `${origin}/subscribe?checkout=cancelled`

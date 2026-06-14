@@ -1,13 +1,13 @@
+import {
+  isPlatformTenantAccount,
+  parseAccountRole,
+  tenantSlugFromUser,
+} from "./platform-tenant-accounts.js";
+
 const MS_DAY = 24 * 60 * 60 * 1000;
 
 function toText(value) {
   return String(value ?? "").trim();
-}
-
-function roleFromUser(user) {
-  return String(
-    user?.app_metadata?.role || user?.user_metadata?.role || "contractor",
-  ).toLowerCase();
 }
 
 function isProbeAccount(user) {
@@ -39,17 +39,17 @@ function bucketLabel(bucket) {
  */
 export function summarizeOwnerLoginActivity(users = [], { now = Date.now() } = {}) {
   const all = Array.isArray(users) ? users : [];
-  const contractors = all.filter((user) => roleFromUser(user) === "contractor");
-  const realContractors = contractors.filter((user) => !isProbeAccount(user));
-  const probes = contractors.filter((user) => isProbeAccount(user));
+  const tenantAccounts = all.filter(isPlatformTenantAccount);
+  const realAccounts = tenantAccounts.filter((user) => !isProbeAccount(user));
+  const probes = tenantAccounts.filter((user) => isProbeAccount(user));
 
-  const withLogin = realContractors.filter((user) => user.last_sign_in_at);
+  const withLogin = realAccounts.filter((user) => user.last_sign_in_at);
   const countSince = (days) =>
     withLogin.filter(
       (user) => now - new Date(user.last_sign_in_at).getTime() <= days * MS_DAY,
     ).length;
 
-  const rows = realContractors
+  const rows = realAccounts
     .map((user) => {
       const lastLoginAt = user.last_sign_in_at || null;
       const bucket = loginBucket(lastLoginAt, now);
@@ -58,11 +58,8 @@ export function summarizeOwnerLoginActivity(users = [], { now = Date.now() } = {
         email: toText(user.email),
         name: toText(user.user_metadata?.name),
         companyName: toText(user.user_metadata?.companyName),
-        tenantId: toText(
-          user.app_metadata?.tenant_id ||
-            user.user_metadata?.tenant_id ||
-            user.id,
-        ),
+        role: parseAccountRole(user),
+        tenantId: tenantSlugFromUser(user) || toText(user.id),
         status: toText(user.user_metadata?.status || "unknown"),
         createdAt: user.created_at || null,
         lastLoginAt,
@@ -81,13 +78,13 @@ export function summarizeOwnerLoginActivity(users = [], { now = Date.now() } = {
     generatedAt: new Date(now).toISOString(),
     summary: {
       totalAuthUsers: all.length,
-      contractorAccounts: realContractors.length,
+      contractorAccounts: realAccounts.length,
       probeAccounts: probes.length,
       everLoggedIn: withLogin.length,
       loggedInLast24h: countSince(1),
       loggedInLast7d: countSince(7),
       mau30d: countSince(30),
-      neverLoggedIn: realContractors.length - withLogin.length,
+      neverLoggedIn: realAccounts.length - withLogin.length,
     },
     rows,
     probes: probes.map((user) => ({
