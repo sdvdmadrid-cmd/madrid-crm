@@ -19,7 +19,7 @@ test("AuthShell logout clears Supabase browser session", () => {
   const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
   assert.match(src, /supabase\.auth\.signOut\(\)/);
   assert.match(src, /markClientLoggedOut\(\)/);
-  assert.match(src, /router\.replace\("\/login"\)/);
+  assert.match(src, /performAuthHardNavigate\("\/login"\)/);
 });
 
 test("logout API sets guard cookie and clears supabase session", () => {
