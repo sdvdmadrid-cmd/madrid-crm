@@ -1136,8 +1136,13 @@ export async function createSubscriptionCheckoutSession({
     metadata: { plan_id: planId },
   });
 
-  const successUrl = `${origin}/subscriptions?checkout=success`;
-  const cancelUrl = `${origin}/subscriptions?checkout=cancelled`;
+  const isExpiredTrialFlow = source === "expired_trial";
+  const successUrl = isExpiredTrialFlow
+    ? `${origin}/subscriptions?checkout=success`
+    : `${origin}/subscriptions?checkout=success`;
+  const cancelUrl = isExpiredTrialFlow
+    ? `${origin}/subscribe?checkout=cancelled`
+    : `${origin}/subscriptions?checkout=cancelled`;
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",

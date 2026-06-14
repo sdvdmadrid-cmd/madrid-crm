@@ -153,6 +153,19 @@ export function buildLoginRedirectPath(
 
 export function resolvePostLoginPath(user, redirectParam = "", options = {}) {
   const role = String(user?.role || "").toLowerCase();
+  if (
+    user?.hasBusinessAccess === false &&
+    role !== "super_admin" &&
+    !user?.complimentaryAccess
+  ) {
+    if (typeof console !== "undefined") {
+      console.log("Trial expired:", user?.userId || "unknown");
+      console.log("Subscription active:", user?.isSubscribed === true);
+      console.log("Redirecting to /subscribe");
+    }
+    return "/subscribe";
+  }
+
   const sanitized = sanitizeRedirectPath(redirectParam, {
     role,
     currentPath: options.currentPath || "",

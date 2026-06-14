@@ -33,6 +33,12 @@ import { useStoredUiLanguage } from "@/lib/ui-language";
 import { buildPublicWebsitePath } from "@/lib/public-website-routing";
 import { usePublishedWebsiteStatus } from "@/hooks/usePublishedWebsiteStatus";
 import { performAuthHardNavigate } from "@/lib/auth-nav";
+import {
+  EXPIRED_TRIAL_SUBSCRIBE_PATH,
+  isSubscriptionExemptPage,
+  logExpiredTrialRedirect,
+  shouldRestrictForSubscription,
+} from "@/lib/subscription-routes";
 
 const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
   ssr: false,
@@ -235,19 +241,21 @@ export default function AuthShell({ children }) {
     [pathname],
   );
 
-  useEffect(() => {
-    if (!authUser || authUser.hasBusinessAccess !== false) return;
-    if (authUser.complimentaryAccess || authUser.role === "super_admin") return;
+  useLayoutEffect(() => {
+    if (!authUser || !shouldRestrictForSubscription(authUser)) return;
 
-    const allowedPrefixes = ["/subscriptions", "/settings", "/legal-required", "/legal"];
-    const currentPath = pathname || "";
-    const allowed = allowedPrefixes.some(
-      (prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`),
-    );
-    if (allowed) return;
+    const subscriptionActive =
+      authUser.isSubscribed === true || authUser.hasBusinessAccess === true;
+    logExpiredTrialRedirect(authUser, subscriptionActive);
 
-    router.replace("/subscriptions?trial_expired=1");
-  }, [authUser, pathname, router]);
+    if (isSubscriptionExemptPage(pathname)) return;
+
+    performAuthHardNavigate(EXPIRED_TRIAL_SUBSCRIBE_PATH);
+  }, [authUser, pathname]);
+
+  const isSubscribePage =
+    pathname === EXPIRED_TRIAL_SUBSCRIBE_PATH ||
+    pathname?.startsWith(`${EXPIRED_TRIAL_SUBSCRIBE_PATH}/`);
 
   const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
 
@@ -1076,6 +1084,40 @@ export default function AuthShell({ children }) {
     );
   }
 
+  if (isSubscribePage) {
+    if (!authUser && authChecked) {
+      performAuthHardNavigate(
+        buildLoginRedirectPath(EXPIRED_TRIAL_SUBSCRIBE_PATH),
+      );
+      return (
+        <div
+          style={{ minHeight: "100vh", background: "#f4f5f7" }}
+          aria-busy="true"
+        />
+      );
+    }
+    if (authUser) {
+      return children;
+    }
+    return (
+      <div
+        style={{ minHeight: "100vh", background: "#f4f5f7" }}
+        aria-busy="true"
+        aria-label="Loading"
+      />
+    );
+  }
+
+  if (authUser && shouldRestrictForSubscription(authUser) && !isSubscriptionExemptPage(pathname)) {
+    return (
+      <div
+        style={{ minHeight: "100vh", background: "#f4f5f7" }}
+        aria-busy="true"
+        aria-label="Redirecting to subscription"
+      />
+    );
+  }
+
   if (!hasMounted || !authChecked) {
     return <AuthBootShell dark={isPremiumWorkspace} />;
   }
@@ -1466,7 +1508,7 @@ export default function AuthShell({ children }) {
   const effectiveMainNavItems = subscriptionRestricted
     ? [
         {
-          href: "/subscriptions",
+          href: EXPIRED_TRIAL_SUBSCRIBE_PATH,
           label: t("sidebar.subscriptions"),
           iconKey: "subscriptions",
         },
@@ -2099,7 +2141,7 @@ function TrialBanner({ authUser, trialExpired, subscriptionRestricted, t }) {
     >
       <span>{message}</span>
       <Link
-        href="/subscriptions?subscribe=1"
+        href="/subscribe"
         data-testid="trial-subscribe-now"
         style={{
           background: isExpired ? "#ef4444" : "#f59e0b",

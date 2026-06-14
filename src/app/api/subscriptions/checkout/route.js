@@ -104,6 +104,9 @@ export async function POST(request) {
 
     await getOrCreateStripeCustomer(context.tenantDbId, tenantEmail, tenantName);
 
+    const body = await request.json().catch(() => ({}));
+    const checkoutSource = String(body?.source || "app").trim() || "app";
+
     const checkout = await createSubscriptionCheckoutSession({
       tenantId: context.tenantDbId,
       planId: plan.id,
@@ -112,7 +115,7 @@ export async function POST(request) {
       userId: context.userId,
       origin,
       trialDays: 0,
-      source: "app",
+      source: checkoutSource,
     });
 
     if (!checkout.url) {
