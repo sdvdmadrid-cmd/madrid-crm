@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { normalizeAppRole } from "@/lib/access-control";
 import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { getSessionFromRequest } from "@/lib/auth";
-import { applyComplimentarySessionFields } from "@/lib/complimentary-access";
+import { applyComplimentarySessionFields, isComplimentaryTenant } from "@/lib/complimentary-access";
 import { resolveSubscriptionAccess } from "@/lib/subscription-access-core";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
 
@@ -44,6 +44,13 @@ export function normalizeAuthUser(user, profile = null) {
   const appMetadata = user?.app_metadata || {};
   const userMetadata = user?.user_metadata || {};
 
+  const tenantDbId =
+      profile?.tenantId ||
+      appMetadata.tenant_db_id ||
+      appMetadata.tenantDbId ||
+      user?.id ||
+      null;
+
   return {
     id: user?.id || "",
     email: user?.email || "",
@@ -55,12 +62,7 @@ export function normalizeAuthUser(user, profile = null) {
       userMetadata.tenant_id ||
       userMetadata.tenantId ||
       "default",
-    tenantDbId:
-      profile?.tenantId ||
-      appMetadata.tenant_db_id ||
-      appMetadata.tenantDbId ||
-      user?.id ||
-      null,
+    tenantDbId,
     role: normalizeAppRole(
       // Platform operator emails always resolve to super_admin (Mission Control).
       appMetadata.role === "super_admin" || isPlatformOperatorEmail(user?.email)
@@ -71,6 +73,9 @@ export function normalizeAuthUser(user, profile = null) {
     isSubscribed: userMetadata.isSubscribed === true,
     billPaymentsSubscribed: userMetadata.billPaymentsSubscribed === true,
     trialEndDate: userMetadata.trialEndDate || null,
+    complimentaryAccess:
+      userMetadata.complimentaryAccess === true ||
+      isComplimentaryTenant(tenantDbId),
     emailConfirmedAt: user?.email_confirmed_at || null,
     appMetadata,
     userMetadata,

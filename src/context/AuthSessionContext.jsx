@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 
 const DEFAULT_CAPABILITIES = {
   role: "worker",
@@ -32,6 +32,16 @@ export function AuthSessionProvider({
       isAuthenticated: Boolean(authUser?.userId),
     };
   }, [authUser, authChecked, refreshSession]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    console.log("AuthProvider READY", {
+      isAuthenticated: Boolean(authUser?.userId),
+      userId: authUser?.userId || null,
+      role: authUser?.role || null,
+      hasBusinessAccess: authUser?.hasBusinessAccess,
+    });
+  }, [authChecked, authUser?.userId, authUser?.role, authUser?.hasBusinessAccess]);
 
   return (
     <AuthSessionContext.Provider value={value}>

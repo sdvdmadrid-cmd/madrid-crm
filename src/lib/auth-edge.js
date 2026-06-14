@@ -128,3 +128,51 @@ export async function verifyEdgeSessionToken(token) {
 
   return payload && typeof payload === "object" ? payload : null;
 }
+
+function encodeBase64UrlBytes(bytes) {
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/_/g, "/").replace(/=+$/, "");
+}
+
+/** Sign a session JWT in Edge middleware (HS256). */
+export async function signEdgeSessionToken(payload = {}, expiresInSeconds = 604800) {
+  const resolved = resolveSessionSecret();
+  const sessionSecret = resolved.value;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET must be configured");
+  }
+
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const body = {
+    ...payload,
+    sv: SESSION_VERSION,
+    iss: JWT_ISSUER,
+    aud: JWT_AUDIENCE,
+    iat: now,
+    exp: now + expiresInSeconds,
+  };
+
+  const encodedHeader = encodeBase64UrlBytes(encoder.encode(JSON.stringify(header)));
+  const encodedPayload = encodeBase64UrlBytes(encoder.encode(JSON.stringify(body)));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(sessionSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(signingInput),
+  );
+
+  return `${signingInput}.${encodeBase64UrlBytes(new Uint8Array(signature))}`;
+}

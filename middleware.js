@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyEdgeSessionToken, decodeSessionPayloadUnsafe } from "./src/lib/auth-edge";
+import { verifyEdgeSessionToken, decodeSessionPayloadUnsafe, signEdgeSessionToken } from "./src/lib/auth-edge";
 import { isLogoutGuardCookieSet } from "./src/lib/auth-logout-guard";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
 import {
@@ -8,8 +8,12 @@ import {
   SUBSCRIPTION_ALLOWED_API_PREFIXES,
   SUBSCRIPTION_ALLOWED_PAGE_PREFIXES,
 } from "./src/lib/subscription-access-core";
+import { fetchStripeSubscriptionStatusEdge } from "./src/lib/subscription-access-edge.js";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+const SESSION_COOKIE_NAME =
+  process.env.NODE_ENV === "production" ? "__Host-madrid_session" : "madrid_session";
+const SESSION_TTL_SECONDS = Number(process.env.SESSION_TTL_SECONDS || 60 * 60 * 24 * 7);
 
 function attachDeployHeaders(response) {
   const sha = String(
@@ -785,13 +789,41 @@ export async function middleware(request) {
 
   // ── Subscription / trial enforcement ──
   if (sessionRole !== "super_admin" && !isSubscriptionBypassPathname(pathname)) {
-    const subscriptionAccess = resolveSubscriptionAccess({
+    let stripeSubscriptionStatus = String(session?.stripeSubscriptionStatus || "");
+    let isSubscribed = session?.isSubscribed === true;
+    let liveStatusGranted = false;
+
+    let subscriptionAccess = resolveSubscriptionAccess({
       role: sessionRole,
-      isSubscribed: session?.isSubscribed === true,
+      isSubscribed,
       trialEndDate: session?.trialEndDate || null,
       complimentaryAccess: session?.complimentaryAccess === true,
-      stripeSubscriptionStatus: session?.stripeSubscriptionStatus || "",
+      stripeSubscriptionStatus,
     });
+
+    if (!subscriptionAccess.hasBusinessAccess) {
+      const tenantDbId = String(session?.tenantDbId || session?.userId || "").trim();
+      const liveStatus = tenantDbId
+        ? await fetchStripeSubscriptionStatusEdge(tenantDbId)
+        : null;
+
+      if (liveStatus) {
+        console.log("Subscription status:", liveStatus);
+        console.log("User ID:", session?.userId || "unknown");
+        console.log("Updating subscription to ACTIVE");
+        liveStatusGranted = true;
+        stripeSubscriptionStatus = liveStatus;
+        isSubscribed = true;
+        subscriptionAccess = resolveSubscriptionAccess({
+          role: sessionRole,
+          isSubscribed: true,
+          trialEndDate: session?.trialEndDate || null,
+          complimentaryAccess: session?.complimentaryAccess === true,
+          stripeSubscriptionStatus: liveStatus,
+        });
+        console.log("Access granted");
+      }
+    }
 
     if (!subscriptionAccess.hasBusinessAccess) {
       if (isApiPath(pathname)) {
@@ -811,6 +843,29 @@ export async function middleware(request) {
       console.log("Subscription active:", subscriptionAccess.hasBusinessAccess);
       console.log("Redirecting to /subscribe");
       return NextResponse.redirect(url);
+    }
+
+    if (liveStatusGranted && stripeSubscriptionStatus) {
+      try {
+        const refreshedToken = await signEdgeSessionToken({
+          ...session,
+          isSubscribed: true,
+          stripeSubscriptionStatus,
+          hasBusinessAccess: true,
+          subscriptionState: "active",
+        });
+        const response = attachDeployHeaders(NextResponse.next());
+        response.cookies.set(SESSION_COOKIE_NAME, refreshedToken, {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          maxAge: SESSION_TTL_SECONDS,
+        });
+        return response;
+      } catch (cookieError) {
+        console.warn("[middleware] subscription cookie refresh failed", cookieError);
+      }
     }
   }
 

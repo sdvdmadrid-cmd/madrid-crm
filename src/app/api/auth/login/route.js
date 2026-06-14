@@ -13,6 +13,7 @@ import {
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
 import { resolvePostLoginPath } from "@/lib/auth-redirect";
+import { hydrateSessionSubscriptionFields } from "@/lib/subscription-access";
 import { writeSecurityAudit } from "@/lib/security-audit";
 
 export async function POST(request) {
@@ -124,10 +125,18 @@ export async function POST(request) {
       role: data.user.app_metadata?.role,
     });
 
+    const tenantDbId = profile?.tenantId || reconciledUser.id;
+    const { stripeSubscriptionStatus } = await hydrateSessionSubscriptionFields({
+      tenantDbId,
+      userId: reconciledUser.id,
+      userMetadata: reconciledUser.user_metadata,
+    });
+
     const sessionUser = buildAppSessionFromSupabaseUser(
       reconciledUser,
       data.session,
       profile,
+      { stripeSubscriptionStatus },
     );
 
     const token = createSessionToken(sessionUser);
