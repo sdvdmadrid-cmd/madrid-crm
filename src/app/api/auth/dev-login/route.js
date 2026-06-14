@@ -1,5 +1,5 @@
 import { normalizeAppRole } from "@/lib/access-control";
-import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { buildSessionCookie, clearLogoutGuardCookie, createSessionToken } from "@/lib/auth";
 import {
   buildLegalCookieValue,
   LEGAL_COOKIE_MAX_AGE,
@@ -239,6 +239,7 @@ export async function GET(request) {
       buildSessionCookie(
         createSessionToken({ ...sessionUser, devProfile: profile }),
       ),
+      clearLogoutGuardCookie(),
     ];
     try {
       const legal = await getCurrentLegalVersionForTenant({

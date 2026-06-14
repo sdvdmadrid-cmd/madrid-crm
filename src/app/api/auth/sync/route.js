@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { isLogoutGuardCookieSet } from "@/lib/auth-logout-guard.js";
 import {
   buildAppSessionFromSupabaseUser,
   reconcileUserRoleOnLogin,
@@ -19,6 +20,16 @@ export async function POST(request) {
       trigger,
       cookieNames: request.cookies.getAll().map((cookie) => cookie.name),
     });
+  }
+
+  if (isLogoutGuardCookieSet(request)) {
+    return new Response(
+      JSON.stringify({ success: true, data: { synced: false, reason: "logged_out" } }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   const cookieStore = await cookies();

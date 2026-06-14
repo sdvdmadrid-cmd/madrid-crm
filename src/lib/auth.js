@@ -2,6 +2,10 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { resolveSessionSecret } from "@/lib/session-secret";
+import {
+  LOGOUT_GUARD_COOKIE,
+  LOGOUT_GUARD_MAX_AGE_SECONDS,
+} from "@/lib/auth-logout-guard.js";
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === "production"
@@ -128,6 +132,21 @@ export function buildSessionCookie(token) {
 export function clearSessionCookie() {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+export {
+  LOGOUT_GUARD_COOKIE,
+  LOGOUT_GUARD_MAX_AGE_SECONDS,
+} from "@/lib/auth-logout-guard.js";
+
+export function buildLogoutGuardCookie() {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${LOGOUT_GUARD_COOKIE}=1; Path=/; HttpOnly; SameSite=Lax; Max-Age=${LOGOUT_GUARD_MAX_AGE_SECONDS}${secure}`;
+}
+
+export function clearLogoutGuardCookie() {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${LOGOUT_GUARD_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
 }
 
 // ---------------------------------------------------------------------------
