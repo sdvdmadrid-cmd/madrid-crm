@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import OwnerShell from '@/components/owner/OwnerShell';
 import { verifySessionToken } from '@/lib/auth';
+import { buildLoginRedirectPath } from '@/lib/auth-redirect';
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === 'production'
@@ -14,7 +15,7 @@ export default async function OwnerLayout({ children }) {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect('/login?redirect=/owner/overview');
+    redirect(buildLoginRedirectPath('/owner/overview'));
   }
 
   if (String(session.role || '').toLowerCase() !== 'super_admin') {

@@ -1,6 +1,7 @@
 ﻿import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { buildLoginRedirectPath } from "@/lib/auth-redirect";
 import { listClientsForTenant } from "@/lib/clients-list-server";
 import { normalizeAppRole } from "@/lib/access-control";
 import ClientsPageClient from "./ClientsPageClient";
@@ -16,7 +17,7 @@ export default async function ClientsPage() {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/clients");
+    redirect(buildLoginRedirectPath("/clients"));
   }
 
   let initialList = null;

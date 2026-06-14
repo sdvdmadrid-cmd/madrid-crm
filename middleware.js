@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyEdgeSessionToken, decodeSessionPayloadUnsafe } from "./src/lib/auth-edge";
+import { isLogoutGuardCookieSet } from "./src/lib/auth-logout-guard";
 import { createSupabaseMiddlewareClient } from "./src/lib/supabase-ssr";
 import {
   isSubscriptionBypassPath,
@@ -572,7 +573,8 @@ export async function middleware(request) {
     }
     // Only redirect when the authoritative app session cookie is valid.
     // A leftover Supabase browser session after logout must not skip the login page.
-    if (edgeSession) {
+    // The logout guard blocks redirect when the user explicitly signed out but cookies linger.
+    if (edgeSession && !isLogoutGuardCookieSet(request)) {
       const url = request.nextUrl.clone();
       const sessionRole = String(edgeSession?.role || "").toLowerCase();
       url.pathname =

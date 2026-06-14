@@ -11,7 +11,7 @@ test("middleware login redirect requires app session cookie, not Supabase alone"
     src.indexOf('if (["/verify-email", "/sign-in", "/login"].includes(pathname))'),
     src.indexOf("if (pathname === \"/website-builder\")"),
   );
-  assert.match(loginBlock, /if \(edgeSession\)/);
+  assert.match(loginBlock, /if \(edgeSession && !isLogoutGuardCookieSet\(request\)/);
   assert.doesNotMatch(loginBlock, /hasConfirmedSupabaseUser\)\s*\{/);
 });
 
@@ -36,4 +36,21 @@ test("auth/me blocks supabase restore when logout guard cookie is set", () => {
 test("auth/sync skips session restore when logout guard cookie is set", () => {
   const src = readFileSync(path.join(root, "src/app/api/auth/sync/route.js"), "utf8");
   assert.match(src, /isLogoutGuardCookieSet/);
+});
+
+test("middleware login redirect respects logout guard cookie", () => {
+  const src = readFileSync(path.join(root, "middleware.js"), "utf8");
+  assert.match(src, /isLogoutGuardCookieSet/);
+  const loginBlock = src.slice(
+    src.indexOf('if (["/verify-email", "/sign-in", "/login"].includes(pathname))'),
+    src.indexOf("if (pathname === \"/website-builder\")"),
+  );
+  assert.match(loginBlock, /edgeSession && !isLogoutGuardCookieSet\(request\)/);
+});
+
+test("AuthShell uses safe redirect helpers", () => {
+  const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
+  assert.match(src, /buildLoginRedirectPath/);
+  assert.match(src, /safeAuthReplace/);
+  assert.match(src, /parseRedirectParam/);
 });

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { buildLoginRedirectPath } from "@/lib/auth-redirect";
 import { listInvoicesForTenant } from "@/lib/invoices-list-server";
 import { normalizeAppRole } from "@/lib/access-control";
 import InvoicesPageClient from "./InvoicesPageClient";
@@ -16,7 +17,7 @@ export default async function InvoicesPage() {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/invoices");
+    redirect(buildLoginRedirectPath("/invoices"));
   }
 
   let initialList = null;

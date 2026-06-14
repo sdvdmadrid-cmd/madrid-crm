@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken } from "@/lib/auth";
+import { buildLoginRedirectPath } from "@/lib/auth-redirect";
 import { listEstimatesForTenant } from "@/lib/estimates-list-server";
 import { normalizeAppRole } from "@/lib/access-control";
 import EstimatesPageClient from "./EstimatesPageClient";
@@ -16,7 +17,7 @@ export default async function EstimatesPage() {
   const session = verifySessionToken(token);
 
   if (!session) {
-    redirect("/login?next=/estimates");
+    redirect(buildLoginRedirectPath("/estimates"));
   }
 
   let initialList = null;

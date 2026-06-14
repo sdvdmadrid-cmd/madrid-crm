@@ -12,6 +12,7 @@ import {
   buildAppSessionFromSupabaseUser,
   findAuthUserByEmail,
 } from "@/lib/supabase-auth";
+import { resolvePostLoginPath } from "@/lib/auth-redirect";
 
 const DEV_PROFILES = {
   super_admin: {
@@ -124,16 +125,13 @@ function isAllowed(request) {
   );
 }
 
-function getRedirectTarget(request, role) {
+function getRedirectTarget(request, role, sessionUser) {
   const url = new URL(request.url);
-  const redirect = url.searchParams.get("redirect");
-  if (redirect?.startsWith("/")) {
-    return redirect;
-  }
-  if (String(role || "").toLowerCase() === "super_admin") {
-    return "/owner/overview";
-  }
-  return "/dashboard";
+  const redirect =
+    url.searchParams.get("redirect") ||
+    url.searchParams.get("next") ||
+    "";
+  return resolvePostLoginPath(sessionUser || { role }, redirect);
 }
 
 function getProfile(request) {
@@ -262,7 +260,7 @@ export async function GET(request) {
     return new Response(null, {
       status: 302,
       headers: {
-        Location: getRedirectTarget(request, devProfileRole),
+        Location: getRedirectTarget(request, devProfileRole, sessionUser),
         "Cache-Control": "no-store",
         "Set-Cookie": cookieHeaders,
       },
