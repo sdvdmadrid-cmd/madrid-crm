@@ -91,7 +91,7 @@ try {
   $hasAppRouterRedirectDigest =
     ($statusCode -eq 200) -and
     ($content -match "NEXT_REDIRECT") -and
-    ($content -match "/login\?next=/clients")
+    ($content -match "/login\?(next|redirect)=")
 
   if ((($statusCode -in 301, 302, 303, 307, 308) -and $location -and ($location -like "/login*" -or $location -like "$BaseUrl/login*")) -or $hasAppRouterRedirectDigest) {
     Add-Pass "Unauthenticated /clients redirects to /login"
