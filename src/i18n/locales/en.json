@@ -619,9 +619,13 @@
       "rosterTitle": "Employee roster",
       "historyTitle": "Payroll history",
       "saved": "Employee saved.",
+      "deleted": "Employee deleted permanently.",
+      "confirmDeleteTitle": "Delete employee",
+      "confirmDeleteMessage": "Are you sure you want to delete this employee? This action cannot be undone.",
       "formIntro": "Enter the basics first. You can skip tax and direct-deposit details until you're ready to run payroll.",
       "errors": {
-        "nameRequired": "First and last name are required."
+        "nameRequired": "First and last name are required.",
+        "deleteFailed": "Unable to delete employee."
       },
       "sections": {
         "personal": "Personal information",
@@ -844,6 +848,9 @@
       "update": "Update employee",
       "clear": "Clear form",
       "edit": "Edit",
+      "delete": "Delete employee",
+      "confirmDelete": "Delete permanently",
+      "cancel": "Cancel",
       "saveHours": "Save hours",
       "calculate": "Calculate payroll",
       "approve": "Approve pay run",

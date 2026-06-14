@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import PayrollNav from "@/components/payroll/PayrollNav";
 import PayrollEmployeeForm from "@/components/payroll/PayrollEmployeeForm";
 import { apiFetch } from "@/lib/client-auth";
+import { useCurrentUserAccess } from "@/lib/current-user-client";
 import styles from "@/app/payroll/payroll.module.css";
 import "@/i18n";
 
@@ -70,8 +71,63 @@ function buildSavePayload(form) {
   return body;
 }
 
+function DeleteEmployeeModal({
+  open,
+  employeeName,
+  loading,
+  onCancel,
+  onConfirm,
+  t,
+}) {
+  if (!open) return null;
+  return (
+    <div
+      className={styles.modalOverlay}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payroll-delete-employee-title"
+      data-testid="payroll-delete-employee-modal"
+    >
+      <div className={styles.modalPanel}>
+        <h3 className={styles.modalTitle} id="payroll-delete-employee-title">
+          {t("payroll.employees.confirmDeleteTitle")}
+        </h3>
+        <p className={styles.modalMessage}>
+          {t("payroll.employees.confirmDeleteMessage")}
+        </p>
+        {employeeName ? (
+          <p className={styles.modalMessage}>
+            <strong>{employeeName}</strong>
+          </p>
+        ) : null}
+        <div className={styles.modalActions}>
+          <button
+            type="button"
+            className={styles.modalBtnCancel}
+            onClick={onCancel}
+            disabled={loading}
+          >
+            {t("payroll.actions.cancel")}
+          </button>
+          <button
+            type="button"
+            className={`${styles.modalBtnConfirm} ${styles.modalBtnDanger}`}
+            onClick={onConfirm}
+            disabled={loading}
+            data-testid="payroll-delete-employee-confirm"
+          >
+            {loading ? t("payroll.actions.working") : t("payroll.actions.confirmDelete")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PayrollEmployeesClient() {
   const { t } = useTranslation();
+  const { capabilities } = useCurrentUserAccess();
+  const canDeleteEmployee = Boolean(capabilities?.canDeleteRecords);
   const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(initialEmployee);
   const [payrollSettings, setPayrollSettings] = useState({
@@ -83,6 +139,12 @@ export default function PayrollEmployeesClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    employeeId: "",
+    employeeName: "",
+  });
+  const [deleting, setDeleting] = useState(false);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -205,6 +267,49 @@ export default function PayrollEmployeesClient() {
     setHistory([]);
   };
 
+  const employeeDisplayName = (employee) =>
+    employee.fullName || `${employee.firstName || ""} ${employee.lastName || ""}`.trim();
+
+  const requestDeleteEmployee = (employee) => {
+    if (!employee?.id || !canDeleteEmployee) return;
+    setError("");
+    setNotice("");
+    setDeleteModal({
+      open: true,
+      employeeId: employee.id,
+      employeeName: employeeDisplayName(employee),
+    });
+  };
+
+  const confirmDeleteEmployee = async () => {
+    const { employeeId } = deleteModal;
+    if (!employeeId) return;
+    setDeleting(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch(`/api/payroll/employees/${employeeId}`, {
+        method: "DELETE",
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || t("payroll.employees.errors.deleteFailed"));
+      }
+      setDeleteModal({ open: false, employeeId: "", employeeName: "" });
+      if (selectedId === employeeId) {
+        clearForm();
+      } else {
+        setEmployees((current) => current.filter((row) => row.id !== employeeId));
+      }
+      setNotice(t("payroll.employees.deleted"));
+      await loadEmployees();
+    } catch (err) {
+      setError(err.message || t("payroll.employees.errors.deleteFailed"));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <main className={styles.page} data-testid="payroll-employees-page">
       <header className={styles.headerRow}>
@@ -223,6 +328,19 @@ export default function PayrollEmployeesClient() {
         onSave={saveEmployee}
         onClear={clearForm}
         payrollSettings={payrollSettings}
+        canDeleteEmployee={canDeleteEmployee}
+        onDelete={
+          selectedId
+            ? () =>
+                requestDeleteEmployee({
+                  id: selectedId,
+                  firstName: form.firstName,
+                  lastName: form.lastName,
+                  fullName: `${form.firstName} ${form.lastName}`.trim(),
+                })
+            : undefined
+        }
+        deleting={deleting}
       />
 
       {error ? <div className={styles.error}>{error}</div> : null}
@@ -258,13 +376,25 @@ export default function PayrollEmployeesClient() {
                     <span className={styles.badge}>{employee.status}</span>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className={styles.btnGhost}
-                      onClick={() => editEmployee(employee)}
-                    >
-                      {t("payroll.actions.edit")}
-                    </button>
+                    <div className={styles.tableActions}>
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        onClick={() => editEmployee(employee)}
+                      >
+                        {t("payroll.actions.edit")}
+                      </button>
+                      {canDeleteEmployee ? (
+                        <button
+                          type="button"
+                          className={styles.btnDanger}
+                          onClick={() => requestDeleteEmployee(employee)}
+                          data-testid={`payroll-delete-employee-${employee.id}`}
+                        >
+                          {t("payroll.actions.delete")}
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -326,6 +456,17 @@ export default function PayrollEmployeesClient() {
           </div>
         </section>
       ) : null}
+
+      <DeleteEmployeeModal
+        open={deleteModal.open}
+        employeeName={deleteModal.employeeName}
+        loading={deleting}
+        onCancel={() =>
+          setDeleteModal({ open: false, employeeId: "", employeeName: "" })
+        }
+        onConfirm={confirmDeleteEmployee}
+        t={t}
+      />
     </main>
   );
 }

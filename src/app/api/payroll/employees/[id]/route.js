@@ -8,11 +8,15 @@ import {
   buildEmployeeInsertRow,
   serializePayrollEmployee,
 } from "@/lib/payroll-serializer";
-import { listEmployeePayrollHistory } from "@/lib/payroll-service";
+import {
+  deletePayrollEmployeePermanently,
+  listEmployeePayrollHistory,
+} from "@/lib/payroll-service";
 import { applyMutationCsrfGuard } from "@/lib/mutation-guard";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { scopeByTenant } from "@/lib/tenant-scope";
 import {
+  canDelete,
   canManageSensitive,
   canWrite,
   forbiddenResponse,
@@ -133,28 +137,22 @@ export async function DELETE(request, { params }) {
     const { authenticated, tenantDbId, role } =
       await getAuthenticatedTenantContext(request);
     if (!authenticated) return unauthenticatedResponse();
-    if (!canWrite(role)) return forbiddenResponse();
+    if (!canDelete(role)) return forbiddenResponse();
 
     const { id } = await params;
-    const { data, error } = await scopeByTenant(
-      supabaseAdmin
-        .from(PAYROLL_TABLES.EMPLOYEES)
-        .update({
-          status: "inactive",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select("*")
-        .maybeSingle(),
-      { tenantDbId, role },
-    );
+    const result = await deletePayrollEmployeePermanently({
+      tenantDbId,
+      role,
+      employeeId: id,
+    });
 
-    if (error) throw new Error(error.message);
-    if (!data) return json({ success: false, error: "Employee not found" }, 404);
-
-    return json({ success: true, data: serializePayrollEmployee(data) });
+    return json({ success: true, data: result });
   } catch (error) {
     console.error("[api/payroll/employees/:id][DELETE]", error);
-    return json({ success: false, error: error.message }, 500);
+    const status = Number(error?.statusCode) || 500;
+    return json(
+      { success: false, error: error?.message || "Unable to delete employee" },
+      status,
+    );
   }
 }
