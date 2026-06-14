@@ -5,16 +5,11 @@ import {
   buildPlatformOverview,
   listAllAuthUsers,
 } from "@/lib/platform-overview";
+import { isPlatformTenantAccount } from "@/lib/platform-tenant-accounts";
 import { summarizeOwnerLoginActivity } from "@/lib/owner-login-activity";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const FEEDBACK_TABLE = "product_feedback";
-
-function parseContractorRole(user) {
-  return String(
-    user?.app_metadata?.role || user?.user_metadata?.role || "contractor",
-  ).toLowerCase();
-}
 
 /**
  * Contractor login activity for owner platform dashboards.
@@ -38,7 +33,10 @@ export async function buildOwnerTenantCommandRows() {
   );
 
   return (users || []).map((user) => {
-    const stats = tenantById.get(user.tenantId) || {};
+    const stats =
+      tenantById.get(user.tenantDbId) ||
+      tenantById.get(user.tenantId) ||
+      {};
     const paidRevenue = Number(stats.paidRevenue || 0);
 
     return {
@@ -47,15 +45,19 @@ export async function buildOwnerTenantCommandRows() {
       email: user.email,
       companyName: user.companyName,
       industry: user.industry || user.businessType || "",
+      role: user.role,
       createdAt: user.createdAt,
       lastLoginAt: user.lastLoginAt,
       trialEndDate: user.trialEndDate,
       status: user.status,
+      isSubscribed: user.isSubscribed,
+      complimentaryAccess: user.complimentaryAccess,
       totalClients: Number(stats.clients || 0),
       jobsActive: Number(stats.jobs || 0),
       revenueCents: Math.round(paidRevenue * 100),
       estimateCount: user.estimateCount,
       tenantId: user.tenantId,
+      tenantDbId: user.tenantDbId,
     };
   });
 }
@@ -81,7 +83,7 @@ export async function loadOwnerSupportQueue() {
 
   const userMap = new Map();
   for (const user of authUsers) {
-    if (parseContractorRole(user) === "super_admin") continue;
+    if (!isPlatformTenantAccount(user)) continue;
     userMap.set(user.id, {
       email: String(user.email || "").trim(),
       companyName: String(user.user_metadata?.companyName || "").trim(),
@@ -98,7 +100,7 @@ export async function loadOwnerSupportQueue() {
   });
 
   const tenants = authUsers
-    .filter((user) => parseContractorRole(user) !== "super_admin")
+    .filter(isPlatformTenantAccount)
     .map((user) => ({
       id: user.id,
       label: `${user.user_metadata?.companyName || user.email || user.id}`,

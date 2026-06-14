@@ -15,6 +15,14 @@ describe("owner-login-activity", () => {
           last_sign_in_at: "2026-06-04T20:00:00.000Z",
         },
         {
+          id: "owner-1",
+          email: "owner@acme.com",
+          app_metadata: { role: "owner", tenant_id: "acme" },
+          user_metadata: { companyName: "Acme LLC", status: "trial" },
+          created_at: "2026-05-10T00:00:00.000Z",
+          last_sign_in_at: "2026-06-03T12:00:00.000Z",
+        },
+        {
           id: "c1",
           email: "active@example.com",
           app_metadata: { role: "contractor" },
@@ -49,10 +57,10 @@ describe("owner-login-activity", () => {
       { now: NOW },
     );
 
-    assert.equal(snapshot.summary.contractorAccounts, 3);
+    assert.equal(snapshot.summary.contractorAccounts, 4);
     assert.equal(snapshot.summary.probeAccounts, 1);
     assert.equal(snapshot.summary.loggedInLast24h, 1);
-    assert.equal(snapshot.summary.loggedInLast7d, 2);
+    assert.equal(snapshot.summary.loggedInLast7d, 3);
     assert.equal(snapshot.summary.neverLoggedIn, 1);
     assert.equal(snapshot.rows[0].email, "active@example.com");
     assert.equal(snapshot.rows[0].activityBucket, "today");

@@ -1,8 +1,11 @@
 import { getAuthenticatedTenantContext } from "@/lib/tenant";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getRequestOrigin, generatePasswordRecoveryLink } from "@/lib/supabase-auth";
+import { reconcileTenantSubscriptionFromStripe } from "@/lib/subscription-stripe-sync";
+import { tenantDbIdFromUser } from "@/lib/platform-tenant-accounts";
 
 function deriveStatus(userMetadata) {
+  if (userMetadata?.complimentaryAccess === true) return "Active";
   if (userMetadata?.isSubscribed === true) return "Active";
 
   const trialEndMs = userMetadata?.trialEndDate
@@ -11,9 +14,17 @@ function deriveStatus(userMetadata) {
   if (Number.isFinite(trialEndMs) && trialEndMs > Date.now()) return "Trial";
 
   const raw = String(userMetadata?.status || "").toLowerCase();
-  if (raw === "pending_verification") return "Pending";
+  if (raw === "pending_verification" || raw === "pending") return "Pending";
 
   return "Expired";
+}
+
+function accountStatusKey(userMetadata) {
+  const label = deriveStatus(userMetadata);
+  if (label === "Active") return "active";
+  if (label === "Trial") return "trial";
+  if (label === "Pending") return "pending";
+  return "expired";
 }
 
 export async function POST(request, { params }) {
@@ -89,10 +100,122 @@ export async function POST(request, { params }) {
           success: true,
           data: {
             userId: targetUserId,
-            status: deriveStatus(nextMeta),
+            status: accountStatusKey(nextMeta),
             trialEndDate: nextTrial,
             isSubscribed: false,
+            complimentaryAccess: false,
             message: `Trial extended by ${days} day(s).`,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "grant_complimentary") {
+      const nextMeta = {
+        ...currentMeta,
+        complimentaryAccess: true,
+        isSubscribed: true,
+        status: "active",
+      };
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUserId,
+        { user_metadata: nextMeta },
+      );
+      if (updateError) {
+        throw new Error(updateError.message || "Unable to grant complimentary access");
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            userId: targetUserId,
+            status: accountStatusKey(nextMeta),
+            trialEndDate: nextMeta.trialEndDate || null,
+            isSubscribed: true,
+            complimentaryAccess: true,
+            message: "Complimentary platform access granted.",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "revoke_complimentary") {
+      const now = Date.now();
+      const trialEndMs = currentMeta?.trialEndDate
+        ? new Date(currentMeta.trialEndDate).getTime()
+        : 0;
+
+      const nextMeta = {
+        ...currentMeta,
+        complimentaryAccess: false,
+        isSubscribed: false,
+        status:
+          Number.isFinite(trialEndMs) && trialEndMs > now ? "trial" : "expired",
+      };
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUserId,
+        { user_metadata: nextMeta },
+      );
+      if (updateError) {
+        throw new Error(updateError.message || "Unable to revoke complimentary access");
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            userId: targetUserId,
+            status: accountStatusKey(nextMeta),
+            trialEndDate: nextMeta.trialEndDate || null,
+            isSubscribed: false,
+            complimentaryAccess: false,
+            message: "Complimentary access removed.",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "sync_stripe_subscription") {
+      const tenantDbId =
+        String(currentUser.app_metadata?.tenant_db_id || "").trim() ||
+        tenantDbIdFromUser(currentUser);
+
+      const result = await reconcileTenantSubscriptionFromStripe({
+        tenantDbId,
+        userId: targetUserId,
+        email: currentUser.email,
+      });
+
+      const nextMeta = {
+        ...currentMeta,
+        isSubscribed: result.activated === true,
+        status: result.activated ? "active" : currentMeta.status || "expired",
+      };
+
+      if (result.activated) {
+        await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+          user_metadata: nextMeta,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            userId: targetUserId,
+            status: accountStatusKey(nextMeta),
+            isSubscribed: result.activated === true,
+            hasBusinessAccess: result.hasBusinessAccess === true,
+            stripeSubscriptionStatus: result.stripeSubscriptionStatus || null,
+            message: result.activated
+              ? "Stripe subscription synced — access restored."
+              : "No active Stripe subscription found for this account.",
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -129,9 +252,10 @@ export async function POST(request, { params }) {
           success: true,
           data: {
             userId: targetUserId,
-            status: deriveStatus(nextMeta),
+            status: accountStatusKey(nextMeta),
             trialEndDate: nextMeta?.trialEndDate || null,
             isSubscribed: subscribed,
+            complimentaryAccess: nextMeta.complimentaryAccess === true,
             message: subscribed
               ? "Subscription marked as active."
               : "Subscription removed.",

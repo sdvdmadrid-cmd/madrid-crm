@@ -51,7 +51,7 @@ export async function hydrateSessionSubscriptionFields({
   userId,
   userMetadata = {},
 } = {}) {
-  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(tenantDbId);
+  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(tenantDbId, userId);
   const active =
     stripeSubscriptionStatus === "active" || stripeSubscriptionStatus === "trialing";
 
@@ -87,7 +87,10 @@ export async function resolveTenantSubscriptionAccess(context = {}) {
 
   let stripeSubscriptionStatus = context.stripeSubscriptionStatus || null;
   if (!stripeSubscriptionStatus && context.tenantDbId) {
-    stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(context.tenantDbId);
+    stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
+      context.tenantDbId,
+      context.userId,
+    );
   }
 
   return resolveSubscriptionAccess({
