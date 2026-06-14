@@ -8,6 +8,16 @@ import {
 
 export const runtime = "nodejs";
 
+const SYNC_SUBSCRIPTION_EVENT_TYPES = new Set([
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_succeeded",
+  "invoice.payment_failed",
+  "invoice.paid",
+]);
 export async function POST(request) {
   try {
     const secret = getStripeSecretKey();
@@ -66,6 +76,7 @@ export async function POST(request) {
         "customer.subscription.deleted",
         "invoice.payment_succeeded",
         "invoice.payment_failed",
+        "invoice.paid",
         "account.updated",
       ].includes(event.type)
     ) {
@@ -75,7 +86,7 @@ export async function POST(request) {
       );
     }
 
-    if (isInngestEnabled()) {
+    if (isInngestEnabled() && !SYNC_SUBSCRIPTION_EVENT_TYPES.has(event.type)) {
       const queued = await sendInngestEvent(INNGEST_EVENTS.STRIPE_WEBHOOK, {
         stripeEventId: event.id,
         event,
@@ -87,7 +98,6 @@ export async function POST(request) {
         );
       }
     }
-
     return await processStripeWebhookEvent(event);
   } catch (error) {
     console.error("[api/payments/webhooks/stripe][POST] error", error);

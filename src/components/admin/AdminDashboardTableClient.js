@@ -18,6 +18,12 @@ function badgeClasses(status) {
   return "bg-amber-100 text-amber-700";
 }
 
+function subscriptionLabel(row) {
+  if (row?.complimentaryAccess) return "Complimentary";
+  if (row?.isSubscribed) return "Subscribed";
+  return "None";
+}
+
 function formatMoneyFromCents(cents) {
   const amount = Number(cents || 0) / 100;
   return new Intl.NumberFormat("en-US", {
@@ -77,7 +83,8 @@ export default function AdminDashboardTableClient({ rows }) {
         (trialFilter === "on_trial" && String(row.status || "").toLowerCase() === "trial") ||
         (trialFilter === "expiring_7_days" && trialEnd > now && trialEnd - now <= 7 * 24 * 60 * 60 * 1000) ||
         (trialFilter === "expired_trial" && trialEnd > 0 && trialEnd <= now) ||
-        (trialFilter === "subscribed" && String(row.status || "").toLowerCase() === "active");
+        (trialFilter === "subscribed" &&
+          (String(row.status || "").toLowerCase() === "active" || row.isSubscribed || row.complimentaryAccess));
 
       const matchesTenant = tenantFilter === "all" || String(row.id || "") === tenantFilter;
 
@@ -109,6 +116,20 @@ export default function AdminDashboardTableClient({ rows }) {
     const health = [];
     const trialEndMs = selectedTenant.trialEndDate ? new Date(selectedTenant.trialEndDate).getTime() : 0;
     const daysToTrialEnd = trialEndMs > 0 ? Math.ceil((trialEndMs - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+
+    if (selectedTenant.complimentaryAccess) {
+      health.unshift({
+        label: "Billing",
+        value: "Complimentary access",
+        tone: "emerald",
+      });
+    } else if (selectedTenant.isSubscribed) {
+      health.unshift({
+        label: "Billing",
+        value: "Paid subscription",
+        tone: "emerald",
+      });
+    }
 
     if (String(selectedTenant.status || "").toLowerCase() === "trial" && daysToTrialEnd !== null) {
       health.push({
@@ -149,6 +170,8 @@ export default function AdminDashboardTableClient({ rows }) {
       "email",
       "owner_name",
       "company_name",
+      "role",
+      "subscription",
       "industry",
       "registration_date",
       "last_login",
@@ -165,6 +188,8 @@ export default function AdminDashboardTableClient({ rows }) {
         toCsvCell(row.email),
         toCsvCell(row.name),
         toCsvCell(row.companyName),
+        toCsvCell(row.role),
+        toCsvCell(subscriptionLabel(row)),
         toCsvCell(row.industry),
         toCsvCell(formatDate(row.createdAt)),
         toCsvCell(formatDate(row.lastLoginAt)),
@@ -216,6 +241,14 @@ export default function AdminDashboardTableClient({ rows }) {
                   Object.prototype.hasOwnProperty.call(data, "trialEndDate")
                     ? data.trialEndDate
                     : row.trialEndDate,
+                isSubscribed:
+                  Object.prototype.hasOwnProperty.call(data, "isSubscribed")
+                    ? data.isSubscribed
+                    : row.isSubscribed,
+                complimentaryAccess:
+                  Object.prototype.hasOwnProperty.call(data, "complimentaryAccess")
+                    ? data.complimentaryAccess
+                    : row.complimentaryAccess,
               }
             : row,
         ),
@@ -295,7 +328,7 @@ export default function AdminDashboardTableClient({ rows }) {
 
       <div className="grid gap-4 border-b border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Filtered contractors</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Filtered accounts</p>
           <p className="mt-1 text-xl font-semibold text-slate-900">{filteredTotals.contractors}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -320,7 +353,9 @@ export default function AdminDashboardTableClient({ rows }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Owner</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Company</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Role</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Industry</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Subscription</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Registration</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Last Login</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Trial Ends</th>
@@ -340,7 +375,9 @@ export default function AdminDashboardTableClient({ rows }) {
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-800">{row.email}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">{row.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-800">{row.companyName}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">{row.role || "-"}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">{row.industry}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{subscriptionLabel(row)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">{formatDate(row.createdAt)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-800">{formatDate(row.lastLoginAt)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-800">{formatDate(row.trialEndDate)}</td>
@@ -356,8 +393,8 @@ export default function AdminDashboardTableClient({ rows }) {
               ))}
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={11}>
-                    No contractors match current filters.
+                  <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={13}>
+                    No accounts match current filters.
                   </td>
                 </tr>
               ) : null}
@@ -423,8 +460,21 @@ export default function AdminDashboardTableClient({ rows }) {
                   </p>
                 </div>
 
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</p>
+                  <p className="mt-1 capitalize">{selectedTenant.role || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Subscription</p>
+                  <p className="mt-1">{subscriptionLabel(selectedTenant)}</p>
+                </div>
+
                 <div className="space-y-2 border-t border-slate-200 pt-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Owner actions</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Subscription actions</p>
+                  <p className="text-xs text-slate-500">
+                    Optional — extend trial, mark subscribed, or grant free platform access.
+                  </p>
 
                   <div className="grid grid-cols-[1fr_auto] gap-2">
                     <input
@@ -446,6 +496,45 @@ export default function AdminDashboardTableClient({ rows }) {
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <button
+                      type="button"
+                      disabled={actionLoading !== "" || selectedTenant.complimentaryAccess}
+                      onClick={() =>
+                        runTenantAction("grant_complimentary", {}, "grant_complimentary")
+                      }
+                      className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionLoading === "grant_complimentary"
+                        ? "Granting..."
+                        : "Grant free access"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionLoading !== "" || !selectedTenant.complimentaryAccess}
+                      onClick={() =>
+                        runTenantAction("revoke_complimentary", {}, "revoke_complimentary")
+                      }
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionLoading === "revoke_complimentary"
+                        ? "Revoking..."
+                        : "Revoke free access"}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <button
+                      type="button"
+                      disabled={actionLoading !== ""}
+                      onClick={() =>
+                        runTenantAction("sync_stripe_subscription", {}, "sync_stripe_subscription")
+                      }
+                      className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2 xl:col-span-1"
+                    >
+                      {actionLoading === "sync_stripe_subscription"
+                        ? "Syncing from Stripe..."
+                        : "Sync paid subscription from Stripe"}
+                    </button>
                     <button
                       type="button"
                       disabled={actionLoading !== ""}

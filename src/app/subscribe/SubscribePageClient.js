@@ -96,6 +96,19 @@ export default function SubscribePageClient() {
 
   const restoreExistingAccess = useCallback(async () => {
     try {
+      const reconcileRes = await withTimeout(
+        apiFetch("/api/subscriptions/reconcile", { method: "POST", cache: "no-store" }),
+        PLAN_LOAD_TIMEOUT_MS,
+      );
+      if (reconcileRes.ok) {
+        const reconcilePayload = await reconcileRes.json();
+        if (reconcilePayload?.data?.hasBusinessAccess) {
+          clearAuthNavAttempt();
+          redirectToDashboard();
+          return true;
+        }
+      }
+
       const res = await withTimeout(
         apiFetch("/api/auth/me", { cache: "no-store", timeoutMs: PLAN_LOAD_TIMEOUT_MS }),
         PLAN_LOAD_TIMEOUT_MS,
@@ -129,6 +142,26 @@ export default function SubscribePageClient() {
 
     for (let attempt = 0; attempt < 12; attempt += 1) {
       try {
+        if (attempt === 0 || attempt % 2 === 0) {
+          const reconcileRes = await withTimeout(
+            apiFetch("/api/subscriptions/reconcile", {
+              method: "POST",
+              cache: "no-store",
+            }),
+            PLAN_LOAD_TIMEOUT_MS,
+          );
+          if (reconcileRes.ok) {
+            const reconcilePayload = await reconcileRes.json();
+            if (reconcilePayload?.data?.hasBusinessAccess) {
+              console.log("Access granted via Stripe reconcile");
+              setSuccessNotice("Subscription active. Redirecting to your workspace…");
+              clearAuthNavAttempt();
+              redirectToDashboard();
+              return;
+            }
+          }
+        }
+
         const res = await withTimeout(
           apiFetch("/api/auth/me", { cache: "no-store" }),
           PLAN_LOAD_TIMEOUT_MS,

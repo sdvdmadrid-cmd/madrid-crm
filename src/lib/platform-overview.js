@@ -1,6 +1,13 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  computeTenantAccountStatus,
+  isPlatformTenantAccount,
+  parseAccountRole,
+  tenantDbIdFromUser,
+  tenantSlugFromUser,
+} from "@/lib/platform-tenant-accounts";
 import { filterRowsWithTenantId, rowHasTenantId } from "@/lib/tenant-row-guard";
 
 function toTenantId(value) {
@@ -13,18 +20,11 @@ function toNumber(value) {
 }
 
 function roleFromUser(user) {
-  return String(
-    user?.app_metadata?.role || user?.user_metadata?.role || "viewer",
-  ).toLowerCase();
+  return parseAccountRole(user);
 }
 
 function tenantFromUser(user) {
-  return toTenantId(
-    user?.app_metadata?.tenant_id ||
-      user?.app_metadata?.tenantId ||
-      user?.user_metadata?.tenant_id ||
-      user?.user_metadata?.tenantId,
-  );
+  return tenantSlugFromUser(user);
 }
 
 export async function listAllAuthUsers() {
@@ -116,16 +116,24 @@ export async function buildPlatformOverview() {
   };
 
   for (const user of users) {
-    const tenantStats = ensureTenant(tenantFromUser(user));
     const roleKey = roleFromUser(user);
+    usersByRole[roleKey] = (usersByRole[roleKey] || 0) + 1;
+
+    if (roleKey === "super_admin") continue;
+
+    const tenantKey = tenantDbIdFromUser(user) || tenantFromUser(user);
+    const tenantStats = ensureTenant(tenantKey);
 
     tenantStats.users += 1;
     if (roleKey === "admin" || roleKey === "owner") tenantStats.admins += 1;
-    if (roleKey === "contractor") tenantStats.contractors += 1;
+    if (
+      roleKey === "owner" ||
+      roleKey === "contractor" ||
+      roleKey === "worker"
+    ) {
+      tenantStats.contractors += 1;
+    }
     if (roleKey === "viewer") tenantStats.viewers += 1;
-    if (roleKey === "super_admin") tenantStats.superAdmins += 1;
-
-    usersByRole[roleKey] = (usersByRole[roleKey] || 0) + 1;
 
     const activityDate = new Date(
       user.last_sign_in_at || user.updated_at || user.created_at || 0,
@@ -175,10 +183,12 @@ export async function buildPlatformOverview() {
     }))
     .sort((a, b) => b.users - a.users || a.tenantId.localeCompare(b.tenantId));
 
+  const tenantAccountCount = users.filter(isPlatformTenantAccount).length;
+
   const summary = {
     totalTenants: tenants.length,
     totalUsers: users.length,
-    totalContractors: usersByRole.contractor || 0,
+    totalContractors: tenantAccountCount,
     totalAdmins: (usersByRole.admin || 0) + (usersByRole.owner || 0),
     activeTenants30d: activeTenants.size,
     totalClients: tenants.reduce((sum, tenant) => sum + tenant.clients, 0),
@@ -203,23 +213,6 @@ export async function buildPlatformOverview() {
   return { summary, tenants, users, metricsTruncated };
 }
 
-function parseContractorRole(user) {
-  return String(
-    user?.app_metadata?.role || user?.user_metadata?.role || "contractor",
-  ).toLowerCase();
-}
-
-function computeContractorStatus(user) {
-  const raw = String(
-    user?.user_metadata?.status || user?.app_metadata?.status || "",
-  ).toLowerCase();
-  if (["active", "trial", "expired"].includes(raw)) return raw;
-
-  const created = new Date(user?.created_at || 0).getTime();
-  if (!Number.isFinite(created) || created <= 0) return "trial";
-  const ageDays = (Date.now() - created) / (1000 * 60 * 60 * 24);
-  return ageDays > 30 ? "active" : "trial";
-}
 
 async function readEstimateCountsByUser() {
   const { data, error } = await supabaseAdmin
@@ -238,24 +231,55 @@ async function readEstimateCountsByUser() {
   }, {});
 }
 
-function serializeContractorUser(user, estimateCount) {
+async function readPaidSubscriptionTenantIds() {
+  const { data, error } = await supabaseAdmin
+    .from("contractor_subscriptions")
+    .select("tenant_id")
+    .in("status", ["active", "trialing"]);
+
+  if (error) {
+    console.warn("[platform-overview] subscription lookup failed", error.message);
+    return new Set();
+  }
+
+  return new Set(
+    (data || [])
+      .map((row) => String(row.tenant_id || "").trim())
+      .filter(Boolean),
+  );
+}
+
+function serializeContractorUser(user, estimateCount, paidTenantIds = new Set()) {
   const businessType = String(
     user?.user_metadata?.businessType || user?.user_metadata?.industry || "",
   ).trim();
+  const tenantDbId = tenantDbIdFromUser(user);
+
+  let status = computeTenantAccountStatus(user);
+  if (
+    paidTenantIds.has(tenantDbId) ||
+    paidTenantIds.has(String(user.id || ""))
+  ) {
+    status = "active";
+  }
 
   return {
     _id: user.id,
     tenantId: tenantFromUser(user),
+    tenantDbId,
     name: String(user?.user_metadata?.name || "").trim(),
     email: String(user?.email || "").trim(),
     companyName: String(user?.user_metadata?.companyName || "").trim(),
     businessType,
     industry: businessType,
-    role: parseContractorRole(user),
-    status: computeContractorStatus(user),
+    role: parseAccountRole(user),
+    status: computeTenantAccountStatus(user),
     isSubscribed: Boolean(
-      user?.user_metadata?.isSubscribed || user?.app_metadata?.isSubscribed,
+      user?.user_metadata?.isSubscribed ||
+        user?.app_metadata?.isSubscribed ||
+        status === "active",
     ),
+    complimentaryAccess: user?.user_metadata?.complimentaryAccess === true,
     trialStartDate: user?.user_metadata?.trialStartDate || null,
     trialEndDate: user?.user_metadata?.trialEndDate || null,
     createdAt: user?.created_at || null,
@@ -268,14 +292,20 @@ function serializeContractorUser(user, estimateCount) {
  * Contractor-focused metrics (legacy /api/admin/overview shape).
  */
 export async function buildContractorAdminOverview() {
-  const [allUsers, estimateMap] = await Promise.all([
+  const [allUsers, estimateMap, paidTenantIds] = await Promise.all([
     listAllAuthUsers(),
     readEstimateCountsByUser(),
+    readPaidSubscriptionTenantIds(),
   ]);
 
   const users = allUsers
-    .filter((user) => parseContractorRole(user) === "contractor")
-    .map((user) => serializeContractorUser(user, estimateMap[user.id] || 0));
+    .filter(isPlatformTenantAccount)
+    .map((user) => {
+      const tenantDbId = tenantDbIdFromUser(user);
+      const estimateCount =
+        estimateMap[tenantDbId] || estimateMap[user.id] || 0;
+      return serializeContractorUser(user, estimateCount, paidTenantIds);
+    });
 
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
