@@ -28,6 +28,22 @@ export function WebsiteBuilderAiProvider({ children }) {
     return apiRef.current?.runGenerateFull?.();
   }, []);
 
+  const generateHeroImage = useCallback((payload) => {
+    return apiRef.current?.generateHeroImage?.(payload);
+  }, []);
+
+  const generateGalleryImages = useCallback((payload) => {
+    return apiRef.current?.generateGalleryImages?.(payload);
+  }, []);
+
+  const removeGalleryImage = useCallback((payload) => {
+    return apiRef.current?.removeGalleryImage?.(payload);
+  }, []);
+
+  const removeHeroImage = useCallback((payload) => {
+    return apiRef.current?.removeHeroImage?.(payload);
+  }, []);
+
   const value = useMemo(
     () => ({
       registerBuilder,
@@ -35,9 +51,23 @@ export function WebsiteBuilderAiProvider({ children }) {
       getSnapshot,
       applyPatches,
       runGenerateFull,
+      generateHeroImage,
+      generateGalleryImages,
+      removeGalleryImage,
+      removeHeroImage,
       isActive: () => Boolean(apiRef.current),
     }),
-    [registerBuilder, unregisterBuilder, getSnapshot, applyPatches, runGenerateFull],
+    [
+      registerBuilder,
+      unregisterBuilder,
+      getSnapshot,
+      applyPatches,
+      runGenerateFull,
+      generateHeroImage,
+      generateGalleryImages,
+      removeGalleryImage,
+      removeHeroImage,
+    ],
   );
 
   return (

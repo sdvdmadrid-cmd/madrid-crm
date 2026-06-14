@@ -48,6 +48,36 @@ const PAGE_DEFS = [
     capabilities: ["schedule.parse", "schedule.navigate"],
   },
   {
+    match: (path) => path.startsWith("/jobs"),
+    id: "jobs",
+    label: "Jobs & Projects",
+    capabilities: ["jobs.create", "jobs.schedule", "jobs.navigate"],
+  },
+  {
+    match: (path) => path.startsWith("/payroll"),
+    id: "payroll",
+    label: "Payroll",
+    capabilities: ["payroll.employees", "payroll.runs", "payroll.reports"],
+  },
+  {
+    match: (path) => path.startsWith("/subscriptions") || path.startsWith("/bill-payments"),
+    id: "subscriptions",
+    label: "Subscriptions & Billing",
+    capabilities: ["billing.status", "billing.upgrade"],
+  },
+  {
+    match: (path) => path.startsWith("/contracts"),
+    id: "contracts",
+    label: "Contracts",
+    capabilities: ["contracts.create", "contracts.navigate"],
+  },
+  {
+    match: (path) => path.startsWith("/dashboard"),
+    id: "dashboard",
+    label: "Dashboard",
+    capabilities: ["dashboard.summary", "navigate"],
+  },
+  {
     match: (path) => path.startsWith("/services-catalog"),
     id: "services_catalog",
     label: "Services Catalog",

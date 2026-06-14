@@ -16,12 +16,21 @@ const TEXT = {
   en: {
     open: "AI Assistant",
     close: "Close",
-    title: "FieldBase Assistant",
-    subtitle: "Operations assistant — creates estimates, invoices, jobs, appointments, and more.",
+    title: "AI Operations Manager",
+    titleWebsite: "AI Website Designer",
+    subtitle:
+      "Manage your entire business through conversation — clients, estimates, invoices, jobs, calendar, payroll, and billing.",
+    subtitleWebsite:
+      "Build, redesign, and publish your website through conversation — copy, images, SEO, and layout.",
     agentMode: "Agent Mode",
     agentModeHint: "When on, I can apply approved changes across this workspace.",
-    placeholder: "e.g. Create estimate for John Smith — spring cleanup… or /help",
-    slashHint: "Quick commands",
+    agentModeHintWebsite: "When on, I create and edit your website automatically — text, images, and sections.",
+    placeholder:
+      "e.g. Create a client, show unpaid invoices, schedule next Thursday, delete duplicate employees… or /help",
+    placeholderWebsite:
+      "e.g. Build my cleaning company website, add testimonials, generate 6 gallery photos… or /build",
+    slashHint: "Try /client /estimate /invoice /schedule /payroll /subscription /search",
+    slashHintWebsite: "Try /build /hero /images /testimonials /seo /audit",
     send: "Send",
     voice: "Voice",
     voiceStop: "Stop",
@@ -93,6 +102,15 @@ export default function WorkspaceAgentBubble({
   const onWebsiteBuilder =
     websiteBuilderMode || Boolean(pathname?.startsWith("/website"));
 
+  const ui = {
+    title: onWebsiteBuilder && t.titleWebsite ? t.titleWebsite : t.title,
+    subtitle: onWebsiteBuilder && t.subtitleWebsite ? t.subtitleWebsite : t.subtitle,
+    placeholder: onWebsiteBuilder && t.placeholderWebsite ? t.placeholderWebsite : t.placeholder,
+    agentModeHint:
+      onWebsiteBuilder && t.agentModeHintWebsite ? t.agentModeHintWebsite : t.agentModeHint,
+    slashHint: onWebsiteBuilder && t.slashHintWebsite ? t.slashHintWebsite : t.slashHint,
+  };
+
   const {
     messages,
     agentMode,
@@ -100,7 +118,7 @@ export default function WorkspaceAgentBubble({
     appendMessage,
     clearSession,
     hydrated,
-  } = useWorkspaceAgentSession();
+  } = useWorkspaceAgentSession(authUser?.tenantId || authUser?.tenantDbId);
 
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -170,6 +188,11 @@ export default function WorkspaceAgentBubble({
           navigate: (path) => router.push(path),
           apiFetch,
           getJsonOrThrow,
+          runGenerateFull: () => wbAi?.runGenerateFull?.(),
+          generateHeroImage: (payload) => wbAi?.generateHeroImage?.(payload),
+          generateGalleryImages: (payload) => wbAi?.generateGalleryImages?.(payload),
+          removeGalleryImage: (payload) => wbAi?.removeGalleryImage?.(payload),
+          removeHeroImage: (payload) => wbAi?.removeHeroImage?.(payload),
         });
       } else if (data.patches && onWebsiteBuilder) {
         wbAi?.applyPatches?.(data.patches);
@@ -259,9 +282,9 @@ export default function WorkspaceAgentBubble({
             }}
           >
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15 }}>{t.title}</div>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>{ui.title}</div>
               <div style={{ color: "#94a3b8", fontSize: 11, lineHeight: 1.4 }}>
-                {t.subtitle}
+                {ui.subtitle}
               </div>
             </div>
             <button
@@ -293,7 +316,7 @@ export default function WorkspaceAgentBubble({
               />
               <span>
                 <strong>{t.agentMode}</strong>
-                <span style={{ color: "#64748b", marginLeft: 6 }}>{t.agentModeHint}</span>
+                <span style={{ color: "#64748b", marginLeft: 6 }}>{ui.agentModeHint}</span>
               </span>
             </label>
             <button type="button" onClick={clearSession} style={iconBtnStyle}>
@@ -450,7 +473,7 @@ export default function WorkspaceAgentBubble({
                   handleSend();
                 }
               }}
-              placeholder={t.placeholder}
+              placeholder={ui.placeholder}
               rows={3}
               style={{
                 width: "100%",

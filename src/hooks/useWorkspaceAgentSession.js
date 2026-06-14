@@ -2,13 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const STORAGE_KEY = "fieldbase-workspace-agent-session-v1";
-const MAX_MESSAGES = 40;
+const STORAGE_PREFIX = "fieldbase-workspace-agent-v2";
+const MAX_MESSAGES = 80;
 
-function loadSession() {
+function storageKey(tenantId) {
+  const tid = String(tenantId || "default").trim() || "default";
+  return `${STORAGE_PREFIX}:${tid}`;
+}
+
+function loadSession(tenantId) {
   if (typeof window === "undefined") return { messages: [], agentMode: true };
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(storageKey(tenantId)) ||
+      window.sessionStorage.getItem("fieldbase-workspace-agent-session-v1");
     if (!raw) return { messages: [], agentMode: true };
     const parsed = JSON.parse(raw);
     return {
@@ -20,11 +27,11 @@ function loadSession() {
   }
 }
 
-function saveSession(messages, agentMode) {
+function saveSession(tenantId, messages, agentMode) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(
-      STORAGE_KEY,
+    window.localStorage.setItem(
+      storageKey(tenantId),
       JSON.stringify({
         messages: messages.slice(-MAX_MESSAGES),
         agentMode,
@@ -36,22 +43,22 @@ function saveSession(messages, agentMode) {
   }
 }
 
-export function useWorkspaceAgentSession() {
+export function useWorkspaceAgentSession(tenantId) {
   const [messages, setMessages] = useState([]);
   const [agentMode, setAgentMode] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const session = loadSession();
+    const session = loadSession(tenantId);
     setMessages(session.messages);
     setAgentMode(session.agentMode);
     setHydrated(true);
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     if (!hydrated) return;
-    saveSession(messages, agentMode);
-  }, [messages, agentMode, hydrated]);
+    saveSession(tenantId, messages, agentMode);
+  }, [messages, agentMode, hydrated, tenantId]);
 
   const appendMessage = useCallback((role, content, meta = {}) => {
     const entry = {
@@ -69,9 +76,9 @@ export function useWorkspaceAgentSession() {
   const clearSession = useCallback(() => {
     setMessages([]);
     if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(storageKey(tenantId));
     }
-  }, []);
+  }, [tenantId]);
 
   return {
     messages,

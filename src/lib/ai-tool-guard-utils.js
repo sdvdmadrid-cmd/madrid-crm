@@ -4,7 +4,11 @@ export const AI_TOOLS_REQUIRING_CONFIRM = new Set([
   "createInvoice",
   "createInvoiceForJob",
   "sendEstimate",
+  "sendInvoice",
+  "recordInvoicePayment",
   "runPayrollForPeriod",
+  "approvePayrollRun",
+  "cleanupDuplicateEmployees",
   "createEstimate",
 ]);
 
@@ -29,6 +33,14 @@ export function describeAiToolAction(toolName, args = {}) {
       return a.send
         ? `Create and send estimate for ${a.clientName || "client"}`
         : `Create estimate for ${a.clientName || "client"}`;
+    case "sendInvoice":
+      return `Send invoice ${a.invoiceId || a.query || ""} to client`;
+    case "recordInvoicePayment":
+      return `Record $${a.amount || "?"} payment on invoice ${a.invoiceId || a.query || ""}`;
+    case "approvePayrollRun":
+      return `Approve payroll run ${a.runId || "(latest calculated)"}`;
+    case "cleanupDuplicateEmployees":
+      return "Delete safe duplicate payroll employees";
     default:
       return `Execute ${toolName}`;
   }

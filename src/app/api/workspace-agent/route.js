@@ -19,6 +19,8 @@ import { runWorkspaceAgentTurn } from "@/lib/workspace-agent/orchestrator.js";
 export async function POST(request) {
   const access = await getAuthenticatedTenantContext(request);
   if (!access.authenticated) return unauthenticatedResponse();
+  const subscriptionBlocked = getSubscriptionBlockedResponse(access);
+  if (subscriptionBlocked) return subscriptionBlocked;
   if (!canWrite(access.role)) return forbiddenResponse();
 
   const body = await request.json().catch(() => ({}));
