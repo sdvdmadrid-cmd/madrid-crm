@@ -46,6 +46,9 @@ export default function PayrollEmployeeForm({
   selectedId,
   onSave,
   onClear,
+  onDelete,
+  canDeleteEmployee = false,
+  deleting = false,
   payrollSettings = {},
 }) {
   const { t } = useTranslation();
@@ -575,6 +578,17 @@ export default function PayrollEmployeeForm({
         {selectedId ? (
           <button type="button" className={styles.btnGhost} onClick={onClear}>
             {t("payroll.actions.clear")}
+          </button>
+        ) : null}
+        {selectedId && canDeleteEmployee && onDelete ? (
+          <button
+            type="button"
+            className={styles.btnDanger}
+            onClick={onDelete}
+            disabled={deleting}
+            data-testid="payroll-employee-delete"
+          >
+            {t("payroll.actions.delete")}
           </button>
         ) : null}
       </div>

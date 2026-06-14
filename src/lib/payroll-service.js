@@ -378,3 +378,68 @@ export async function listEmployeePayrollHistory({
       : null,
   }));
 }
+
+/**
+ * Permanently remove an employee when no pay-run history exists.
+ * Time entries cascade at the DB layer; run items RESTRICT deletion.
+ */
+export async function deletePayrollEmployeePermanently({
+  tenantDbId,
+  role,
+  employeeId,
+}) {
+  const id = String(employeeId || "").trim();
+  if (!id) {
+    const err = new Error("Invalid employee id");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { data: existing, error: loadError } = await scopeByTenant(
+    supabaseAdmin
+      .from(PAYROLL_TABLES.EMPLOYEES)
+      .select("id")
+      .eq("id", id)
+      .maybeSingle(),
+    { tenantDbId, role },
+  );
+  if (loadError) throw new Error(loadError.message);
+  if (!existing) {
+    const err = new Error("Employee not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const { count, error: countError } = await scopeByTenant(
+    supabaseAdmin
+      .from(PAYROLL_TABLES.RUN_ITEMS)
+      .select("id", { count: "exact", head: true })
+      .eq("employee_id", id),
+    { tenantDbId, role },
+  );
+  if (countError) throw new Error(countError.message);
+  if (Number(count || 0) > 0) {
+    const err = new Error(
+      "This employee has payroll history and cannot be permanently deleted. Mark them inactive instead.",
+    );
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const { error: deleteError } = await scopeByTenant(
+    supabaseAdmin.from(PAYROLL_TABLES.EMPLOYEES).delete().eq("id", id),
+    { tenantDbId, role },
+  );
+  if (deleteError) {
+    if (/foreign key|violates.*constraint/i.test(deleteError.message || "")) {
+      const err = new Error(
+        "Unable to delete employee because related payroll records still exist.",
+      );
+      err.statusCode = 409;
+      throw err;
+    }
+    throw new Error(deleteError.message);
+  }
+
+  return { id, deleted: true };
+}
