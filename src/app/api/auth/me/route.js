@@ -6,6 +6,7 @@ import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import { enrichAuthMeData, authReconcileCacheKey, AUTH_RECONCILE_CACHE_TTL_SECONDS } from "@/lib/auth-me-workspace";
 import {
   fetchStripeSubscriptionStatus,
+  hydrateSessionSubscriptionFields,
   resolveSubscriptionAccess,
 } from "@/lib/subscription-access";
 import {
@@ -22,7 +23,10 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
 
 async function attachSubscriptionAccessFields(base = {}) {
-  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(base.tenantDbId);
+  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
+    base.tenantDbId,
+    base.userId,
+  );
   const access = resolveSubscriptionAccess({
     role: base.role,
     isSubscribed: base.isSubscribed === true,
@@ -40,11 +44,40 @@ async function attachSubscriptionAccessFields(base = {}) {
 }
 
 async function buildAuthMePayload(base = {}) {
-  return enrichAuthMeData(await attachSubscriptionAccessFields(base));
+  try {
+    console.log("[api/auth/me] SUBSCRIPTION CHECK START", base.userId || "");
+    const withAccess = await attachSubscriptionAccessFields(base);
+    console.log("[api/auth/me] SUBSCRIPTION CHECK SUCCESS", {
+      userId: withAccess.userId || null,
+      hasBusinessAccess: withAccess.hasBusinessAccess,
+      stripeSubscriptionStatus: withAccess.stripeSubscriptionStatus || null,
+    });
+    const enriched = await enrichAuthMeData(withAccess);
+    console.log("[api/auth/me] PROFILE FETCH SUCCESS", base.userId || "");
+    return enriched;
+  } catch (error) {
+    console.error("[api/auth/me] buildAuthMePayload degraded", error);
+    const fallback = await attachSubscriptionAccessFields(base).catch(() => base);
+    return {
+      ...fallback,
+      capabilities:
+        fallback.capabilities || getRoleCapabilities(normalizeAppRole(base.role)),
+    };
+  }
+}
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), ms);
+    }),
+  ]);
 }
 
 export async function GET(request) {
   try {
+    console.log("[api/auth/me] AUTH START");
     if (AUTH_DEBUG) {
       console.info("[api/auth/me] entry", {
         pathname: new URL(request.url).pathname,
@@ -176,27 +209,56 @@ export async function GET(request) {
 
     const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(
       responseBody.tenantDbId,
+      responseBody.userId,
     );
+    await hydrateSessionSubscriptionFields({
+      tenantDbId: responseBody.tenantDbId,
+      userId: responseBody.userId,
+      userMetadata: {
+        isSubscribed: responseBody.isSubscribed,
+        status: session?.status,
+      },
+    }).catch(() => {});
+
     const subscriptionAccess = resolveSubscriptionAccess({
       ...responseBody,
       stripeSubscriptionStatus,
     });
+    const paidOrStripeActive =
+      stripeSubscriptionStatus === "active" || stripeSubscriptionStatus === "trialing";
+    const effectiveIsSubscribed =
+      responseBody.isSubscribed === true || paidOrStripeActive;
     responseBody = {
       ...responseBody,
       stripeSubscriptionStatus,
+      isSubscribed: effectiveIsSubscribed,
       hasBusinessAccess: subscriptionAccess.hasBusinessAccess,
       subscriptionState: subscriptionAccess.state,
     };
 
     const sessionNeedsRefresh =
+      !appSession ||
       appSession?.hasBusinessAccess !== subscriptionAccess.hasBusinessAccess ||
-      appSession?.isSubscribed !== responseBody.isSubscribed ||
-      appSession?.stripeSubscriptionStatus !== stripeSubscriptionStatus;
+      appSession?.isSubscribed !== effectiveIsSubscribed ||
+      appSession?.stripeSubscriptionStatus !== stripeSubscriptionStatus ||
+      (subscriptionAccess.hasBusinessAccess && !appSession?.hasBusinessAccess);
 
-    if (sessionNeedsRefresh && appSession) {
+    if (sessionNeedsRefresh) {
       const token = createSessionToken({
-        ...appSession,
-        isSubscribed: responseBody.isSubscribed,
+        ...(appSession || {
+          userId: responseBody.userId,
+          tenantId: responseBody.tenantId,
+          tenantDbId: responseBody.tenantDbId,
+          email: responseBody.email,
+          name: responseBody.name,
+          companyName: responseBody.companyName,
+          role: responseBody.role,
+          businessType: responseBody.businessType,
+          industry: responseBody.industry,
+          trialEndDate: responseBody.trialEndDate,
+          complimentaryAccess: responseBody.complimentaryAccess,
+        }),
+        isSubscribed: effectiveIsSubscribed,
         stripeSubscriptionStatus,
         hasBusinessAccess: subscriptionAccess.hasBusinessAccess,
         subscriptionState: subscriptionAccess.state,
@@ -208,60 +270,75 @@ export async function GET(request) {
     const recentlyReconciled = await getApiResponseCache(reconcileKey);
 
     if (!recentlyReconciled) {
-      const cookieStore = await cookies();
-      const supabase = createSupabaseRouteHandlerClient(cookieStore);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        await withTimeout(
+          (async () => {
+            const cookieStore = await cookies();
+            const supabase = createSupabaseRouteHandlerClient(cookieStore);
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
 
-      if (user?.id) {
-        const reconciled = await reconcileUserRoleOnLogin(user);
-        const profile = await resolveProfileForUser(reconciled, {
-          tenantId: session.tenantDbId || reconciled.id,
-          role: session.role,
-        });
-        const refreshedStripeStatus = await fetchStripeSubscriptionStatus(
-          session.tenantDbId || reconciled.id,
-        );
-        const refreshedSession = buildAppSessionFromSupabaseUser(
-          reconciled,
-          null,
-          profile,
-          { stripeSubscriptionStatus: refreshedStripeStatus },
-        );
-        const roleChanged = refreshedSession.role !== session.role;
-        const accessChanged =
-          refreshedSession.hasBusinessAccess !== appSession?.hasBusinessAccess ||
-          refreshedSession.isSubscribed !== appSession?.isSubscribed;
+            if (user?.id) {
+              const reconciled = await reconcileUserRoleOnLogin(user);
+              const profile = await resolveProfileForUser(reconciled, {
+                tenantId: session.tenantDbId || reconciled.id,
+                role: session.role,
+              });
+              const refreshedStripeStatus = await fetchStripeSubscriptionStatus(
+                session.tenantDbId || reconciled.id,
+              );
+              const refreshedSession = buildAppSessionFromSupabaseUser(
+                reconciled,
+                null,
+                profile,
+                { stripeSubscriptionStatus: refreshedStripeStatus },
+              );
+              const roleChanged = refreshedSession.role !== session.role;
+              const accessChanged =
+                refreshedSession.hasBusinessAccess !== appSession?.hasBusinessAccess ||
+                refreshedSession.isSubscribed !== appSession?.isSubscribed;
 
-        if (roleChanged || accessChanged) {
-          const token = createSessionToken(refreshedSession);
-          setCookieHeader = buildSessionCookie(token);
-          responseBody = {
-            userId: refreshedSession.userId,
-            tenantId: refreshedSession.tenantId,
-            tenantDbId: refreshedSession.tenantDbId,
-            email: refreshedSession.email,
-            name: refreshedSession.name,
-            companyName: refreshedSession.companyName || "",
-            role: refreshedSession.role,
-            capabilities: getRoleCapabilities(
-              normalizeAppRole(refreshedSession.role),
-            ),
-            businessType: refreshedSession.businessType || "",
-            industry: refreshedSession.businessType || "",
-            isSubscribed: refreshedSession.isSubscribed === true,
-            trialEndDate: refreshedSession.trialEndDate || null,
-            complimentaryAccess: refreshedSession.complimentaryAccess === true,
-            stripeSubscriptionStatus: refreshedStripeStatus,
-            hasBusinessAccess: refreshedSession.hasBusinessAccess,
-            subscriptionState: refreshedSession.subscriptionState,
-          };
-        }
+              if (roleChanged || accessChanged) {
+                const token = createSessionToken(refreshedSession);
+                setCookieHeader = buildSessionCookie(token);
+                responseBody = {
+                  userId: refreshedSession.userId,
+                  tenantId: refreshedSession.tenantId,
+                  tenantDbId: refreshedSession.tenantDbId,
+                  email: refreshedSession.email,
+                  name: refreshedSession.name,
+                  companyName: refreshedSession.companyName || "",
+                  role: refreshedSession.role,
+                  capabilities: getRoleCapabilities(
+                    normalizeAppRole(refreshedSession.role),
+                  ),
+                  businessType: refreshedSession.businessType || "",
+                  industry: refreshedSession.businessType || "",
+                  isSubscribed: refreshedSession.isSubscribed === true,
+                  trialEndDate: refreshedSession.trialEndDate || null,
+                  complimentaryAccess: refreshedSession.complimentaryAccess === true,
+                  stripeSubscriptionStatus: refreshedStripeStatus,
+                  hasBusinessAccess: refreshedSession.hasBusinessAccess,
+                  subscriptionState: refreshedSession.subscriptionState,
+                };
+              }
+            }
+          })(),
+          5000,
+          "auth_reconcile",
+        );
+      } catch (reconcileError) {
+        console.warn(
+          "[api/auth/me] reconcile skipped",
+          reconcileError instanceof Error ? reconcileError.message : reconcileError,
+        );
       }
 
       await setApiResponseCache(reconcileKey, true, AUTH_RECONCILE_CACHE_TTL_SECONDS);
     }
+
+    console.log("[api/auth/me] SESSION FOUND", Boolean(responseBody.userId));
 
     return new Response(
       JSON.stringify({

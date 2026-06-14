@@ -116,6 +116,18 @@ export default function RevenueDashboardPage() {
   );
 
   useEffect(() => {
+    console.log("DASHBOARD MOUNTING");
+    return () => {
+      console.log("DASHBOARD UNMOUNTING");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sessionReady) return;
+    console.log("DASHBOARD RENDERED", authUser?.userId || null);
+  }, [sessionReady, authUser?.userId]);
+
+  useEffect(() => {
     if (String(authUser?.role || "").toLowerCase() === "super_admin") {
       router.replace("/owner/overview");
     }

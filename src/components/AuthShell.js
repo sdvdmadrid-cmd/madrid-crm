@@ -21,7 +21,6 @@ import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { TenantWorkspaceProvider } from "@/context/TenantWorkspaceContext";
 import {
-  buildLoginRedirectPath,
   isOwnerCommandCenterPath,
   isTenantContractorAppPath,
   parseRedirectParam,
@@ -33,12 +32,8 @@ import { useStoredUiLanguage } from "@/lib/ui-language";
 import { buildPublicWebsitePath } from "@/lib/public-website-routing";
 import { usePublishedWebsiteStatus } from "@/hooks/usePublishedWebsiteStatus";
 import { performAuthHardNavigate } from "@/lib/auth-nav";
-import {
-  EXPIRED_TRIAL_SUBSCRIBE_PATH,
-  isSubscriptionExemptPage,
-  logExpiredTrialRedirect,
-  shouldRestrictForSubscription,
-} from "@/lib/subscription-routes";
+import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
+import { EXPIRED_TRIAL_SUBSCRIBE_PATH } from "@/lib/subscription-routes";
 
 const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
   ssr: false,
@@ -56,6 +51,9 @@ const WebsiteBuilderAiProvider = dynamic(
 );
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
+const AUTH_BOOT_TIMEOUT_MS = 10_000;
+const AUTH_BOOT_FAILSAFE_MS = 5_000;
+const BOOT_FAILSAFE_MESSAGE = "Application failed to load.";
 
 function maskToken(value) {
   const raw = String(value || "");
@@ -105,17 +103,86 @@ function isStrongPassword(value) {
   return true;
 }
 
-/** Static shell for SSR + client boot — avoids hydration mismatch from i18n/auth state. */
-function AuthBootShell({ dark = false }) {
+/** Static shell for SSR + client boot — never blocks forever. */
+function AuthBootShell({
+  dark = false,
+  error = "",
+  onRetry,
+  onLogout,
+  loadingLabel = "Loading your account…",
+}) {
+  const showError = Boolean(error);
   return (
     <div
       style={{
         minHeight: "100vh",
         background: dark ? "#13161c" : "#f4f5f7",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16,
+        padding: 24,
       }}
-      aria-busy="true"
-      aria-label="Loading"
-    />
+      aria-busy={showError ? "false" : "true"}
+      aria-label={showError ? "Application load error" : "Loading"}
+      data-testid="auth-boot-shell"
+    >
+      {showError ? (
+        <>
+          <p
+            style={{
+              margin: 0,
+              maxWidth: 420,
+              textAlign: "center",
+              color: dark ? "#e2e8f0" : "#334155",
+              lineHeight: 1.5,
+              fontWeight: 600,
+            }}
+          >
+            {error}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                style={{
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#0f172a",
+                  borderRadius: 8,
+                  padding: "10px 16px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            ) : null}
+            {onLogout ? (
+              <button
+                type="button"
+                onClick={onLogout}
+                style={{
+                  border: `1px solid ${dark ? "#475569" : "#cbd5e1"}`,
+                  background: "transparent",
+                  color: dark ? "#e2e8f0" : "#0f172a",
+                  borderRadius: 8,
+                  padding: "10px 16px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Log out
+              </button>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <p style={{ margin: 0, color: dark ? "#94a3b8" : "#64748b" }}>{loadingLabel}</p>
+      )}
+    </div>
   );
 }
 
@@ -193,9 +260,15 @@ export default function AuthShell({ children }) {
     isVerifyEmailPage;
   const [hasMounted, setHasMounted] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [authBootError, setAuthBootError] = useState("");
   const [authHydrating, setAuthHydrating] = useState(!isPublicPage);
   const authBootstrappedRef = useRef(false);
+  const authUserRef = useRef(null);
+  const pathnameRef = useRef(pathname);
   const lastAuthNavRef = useRef({ target: "", at: 0 });
+  const loginTransitionRef = useRef(0);
+  const bootstrapInFlightRef = useRef(null);
+  const postLoginNavRef = useRef(false);
   const [authUser, setAuthUser] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -230,6 +303,41 @@ export default function AuthShell({ children }) {
     [router],
   );
 
+  const normalizeSessionUser = useCallback((user) => {
+    if (!user || typeof user !== "object") return null;
+    const role = normalizeAppRole(user.role);
+    return {
+      ...user,
+      capabilities: user.capabilities || getRoleCapabilities(role),
+    };
+  }, []);
+
+  const completeAuthTransition = useCallback(
+    (user, destination) => {
+      const normalized = normalizeSessionUser(user);
+      if (!normalized?.userId) return false;
+
+      clearClientLoggedOut();
+      loginTransitionRef.current = Date.now();
+      postLoginNavRef.current = true;
+      authBootstrappedRef.current = true;
+      authUserRef.current = normalized;
+      setAuthUser(normalized);
+      setAuthChecked(true);
+      setAuthBootError("");
+      setError("");
+      setNotice("");
+
+      const dest = String(destination || "/dashboard").trim();
+      console.log("LOGIN TRANSITION", { userId: normalized.userId, dest });
+      if (dest.startsWith("/") && dest !== pathnameRef.current) {
+        safeAuthReplace(dest);
+      }
+      return true;
+    },
+    [normalizeSessionUser, safeAuthReplace],
+  );
+
   const resolveAuthRedirect = useCallback(
     (user) => {
       if (typeof window === "undefined") {
@@ -244,23 +352,22 @@ export default function AuthShell({ children }) {
     [pathname],
   );
 
-  useLayoutEffect(() => {
-    if (!authUser || !shouldRestrictForSubscription(authUser)) return;
-
-    const subscriptionActive =
-      authUser.isSubscribed === true || authUser.hasBusinessAccess === true;
-    logExpiredTrialRedirect(authUser, subscriptionActive);
-
-    if (isSubscriptionExemptPage(pathname)) return;
-
-    performAuthHardNavigate(EXPIRED_TRIAL_SUBSCRIBE_PATH);
-  }, [authUser, pathname]);
-
   const isOwnerCommandCenter = isOwnerCommandCenterPath(pathname);
 
   useLayoutEffect(() => {
     setHasMounted(true);
+    if (typeof console !== "undefined") {
+      console.log("APP STARTED", pathnameRef.current);
+    }
   }, []);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  useEffect(() => {
+    authUserRef.current = authUser;
+  }, [authUser]);
 
   useEffect(() => {
     if (!hasMounted || !isDedicatedLoginPage) return;
@@ -296,17 +403,24 @@ export default function AuthShell({ children }) {
     }
   }, [hasMounted]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!hasMounted || !authChecked || !authUser) return;
     if (!isDedicatedLoginPage && !isRegisterPage) return;
-    performAuthHardNavigate(resolveAuthRedirect(authUser));
+    if (postLoginNavRef.current) return;
+
+    const destination = resolveAuthRedirect(authUser);
+    if (!destination || destination === pathname) return;
+    console.log("AUTH ENTRY REDIRECT", destination);
+    safeAuthReplace(destination);
   }, [
     hasMounted,
     authChecked,
     authUser,
     isDedicatedLoginPage,
     isRegisterPage,
+    pathname,
     resolveAuthRedirect,
+    safeAuthReplace,
   ]);
 
   useEffect(() => {
@@ -316,27 +430,15 @@ export default function AuthShell({ children }) {
     safeAuthReplace("/owner/overview");
   }, [hasMounted, authChecked, authUser, pathname, safeAuthReplace]);
 
-  useLayoutEffect(() => {
+  // Do NOT hard-redirect to /login when authUser is null on protected routes.
+  // Middleware already guards routes; hard-navigating to /login while the session
+  // cookie is valid causes an infinite /dashboard ↔ /login reload loop (white/black blink).
+
+  useEffect(() => {
     if (!hasMounted || !authChecked || authUser) return;
-    if (isRegisterPage) {
-      performAuthHardNavigate("/login?mode=register");
-      return;
-    }
-    if (isPublicPage || isAuthEntryPage || isSubscribePage || isOwnerCommandCenter) return;
-    performAuthHardNavigate(
-      buildLoginRedirectPath(pathname, { currentPath: pathname }),
-    );
-  }, [
-    hasMounted,
-    authChecked,
-    authUser,
-    isPublicPage,
-    isAuthEntryPage,
-    isSubscribePage,
-    isOwnerCommandCenter,
-    isRegisterPage,
-    pathname,
-  ]);
+    if (!isRegisterPage) return;
+    router.replace("/login?mode=register");
+  }, [hasMounted, authChecked, authUser, isRegisterPage, router]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -358,6 +460,14 @@ export default function AuthShell({ children }) {
     // avoid any chance of wiping the app cookie set by the server callback.
     const syncServerSession = async (trigger, event, session) => {
       if (isClientLoggedOut()) {
+        setAuthHydrating(false);
+        return;
+      }
+
+      if (
+        loginTransitionRef.current &&
+        Date.now() - loginTransitionRef.current < 5000
+      ) {
         setAuthHydrating(false);
         return;
       }
@@ -647,39 +757,157 @@ export default function AuthShell({ children }) {
   }, [isDedicatedLoginPage, isResetPasswordPage]);
 
   const fetchMe = useCallback(async () => {
+    console.log("AUTH CHECK START");
+    setAuthBootError("");
+
     if (isClientLoggedOut()) {
+      console.log("SESSION FOUND", false, "(client logout guard)");
       setAuthUser(null);
       return;
     }
-    try {
+
+    const syncSessionFromSupabase = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) {
+          console.warn("SESSION SYNC SKIPPED", "no supabase browser session");
+          return false;
+        }
+        const syncRes = await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ trigger: "auth_boot", event: "SIGNED_IN", hasSession: true }),
+        });
+        console.log("SESSION SYNC", syncRes.ok ? "SUCCESS" : "FAILED", syncRes.status);
+        return syncRes.ok;
+      } catch (syncError) {
+        console.warn("SESSION SYNC FAILED", syncError?.message || syncError);
+        return false;
+      }
+    };
+
+    const loadProfile = async (attemptLabel = "primary") => {
+      console.log("PROFILE FETCH START", attemptLabel, pathnameRef.current);
       const res = await apiFetch("/api/auth/me", {
         cache: "no-store",
         suppressUnauthorizedEvent: true,
+        timeoutMs: AUTH_BOOT_TIMEOUT_MS,
       });
+
       if (AUTH_DEBUG) {
         console.info("[dashboard-load] /api/auth/me response", {
-          pathname,
+          pathname: pathnameRef.current,
           status: res.status,
           ok: res.ok,
+          attempt: attemptLabel,
         });
       }
+
+      return res;
+    };
+
+    try {
+      console.log("SUBSCRIPTION CHECK START");
+      let res = await loadProfile("primary");
+
+      if (!res.ok && res.status === 401) {
+        const synced = await syncSessionFromSupabase();
+        if (synced) {
+          res = await loadProfile("after-sync");
+        }
+      }
+
       if (!res.ok) {
-        setAuthUser(null);
+        console.warn("PROFILE FETCH FAILED", res.status);
+        if (!authUserRef.current?.userId) {
+          setAuthUser(null);
+          if (res.status === 401) {
+            setAuthBootError(BOOT_FAILSAFE_MESSAGE);
+          }
+        }
         return;
       }
+
       const payload = await res.json();
+      const data = normalizeSessionUser(payload?.data || null);
+      clearClientLoggedOut();
+      console.log("PROFILE FETCH SUCCESS", data?.userId || null);
+      console.log("SUBSCRIPTION CHECK SUCCESS", data?.hasBusinessAccess);
+      console.log("SESSION FOUND", Boolean(data?.userId));
+
       if (AUTH_DEBUG) {
         console.info("[dashboard-load] /api/auth/me payload", {
-          pathname,
-          hasUser: Boolean(payload?.data?.userId),
-          userId: payload?.data?.userId || null,
-          role: payload?.data?.role || null,
+          pathname: pathnameRef.current,
+          hasUser: Boolean(data?.userId),
+          userId: data?.userId || null,
+          role: data?.role || null,
         });
       }
-      setAuthUser(payload?.data || null);
-    } catch {
-      setAuthUser(null);
+
+      setAuthUser(data);
+    } catch (error) {
+      const timedOut =
+        error?.name === "AbortError" ||
+        String(error?.message || "").includes("timeout");
+      console.error("AUTH BOOT FAILED", error?.message || error);
+      if (!authUserRef.current?.userId) {
+        setAuthUser(null);
+        setAuthBootError(BOOT_FAILSAFE_MESSAGE);
+      }
     }
+  }, [normalizeSessionUser]);
+
+  const runAuthBootstrap = useCallback(async ({ force = false } = {}) => {
+    if (!force && authUserRef.current?.userId) {
+      authBootstrappedRef.current = true;
+      setAuthChecked(true);
+      console.log("AUTH CHECK COMPLETE", "(existing session)");
+      return;
+    }
+
+    if (bootstrapInFlightRef.current && !force) {
+      await bootstrapInFlightRef.current;
+      return;
+    }
+
+    const task = (async () => {
+      try {
+        await fetchMe();
+      } finally {
+        authBootstrappedRef.current = true;
+        setAuthChecked(true);
+        console.log("AUTH CHECK COMPLETE");
+      }
+    })();
+
+    bootstrapInFlightRef.current = task;
+    try {
+      await task;
+    } finally {
+      bootstrapInFlightRef.current = null;
+    }
+  }, [fetchMe]);
+
+  const handleBootRetry = useCallback(() => {
+    setAuthBootError("");
+    authBootstrappedRef.current = false;
+    void runAuthBootstrap({ force: true });
+  }, [runAuthBootstrap]);
+
+  const handleBootLogout = useCallback(() => {
+    markClientLoggedOut();
+    authBootstrappedRef.current = false;
+    setAuthUser(null);
+    setAuthBootError("");
+    void apiFetch("/api/auth/logout", {
+      method: "POST",
+      suppressUnauthorizedEvent: true,
+    }).catch(() => {});
+    void supabase.auth.signOut().catch(() => {});
+    performAuthHardNavigate("/login");
   }, []);
 
   // Persist industry to localStorage so catalog pages can read it without an extra fetch
@@ -691,38 +919,59 @@ export default function AuthShell({ children }) {
   }, [authUser]);
 
   useEffect(() => {
+    if (!isAuthEntryPage) {
+      postLoginNavRef.current = false;
+    }
+  }, [isAuthEntryPage]);
+
+  useEffect(() => {
     if (!hasMounted) return;
 
-    if (isPublicPage || isAuthEntryPage || isSubscribePage) {
+    if (isPublicPage) {
       setAuthChecked(true);
-      if (isAuthEntryPage || isSubscribePage) {
-        authBootstrappedRef.current = true;
-      }
+      return;
+    }
+
+    if (authUserRef.current?.userId) {
+      authBootstrappedRef.current = true;
+      setAuthChecked(true);
+      return;
+    }
+
+    if (isAuthEntryPage || isSubscribePage) {
+      setAuthChecked(true);
+      void runAuthBootstrap();
       return;
     }
 
     if (isOwnerCommandCenter) {
       setAuthChecked(true);
+      if (!authUserRef.current?.userId) {
+        void runAuthBootstrap();
+      }
+      return;
     }
 
-    if (authBootstrappedRef.current) return;
+    void runAuthBootstrap();
+  }, [
+    hasMounted,
+    isPublicPage,
+    isAuthEntryPage,
+    isSubscribePage,
+    isOwnerCommandCenter,
+    runAuthBootstrap,
+  ]);
 
-    let active = true;
-    (async () => {
-      try {
-        await fetchMe();
-      } finally {
-        if (active) {
-          authBootstrappedRef.current = true;
-          setAuthChecked(true);
-        }
+  useEffect(() => {
+    if (!authChecked || authUser || isPublicPage || isAuthEntryPage) return;
+    const timeoutId = window.setTimeout(() => {
+      if (!authUserRef.current) {
+        console.warn("AUTH BOOT FAILSAFE", AUTH_BOOT_FAILSAFE_MS, "ms elapsed");
+        setAuthBootError((current) => current || BOOT_FAILSAFE_MESSAGE);
       }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [hasMounted, isPublicPage, isAuthEntryPage, isSubscribePage, isOwnerCommandCenter, fetchMe]);
+    }, AUTH_BOOT_FAILSAFE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [authChecked, authUser, isPublicPage, isAuthEntryPage]);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -819,7 +1068,6 @@ export default function AuthShell({ children }) {
         return;
       }
       setLoginFailedAttempts(0);
-      clearClientLoggedOut();
       const destination =
         sanitizeRedirectPath(
           payload.redirectTo || resolveAuthRedirect(payload.data),
@@ -828,7 +1076,10 @@ export default function AuthShell({ children }) {
             currentPath: pathname || "",
           },
         ) || resolveAuthRedirect(payload.data);
-      performAuthHardNavigate(destination);
+      if (completeAuthTransition(payload.data, destination)) {
+        return;
+      }
+      setError(t("auth.loginError"));
       return;
     } catch (err) {
       setError(err.message || t("auth.authError"));
@@ -1024,6 +1275,7 @@ export default function AuthShell({ children }) {
     setNotice("");
 
     authBootstrappedRef.current = false;
+    setAuthBootError("");
     markClientLoggedOut();
     setAuthUser(null);
     setLoginForm(initialLogin);
@@ -1101,27 +1353,44 @@ export default function AuthShell({ children }) {
     );
   }
 
-  if (authUser && shouldRestrictForSubscription(authUser) && !isSubscriptionExemptPage(pathname)) {
+  if (!hasMounted || !authChecked) {
     return (
-      <div
-        style={{ minHeight: "100vh", background: "#f4f5f7" }}
-        aria-busy="true"
-        aria-label="Redirecting to subscription"
+      <AuthBootShell
+        dark={isPremiumWorkspace}
+        error={authBootError}
+        onRetry={authBootError ? handleBootRetry : undefined}
+        onLogout={authBootError ? handleBootLogout : undefined}
       />
     );
   }
 
-  if (!hasMounted || !authChecked) {
-    return <AuthBootShell dark={isPremiumWorkspace} />;
-  }
-
-  if (!authUser) {
-    return <AuthBootShell dark={isPremiumWorkspace} />;
+  if (!authUser && !isAuthEntryPage && !isSubscribePage && !isOwnerCommandCenter) {
+    return (
+      <AuthBootShell
+        dark={isPremiumWorkspace}
+        error={authBootError || BOOT_FAILSAFE_MESSAGE}
+        onRetry={handleBootRetry}
+        onLogout={handleBootLogout}
+      />
+    );
   }
 
   if (isAuthEntryPage && authUser) {
-    return <AuthBootShell dark={false} />;
+    return <AuthBootShell dark={false} loadingLabel="Redirecting…" />;
   }
+
+  if (!authUser) {
+    return (
+      <AuthBootShell
+        dark={isPremiumWorkspace}
+        error={authBootError || BOOT_FAILSAFE_MESSAGE}
+        onRetry={handleBootRetry}
+        onLogout={handleBootLogout}
+      />
+    );
+  }
+
+  console.log("DASHBOARD SHELL READY", pathname, authUser?.userId || null);
 
   // ─── SVG icon helpers ────────────────────────────────────────────────────
   const Icon = ({ d, size = 16 }) => (

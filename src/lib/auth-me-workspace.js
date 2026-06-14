@@ -15,32 +15,42 @@ function workspaceCacheKey(tenantDbId, role) {
 export async function enrichAuthMeData(base = {}) {
   const role = normalizeAppRole(base.role);
   const cacheKey = workspaceCacheKey(base.tenantDbId, role);
-  let workspace = await getApiResponseCache(cacheKey);
 
-  if (!workspace) {
-    workspace = await buildWorkspaceContext({
-      authenticated: true,
-      userId: base.userId,
-      tenantId: base.tenantId,
-      tenantDbId: base.tenantDbId,
-      email: base.email,
-      name: base.name,
-      companyName: base.companyName,
+  try {
+    let workspace = await getApiResponseCache(cacheKey);
+
+    if (!workspace) {
+      workspace = await buildWorkspaceContext({
+        authenticated: true,
+        userId: base.userId,
+        tenantId: base.tenantId,
+        tenantDbId: base.tenantDbId,
+        email: base.email,
+        name: base.name,
+        companyName: base.companyName,
+        role,
+        isSuperAdmin: role === "super_admin",
+      });
+      await setApiResponseCache(cacheKey, workspace, WORKSPACE_CACHE_TTL_SECONDS);
+    }
+
+    const tenantCompanyName = workspace.tenant?.companyName || "";
+
+    return {
+      ...base,
       role,
-      isSuperAdmin: role === "super_admin",
-    });
-    await setApiResponseCache(cacheKey, workspace, WORKSPACE_CACHE_TTL_SECONDS);
+      capabilities: base.capabilities || getRoleCapabilities(role),
+      companyName: tenantCompanyName || base.companyName || "",
+      workspace,
+    };
+  } catch (error) {
+    console.error("[auth-me-workspace] enrichAuthMeData degraded", error);
+    return {
+      ...base,
+      role,
+      capabilities: base.capabilities || getRoleCapabilities(role),
+    };
   }
-
-  const tenantCompanyName = workspace.tenant?.companyName || "";
-
-  return {
-    ...base,
-    role,
-    capabilities: base.capabilities || getRoleCapabilities(role),
-    companyName: tenantCompanyName || base.companyName || "",
-    workspace,
-  };
 }
 
 export function authReconcileCacheKey(userId) {

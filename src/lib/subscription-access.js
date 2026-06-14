@@ -17,24 +17,67 @@ export {
   subscriptionRequiredApiResponse,
 } from "@/lib/subscription-access-core";
 
-export async function fetchStripeSubscriptionStatus(tenantDbId) {
-  const id = String(tenantDbId || "").trim();
-  if (!id) return null;
+export async function fetchStripeSubscriptionStatus(tenantDbId, fallbackUserId = "") {
+  const primaryId = String(tenantDbId || "").trim();
+  const fallbackId = String(fallbackUserId || "").trim();
+  const ids = [...new Set([primaryId, fallbackId].filter(Boolean))];
 
-  const { data, error } = await supabaseAdmin
-    .from("contractor_subscriptions")
-    .select("status")
-    .eq("tenant_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  for (const id of ids) {
+    const { data, error } = await supabaseAdmin
+      .from("contractor_subscriptions")
+      .select("status")
+      .eq("tenant_id", id)
+      .in("status", ["trialing", "active"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
-    console.warn("[subscription-access] fetchStripeSubscriptionStatus", error.message);
-    return null;
+    if (error) {
+      console.warn("[subscription-access] fetchStripeSubscriptionStatus", error.message);
+      continue;
+    }
+
+    if (data?.status) {
+      return String(data.status).toLowerCase();
+    }
   }
 
-  return data?.status ? String(data.status).toLowerCase() : null;
+  return null;
+}
+
+/** Load live Stripe subscription from DB and repair auth metadata when paid. */
+export async function hydrateSessionSubscriptionFields({
+  tenantDbId,
+  userId,
+  userMetadata = {},
+} = {}) {
+  const stripeSubscriptionStatus = await fetchStripeSubscriptionStatus(tenantDbId);
+  const active =
+    stripeSubscriptionStatus === "active" || stripeSubscriptionStatus === "trialing";
+
+  if (active && userId) {
+    const meta = userMetadata && typeof userMetadata === "object" ? userMetadata : {};
+    if (meta.isSubscribed !== true || String(meta.status || "").toLowerCase() !== "active") {
+      try {
+        await syncUserSubscriptionMetadata({
+          userId,
+          isSubscribed: true,
+          status: "active",
+        });
+        console.log("[subscription-access] repaired user metadata to ACTIVE", userId);
+      } catch (repairError) {
+        console.warn(
+          "[subscription-access] metadata repair failed",
+          repairError instanceof Error ? repairError.message : repairError,
+        );
+      }
+    }
+  }
+
+  return {
+    stripeSubscriptionStatus: stripeSubscriptionStatus || "",
+    isSubscribed: active || userMetadata?.isSubscribed === true,
+  };
 }
 
 export async function resolveTenantSubscriptionAccess(context = {}) {
@@ -93,11 +136,16 @@ export async function syncUserSubscriptionMetadata({
   const { data: userData } = await admin.auth.admin.getUserById(id);
   const currentMeta = userData?.user?.user_metadata || {};
 
-  await admin.auth.admin.updateUserById(id, {
+  const { error } = await admin.auth.admin.updateUserById(id, {
     user_metadata: {
       ...currentMeta,
       isSubscribed: Boolean(isSubscribed),
       status: status || (isSubscribed ? "active" : "expired"),
     },
   });
+
+  if (error) {
+    console.error("[subscription-access] syncUserSubscriptionMetadata failed", error.message);
+    throw new Error(error.message || "Unable to sync subscription metadata");
+  }
 }

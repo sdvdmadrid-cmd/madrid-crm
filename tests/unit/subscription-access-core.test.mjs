@@ -42,6 +42,17 @@ describe("subscription-access-core", () => {
     assert.equal(access.state, SUBSCRIPTION_STATES.PAST_DUE);
   });
 
+  it("allows active stripe subscribers even when trial is expired", () => {
+    const access = resolveSubscriptionAccess({
+      role: "owner",
+      isSubscribed: false,
+      trialEndDate: "2020-01-01T00:00:00.000Z",
+      stripeSubscriptionStatus: "active",
+    });
+    assert.equal(access.hasBusinessAccess, true);
+    assert.equal(access.state, SUBSCRIPTION_STATES.ACTIVE);
+  });
+
   it("allows active stripe subscribers", () => {
     const access = resolveSubscriptionAccess({
       role: "owner",

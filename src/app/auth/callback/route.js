@@ -6,6 +6,7 @@ import {
   getRequestOrigin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
+import { hydrateSessionSubscriptionFields } from "@/lib/subscription-access";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function getSafeRedirectPath(value, user) {
@@ -172,8 +173,15 @@ export async function GET(request) {
       tenantId: user.id,
       role: user.app_metadata?.role,
     });
+    const { stripeSubscriptionStatus } = await hydrateSessionSubscriptionFields({
+      tenantDbId: profile?.tenantId || user.id,
+      userId: user.id,
+      userMetadata: user.user_metadata,
+    });
     const sessionToken = createSessionToken(
-      buildAppSessionFromSupabaseUser(user, null, profile),
+      buildAppSessionFromSupabaseUser(user, null, profile, {
+        stripeSubscriptionStatus,
+      }),
     );
 
     if (AUTH_DEBUG) {
@@ -275,8 +283,15 @@ export async function GET(request) {
     tenantId: user.id,
     role: user.app_metadata?.role,
   });
+  const { stripeSubscriptionStatus } = await hydrateSessionSubscriptionFields({
+    tenantDbId: profile?.tenantId || user.id,
+    userId: user.id,
+    userMetadata: user.user_metadata,
+  });
   const sessionToken = createSessionToken(
-    buildAppSessionFromSupabaseUser(user, exchangeData.session, profile),
+    buildAppSessionFromSupabaseUser(user, exchangeData.session, profile, {
+      stripeSubscriptionStatus,
+    }),
   );
   if (AUTH_DEBUG) {
     console.info("[auth/callback] session created via legacy exchange", {

@@ -1,9 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { markClientLoggedOut } from "@/lib/auth-logout-guard.js";
-import { performAuthHardNavigate } from "@/lib/auth-nav";
+import {
+  clearAuthNavAttempt,
+  performAuthHardNavigate,
+  recordAuthNavAttempt,
+  shouldSkipAuthRedirect,
+} from "@/lib/auth-nav";
 import { supabase } from "@/lib/supabase";
 import styles from "./subscribe.module.css";
 
@@ -29,13 +35,17 @@ function withTimeout(promise, ms) {
 }
 
 export default function SubscribePageClient() {
+  const router = useRouter();
   const [startingCheckout, setStartingCheckout] = useState(false);
+  const [activatingAccess, setActivatingAccess] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [successNotice, setSuccessNotice] = useState("");
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansError, setPlansError] = useState("");
   const [plan, setPlan] = useState(DEFAULT_PLAN);
   const mountedRef = useRef(false);
+  const restoreAttemptedRef = useRef(false);
 
   const loadPlans = useCallback(async () => {
     console.log("Loading plans...");
@@ -74,6 +84,79 @@ export default function SubscribePageClient() {
     }
   }, []);
 
+  const redirectToDashboard = useCallback(() => {
+    if (shouldSkipAuthRedirect("/dashboard")) {
+      console.warn("[subscribe] skipping auto-redirect — recent navigation loop detected");
+      return false;
+    }
+    recordAuthNavAttempt("/dashboard");
+    router.replace("/dashboard");
+    return true;
+  }, [router]);
+
+  const restoreExistingAccess = useCallback(async () => {
+    try {
+      const res = await withTimeout(
+        apiFetch("/api/auth/me", { cache: "no-store", timeoutMs: PLAN_LOAD_TIMEOUT_MS }),
+        PLAN_LOAD_TIMEOUT_MS,
+      );
+      if (!res.ok) return false;
+      const payload = await res.json();
+      const data = payload?.data || {};
+      const stripeStatus = String(data.stripeSubscriptionStatus || "").toLowerCase();
+      const paidActive =
+        data.hasBusinessAccess === true &&
+        (data.isSubscribed === true ||
+          stripeStatus === "active" ||
+          stripeStatus === "trialing" ||
+          data.complimentaryAccess === true);
+      if (paidActive) {
+        console.log("Access granted");
+        clearAuthNavAttempt();
+        redirectToDashboard();
+        return true;
+      }
+    } catch (err) {
+      console.warn("[subscribe] restore access failed:", err?.message || err);
+    }
+    return false;
+  }, [redirectToDashboard]);
+
+  const activateAfterCheckout = useCallback(async () => {
+    setActivatingAccess(true);
+    setError("");
+    setSuccessNotice("Payment received. Activating your subscription…");
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      try {
+        const res = await withTimeout(
+          apiFetch("/api/auth/me", { cache: "no-store" }),
+          PLAN_LOAD_TIMEOUT_MS,
+        );
+        if (res.ok) {
+          const payload = await res.json();
+          const data = payload?.data || {};
+          if (data.hasBusinessAccess) {
+            console.log("Access granted");
+            setSuccessNotice("Subscription active. Redirecting to your workspace…");
+            clearAuthNavAttempt();
+            redirectToDashboard();
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("[subscribe] activation poll failed:", err?.message || err);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
+
+    setActivatingAccess(false);
+    setSuccessNotice("");
+    setError(
+      "Payment received. Access is still syncing — click Retry activation or refresh in a moment.",
+    );
+  }, [redirectToDashboard]);
+
   useEffect(() => {
     if (mountedRef.current) return;
     mountedRef.current = true;
@@ -84,11 +167,19 @@ export default function SubscribePageClient() {
       if (params.get("checkout") === "cancelled") {
         setError("Checkout was cancelled. You can try again when you are ready.");
         window.history.replaceState({}, "", "/subscribe");
+      } else if (params.get("checkout") === "success") {
+        window.history.replaceState({}, "", "/subscribe");
+        void activateAfterCheckout();
+      } else if (!restoreAttemptedRef.current) {
+        restoreAttemptedRef.current = true;
+        void restoreExistingAccess();
       }
+    } else {
+      void restoreExistingAccess();
     }
 
     void loadPlans();
-  }, [loadPlans]);
+  }, [loadPlans, activateAfterCheckout, restoreExistingAccess]);
 
   const handleSubscribeNow = useCallback(async () => {
     try {
@@ -161,6 +252,7 @@ export default function SubscribePageClient() {
           {plansError ? <p className={styles.planNotice}>{plansError}</p> : null}
         </section>
 
+        {successNotice ? <div className={styles.planNotice}>{successNotice}</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
 
         <div className={styles.actions}>
@@ -168,7 +260,7 @@ export default function SubscribePageClient() {
             type="button"
             className={styles.primaryBtn}
             onClick={handleSubscribeNow}
-            disabled={startingCheckout || loggingOut || plansLoading}
+            disabled={startingCheckout || loggingOut || plansLoading || activatingAccess}
             data-testid="subscribe-now-btn"
           >
             {startingCheckout ? "Opening checkout…" : "Subscribe Now"}
@@ -177,11 +269,24 @@ export default function SubscribePageClient() {
             <button
               type="button"
               className={styles.secondaryBtn}
+              onClick={() => {
+                if (!activatingAccess) void activateAfterCheckout();
+              }}
+              disabled={startingCheckout || loggingOut || activatingAccess}
+              data-testid="subscribe-retry-activation-btn"
+            >
+              {activatingAccess ? "Activating…" : "Retry activation"}
+            </button>
+          ) : null}
+          {error ? (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
               onClick={handleSubscribeNow}
-              disabled={startingCheckout || loggingOut}
+              disabled={startingCheckout || loggingOut || activatingAccess}
               data-testid="subscribe-retry-btn"
             >
-              Retry
+              Retry checkout
             </button>
           ) : null}
           {!plansLoading && plansError ? (

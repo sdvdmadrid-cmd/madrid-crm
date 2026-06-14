@@ -6,6 +6,7 @@ import {
   reconcileUserRoleOnLogin,
   resolveProfileForUser,
 } from "@/lib/supabase-auth";
+import { hydrateSessionSubscriptionFields } from "@/lib/subscription-access";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase-ssr";
 
 const AUTH_DEBUG = process.env.NEXT_PUBLIC_AUTH_DEBUG === "1";
@@ -78,10 +79,17 @@ export async function POST(request) {
     tenantId: reconciledUser.id,
     role: reconciledUser.app_metadata?.role,
   });
+  const tenantDbId = profile?.tenantId || reconciledUser.id;
+  const { stripeSubscriptionStatus } = await hydrateSessionSubscriptionFields({
+    tenantDbId,
+    userId: reconciledUser.id,
+    userMetadata: reconciledUser.user_metadata,
+  });
   const appSession = buildAppSessionFromSupabaseUser(
     reconciledUser,
     null,
     profile,
+    { stripeSubscriptionStatus },
   );
   const token = createSessionToken(appSession);
 
