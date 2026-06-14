@@ -849,6 +849,130 @@ export default function WebsiteBuilderClient() {
     runOptionalHeroImageEnhancement,
   ]);
 
+  const generateHeroImageForAgent = useCallback(
+    async ({ slotIndex = 0, prompt = "" } = {}) => {
+      const index = Math.max(0, Math.min(3, Number(slotIndex) || 0));
+      const slots = formRef.current?.heroPhotos || form.heroPhotos || [];
+      const resolvedPrompt = String(
+        prompt || slots[index]?.prompt || imagePresets[index] || "",
+      ).trim();
+      if (!resolvedPrompt) throw new Error("No image prompt available");
+
+      const res = await apiFetch("/api/website-builder/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: resolvedPrompt, style: imageStyle, mediaKind: "hero" }),
+        timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+      });
+      const payload = await getJsonOrThrow(res, t.errorGenerateImage);
+      const imageSrc = String(payload?.data?.imageUrl || payload?.data?.imageDataUrl || "");
+      if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
+        throw new Error(t.errorGenerateImage);
+      }
+
+      const nextForm = { ...(formRef.current || form) };
+      const heroPhotos = [...(nextForm.heroPhotos || slots)];
+      while (heroPhotos.length <= index) {
+        heroPhotos.push({ id: `hero-${heroPhotos.length}`, src: "", alt: "", prompt: "" });
+      }
+      heroPhotos[index] = {
+        ...heroPhotos[index],
+        src: imageSrc,
+        alt: String(payload?.data?.alt || resolvedPrompt).slice(0, 160),
+        prompt: resolvedPrompt,
+      };
+      nextForm.heroPhotos = heroPhotos;
+      skipAutosave.current = true;
+      formRef.current = nextForm;
+      setForm(nextForm);
+      await handleSave(nextForm, { silent: true });
+      return true;
+    },
+    [form, imagePresets, imageStyle, t, handleSave],
+  );
+
+  const generateGalleryImagesForAgent = useCallback(
+    async ({ count = 1, prompt = "" } = {}) => {
+      const total = Math.min(10, Math.max(1, Number(count) || 1));
+      const basePrompt = String(prompt || imagePrompt || "").trim();
+      if (!basePrompt) throw new Error("No gallery prompt provided");
+
+      let generated = 0;
+      for (let i = 0; i < total; i += 1) {
+        const current = formRef.current || form;
+        if ((current.galleryPhotos || []).length >= MAX_FEATURED_GALLERY) break;
+
+        const res = await apiFetch("/api/website-builder/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: `${basePrompt}, variation ${i + 1}`,
+            style: imageStyle,
+            mediaKind: "gallery",
+          }),
+          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+        });
+        const payload = await getJsonOrThrow(res, t.errorGenerateImage);
+        const imageSrc = String(payload?.data?.imageUrl || payload?.data?.imageDataUrl || "");
+        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) continue;
+
+        const newPhoto = {
+          id: `ai-${Date.now()}-${i}`,
+          src: imageSrc,
+          thumbnail: imageSrc,
+          alt: String(payload?.data?.alt || basePrompt).slice(0, 160),
+          persisted: /^https?:\/\//i.test(imageSrc),
+        };
+        const nextForm = {
+          ...current,
+          galleryPhotos: normalizeGalleryPhotos([
+            ...(current.galleryPhotos || []),
+            newPhoto,
+          ]).slice(0, MAX_FEATURED_GALLERY),
+        };
+        skipAutosave.current = true;
+        formRef.current = nextForm;
+        setForm(nextForm);
+        generated += 1;
+      }
+      if (generated > 0) await handleSave(formRef.current, { silent: true });
+      return generated;
+    },
+    [form, imagePrompt, imageStyle, t, handleSave],
+  );
+
+  const removeGalleryImageForAgent = useCallback(({ index, altMatch } = {}) => {
+    setForm((prev) => {
+      const photos = [...(prev.galleryPhotos || [])];
+      let idx = typeof index === "number" ? index : -1;
+      if (idx < 0 && altMatch) {
+        const needle = String(altMatch).toLowerCase();
+        idx = photos.findIndex((p) =>
+          String(p?.alt || p?.caption || "").toLowerCase().includes(needle),
+        );
+      }
+      if (idx < 0 || idx >= photos.length) return prev;
+      const next = {
+        ...prev,
+        galleryPhotos: photos.filter((_, i) => i !== idx),
+      };
+      formRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const removeHeroImageForAgent = useCallback(({ slotIndex = 0 } = {}) => {
+    const index = Math.max(0, Math.min(3, Number(slotIndex) || 0));
+    setForm((prev) => {
+      const heroPhotos = [...(prev.heroPhotos || [])];
+      if (!heroPhotos[index]) return prev;
+      heroPhotos[index] = { ...heroPhotos[index], src: "", alt: heroPhotos[index].alt || "" };
+      const next = { ...prev, heroPhotos };
+      formRef.current = next;
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!wbAi?.registerBuilder) return undefined;
     wbAi.registerBuilder({
@@ -894,6 +1018,10 @@ export default function WebsiteBuilderClient() {
         showNotice(t.aiPatchesApplied);
       },
       runGenerateFull: () => handleGenerateFullSite(),
+      generateHeroImage: generateHeroImageForAgent,
+      generateGalleryImages: generateGalleryImagesForAgent,
+      removeGalleryImage: removeGalleryImageForAgent,
+      removeHeroImage: removeHeroImageForAgent,
     });
     return () => wbAi.unregisterBuilder();
   }, [
@@ -906,6 +1034,10 @@ export default function WebsiteBuilderClient() {
     industryKey,
     industryLabel,
     handleGenerateFullSite,
+    generateHeroImageForAgent,
+    generateGalleryImagesForAgent,
+    removeGalleryImageForAgent,
+    removeHeroImageForAgent,
     showNotice,
     t.aiPatchesApplied,
   ]);

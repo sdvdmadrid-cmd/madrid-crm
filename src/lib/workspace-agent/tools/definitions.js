@@ -408,4 +408,213 @@ export const WORKSPACE_OPERATIONS_TOOLS = [
       parameters: { type: "object", properties: {} },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "sendInvoice",
+      description: "Email an invoice to the client by invoice id or search query.",
+      parameters: {
+        type: "object",
+        properties: {
+          invoiceId: { type: "string" },
+          query: { type: "string", description: "Client name or invoice number" },
+          recipientEmail: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recordInvoicePayment",
+      description: "Record a manual payment against an invoice.",
+      parameters: {
+        type: "object",
+        properties: {
+          invoiceId: { type: "string" },
+          query: { type: "string" },
+          amount: { type: "number" },
+          method: { type: "string", description: "cash, check, card, transfer, other" },
+          reference: { type: "string" },
+          paymentDate: { type: "string", description: "YYYY-MM-DD" },
+        },
+        required: ["amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getScheduleForRange",
+      description:
+        "List jobs, estimates, and appointments for a date range. Use range: today, tomorrow, this_week, this_month or from/to YYYY-MM-DD.",
+      parameters: {
+        type: "object",
+        properties: {
+          range: { type: "string" },
+          from: { type: "string" },
+          to: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "detectScheduleConflicts",
+      description: "Find overlapping appointments on a date and suggest open time slots.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "YYYY-MM-DD" },
+          time: { type: "string", description: "HH:MM optional" },
+        },
+        required: ["date"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "updateAppointment",
+      description: "Reschedule or edit an appointment by id or search query.",
+      parameters: {
+        type: "object",
+        properties: {
+          appointmentId: { type: "string" },
+          query: { type: "string" },
+          date: { type: "string" },
+          time: { type: "string" },
+          endTime: { type: "string" },
+          location: { type: "string" },
+          crew: { type: "string" },
+          status: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cancelAppointment",
+      description: "Cancel an appointment by id or search query.",
+      parameters: {
+        type: "object",
+        properties: {
+          appointmentId: { type: "string" },
+          query: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "updateJob",
+      description: "Update a job — reschedule due date, assign crew, change status.",
+      parameters: {
+        type: "object",
+        properties: {
+          jobId: { type: "string" },
+          jobSearch: { type: "string" },
+          dueDate: { type: "string" },
+          status: { type: "string" },
+          crew: { type: "string" },
+          title: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "convertEstimateToJob",
+      description: "Convert an approved estimate into a job/project.",
+      parameters: {
+        type: "object",
+        properties: {
+          estimateId: { type: "string" },
+          estimateQuery: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "createPayrollEmployee",
+      description: "Add a new payroll employee.",
+      parameters: {
+        type: "object",
+        properties: {
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          email: { type: "string" },
+          phone: { type: "string" },
+          hourlyRate: { type: "number" },
+          payType: { type: "string", enum: ["hourly", "salary"] },
+        },
+        required: ["firstName", "lastName"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "deactivatePayrollEmployee",
+      description: "Mark a payroll employee inactive (remove from active roster).",
+      parameters: {
+        type: "object",
+        properties: {
+          employeeId: { type: "string" },
+          employeeName: { type: "string" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "findDuplicateEmployees",
+      description: "Find duplicate payroll employees by name, email, or phone.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cleanupDuplicateEmployees",
+      description:
+        "Delete safe duplicate employees (no payroll history). Use after findDuplicateEmployees.",
+      parameters: {
+        type: "object",
+        properties: {
+          employeeIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional specific ids; defaults to all safe duplicates",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "approvePayrollRun",
+      description: "Approve the latest calculated pay run or a specific runId.",
+      parameters: {
+        type: "object",
+        properties: { runId: { type: "string" } },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getSubscriptionStatus",
+      description: "Explain trial, subscription, and account access status.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];

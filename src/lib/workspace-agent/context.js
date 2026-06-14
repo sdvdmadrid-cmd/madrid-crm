@@ -4,6 +4,8 @@
 
 import { resolvePageFromPathname } from "./pages.js";
 
+import { buildImageInventory } from "./website-image-refs.js";
+
 export function buildWorkspaceContext({
   pathname = "",
   snapshot = null,
@@ -60,6 +62,9 @@ export function buildWorkspaceContext({
           heroFilled: heroPhotos.filter((p) => p?.src).length,
           seoTitle: siteMeta.seoTitle || "",
           seoDescription: siteMeta.seoDescription || "",
+          testimonialsCount: Array.isArray(form.testimonials) ? form.testimonials.length : 0,
+          themeColor: form.themeColor || "",
+          imageInventory: buildImageInventory(form),
         }
       : null,
     capabilities: page.capabilities,

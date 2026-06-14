@@ -3,6 +3,7 @@ import { detectWorkspaceIntents, intentRequiresConfirmation } from "./intents.js
 import { executeWebsiteIntents } from "./website-executor.js";
 import { executeCrmIntents } from "./crm-executor.js";
 import { buildWorkspaceAgentSystemPrompt } from "./prompt.js";
+import { buildWebsiteAgentSystemPrompt } from "./website-prompt.js";
 import { parseAgentStructuredResponse } from "./parse-response.js";
 import { runAiCompletion } from "../ai-service.js";
 import {
@@ -212,7 +213,13 @@ export async function runWorkspaceAgentTurn({
     }
   }
 
-  if (onWebsite && intents.includes("website.improve_hero") && agentMode) {
+  if (
+    onWebsite &&
+    (intents.includes("website.improve_hero") ||
+      intents.includes("website.premium_look") ||
+      intents.includes("website.conversion_homepage")) &&
+    agentMode
+  ) {
     try {
       const hero = await generateHeroCopyPatches({
         request,
@@ -249,7 +256,7 @@ export async function runWorkspaceAgentTurn({
 
   if (onWebsite && intents.length > 0) {
     const websiteIntents = intents.filter((id) => id.startsWith("website."));
-    const exec = executeWebsiteIntents(websiteIntents, { context, snapshot });
+    const exec = executeWebsiteIntents(websiteIntents, { context, snapshot, userMessage: prompt });
     const needsConfirm =
       agentMode && intentRequiresConfirmation(websiteIntents) && exec.actions.length > 0;
 
@@ -319,7 +326,10 @@ export async function runWorkspaceAgentTurn({
     };
   }
 
-  const systemPrompt = buildWorkspaceAgentSystemPrompt({ context, snapshot, language });
+  const systemPrompt =
+    onWebsite && snapshot
+      ? buildWebsiteAgentSystemPrompt({ context, snapshot, language })
+      : buildWorkspaceAgentSystemPrompt({ context, snapshot, language });
   const historyMessages = (Array.isArray(history) ? history : [])
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
     .slice(-16)
@@ -341,8 +351,8 @@ export async function runWorkspaceAgentTurn({
         ...historyMessages,
         { role: "user", content: prompt },
       ],
-      maxTokens: 1200,
-      temperature: 0.35,
+      maxTokens: onWebsite ? 1800 : 1200,
+      temperature: onWebsite ? 0.4 : 0.35,
     });
     raw = response.text || "";
   } catch (error) {

@@ -19,13 +19,62 @@ export function normalizeAgentSummaries(value, label = "summaries") {
 
 export async function executeWorkspaceActions(actions = [], helpers = {}) {
   const summaries = [];
-  const { applyWebsitePatches, navigate, showNotice, apiFetch, getJsonOrThrow } = helpers;
+  const {
+    applyWebsitePatches,
+    navigate,
+    showNotice,
+    apiFetch,
+    getJsonOrThrow,
+    runGenerateFull,
+    generateHeroImage,
+    generateGalleryImages,
+    removeGalleryImage,
+    removeHeroImage,
+  } = helpers;
   const safeActions = Array.isArray(actions) ? actions : [];
 
   for (const action of safeActions) {
     const type = String(action?.type || "").trim();
     const payload = action?.payload && typeof action.payload === "object" ? action.payload : {};
     const summary = String(action?.summary || "").trim();
+
+    if (type === "website.generateFull" && runGenerateFull) {
+      await runGenerateFull();
+      summaries.push(summary || "Generated complete website");
+      continue;
+    }
+
+    if (type === "website.generateHeroImage" && generateHeroImage) {
+      try {
+        await generateHeroImage(payload);
+        summaries.push(summary || "Generated hero image");
+      } catch (err) {
+        summaries.push(err?.message || "Hero image generation failed");
+      }
+      continue;
+    }
+
+    if (type === "website.generateGalleryImages" && generateGalleryImages) {
+      try {
+        const count = await generateGalleryImages(payload);
+        summaries.push(summary || `Generated ${count} gallery image(s)`);
+      } catch (err) {
+        summaries.push(err?.message || "Gallery image generation failed");
+      }
+      continue;
+    }
+
+    if (type === "website.removeGalleryImage" && removeGalleryImage) {
+      removeGalleryImage(payload);
+      summaries.push(summary || "Removed gallery image");
+      continue;
+    }
+
+    if (type === "website.removeHeroImage" && removeHeroImage) {
+      removeHeroImage(payload);
+      summaries.push(summary || "Removed hero image");
+      continue;
+    }
 
     if (type === "website.applyPatches" && applyWebsitePatches) {
       applyWebsitePatches(payload);

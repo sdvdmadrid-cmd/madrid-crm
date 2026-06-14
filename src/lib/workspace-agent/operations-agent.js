@@ -60,7 +60,7 @@ export async function runOperationsAgent({
         tools: WORKSPACE_OPERATIONS_TOOLS,
         tool_choice: "auto",
         temperature: 0.2,
-        max_tokens: 900,
+        max_tokens: 1200,
       },
       { timeout: Number(process.env.AI_REQUEST_TIMEOUT_MS || 18000) },
     );

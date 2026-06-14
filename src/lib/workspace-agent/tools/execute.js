@@ -53,6 +53,22 @@ import {
   parseEstimateItems,
   scoreTextMatch,
 } from "./helpers.js";
+import {
+  aiApprovePayrollRun,
+  aiCancelAppointment,
+  aiCleanupDuplicateEmployees,
+  aiConvertEstimateToJob,
+  aiCreatePayrollEmployee,
+  aiDeactivatePayrollEmployee,
+  aiDetectScheduleConflicts,
+  aiFindDuplicateEmployees,
+  aiGetScheduleForRange,
+  aiGetSubscriptionStatus,
+  aiRecordInvoicePayment,
+  aiSendInvoice,
+  aiUpdateAppointment,
+  aiUpdateJob,
+} from "./platform-ops.js";
 
 function recomputeSubtotal(services) {
   if (!Array.isArray(services)) return 0;
@@ -778,6 +794,96 @@ async function executeWorkspaceToolImpl(toolName, args, ctx) {
     }
     case "getPayrollCostsThisMonth": {
       return aiGetPayrollCostsThisMonth(tenantId);
+    }
+    case "sendInvoice": {
+      const result = await aiSendInvoice(tenantId, userId, ctx.role, args);
+      if (result.ok && result.invoice?.id) {
+        actions.push({
+          type: "navigate",
+          payload: { path: `/invoices?invoiceId=${result.invoice.id}` },
+          summary: `Sent invoice ${result.invoice.invoiceNumber}`,
+        });
+      }
+      return { ...result, actions };
+    }
+    case "recordInvoicePayment": {
+      return aiRecordInvoicePayment(tenantId, userId, ctx.role, args);
+    }
+    case "getScheduleForRange": {
+      return aiGetScheduleForRange(tenantId, ctx.role, args);
+    }
+    case "detectScheduleConflicts": {
+      return aiDetectScheduleConflicts(tenantId, ctx.role, args);
+    }
+    case "updateAppointment": {
+      const result = await aiUpdateAppointment(tenantId, ctx.role, args);
+      if (result.ok && result.appointment?.date) {
+        actions.push({
+          type: "navigate",
+          payload: { path: `/calendar?date=${result.appointment.date}` },
+          summary: `Rescheduled ${result.appointment.title}`,
+        });
+      }
+      return { ...result, actions };
+    }
+    case "cancelAppointment": {
+      return aiCancelAppointment(tenantId, ctx.role, args);
+    }
+    case "updateJob": {
+      const result = await aiUpdateJob(tenantId, args);
+      if (result.ok && result.job?.id) {
+        actions.push({
+          type: "navigate",
+          payload: { path: `/jobs?jobId=${result.job.id}` },
+          summary: `Updated job ${result.job.title}`,
+        });
+      }
+      return { ...result, actions };
+    }
+    case "convertEstimateToJob": {
+      const result = await aiConvertEstimateToJob(tenantId, userId, ctx.role, args);
+      if (result.ok && result.job?.id) {
+        actions.push({
+          type: "navigate",
+          payload: { path: `/jobs?jobId=${result.job.id}` },
+          summary: result.alreadyLinked ? "Opened linked job" : "Created job from estimate",
+        });
+      }
+      return { ...result, actions };
+    }
+    case "createPayrollEmployee": {
+      const result = await aiCreatePayrollEmployee(tenantId, userId, ctx.role, args);
+      if (result.ok && result.employee?.id) {
+        actions.push({
+          type: "navigate",
+          payload: { path: `/payroll/employees?employeeId=${result.employee.id}` },
+          summary: `Added employee ${result.employee.firstName} ${result.employee.lastName}`,
+        });
+      }
+      return { ...result, actions };
+    }
+    case "deactivatePayrollEmployee": {
+      return aiDeactivatePayrollEmployee(tenantId, ctx.role, args);
+    }
+    case "findDuplicateEmployees": {
+      return aiFindDuplicateEmployees(tenantId, ctx.role);
+    }
+    case "cleanupDuplicateEmployees": {
+      return aiCleanupDuplicateEmployees(tenantId, ctx.role, args);
+    }
+    case "approvePayrollRun": {
+      const result = await aiApprovePayrollRun(tenantId, ctx.role, userId, args);
+      if (result.ok && result.runId) {
+        actions.push({
+          type: "navigate",
+          payload: { path: `/payroll/runs/${result.runId}` },
+          summary: "Approved pay run",
+        });
+      }
+      return { ...result, actions };
+    }
+    case "getSubscriptionStatus": {
+      return aiGetSubscriptionStatus(tenantId, ctx.role);
     }
     default:
       return { ok: false, error: `Unknown tool: ${toolName}` };

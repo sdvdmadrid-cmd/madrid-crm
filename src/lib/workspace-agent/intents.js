@@ -4,6 +4,51 @@
 
 const INTENT_RULES = [
   {
+    id: "website.build_full",
+    patterns: [
+      /build\s+(my\s+)?(whole\s+)?(site|website)/i,
+      /create\s+(my\s+)?(whole\s+)?(site|website)/i,
+      /generate\s+(my\s+)?(whole\s+)?(site|website|full)/i,
+      /make\s+(me\s+)?a\s+(new\s+)?website/i,
+      /design\s+(my\s+)?website/i,
+      /from\s+scratch/i,
+      /single\s+prompt/i,
+    ],
+  },
+  {
+    id: "website.premium_look",
+    patterns: [
+      /more\s+premium/i,
+      /look\s+premium/i,
+      /high[\s-]end/i,
+      /luxury/i,
+      /upscale/i,
+      /professional\s+look/i,
+      /modern\s+design/i,
+    ],
+  },
+  {
+    id: "website.conversion_homepage",
+    patterns: [
+      /conversion/i,
+      /convert\s+more\s+leads/i,
+      /more\s+leads/i,
+      /better\s+homepage/i,
+      /lead[\s-]focused/i,
+      /focus(ed)?\s+on\s+(leads|bookings|calls)/i,
+    ],
+  },
+  {
+    id: "website.add_testimonials",
+    patterns: [
+      /add\s+(a\s+)?testimonial/i,
+      /testimonial\s+section/i,
+      /customer\s+review/i,
+      /social\s+proof/i,
+      /add\s+reviews/i,
+    ],
+  },
+  {
     id: "website.remove_pricing",
     patterns: [
       /remove\s+(all\s+)?pricing/i,
@@ -14,13 +59,75 @@ const INTENT_RULES = [
     ],
   },
   {
+    id: "website.industry_services",
+    patterns: [
+      /add\s+(my\s+)?services/i,
+      /default\s+services/i,
+      /industry\s+services/i,
+      /service\s+list/i,
+      /populate\s+services/i,
+    ],
+  },
+  {
     id: "website.landscaping_catalog",
     patterns: [
       /landscap(ing)?\s+(service|categor)/i,
       /add\s+(landscap|lawn|hardscape)/i,
-      /service\s+catalog/i,
-      /more\s+services/i,
-      /quote\s+form\s+services/i,
+      /landscaping\s+catalog/i,
+    ],
+  },
+  {
+    id: "website.generate_gallery_images",
+    patterns: [
+      /generate\s+\d*\s*(gallery|portfolio|project)\s*(images?|photos?)/i,
+      /create\s+\d*\s*(gallery|portfolio)\s*(images?|photos?)/i,
+      /\d+\s+gallery\s+(images?|photos?)/i,
+      /before\s+and\s+after\s+(gallery|images?)/i,
+      /gallery\s+with\s+before/i,
+    ],
+  },
+  {
+    id: "website.generate_hero_image",
+    patterns: [
+      /generate\s+(a\s+)?(new\s+)?hero\s*(image|photo|banner)?/i,
+      /create\s+(a\s+)?hero\s*(image|photo|banner)/i,
+      /new\s+hero\s*(image|photo)/i,
+    ],
+  },
+  {
+    id: "website.replace_hero_image",
+    patterns: [
+      /replace\s+(the\s+)?hero\s*(image|photo|banner)?/i,
+      /swap\s+(the\s+)?hero/i,
+      /change\s+(the\s+)?hero\s*(image|photo|banner)/i,
+      /update\s+(the\s+)?hero\s*(image|photo)/i,
+    ],
+  },
+  {
+    id: "website.remove_gallery_image",
+    patterns: [
+      /remove\s+(this\s+)?(gallery\s+)?(image|photo|picture)/i,
+      /delete\s+(the\s+)?(second|third|fourth|\d+(?:st|nd|rd|th)?)\s*(gallery\s+)?(image|photo)/i,
+      /delete\s+(the\s+)?(image|photo)\s+(in\s+)?(the\s+)?gallery/i,
+      /remove\s+(the\s+)?(image|photo)\s+(that\s+shows|showing|of)/i,
+    ],
+  },
+  {
+    id: "website.remove_hero_image",
+    patterns: [
+      /remove\s+(the\s+)?hero\s*(image|photo)?/i,
+      /delete\s+(the\s+)?hero\s*(image|photo)?/i,
+      /clear\s+(the\s+)?hero\s*(image|slot)?/i,
+    ],
+  },
+  {
+    id: "website.match_brand_colors",
+    patterns: [
+      /brand\s+colou?rs?/i,
+      /match\s+(the\s+)?(brand|theme|color)/i,
+      /change\s+(all\s+)?buttons/i,
+      /button\s+colou?rs?/i,
+      /theme\s+colou?r/i,
     ],
   },
   {
@@ -38,6 +145,7 @@ const INTENT_RULES = [
       /improve\s+.*hero/i,
       /hero\s+section/i,
       /better\s+headline/i,
+      /rewrite\s+.*headline/i,
     ],
   },
   {
@@ -51,7 +159,13 @@ const INTENT_RULES = [
   },
   {
     id: "website.improve_seo",
-    patterns: [/\bseo\b/i, /search\s+engine/i, /meta\s+(title|description)/i],
+    patterns: [
+      /\bseo\b/i,
+      /search\s+engine/i,
+      /meta\s+(title|description)/i,
+      /local\s+seo/i,
+      /rank\s+(in|for|on)/i,
+    ],
   },
   {
     id: "website.mobile_layout",
@@ -112,7 +226,10 @@ export function detectWorkspaceIntents(message) {
 export function intentRequiresConfirmation(intentIds = []) {
   const major = new Set([
     "website.landscaping_catalog",
+    "website.industry_services",
     "website.remove_pricing",
+    "website.build_full",
+    "website.generate_gallery_images",
   ]);
   return intentIds.some((id) => major.has(id));
 }
