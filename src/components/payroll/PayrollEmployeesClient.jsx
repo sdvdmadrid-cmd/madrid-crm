@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import PayrollNav from "@/components/payroll/PayrollNav";
 import PayrollEmployeeForm from "@/components/payroll/PayrollEmployeeForm";
@@ -8,6 +8,15 @@ import { apiFetch } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import styles from "@/app/payroll/payroll.module.css";
 import "@/i18n";
+
+const IDEMPOTENCY_STORAGE_KEY = "payroll-new-employee-idempotency";
+
+function createIdempotencyKey() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `emp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export const initialEmployee = {
   firstName: "",
@@ -73,13 +82,16 @@ function buildSavePayload(form) {
 
 function DeleteEmployeeModal({
   open,
+  mode = "confirm",
   employeeName,
   loading,
   onCancel,
   onConfirm,
+  onMarkInactive,
   t,
 }) {
   if (!open) return null;
+  const blocked = mode === "blocked";
   return (
     <div
       className={styles.modalOverlay}
@@ -90,10 +102,14 @@ function DeleteEmployeeModal({
     >
       <div className={styles.modalPanel}>
         <h3 className={styles.modalTitle} id="payroll-delete-employee-title">
-          {t("payroll.employees.confirmDeleteTitle")}
+          {blocked
+            ? t("payroll.employees.blockedDeleteTitle")
+            : t("payroll.employees.confirmDeleteTitle")}
         </h3>
         <p className={styles.modalMessage}>
-          {t("payroll.employees.confirmDeleteMessage")}
+          {blocked
+            ? t("payroll.employees.blockedDeleteMessage")
+            : t("payroll.employees.confirmDeleteMessage")}
         </p>
         {employeeName ? (
           <p className={styles.modalMessage}>
@@ -109,15 +125,27 @@ function DeleteEmployeeModal({
           >
             {t("payroll.actions.cancel")}
           </button>
-          <button
-            type="button"
-            className={`${styles.modalBtnConfirm} ${styles.modalBtnDanger}`}
-            onClick={onConfirm}
-            disabled={loading}
-            data-testid="payroll-delete-employee-confirm"
-          >
-            {loading ? t("payroll.actions.working") : t("payroll.actions.confirmDelete")}
-          </button>
+          {blocked ? (
+            <button
+              type="button"
+              className={styles.modalBtnSecondary}
+              onClick={onMarkInactive}
+              disabled={loading}
+              data-testid="payroll-mark-inactive-confirm"
+            >
+              {loading ? t("payroll.actions.working") : t("payroll.actions.markInactive")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.modalBtnConfirm} ${styles.modalBtnDanger}`}
+              onClick={onConfirm}
+              disabled={loading}
+              data-testid="payroll-delete-employee-confirm"
+            >
+              {loading ? t("payroll.actions.working") : t("payroll.actions.confirmDelete")}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -139,12 +167,42 @@ export default function PayrollEmployeesClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [employeeTotal, setEmployeeTotal] = useState(0);
+  const saveInFlightRef = useRef(false);
+  const idempotencyKeyRef = useRef("");
   const [deleteModal, setDeleteModal] = useState({
     open: false,
+    mode: "confirm",
     employeeId: "",
     employeeName: "",
   });
   const [deleting, setDeleting] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
+  const [duplicatesLoading, setDuplicatesLoading] = useState(false);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+
+  const resetCreateIdempotencyKey = useCallback(() => {
+    const nextKey = createIdempotencyKey();
+    idempotencyKeyRef.current = nextKey;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(IDEMPOTENCY_STORAGE_KEY, nextKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedId) return;
+    if (!idempotencyKeyRef.current) {
+      const stored =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(IDEMPOTENCY_STORAGE_KEY)
+          : "";
+      idempotencyKeyRef.current = stored || createIdempotencyKey();
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(IDEMPOTENCY_STORAGE_KEY, idempotencyKeyRef.current);
+      }
+    }
+  }, [selectedId]);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -159,6 +217,7 @@ export default function PayrollEmployeesClient() {
         throw new Error(payload.error || "Load failed");
       }
       setEmployees(payload.data || []);
+      setEmployeeTotal(Number(payload.pagination?.total || payload.data?.length || 0));
 
       const settingsPayload = await settingsRes.json();
       if (settingsRes.ok && settingsPayload.success && settingsPayload.data) {
@@ -197,6 +256,7 @@ export default function PayrollEmployeesClient() {
   };
 
   const saveEmployee = async () => {
+    if (saveInFlightRef.current || saving) return;
     setError("");
     setNotice("");
 
@@ -205,26 +265,46 @@ export default function PayrollEmployeesClient() {
       return;
     }
 
-    const body = buildSavePayload(form);
-    const res = await apiFetch(
-      selectedId ? `/api/payroll/employees/${selectedId}` : "/api/payroll/employees",
-      {
-        method: selectedId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-    );
-    const payload = await res.json();
-    if (!res.ok || !payload.success) {
-      setError(payload.error || "Unable to save employee");
-      return;
-    }
+    saveInFlightRef.current = true;
+    setSaving(true);
+    try {
+      const body = buildSavePayload(form);
+      const isCreate = !selectedId;
+      const headers = { "Content-Type": "application/json" };
+      if (isCreate && idempotencyKeyRef.current) {
+        headers["Idempotency-Key"] = idempotencyKeyRef.current;
+        body.idempotencyKey = idempotencyKeyRef.current;
+      }
 
-    setNotice(t("payroll.employees.saved"));
-    setForm(initialEmployee);
-    setSelectedId("");
-    setHistory([]);
-    await loadEmployees();
+      const res = await apiFetch(
+        selectedId ? `/api/payroll/employees/${selectedId}` : "/api/payroll/employees",
+        {
+          method: selectedId ? "PATCH" : "POST",
+          headers,
+          body: JSON.stringify(body),
+        },
+      );
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        setError(payload.error || "Unable to save employee");
+        return;
+      }
+
+      setNotice(t("payroll.employees.saved"));
+      if (isCreate) {
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem(IDEMPOTENCY_STORAGE_KEY);
+        }
+        resetCreateIdempotencyKey();
+      }
+      setForm(initialEmployee);
+      setSelectedId("");
+      setHistory([]);
+      await loadEmployees();
+    } finally {
+      saveInFlightRef.current = false;
+      setSaving(false);
+    }
   };
 
   const editEmployee = async (employee) => {
@@ -265,20 +345,63 @@ export default function PayrollEmployeesClient() {
     setSelectedId("");
     setForm(initialEmployee);
     setHistory([]);
+    resetCreateIdempotencyKey();
   };
 
   const employeeDisplayName = (employee) =>
     employee.fullName || `${employee.firstName || ""} ${employee.lastName || ""}`.trim();
 
-  const requestDeleteEmployee = (employee) => {
+  const requestDeleteEmployee = async (employee) => {
     if (!employee?.id || !canDeleteEmployee) return;
     setError("");
     setNotice("");
-    setDeleteModal({
-      open: true,
-      employeeId: employee.id,
-      employeeName: employeeDisplayName(employee),
-    });
+    try {
+      const res = await apiFetch(`/api/payroll/employees/${employee.id}`);
+      const payload = await res.json();
+      const historyCount = Number(payload?.data?.payrollHistoryCount || 0);
+      setDeleteModal({
+        open: true,
+        mode: historyCount > 0 ? "blocked" : "confirm",
+        employeeId: employee.id,
+        employeeName: employeeDisplayName(employee),
+      });
+    } catch {
+      setDeleteModal({
+        open: true,
+        mode: "confirm",
+        employeeId: employee.id,
+        employeeName: employeeDisplayName(employee),
+      });
+    }
+  };
+
+  const markEmployeeInactive = async (employeeId) => {
+    const id = employeeId || deleteModal.employeeId;
+    if (!id) return;
+    setDeleting(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch(`/api/payroll/employees/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "inactive" }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || t("payroll.employees.errors.deleteFailed"));
+      }
+      setDeleteModal({ open: false, mode: "confirm", employeeId: "", employeeName: "" });
+      if (selectedId === id) {
+        setForm((current) => ({ ...current, status: "inactive" }));
+      }
+      setNotice(t("payroll.employees.markedInactive"));
+      await loadEmployees();
+    } catch (err) {
+      setError(err.message || t("payroll.employees.errors.deleteFailed"));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const confirmDeleteEmployee = async () => {
@@ -295,7 +418,7 @@ export default function PayrollEmployeesClient() {
       if (!res.ok || !payload.success) {
         throw new Error(payload.error || t("payroll.employees.errors.deleteFailed"));
       }
-      setDeleteModal({ open: false, employeeId: "", employeeName: "" });
+      setDeleteModal({ open: false, mode: "confirm", employeeId: "", employeeName: "" });
       if (selectedId === employeeId) {
         clearForm();
       } else {
@@ -309,6 +432,60 @@ export default function PayrollEmployeesClient() {
       setDeleting(false);
     }
   };
+
+  const loadDuplicateGroups = async () => {
+    if (!canDeleteEmployee) return;
+    setDuplicatesLoading(true);
+    setError("");
+    try {
+      const res = await apiFetch("/api/payroll/employees/duplicates");
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || "Unable to scan duplicates");
+      }
+      setDuplicateGroups(payload.data?.groups || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDuplicatesLoading(false);
+    }
+  };
+
+  const cleanupSafeDuplicates = async () => {
+    const ids = duplicateGroups.flatMap((group) => group.safeDeleteIds || []);
+    if (!ids.length) return;
+    setCleanupBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const res = await apiFetch("/api/payroll/employees/duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeIds: ids }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        const firstError = payload.data?.failed?.[0]?.error;
+        throw new Error(firstError || payload.error || "Unable to delete duplicates");
+      }
+      setNotice(
+        t("payroll.employees.duplicatesCleaned", {
+          count: payload.data?.deleted?.length || 0,
+        }),
+      );
+      await loadEmployees();
+      await loadDuplicateGroups();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCleanupBusy(false);
+    }
+  };
+
+  const duplicateSafeCount = duplicateGroups.reduce(
+    (sum, group) => sum + (group.safeDeleteIds?.length || 0),
+    0,
+  );
 
   return (
     <main className={styles.page} data-testid="payroll-employees-page">
@@ -341,6 +518,7 @@ export default function PayrollEmployeesClient() {
             : undefined
         }
         deleting={deleting}
+        saving={saving}
       />
 
       {error ? <div className={styles.error}>{error}</div> : null}
@@ -348,6 +526,9 @@ export default function PayrollEmployeesClient() {
 
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>{t("payroll.employees.rosterTitle")}</h2>
+        <p className={styles.rosterMeta}>
+          {t("payroll.employees.rosterCount", { count: employeeTotal || employees.length })}
+        </p>
         {loading ? <p className={styles.muted}>{t("payroll.loading")}</p> : null}
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -402,6 +583,88 @@ export default function PayrollEmployeesClient() {
           </table>
         </div>
       </section>
+
+      {canDeleteEmployee ? (
+        <section className={styles.card} data-testid="payroll-duplicates-panel">
+          <h2 className={styles.cardTitle}>{t("payroll.employees.duplicatesTitle")}</h2>
+          <p className={styles.muted}>{t("payroll.employees.duplicatesSubtitle")}</p>
+          <div className={styles.formActions}>
+            <button
+              type="button"
+              className={styles.btnGhost}
+              onClick={loadDuplicateGroups}
+              disabled={duplicatesLoading || cleanupBusy}
+              data-testid="payroll-scan-duplicates"
+            >
+              {duplicatesLoading
+                ? t("payroll.actions.working")
+                : t("payroll.employees.duplicatesScan")}
+            </button>
+            {duplicateSafeCount > 0 ? (
+              <button
+                type="button"
+                className={styles.btnDanger}
+                onClick={cleanupSafeDuplicates}
+                disabled={cleanupBusy || duplicatesLoading}
+                data-testid="payroll-cleanup-duplicates"
+              >
+                {cleanupBusy
+                  ? t("payroll.actions.working")
+                  : `${t("payroll.employees.duplicatesCleanup")} (${duplicateSafeCount})`}
+              </button>
+            ) : null}
+          </div>
+          {duplicateGroups.length === 0 && !duplicatesLoading ? (
+            <p className={styles.muted}>{t("payroll.employees.duplicatesNone")}</p>
+          ) : null}
+          {duplicateGroups.length > 0 ? (
+            <p className={styles.rosterMeta}>
+              {t("payroll.employees.duplicatesFound", {
+                count: duplicateGroups.length,
+                employees: duplicateGroups.reduce(
+                  (sum, group) => sum + group.employees.length,
+                  0,
+                ),
+              })}
+            </p>
+          ) : null}
+          {duplicateGroups.map((group) => (
+            <div key={group.suggestedKeepId || group.employees.map((e) => e.id).join("-")} className={styles.duplicateGroup}>
+              <h3 className={styles.duplicateGroupTitle}>
+                {group.reasons
+                  .map((reason) =>
+                    reason === "name"
+                      ? t("payroll.employees.duplicatesMatchName")
+                      : reason === "email"
+                        ? t("payroll.employees.duplicatesMatchEmail")
+                        : t("payroll.employees.duplicatesMatchPhone"),
+                  )
+                  .join(" · ")}
+              </h3>
+              <ul className={styles.duplicateList}>
+                {group.employees.map((employee) => (
+                  <li key={employee.id} className={styles.duplicateItem}>
+                    <span>
+                      {employee.fullName || `${employee.firstName} ${employee.lastName}`}
+                      {employee.id === group.suggestedKeepId
+                        ? ` (${t("payroll.employees.keepOldest")})`
+                        : ""}
+                    </span>
+                    <span>
+                      {employee.payrollHistoryCount > 0
+                        ? t("payroll.employees.hasPayrollHistory")
+                        : employee.canPermanentlyDelete &&
+                            employee.id !== group.suggestedKeepId
+                          ? t("payroll.employees.safeToDelete")
+                          : employee.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       {selectedId ? (
         <section className={styles.card}>
@@ -459,12 +722,14 @@ export default function PayrollEmployeesClient() {
 
       <DeleteEmployeeModal
         open={deleteModal.open}
+        mode={deleteModal.mode}
         employeeName={deleteModal.employeeName}
         loading={deleting}
         onCancel={() =>
-          setDeleteModal({ open: false, employeeId: "", employeeName: "" })
+          setDeleteModal({ open: false, mode: "confirm", employeeId: "", employeeName: "" })
         }
         onConfirm={confirmDeleteEmployee}
+        onMarkInactive={() => markEmployeeInactive(deleteModal.employeeId)}
         t={t}
       />
     </main>

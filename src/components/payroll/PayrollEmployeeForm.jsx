@@ -49,6 +49,7 @@ export default function PayrollEmployeeForm({
   onDelete,
   canDeleteEmployee = false,
   deleting = false,
+  saving = false,
   payrollSettings = {},
 }) {
   const { t } = useTranslation();
@@ -572,8 +573,19 @@ export default function PayrollEmployeeForm({
           className={styles.btnPrimary}
           data-testid="payroll-employee-save"
           onClick={onSave}
+          disabled={saving}
+          aria-busy={saving}
         >
-          {selectedId ? t("payroll.actions.update") : t("payroll.actions.save")}
+          {saving ? (
+            <>
+              <span className={styles.btnSpinner} aria-hidden="true" />
+              {t("payroll.actions.saving")}
+            </>
+          ) : selectedId ? (
+            t("payroll.actions.update")
+          ) : (
+            t("payroll.actions.save")
+          )}
         </button>
         {selectedId ? (
           <button type="button" className={styles.btnGhost} onClick={onClear}>
