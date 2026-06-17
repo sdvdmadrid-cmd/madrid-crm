@@ -36,6 +36,23 @@ export function isClientLoggedOut() {
   }
 }
 
+const AUTH_ENTRY_API_PREFIXES = [
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/resend-verification",
+  "/api/auth/verify-email",
+];
+
+/** Allow sign-in flows while the post-logout client guard is active. */
+export function isAuthEntryApiRequest(target) {
+  const path = String(target || "");
+  return AUTH_ENTRY_API_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}?`),
+  );
+}
+
 let logoutAbortController = null;
 
 /** Abort in-flight authenticated API calls when logout begins. */
