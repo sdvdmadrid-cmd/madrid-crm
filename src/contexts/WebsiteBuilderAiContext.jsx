@@ -32,6 +32,10 @@ export function WebsiteBuilderAiProvider({ children }) {
     return apiRef.current?.generateHeroImage?.(payload);
   }, []);
 
+  const generateHeroImagesBatch = useCallback((payload) => {
+    return apiRef.current?.generateHeroImagesBatch?.(payload);
+  }, []);
+
   const generateGalleryImages = useCallback((payload) => {
     return apiRef.current?.generateGalleryImages?.(payload);
   }, []);
@@ -52,6 +56,7 @@ export function WebsiteBuilderAiProvider({ children }) {
       applyPatches,
       runGenerateFull,
       generateHeroImage,
+      generateHeroImagesBatch,
       generateGalleryImages,
       removeGalleryImage,
       removeHeroImage,
@@ -64,6 +69,7 @@ export function WebsiteBuilderAiProvider({ children }) {
       applyPatches,
       runGenerateFull,
       generateHeroImage,
+      generateHeroImagesBatch,
       generateGalleryImages,
       removeGalleryImage,
       removeHeroImage,

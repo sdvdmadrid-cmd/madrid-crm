@@ -10,8 +10,9 @@ export const WEBSITE_IMAGE_DRAFT_SIZE = String(
 ).trim();
 export const WEBSITE_IMAGE_BATCH_CONCURRENCY = Math.max(
   1,
-  Math.min(4, Number(process.env.WEBSITE_IMAGE_BATCH_CONCURRENCY || 3)),
+  Math.min(5, Number(process.env.WEBSITE_IMAGE_BATCH_CONCURRENCY || 4)),
 );
+const IMAGE_MAX_RETRIES = Math.max(0, Math.min(3, Number(process.env.WEBSITE_IMAGE_RETRY_LIMIT || 2)));
 
 function assertTrustedOpenAiImageUrl(rawUrl) {
   const value = String(rawUrl || "").trim();
@@ -42,7 +43,7 @@ function assertTrustedOpenAiImageUrl(rawUrl) {
 
 export async function urlToDataUrl(imageUrl) {
   const trustedUrl = assertTrustedOpenAiImageUrl(imageUrl);
-  const response = await fetch(trustedUrl, { signal: AbortSignal.timeout(10000) });
+  const response = await fetch(trustedUrl, { signal: AbortSignal.timeout(8000) });
   if (!response.ok) {
     throw new Error("Unable to download AI image");
   }
@@ -67,15 +68,70 @@ export async function urlToDataUrl(imageUrl) {
 }
 
 export function buildWebsiteImagePrompt({ pack, companyName, safePrompt, styleHint = "realistic" }) {
+  const style = String(styleHint || "realistic").trim().slice(0, 40);
   return [
     pack.imagePromptPrefix,
     `Business: ${companyName || pack.label}.`,
     safePrompt,
-    `Style: ${String(styleHint || "realistic").trim().slice(0, 40)}.`,
-    "Photorealistic, high quality, natural lighting, no logos, no text, no watermarks.",
-    `CRITICAL: Image must ONLY show ${pack.label} work.`,
-    `Do NOT show: other trades, unrelated tools, or generic construction unless industry is construction.`,
+    `Style: ${style}.`,
+    "Photorealistic, sharp focus, natural lighting, professional composition.",
+    "No logos, no text, no watermarks, no people's faces close-up.",
+    `CRITICAL: Show ONLY ${pack.label} work — correct tools, materials, and setting.`,
   ].join(" ");
+}
+
+function isRetryableImageError(error) {
+  const status = Number(error?.status || error?.response?.status || 0);
+  const msg = String(error?.message || "").toLowerCase();
+  return (
+    status === 429 ||
+    status >= 500 ||
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("econnreset") ||
+    msg.includes("socket hang up")
+  );
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callOpenAiImageGenerate(client, { prompt, size }, timeoutMs) {
+  const baseBody = {
+    model: WEBSITE_IMAGE_MODEL,
+    prompt,
+    size,
+  };
+
+  let lastError;
+  for (let attempt = 0; attempt <= IMAGE_MAX_RETRIES; attempt += 1) {
+    try {
+      try {
+        return await client.images.generate(
+          { ...baseBody, response_format: "b64_json" },
+          { timeout: timeoutMs },
+        );
+      } catch (formatError) {
+        const formatMsg = String(formatError?.message || "").toLowerCase();
+        if (
+          formatMsg.includes("response_format") ||
+          formatMsg.includes("unknown parameter")
+        ) {
+          return await client.images.generate(baseBody, { timeout: timeoutMs });
+        }
+        throw formatError;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt >= IMAGE_MAX_RETRIES || !isRetryableImageError(error)) {
+        throw error;
+      }
+      await sleep(400 * (attempt + 1));
+    }
+  }
+
+  throw lastError || new Error("AI image generation failed");
 }
 
 export async function generateWebsiteImage({
@@ -95,7 +151,7 @@ export async function generateWebsiteImage({
 
   const useDraftSize = draft !== false;
   const imageSize = useDraftSize ? WEBSITE_IMAGE_DRAFT_SIZE : WEBSITE_IMAGE_SIZE;
-  const imageTimeoutMs = useDraftSize ? 35_000 : 60_000;
+  const imageTimeoutMs = useDraftSize ? 28_000 : 55_000;
   const finalPrompt = buildWebsiteImagePrompt({
     pack,
     companyName,
@@ -104,13 +160,10 @@ export async function generateWebsiteImage({
   });
 
   const client = getOpenAiClient();
-  const response = await client.images.generate(
-    {
-      model: WEBSITE_IMAGE_MODEL,
-      prompt: finalPrompt,
-      size: imageSize,
-    },
-    { timeout: imageTimeoutMs },
+  const response = await callOpenAiImageGenerate(
+    client,
+    { prompt: finalPrompt, size: imageSize },
+    imageTimeoutMs,
   );
 
   const first = response?.data?.[0] || null;
@@ -131,7 +184,9 @@ export async function generateWebsiteImage({
 
   const kind = String(mediaKind || "hero").trim() === "gallery" ? "gallery" : "hero";
   let imageUrl = "";
-  if (websiteSlug) {
+
+  // Draft previews skip storage upload — persist on save via data URLs (much faster).
+  if (!useDraftSize && websiteSlug) {
     imageUrl = await uploadWebsiteImageFromDataUrl({
       tenantId,
       slug: websiteSlug,

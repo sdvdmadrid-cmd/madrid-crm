@@ -23,11 +23,15 @@ import {
 import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
 import {
   enhanceWebsiteCopyParallel,
-  findFirstEmptyHeroSlotIndex,
+  findHeroSlotsForAiEnhancement,
+  isValidWebsiteImageSrc,
   mergeFullSiteIntoDraft,
   mergeWebsiteCopySection,
+  requestWebsiteImagesBatch,
+  resolveWebsiteImageSrc,
   WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
   WEBSITE_FULL_GENERATE_TIMEOUT_MS,
+  WEBSITE_GALLERY_BATCH_DEFAULT,
   WEBSITE_HERO_IMAGE_TIMEOUT_MS,
 } from "@/lib/website-builder-client-generation";
 import {
@@ -749,49 +753,80 @@ export default function WebsiteBuilderClient() {
     showNotice(t.generateCancelled);
   }, [t, showNotice]);
 
-  const runOptionalHeroImageEnhancement = useCallback(
-    async (heroIndex, prompt, signal) => {
-      if (!aiConfigOk || heroIndex < 0 || !prompt) return;
-      const slotId = formRef.current?.heroPhotos?.[heroIndex]?.id || "";
-      setImageEnhancing(true);
-      setGenProgress(t.genStepHero);
-      if (slotId) setGeneratingSlotId(slotId);
-      try {
-        const imgRes = await apiFetch("/api/website-builder/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
-          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
-          signal,
-        });
-        const imgPayload = await getJsonOrThrow(imgRes, t.errorGenerateImage);
-        const imageSrc = String(
-          imgPayload?.data?.imageUrl || imgPayload?.data?.imageDataUrl || "",
-        );
-        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) return;
+  const runBackgroundHeroImageEnhancement = useCallback(
+    async (imagePresetsList, signal) => {
+      if (!aiConfigOk || signal?.aborted) return;
 
-        const current = formRef.current;
-        if (!current) return;
-        const updatedHero = [...(current.heroPhotos || [])];
-        updatedHero[heroIndex] = {
-          ...updatedHero[heroIndex],
-          src: imageSrc,
-          alt: String(imgPayload?.data?.alt || prompt).slice(0, 160),
-          prompt,
-        };
-        const withHero = { ...current, heroPhotos: updatedHero };
+      const current = formRef.current;
+      if (!current) return;
+
+      const slots = findHeroSlotsForAiEnhancement(
+        current.heroPhotos || [],
+        imagePresetsList,
+      );
+      if (slots.length === 0) return;
+
+      imageEnhanceAbortRef.current?.abort();
+      const enhanceAbort = new AbortController();
+      imageEnhanceAbortRef.current = enhanceAbort;
+      if (signal) {
+        if (signal.aborted) {
+          enhanceAbort.abort();
+        } else {
+          signal.addEventListener("abort", () => enhanceAbort.abort(), { once: true });
+        }
+      }
+      const combinedSignal = enhanceAbort.signal;
+
+      setImageEnhancing(true);
+      setGenProgress(t.genStepHero || t.generatingImage);
+
+      try {
+        const images = await requestWebsiteImagesBatch({
+          apiFetch,
+          getJsonOrThrow,
+          prompts: slots.map((slot) => slot.prompt),
+          style: imageStyle,
+          mediaKind: "hero",
+          draft: true,
+          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+          signal: combinedSignal,
+          errorMessage: t.errorGenerateImage,
+        });
+
+        if (combinedSignal.aborted || images.length === 0) return;
+
+        const working = formRef.current || current;
+        const updatedHero = [...(working.heroPhotos || [])];
+
+        images.forEach((row, imageIndex) => {
+          const slot = slots[imageIndex];
+          if (!slot) return;
+          const imageSrc = resolveWebsiteImageSrc(row);
+          if (!isValidWebsiteImageSrc(imageSrc)) return;
+          updatedHero[slot.index] = {
+            ...updatedHero[slot.index],
+            src: imageSrc,
+            alt: String(row?.alt || slot.prompt).slice(0, 160),
+            prompt: slot.prompt,
+          };
+        });
+
+        const withHero = { ...working, heroPhotos: updatedHero };
         skipAutosave.current = true;
         formRef.current = withHero;
         setForm(withHero);
         void handleSave({ ...withHero, siteMeta }, { silent: true });
       } catch (err) {
         if (err?.name !== "AbortError") {
-          /* optional — site already usable */
+          /* optional — site already usable with stock images */
         }
       } finally {
         setGeneratingSlotId("");
         setImageEnhancing(false);
-        setGenProgress("");
+        if (!signal?.aborted) {
+          setGenProgress("");
+        }
       }
     },
     [aiConfigOk, imageStyle, siteMeta, t, handleSave],
@@ -868,51 +903,72 @@ export default function WebsiteBuilderClient() {
       generationAbortRef.current = null;
       skipAutosave.current = false;
 
+      const postInstantTasks = [];
+
       if (featureAiDescription && aiConfigOk && !abort.signal.aborted) {
-        setCopyEnhancing(true);
-        setGenProgress(t.genStepCopyEnhance || t.genStepCopy);
-        try {
-          let workingForm = formRef.current || nextForm;
-          let workingMeta = nextSiteMeta;
+        postInstantTasks.push(
+          (async () => {
+            setCopyEnhancing(true);
+            setGenProgress(t.genStepCopyEnhance || t.genStepCopy);
+            try {
+              let workingForm = formRef.current || nextForm;
+              let workingMeta = nextSiteMeta;
 
-          await enhanceWebsiteCopyParallel({
-            apiFetch,
-            getJsonOrThrow,
-            catalogServices,
-            signal: abort.signal,
-            timeoutMs: WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
-            onSectionComplete: async (_section, sectionData) => {
-              const merged = mergeWebsiteCopySection(
-                workingForm,
-                workingMeta,
-                sectionData,
-              );
-              workingForm = merged.nextForm;
-              workingMeta = {
-                ...merged.nextSiteMeta,
-                generationSource: "ai",
-              };
-              skipAutosave.current = true;
-              formRef.current = workingForm;
-              setForm(workingForm);
-              setSiteMeta(workingMeta);
-              setCompletenessScore(
-                analyzeWebsiteCompleteness(workingForm, workingMeta).score,
-              );
-            },
-          });
+              await enhanceWebsiteCopyParallel({
+                apiFetch,
+                getJsonOrThrow,
+                catalogServices,
+                signal: abort.signal,
+                timeoutMs: WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
+                onSectionComplete: async (_section, sectionData) => {
+                  const merged = mergeWebsiteCopySection(
+                    workingForm,
+                    workingMeta,
+                    sectionData,
+                  );
+                  workingForm = merged.nextForm;
+                  workingMeta = {
+                    ...merged.nextSiteMeta,
+                    generationSource: "ai",
+                  };
+                  skipAutosave.current = true;
+                  formRef.current = workingForm;
+                  setForm(workingForm);
+                  setSiteMeta(workingMeta);
+                  setCompletenessScore(
+                    analyzeWebsiteCompleteness(workingForm, workingMeta).score,
+                  );
+                },
+              });
 
-          void handleSave({ ...workingForm, siteMeta: workingMeta }, { silent: true });
-          showNotice(t.generateFullDone);
-        } catch (copyErr) {
-          if (copyErr?.name !== "AbortError") {
-            console.warn("[website-builder] copy enhance skipped:", copyErr?.message || copyErr);
-          }
-        } finally {
-          setCopyEnhancing(false);
-          setGenProgress("");
-          skipAutosave.current = false;
-        }
+              void handleSave({ ...workingForm, siteMeta: workingMeta }, { silent: true });
+              showNotice(t.generateFullDone);
+            } catch (copyErr) {
+              if (copyErr?.name !== "AbortError") {
+                console.warn(
+                  "[website-builder] copy enhance skipped:",
+                  copyErr?.message || copyErr,
+                );
+              }
+            } finally {
+              setCopyEnhancing(false);
+              if (!abort.signal.aborted) {
+                setGenProgress("");
+              }
+              skipAutosave.current = false;
+            }
+          })(),
+        );
+      }
+
+      if (aiConfigOk && !abort.signal.aborted) {
+        postInstantTasks.push(
+          runBackgroundHeroImageEnhancement(imagePresets, abort.signal),
+        );
+      }
+
+      if (postInstantTasks.length > 0) {
+        await Promise.allSettled(postInstantTasks);
       }
     } catch (err) {
       if (err?.name === "AbortError") {
@@ -932,6 +988,8 @@ export default function WebsiteBuilderClient() {
     form,
     siteMeta,
     aiConfigOk,
+    imagePresets,
+    runBackgroundHeroImageEnhancement,
     t,
     showNotice,
     handleSave,
@@ -979,6 +1037,70 @@ export default function WebsiteBuilderClient() {
     [form, imagePresets, imageStyle, t, handleSave],
   );
 
+  const generateHeroImagesBatchForAgent = useCallback(
+    async (requests = []) => {
+      const list = Array.isArray(requests) ? requests : [];
+      if (list.length === 0) return 0;
+
+      const current = formRef.current || form;
+      const slots = current.heroPhotos || [];
+      const plan = list
+        .map((req) => {
+          const index = Math.max(0, Math.min(3, Number(req?.slotIndex) || 0));
+          const prompt = String(
+            req?.prompt || slots[index]?.prompt || imagePresets[index] || "",
+          ).trim();
+          return { index, prompt };
+        })
+        .filter((entry) => entry.prompt);
+
+      if (plan.length === 0) throw new Error("No image prompts available");
+
+      const images = await requestWebsiteImagesBatch({
+        apiFetch,
+        getJsonOrThrow,
+        prompts: plan.map((entry) => entry.prompt),
+        style: imageStyle,
+        mediaKind: "hero",
+        draft: true,
+        timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+        errorMessage: t.errorGenerateImage,
+      });
+
+      if (images.length === 0) return 0;
+
+      const nextForm = { ...current };
+      const heroPhotos = [...(nextForm.heroPhotos || slots)];
+      images.forEach((row, imageIndex) => {
+        const entry = plan[imageIndex];
+        if (!entry) return;
+        const imageSrc = resolveWebsiteImageSrc(row);
+        if (!isValidWebsiteImageSrc(imageSrc)) return;
+        while (heroPhotos.length <= entry.index) {
+          heroPhotos.push({
+            id: `hero-${heroPhotos.length}`,
+            src: "",
+            alt: "",
+            prompt: "",
+          });
+        }
+        heroPhotos[entry.index] = {
+          ...heroPhotos[entry.index],
+          src: imageSrc,
+          alt: String(row?.alt || entry.prompt).slice(0, 160),
+          prompt: entry.prompt,
+        };
+      });
+      nextForm.heroPhotos = heroPhotos;
+      skipAutosave.current = true;
+      formRef.current = nextForm;
+      setForm(nextForm);
+      await handleSave(nextForm, { silent: true });
+      return images.length;
+    },
+    [form, imagePresets, imageStyle, t, handleSave],
+  );
+
   const generateGalleryImagesForAgent = useCallback(
     async ({ count = 1, prompt = "" } = {}) => {
       const total = Math.min(10, Math.max(1, Number(count) || 1));
@@ -990,27 +1112,21 @@ export default function WebsiteBuilderClient() {
       if (remainingSlots <= 0) return 0;
 
       const batchCount = Math.min(total, remainingSlots);
-      const res = await apiFetch("/api/website-builder/generate-images-batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: basePrompt,
-          count: batchCount,
-          style: imageStyle,
-          mediaKind: "gallery",
-          draft: true,
-        }),
-        timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS * Math.ceil(batchCount / 2),
+      const images = await requestWebsiteImagesBatch({
+        apiFetch,
+        getJsonOrThrow,
+        prompts: Array.from({ length: batchCount }, () => basePrompt),
+        style: imageStyle,
+        mediaKind: "gallery",
+        draft: true,
+        timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+        errorMessage: t.errorGenerateImage,
       });
-      const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-      const images = Array.isArray(payload?.data?.images) ? payload.data.images : [];
 
       const newPhotos = images
         .map((row, i) => {
-          const imageSrc = String(row?.imageUrl || row?.imageDataUrl || "");
-          if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
-            return null;
-          }
+          const imageSrc = resolveWebsiteImageSrc(row);
+          if (!isValidWebsiteImageSrc(imageSrc)) return null;
           return {
             id: `ai-${Date.now()}-${i}`,
             src: imageSrc,
@@ -1117,6 +1233,7 @@ export default function WebsiteBuilderClient() {
       },
       runGenerateFull: () => handleGenerateFullSite(),
       generateHeroImage: generateHeroImageForAgent,
+      generateHeroImagesBatch: generateHeroImagesBatchForAgent,
       generateGalleryImages: generateGalleryImagesForAgent,
       removeGalleryImage: removeGalleryImageForAgent,
       removeHeroImage: removeHeroImageForAgent,
@@ -1133,6 +1250,7 @@ export default function WebsiteBuilderClient() {
     industryLabel,
     handleGenerateFullSite,
     generateHeroImageForAgent,
+    generateHeroImagesBatchForAgent,
     generateGalleryImagesForAgent,
     removeGalleryImageForAgent,
     removeHeroImageForAgent,
@@ -1367,37 +1485,52 @@ export default function WebsiteBuilderClient() {
         showNotice(t.errorGenerateImage, true);
         return;
       }
-      if (form.galleryPhotos.length >= MAX_FEATURED_GALLERY) {
+      const current = formRef.current || form;
+      const remainingSlots = MAX_FEATURED_GALLERY - (current.galleryPhotos || []).length;
+      if (remainingSlots <= 0) {
         showNotice(`Max ${MAX_FEATURED_GALLERY} featured photos.`, true);
         return;
       }
+      const batchCount = Math.min(WEBSITE_GALLERY_BATCH_DEFAULT, remainingSlots);
+
       setGeneratingImage(true);
       try {
-        const res = await apiFetch("/api/website-builder/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "gallery" }),
+        const images = await requestWebsiteImagesBatch({
+          apiFetch,
+          getJsonOrThrow,
+          prompts: Array.from({ length: batchCount }, (_, i) =>
+            batchCount > 1 ? `${prompt}, variation ${i + 1}` : prompt,
+          ),
+          style: imageStyle,
+          mediaKind: "gallery",
+          draft: true,
           timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+          errorMessage: t.errorGenerateImage,
         });
-        const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-        const imageSrc = String(
-          payload?.data?.imageUrl || payload?.data?.imageDataUrl || "",
-        );
-        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
+
+        const newPhotos = images
+          .map((row, i) => {
+            const imageSrc = resolveWebsiteImageSrc(row);
+            if (!isValidWebsiteImageSrc(imageSrc)) return null;
+            return {
+              id: `ai-${Date.now()}-${i}`,
+              src: imageSrc,
+              thumbnail: imageSrc,
+              alt: String(row?.alt || prompt).slice(0, 160),
+              persisted: /^https?:\/\//i.test(imageSrc),
+            };
+          })
+          .filter(Boolean);
+
+        if (newPhotos.length === 0) {
           throw new Error(t.errorGenerateImage);
         }
-        const newPhoto = {
-          id: `ai-${Date.now()}`,
-          src: imageSrc,
-          thumbnail: imageSrc,
-          alt: String(payload?.data?.alt || prompt).slice(0, 160),
-          persisted: /^https?:\/\//i.test(imageSrc),
-        };
+
         const nextForm = {
-          ...(formRef.current || form),
+          ...current,
           galleryPhotos: normalizeGalleryPhotos([
-            ...(formRef.current?.galleryPhotos || form.galleryPhotos || []),
-            newPhoto,
+            ...(current.galleryPhotos || []),
+            ...newPhotos,
           ]).slice(0, MAX_FEATURED_GALLERY),
         };
         skipAutosave.current = true;
