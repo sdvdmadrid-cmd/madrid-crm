@@ -8,7 +8,8 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
-import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
+import { getRequestLanguage } from "@/lib/ai-service";
+import { generateCompleteEstimateDescription } from "@/lib/estimate-description-ai";
 
 export async function POST(request) {
   try {
@@ -45,28 +46,14 @@ export async function POST(request) {
       );
     }
 
-    const response = await runAiCompletion({
+    const result = await generateCompleteEstimateDescription({
       request,
       tenantId: tenantDbId,
       userId,
-      feature: "estimate_description",
-      modelTier: "mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a professional contractor assistant. Output only concise plain text (2-4 sentences).",
-        },
-        {
-          role: "user",
-          content: `Rewrite this contractor estimate description clearly and professionally: ${input}`,
-        },
-      ],
-      maxTokens: 180,
-      temperature: 0.4,
+      input,
     });
 
-    const description = response.text;
+    const description = result.description;
 
     if (!description) {
       return new Response(
@@ -84,10 +71,13 @@ export async function POST(request) {
         data: {
           description,
           ai: {
-            model: response.model,
-            usage: response.usage,
-            estimatedCostUsd: response.estimatedCostUsd,
-            responseTimeMs: response.responseTimeMs,
+            model: result.ai?.model,
+            usage: result.ai?.usage,
+            estimatedCostUsd: result.ai?.estimatedCostUsd,
+            responseTimeMs: result.ai?.responseTimeMs,
+            finishReason: result.ai?.finishReason,
+            continuationRounds: result.continuationRounds,
+            completed: result.completed,
           },
         },
       }),

@@ -8,12 +8,8 @@ import {
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
-import { getRequestLanguage, runAiCompletion } from "@/lib/ai-service";
-
-const SYSTEM_PROMPT =
-  "You are a professional contractor assistant. " +
-  "Output only the description text — no labels, bullet points, or markdown. " +
-  "Be concise (2-4 sentences) and use formal, clear language.";
+import { getRequestLanguage } from "@/lib/ai-service";
+import { generateCompleteEstimateDescription } from "@/lib/estimate-description-ai";
 
 export async function POST(request) {
   try {
@@ -50,25 +46,14 @@ export async function POST(request) {
       );
     }
 
-    const language = getRequestLanguage(request, "en");
-    const response = await runAiCompletion({
+    const result = await generateCompleteEstimateDescription({
       request,
       tenantId: tenantDbId,
       userId,
-      feature: "estimate_description",
-      modelTier: "mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Rewrite this contractor estimate description clearly and professionally: ${input}`,
-        },
-      ],
-      maxTokens: 180,
-      temperature: 0.4,
+      input,
     });
 
-    const description = response.text;
+    const description = result.description;
 
     if (!description) {
       return new Response(
@@ -86,10 +71,13 @@ export async function POST(request) {
         data: {
           description,
           ai: {
-            model: response.model,
-            usage: response.usage,
-            estimatedCostUsd: response.estimatedCostUsd,
-            responseTimeMs: response.responseTimeMs,
+            model: result.ai?.model,
+            usage: result.ai?.usage,
+            estimatedCostUsd: result.ai?.estimatedCostUsd,
+            responseTimeMs: result.ai?.responseTimeMs,
+            finishReason: result.ai?.finishReason,
+            continuationRounds: result.continuationRounds,
+            completed: result.completed,
           },
         },
       }),
