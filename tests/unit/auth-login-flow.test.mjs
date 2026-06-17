@@ -17,9 +17,34 @@ test("middleware login redirect requires app session cookie, not Supabase alone"
 
 test("AuthShell logout clears Supabase browser session", () => {
   const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
-  assert.match(src, /supabase\.auth\.signOut\(\)/);
-  assert.match(src, /markClientLoggedOut\(\)/);
+  assert.match(src, /performClientLogout/);
+  assert.match(src, /isClientLoggedOut/);
   assert.match(src, /performAuthHardNavigate\("\/login"\)/);
+});
+
+test("performClientLogout awaits server logout before hard navigate", () => {
+  const src = readFileSync(path.join(root, "src/lib/auth-logout-client.js"), "utf8");
+  const awaitIndex = src.indexOf("await postServerLogout()");
+  const navigateIndex = src.indexOf("performAuthHardNavigate(redirectTo)");
+  assert.ok(awaitIndex >= 0);
+  assert.ok(navigateIndex > awaitIndex);
+  assert.match(src, /credentials:\s*"include"/);
+  assert.match(src, /postServerLogout/);
+});
+
+test("OwnerLogoutButton uses centralized performClientLogout", () => {
+  const src = readFileSync(
+    path.join(root, "src/components/owner/OwnerLogoutButton.js"),
+    "utf8",
+  );
+  assert.match(src, /performClientLogout/);
+  assert.doesNotMatch(src, /performAuthHardNavigate/);
+});
+
+test("owner layout redirects when logout guard cookie is set", () => {
+  const src = readFileSync(path.join(root, "src/app/owner/layout.js"), "utf8");
+  assert.match(src, /LOGOUT_GUARD_COOKIE/);
+  assert.match(src, /redirect\('\/login'\)/);
 });
 
 test("logout API sets guard cookie and clears supabase session", () => {

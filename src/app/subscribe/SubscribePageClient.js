@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
-import { markClientLoggedOut } from "@/lib/auth-logout-guard.js";
+import { performClientLogout } from "@/lib/auth-logout-client";
 import {
   clearAuthNavAttempt,
   performAuthHardNavigate,
   recordAuthNavAttempt,
   shouldSkipAuthRedirect,
 } from "@/lib/auth-nav";
-import { supabase } from "@/lib/supabase";
 import styles from "./subscribe.module.css";
 
 const PLAN_LOAD_TIMEOUT_MS = 8_000;
@@ -244,13 +243,7 @@ export default function SubscribePageClient() {
   const handleLogout = useCallback(() => {
     if (loggingOut) return;
     setLoggingOut(true);
-    markClientLoggedOut();
-    void apiFetch("/api/auth/logout", {
-      method: "POST",
-      suppressUnauthorizedEvent: true,
-    }).catch(() => {});
-    void supabase.auth.signOut().catch(() => {});
-    performAuthHardNavigate("/login");
+    void performClientLogout();
   }, [loggingOut]);
 
   const priceLabel = `$${plan.priceMonthly}/month`;

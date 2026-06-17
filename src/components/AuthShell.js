@@ -8,10 +8,10 @@ import { useTranslation } from "react-i18next";
 import InstantNavigation from "@/components/InstantNavigation";
 import LoginAccessPanel from "@/components/auth/LoginAccessPanel";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { performClientLogout } from "@/lib/auth-logout-client";
 import {
   clearClientLoggedOut,
   isClientLoggedOut,
-  markClientLoggedOut,
 } from "@/lib/auth-logout-guard.js";
 import { supabase } from "@/lib/supabase";
 import "@/i18n";
@@ -898,16 +898,7 @@ export default function AuthShell({ children }) {
   }, [runAuthBootstrap]);
 
   const handleBootLogout = useCallback(() => {
-    markClientLoggedOut();
-    authBootstrappedRef.current = false;
-    setAuthUser(null);
-    setAuthBootError("");
-    void apiFetch("/api/auth/logout", {
-      method: "POST",
-      suppressUnauthorizedEvent: true,
-    }).catch(() => {});
-    void supabase.auth.signOut().catch(() => {});
-    performAuthHardNavigate("/login");
+    void performClientLogout();
   }, []);
 
   // Persist industry to localStorage so catalog pages can read it without an extra fetch
@@ -963,6 +954,13 @@ export default function AuthShell({ children }) {
   ]);
 
   useEffect(() => {
+    if (!hasMounted || !isOwnerCommandCenter) return;
+    if (isClientLoggedOut()) {
+      performAuthHardNavigate("/login");
+    }
+  }, [hasMounted, isOwnerCommandCenter]);
+
+  useEffect(() => {
     if (!authChecked || authUser || isPublicPage || isAuthEntryPage) return;
     const timeoutId = window.setTimeout(() => {
       if (!authUserRef.current) {
@@ -997,7 +995,6 @@ export default function AuthShell({ children }) {
 
     const onLogout = () => {
       authBootstrappedRef.current = false;
-      markClientLoggedOut();
       setAuthUser(null);
       setSubmitting(false);
       setError("");
@@ -1273,24 +1270,11 @@ export default function AuthShell({ children }) {
     setSubmitting(true);
     setError("");
     setNotice("");
-
     authBootstrappedRef.current = false;
     setAuthBootError("");
-    markClientLoggedOut();
     setAuthUser(null);
     setLoginForm(initialLogin);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("user-industry");
-      window.dispatchEvent(new CustomEvent("auth:logout"));
-    }
-
-    void apiFetch("/api/auth/logout", {
-      method: "POST",
-      suppressUnauthorizedEvent: true,
-    }).catch(() => {});
-    void supabase.auth.signOut().catch(() => {});
-
-    performAuthHardNavigate("/login");
+    await performClientLogout();
   };
 
   if (!authUser && isAuthEntryPage) {
@@ -2250,6 +2234,7 @@ export default function AuthShell({ children }) {
               onClick={logout}
               disabled={submitting}
               className="sb-link"
+              data-testid="sidebar-logout-btn"
               style={{ color: "#94a3b8" }}
             >
               <span

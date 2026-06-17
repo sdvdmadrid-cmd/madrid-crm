@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/client-auth";
+import { isClientLoggedOut } from "@/lib/auth-logout-guard.js";
 
 const REFRESH_MS = 60_000;
 
@@ -58,6 +59,7 @@ export default function OwnerLoginActivityClient() {
   const [refreshedAt, setRefreshedAt] = useState(null);
 
   const load = useCallback(async () => {
+    if (isClientLoggedOut()) return;
     setError("");
     try {
       const res = await apiFetch("/api/owner/login-activity", { cache: "no-store" });
@@ -80,8 +82,13 @@ export default function OwnerLoginActivityClient() {
   }, []);
 
   useEffect(() => {
+    if (isClientLoggedOut()) return undefined;
     load();
-    const timer = setInterval(load, REFRESH_MS);
+    const timer = setInterval(() => {
+      if (!isClientLoggedOut()) {
+        load();
+      }
+    }, REFRESH_MS);
     return () => clearInterval(timer);
   }, [load]);
 

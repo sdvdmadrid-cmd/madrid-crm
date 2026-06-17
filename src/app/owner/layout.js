@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import OwnerShell from '@/components/owner/OwnerShell';
 import { verifySessionToken } from '@/lib/auth';
+import { LOGOUT_GUARD_COOKIE } from '@/lib/auth-logout-guard.js';
 import { buildLoginRedirectPath } from '@/lib/auth-redirect';
 
 const SESSION_COOKIE_NAME =
@@ -11,6 +12,11 @@ const SESSION_COOKIE_NAME =
 
 export default async function OwnerLayout({ children }) {
   const cookieStore = await cookies();
+
+  if (cookieStore.get(LOGOUT_GUARD_COOKIE)?.value === '1') {
+    redirect('/login');
+  }
+
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value || '';
   const session = verifySessionToken(token);
 
