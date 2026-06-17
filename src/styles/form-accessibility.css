@@ -29,10 +29,10 @@
 }
 
 .fb-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
-.fb-workspace textarea,
+.fb-workspace textarea:not([data-doc-editor-canvas="true"]),
 .fb-workspace select,
 .fb-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
-.fb-page textarea,
+.fb-page textarea:not([data-doc-editor-canvas="true"]),
 .fb-page select {
   color: var(--fb-input-text) !important;
   caret-color: var(--fb-accent-blue, #4f8cff);
@@ -81,10 +81,44 @@
 .fb-workspace input.bg-slate-50:focus,
 .fb-workspace textarea.bg-slate-50:focus,
 .fb-workspace .fb-estimate-form input:focus,
-.fb-workspace .fb-estimate-form textarea:focus {
+.fb-workspace .fb-estimate-form textarea:focus:not([data-doc-editor-canvas="true"]) {
   background: rgba(62, 74, 98, 1) !important;
   border-color: rgba(79, 140, 255, 0.55) !important;
   box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+}
+
+.fb-estimate-form input:focus,
+.fb-estimate-form textarea:focus:not([data-doc-editor-canvas="true"]) {
+  background: rgba(62, 74, 98, 1) !important;
+  border-color: rgba(79, 140, 255, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+}
+
+/* Document canvas — white paper, dark text (all states, all shells) */
+textarea[data-doc-editor-canvas="true"],
+textarea[data-doc-editor-canvas="true"]:hover,
+textarea[data-doc-editor-canvas="true"]:focus,
+textarea[data-doc-editor-canvas="true"]:focus-visible,
+textarea[data-doc-editor-canvas="true"]:active {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827 !important;
+  background: #ffffff !important;
+  color-scheme: light !important;
+  border-color: #d1d5db !important;
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.22) !important;
+}
+
+textarea[data-doc-editor-canvas="true"]::placeholder {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
+  opacity: 1;
+}
+
+textarea[data-doc-editor-canvas="true"]:-webkit-autofill,
+textarea[data-doc-editor-canvas="true"]:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827 !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
 }
 
 /* Document-style editor: always white paper + dark text (focus, hover, typing) */
@@ -97,6 +131,7 @@
 .fb-page [data-document-editor="true"] [class*="paper"] {
   background: #ffffff !important;
   border-color: #d1d5db !important;
+  color-scheme: light;
 }
 
 .fb-workspace [data-document-editor="true"] textarea,
