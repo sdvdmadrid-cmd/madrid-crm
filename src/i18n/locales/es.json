@@ -1491,7 +1491,7 @@
       "paymentNotes": "Notas"
     },
     "paymentMethods": {
-      "bank_transfer": "Transferencia bancaria",
+      "bank_transfer": "ACH / Transferencia bancaria",
       "credit_card": "Tarjeta de credito",
       "debit_card": "Tarjeta de debito",
       "cash": "Efectivo",
@@ -1502,17 +1502,25 @@
       "other": "Otro"
     },
     "statusOptions": {
-      "Unpaid": "No pagada",
+      "Draft": "Borrador",
+      "Sent": "Enviada",
+      "Viewed": "Vista",
+      "Partial": "Parcialmente pagada",
+      "PartiallyPaid": "Parcialmente pagada",
       "Paid": "Pagada",
-      "Partial": "Parcial",
-      "Overdue": "Vencida"
+      "Overdue": "Vencida",
+      "Cancelled": "Cancelada",
+      "Unpaid": "No pagada"
     },
     "buttons": {
+      "newInvoice": "+ Nueva factura",
       "ai": "IA completar factura",
       "aiLoading": "IA generando...",
       "save": "Guardar",
       "update": "Actualizar",
       "clear": "Limpiar",
+      "printInvoice": "Imprimir factura",
+      "pdfPreview": "Vista previa PDF",
       "sendInvoiceEmail": "Enviar por email",
       "sendInvoiceText": "Enviar por texto",
       "shareInvoice": "Compartir link de pago",
@@ -1522,13 +1530,15 @@
       "delete": "Eliminar",
       "savePayment": "Guardar pago",
       "savingPayment": "Guardando...",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+      "useClient": "Usar cliente"
     },
     "prompts": {
       "recipientEmail": "Email del destinatario (deja vacio para usar el email del cliente):",
       "recipientPhone": "Telefono del destinatario para SMS:"
     },
     "messages": {
+      "searchingEstimate": "Buscando presupuestos…",
       "invoiceSent": "Factura enviada a {{email}}",
       "invoiceTextOpened": "Se abrio la app SMS para {{phone}}",
       "invoiceTextMessage": "Hola, tu factura {{invoice}} por {{amount}} esta lista. Paga en linea aqui: {{link}}",
@@ -1537,11 +1547,17 @@
     },
     "labels": {
       "untitled": "Factura sin numero",
+      "invoiceNumber": "Numero de factura",
+      "client": "Cliente",
+      "invoiceTitle": "Concepto de la factura",
+      "quoteNumber": "Presupuesto / cotizacion #",
       "amount": "Monto",
       "paid": "Pagado",
       "balance": "Saldo",
-      "preferredMethod": "Metodo preferido",
+      "preferredMethod": "Metodo de pago",
       "dueDate": "Vence",
+      "invoiceDate": "Fecha de factura",
+      "status": "Estado",
       "workPerformed": "Trabajo realizado",
       "internalNotes": "Notas internas",
       "staffOnly": "Solo equipo",
@@ -1562,6 +1578,19 @@
       "notes": "Notas",
       "paidTotal": "Total pagado",
       "balanceDue": "Saldo pendiente"
+    },
+    "summary": {
+      "title": "Resumen de factura",
+      "subtotal": "Subtotal",
+      "tax": "Impuesto",
+      "total": "Total",
+      "amountPaid": "Monto pagado",
+      "balanceDue": "Saldo pendiente"
+    },
+    "hints": {
+      "internalNotes": "Privado para tu equipo. Nunca se muestra en PDFs, emails, enlaces de pago ni vistas del cliente.",
+      "invoiceNumberAuto": "Dejar vacio para auto-generar.",
+      "statusComputed": "Se actualiza automaticamente segun pagos y fecha de vencimiento."
     },
     "empty": "No hay facturas para mostrar.",
     "errors": {

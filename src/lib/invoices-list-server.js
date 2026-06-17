@@ -3,6 +3,7 @@ import "server-only";
 import {
   computeInvoicePaymentState,
   normalizePaymentMethod,
+  resolveInvoiceStatus,
 } from "@/lib/invoice-payments";
 import { hydrateInvoiceDocsParty } from "@/lib/invoice-party";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -48,9 +49,11 @@ export function serializeInvoiceRow(doc) {
     updatedAt: doc.updated_at || null,
   };
 
+  const paymentState = computeInvoicePaymentState(base);
   return {
     ...base,
-    ...computeInvoicePaymentState(base),
+    ...paymentState,
+    status: resolveInvoiceStatus({ ...base, ...paymentState }),
   };
 }
 

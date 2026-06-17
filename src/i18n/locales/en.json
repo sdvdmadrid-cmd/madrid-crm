@@ -1778,7 +1778,7 @@
       "paymentNotes": "Notes"
     },
     "paymentMethods": {
-      "bank_transfer": "Bank transfer",
+      "bank_transfer": "ACH / Bank transfer",
       "credit_card": "Credit card",
       "debit_card": "Debit card",
       "cash": "Cash",
@@ -1789,10 +1789,15 @@
       "other": "Other"
     },
     "statusOptions": {
-      "Unpaid": "Unpaid",
+      "Draft": "Draft",
+      "Sent": "Sent",
+      "Viewed": "Viewed",
+      "Partial": "Partially paid",
+      "PartiallyPaid": "Partially paid",
       "Paid": "Paid",
-      "Partial": "Partial",
-      "Overdue": "Overdue"
+      "Overdue": "Overdue",
+      "Cancelled": "Cancelled",
+      "Unpaid": "Unpaid"
     },
     "buttons": {
       "newInvoice": "+ New invoice",
@@ -1801,7 +1806,8 @@
       "save": "Save",
       "update": "Update",
       "clear": "Clear",
-      "printInvoice": "Print / Save PDF",
+      "printInvoice": "Print invoice",
+      "pdfPreview": "PDF preview",
       "sendInvoiceEmail": "Send by email",
       "sendInvoiceText": "Send by text",
       "shareInvoice": "Share payment link",
@@ -1811,13 +1817,15 @@
       "delete": "Delete",
       "savePayment": "Save payment",
       "savingPayment": "Saving...",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "useClient": "Use client"
     },
     "prompts": {
       "recipientEmail": "Recipient email (leave blank to use client email):",
       "recipientPhone": "Recipient phone number for SMS:"
     },
     "messages": {
+      "searchingEstimate": "Searching estimates…",
       "invoiceSent": "Invoice sent to {{email}}",
       "invoiceTextOpened": "Opened SMS app for {{phone}}",
       "invoiceTextMessage": "Hi, your invoice {{invoice}} for {{amount}} is ready. Pay online here: {{link}}",
@@ -1848,12 +1856,18 @@
     "labels": {
       "untitled": "Invoice without number",
       "lineItems": "Line items",
+      "invoiceNumber": "Invoice number",
+      "client": "Client",
+      "invoiceTitle": "Invoice title",
+      "quoteNumber": "Estimate / quote #",
       "amount": "Amount",
       "paid": "Paid",
       "balance": "Balance",
-      "preferredMethod": "Preferred method",
+      "preferredMethod": "Payment method",
       "dueDate": "Due date",
-      "workPerformed": "Work Performed",
+      "invoiceDate": "Invoice date",
+      "status": "Status",
+      "workPerformed": "Work performed",
       "internalNotes": "Internal notes",
       "staffOnly": "Staff only",
       "noDate": "No date",
@@ -1874,9 +1888,19 @@
       "paidTotal": "Paid total",
       "balanceDue": "Balance due"
     },
+    "summary": {
+      "title": "Invoice summary",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "amountPaid": "Amount paid",
+      "balanceDue": "Balance due"
+    },
     "empty": "No invoices to display.",
     "hints": {
-      "internalNotes": "Private to your team. Never shown on PDFs, emails, payment links, or client views."
+      "internalNotes": "Private to your team. Never shown on PDFs, emails, payment links, or client views.",
+      "invoiceNumberAuto": "Leave blank to auto-generate.",
+      "statusComputed": "Updated automatically from payments and due date."
     },
     "warnings": {
       "clientNotLinked": "Pick the client from the search list (not only typing the name) so billing and job site addresses appear on the invoice."

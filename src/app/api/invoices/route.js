@@ -8,6 +8,7 @@ import {
   computeInvoicePaymentState,
   normalizeMoney,
   normalizePaymentMethod,
+  resolveInvoiceStatus,
 } from "@/lib/invoice-payments";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -266,7 +267,19 @@ export async function POST(request) {
     const paymentState = computeInvoicePaymentState({
       amount,
       payments: [],
+      dueDate: body.dueDate,
+      status: body.status || "Draft",
     });
+    const resolvedStatus = resolveInvoiceStatus(
+      {
+        amount,
+        payments: [],
+        dueDate: body.dueDate,
+        status: body.status || "Draft",
+        ...paymentState,
+      },
+      { requestedStatus: body.status || "Draft" },
+    );
 
     let toInsert = {
       tenant_id: tenantDbId,
@@ -294,7 +307,7 @@ export async function POST(request) {
       payments: paymentState.payments,
       paid_amount: paymentState.paidAmount,
       balance_due: paymentState.balanceDue,
-      status: paymentState.status,
+      status: resolvedStatus,
       created_by: userId || null,
       created_at: nowIso,
       updated_at: nowIso,

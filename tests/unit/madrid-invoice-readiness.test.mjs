@@ -66,6 +66,6 @@ test("Madrid invoice rows compute unpaid balance correctly", async (t) => {
       total_cents: row.total_cents,
     });
     assert.ok(Number.isFinite(state.balanceDue));
-    assert.ok(["Unpaid", "Partial", "Paid"].includes(state.status));
+    assert.ok(["Sent", "Partial", "Paid"].includes(state.status));
   }
 });

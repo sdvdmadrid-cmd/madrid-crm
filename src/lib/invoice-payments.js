@@ -149,10 +149,34 @@ export function serializeInvoiceRow(doc = {}) {
     updatedAt: doc.updated_at || null,
   };
 
+  const paymentState = computeInvoicePaymentState(base);
   return {
     ...base,
-    ...computeInvoicePaymentState(base),
+    ...paymentState,
+    status: resolveInvoiceStatus({ ...base, ...paymentState }),
   };
+}
+
+export const MANUAL_INVOICE_STATUSES = new Set([
+  "Draft",
+  "Sent",
+  "Viewed",
+  "Cancelled",
+]);
+
+export const COMPUTED_INVOICE_STATUSES = new Set([
+  "Paid",
+  "Partial",
+  "Overdue",
+]);
+
+export function isInvoiceOverdue(invoice = {}, balanceDue = 0) {
+  const amount = normalizeMoney(invoice.amount);
+  if (!(amount > 0) || !(balanceDue > 0)) return false;
+  const dueDate = String(invoice.dueDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return false;
+  const due = new Date(`${dueDate}T23:59:59`);
+  return Number.isFinite(due.getTime()) && due < new Date();
 }
 
 export function computeInvoicePaymentState(invoice = {}) {
@@ -165,7 +189,7 @@ export function computeInvoicePaymentState(invoice = {}) {
   );
   const balanceDue = Number(Math.max(0, amount - paidAmount).toFixed(2));
 
-  let status = "Unpaid";
+  let status = "Sent";
   if (amount > 0 && balanceDue <= 0) {
     status = "Paid";
   } else if (paidAmount > 0 && balanceDue > 0) {
@@ -178,4 +202,30 @@ export function computeInvoicePaymentState(invoice = {}) {
     balanceDue,
     status,
   };
+}
+
+/** Merge workflow status with payment-derived state for API/UI display. */
+export function resolveInvoiceStatus(invoice = {}, options = {}) {
+  const requested = String(
+    options.requestedStatus ?? invoice.status ?? "Sent",
+  ).trim();
+  const amount = normalizeMoney(invoice.amount);
+  const paymentState = computeInvoicePaymentState(invoice);
+  const { paidAmount, balanceDue } = paymentState;
+
+  if (requested === "Cancelled" || invoice.status === "Cancelled") {
+    return "Cancelled";
+  }
+
+  if (amount > 0 && balanceDue <= 0) return "Paid";
+  if (paidAmount > 0 && balanceDue > 0) return "Partial";
+
+  if (isInvoiceOverdue(invoice, balanceDue)) return "Overdue";
+
+  if (requested === "Draft" && paidAmount <= 0) return "Draft";
+  if (MANUAL_INVOICE_STATUSES.has(requested)) return requested;
+  if (MANUAL_INVOICE_STATUSES.has(invoice.status)) return invoice.status;
+
+  if (invoice.status === "Unpaid" || !invoice.status) return "Sent";
+  return invoice.status || "Sent";
 }

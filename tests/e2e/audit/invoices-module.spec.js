@@ -73,18 +73,18 @@ test.describe("Invoices module audit", () => {
     const clientName = `UI Inv Client ${stamp}`;
 
     const title = `Audit title ${stamp}`;
-    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
-    await page.getByPlaceholder("Invoice title", { exact: true }).fill(title);
-    await page.getByPlaceholder("Amount", { exact: true }).fill("880");
-    await page.locator('input[type="date"]').first().fill("2026-12-15");
+    await page.getByLabel(/^Invoice title$/i).fill(title);
+    await page.getByLabel(/^Amount$/i).fill("880");
+    await page.getByLabel(/^Due date$/i).fill("2026-12-15");
     await page.getByRole("button", { name: /^Save$/i }).click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
     await expect(card).toBeVisible({ timeout: 25_000 });
     await expect(
-      card.getByRole("link", { name: /Print \/ Save PDF document/i }),
+      card.getByRole("link", { name: /Print invoice document/i }),
     ).toBeVisible();
     await expect(card.getByRole("link", { name: /Download PDF/i })).toBeVisible();
 
@@ -99,10 +99,10 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-EDIT-${stamp}`;
 
     const clientName = `Edit Inv ${stamp}`;
-    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
-    await page.getByPlaceholder("Amount", { exact: true }).fill("400");
-    await page.locator('input[type="date"]').first().fill("2026-11-01");
+    await page.getByLabel(/^Amount$/i).fill("400");
+    await page.getByLabel(/^Due date$/i).fill("2026-11-01");
     await page.getByRole("button", { name: /^Save$/i }).click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
@@ -111,7 +111,7 @@ test.describe("Invoices module audit", () => {
 
     await card.getByRole("button", { name: /^Edit$/i }).click();
     await expect(page.getByRole("heading", { name: /Edit invoice/i })).toBeVisible();
-    await page.getByPlaceholder("Amount", { exact: true }).fill("550");
+    await page.getByLabel(/^Amount$/i).fill("550");
     await page.getByRole("button", { name: /^Update$/i }).click();
 
     await expect(page.getByRole("heading", { name: /New invoice/i })).toBeVisible({
@@ -190,10 +190,10 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-PAY-${stamp}`;
 
     const clientName = `Pay Client ${stamp}`;
-    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
-    await page.getByPlaceholder("Amount", { exact: true }).fill("200");
-    await page.locator('input[type="date"]').first().fill("2026-08-01");
+    await page.getByLabel(/^Amount$/i).fill("200");
+    await page.getByLabel(/^Due date$/i).fill("2026-08-01");
     await page.getByRole("button", { name: /^Save$/i }).click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
@@ -219,9 +219,9 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-LINES-${stamp}`;
     const clientName = `Lines Client ${stamp}`;
 
-    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
-    await page.locator('input[type="date"]').first().fill("2026-12-20");
+    await page.getByLabel(/^Due date$/i).fill("2026-12-20");
 
     await expect(page.getByTestId("invoice-line-items-section")).toBeVisible();
     const row = page.getByTestId("invoice-line-item-row").first();
@@ -231,7 +231,7 @@ test.describe("Invoices module audit", () => {
     await numberInputs.nth(1).fill("175");
 
     await expect(page.getByTestId("invoice-line-items-total")).toContainText("$350.00");
-    await expect(page.getByPlaceholder("Amount", { exact: true })).toHaveValue("350");
+    await expect(page.getByLabel(/^Amount$/i)).toHaveValue("350");
 
     await page.getByRole("button", { name: /^Save$/i }).click();
     await page.getByLabel(/Search invoices/i).fill(clientName);
@@ -254,10 +254,10 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-NOLINES-${stamp}`;
     const clientName = `No Lines ${stamp}`;
 
-    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
-    await page.getByPlaceholder("Amount", { exact: true }).fill("99");
-    await page.locator('input[type="date"]').first().fill("2026-12-01");
+    await page.getByLabel(/^Amount$/i).fill("99");
+    await page.getByLabel(/^Due date$/i).fill("2026-12-01");
     await page.getByRole("button", { name: /^Save$/i }).click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
@@ -399,10 +399,10 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-CLEAR-${stamp}`;
 
     const clientName = `Clear ${stamp}`;
-    await page.getByPlaceholder("Invoice number", { exact: true }).fill(invNum);
+    await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
-    await page.getByPlaceholder("Amount", { exact: true }).fill("100");
-    await page.locator('input[type="date"]').first().fill("2026-07-01");
+    await page.getByLabel(/^Amount$/i).fill("100");
+    await page.getByLabel(/^Due date$/i).fill("2026-07-01");
     await page.getByRole("button", { name: /^Save$/i }).click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
@@ -410,7 +410,7 @@ test.describe("Invoices module audit", () => {
     await expect(page.getByRole("heading", { name: /Edit invoice/i })).toBeVisible();
     await page.getByRole("button", { name: /^Clear$/i }).click();
     await expect(page.getByRole("heading", { name: /New invoice/i })).toBeVisible();
-    await expect(page.getByPlaceholder("Invoice number", { exact: true })).toHaveValue("");
+    await expect(page.getByLabel(/^Invoice number$/i)).toHaveValue("");
   });
 
   test("invoice totals page shows paid and unpaid summary", async ({ page }) => {
