@@ -278,6 +278,7 @@ export async function runAiCompletion({
         usage,
         estimatedCostUsd,
         responseTimeMs,
+        finishReason: completion?.choices?.[0]?.finish_reason || null,
       };
     } catch (error) {
       const status = Number(error?.status || 0);
