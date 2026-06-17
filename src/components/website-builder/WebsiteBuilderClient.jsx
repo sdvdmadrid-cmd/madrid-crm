@@ -22,12 +22,12 @@ import {
 } from "@/lib/public-website-routing";
 import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
 import {
+  enhanceWebsiteCopyParallel,
   findFirstEmptyHeroSlotIndex,
   mergeFullSiteIntoDraft,
-  runWithConcurrency,
+  mergeWebsiteCopySection,
   WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
   WEBSITE_FULL_GENERATE_TIMEOUT_MS,
-  WEBSITE_GALLERY_CONCURRENCY,
   WEBSITE_HERO_IMAGE_TIMEOUT_MS,
 } from "@/lib/website-builder-client-generation";
 import {
@@ -147,6 +147,9 @@ export default function WebsiteBuilderClient() {
   const galleryUploadInputRef = useRef(null);
   const galleryPanelRef = useRef(null);
   const generatingLockRef = useRef(false);
+  const prefetchedDraftRef = useRef(null);
+  const prefetchAbortRef = useRef(null);
+  const PREFETCH_DRAFT_TTL_MS = 120_000;
   const imageEnhanceAbortRef = useRef(null);
   const [imageEnhancing, setImageEnhancing] = useState(false);
   const [copyEnhancing, setCopyEnhancing] = useState(false);
@@ -389,6 +392,46 @@ export default function WebsiteBuilderClient() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || builderStep !== 1 || completenessScore >= 40) return undefined;
+
+    prefetchAbortRef.current?.abort();
+    const abort = new AbortController();
+    prefetchAbortRef.current = abort;
+
+    const catalogServices = (formRef.current?.services || form.services || [])
+      .slice(0, 20)
+      .map((s) => ({
+        name: s?.name || "",
+        description: s?.description || "",
+      }));
+
+    apiFetch("/api/website-builder/generate-full", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        services: catalogServices,
+        currentForm: formRef.current || form,
+        enhanceCopy: false,
+      }),
+      timeoutMs: WEBSITE_FULL_GENERATE_TIMEOUT_MS,
+      signal: abort.signal,
+    })
+      .then((res) => getJsonOrThrow(res, t.errorGenerate))
+      .then((payload) => {
+        if (abort.signal.aborted) return;
+        prefetchedDraftRef.current = {
+          data: payload.data || {},
+          fetchedAt: Date.now(),
+        };
+      })
+      .catch(() => {});
+
+    return () => {
+      abort.abort();
+    };
+  }, [loading, builderStep, completenessScore, form.services, t.errorGenerate]);
 
   const handleSave = useCallback(
     async (data, options = {}) => {
@@ -774,19 +817,30 @@ export default function WebsiteBuilderClient() {
     const currentForm = formRef.current || form;
 
     try {
-      const res = await apiFetch("/api/website-builder/generate-full", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          services: catalogServices,
-          currentForm,
-          enhanceCopy: false,
-        }),
-        timeoutMs: WEBSITE_FULL_GENERATE_TIMEOUT_MS,
-        signal: abort.signal,
-      });
-      const payload = await getJsonOrThrow(res, t.errorGenerate);
-      const d = payload.data || {};
+      let d = null;
+      const prefetched = prefetchedDraftRef.current;
+      if (
+        prefetched?.data &&
+        Date.now() - Number(prefetched.fetchedAt || 0) < PREFETCH_DRAFT_TTL_MS
+      ) {
+        d = prefetched.data;
+        prefetchedDraftRef.current = null;
+      } else {
+        const res = await apiFetch("/api/website-builder/generate-full", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            services: catalogServices,
+            currentForm,
+            enhanceCopy: false,
+          }),
+          timeoutMs: WEBSITE_FULL_GENERATE_TIMEOUT_MS,
+          signal: abort.signal,
+        });
+        const payload = await getJsonOrThrow(res, t.errorGenerate);
+        d = payload.data || {};
+      }
+
       const { nextForm, nextSiteMeta } = mergeFullSiteIntoDraft({
         form: currentForm,
         siteMeta,
@@ -818,44 +872,37 @@ export default function WebsiteBuilderClient() {
         setCopyEnhancing(true);
         setGenProgress(t.genStepCopyEnhance || t.genStepCopy);
         try {
-          const enhanceRes = await apiFetch("/api/website-builder/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ section: "all", services: catalogServices }),
-            timeoutMs: WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
+          let workingForm = formRef.current || nextForm;
+          let workingMeta = nextSiteMeta;
+
+          await enhanceWebsiteCopyParallel({
+            apiFetch,
+            getJsonOrThrow,
+            catalogServices,
             signal: abort.signal,
+            timeoutMs: WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
+            onSectionComplete: async (_section, sectionData) => {
+              const merged = mergeWebsiteCopySection(
+                workingForm,
+                workingMeta,
+                sectionData,
+              );
+              workingForm = merged.nextForm;
+              workingMeta = {
+                ...merged.nextSiteMeta,
+                generationSource: "ai",
+              };
+              skipAutosave.current = true;
+              formRef.current = workingForm;
+              setForm(workingForm);
+              setSiteMeta(workingMeta);
+              setCompletenessScore(
+                analyzeWebsiteCompleteness(workingForm, workingMeta).score,
+              );
+            },
           });
-          const enhancePayload = await getJsonOrThrow(enhanceRes, t.errorGenerate);
-          const copy = enhancePayload.data || {};
-          const enhancedForm = {
-            ...(formRef.current || nextForm),
-            headline: copy.headline || formRef.current?.headline || nextForm.headline,
-            subheadline: copy.subheadline || formRef.current?.subheadline || nextForm.subheadline,
-            aboutText: copy.aboutText || formRef.current?.aboutText || nextForm.aboutText,
-            ctaText: copy.ctaText || formRef.current?.ctaText || nextForm.ctaText,
-            services: copy.services?.length
-              ? copy.services
-              : formRef.current?.services || nextForm.services,
-            trustBadges: copy.trustBadges?.length
-              ? copy.trustBadges
-              : formRef.current?.trustBadges || nextForm.trustBadges,
-            themeColor: copy.themeColor || formRef.current?.themeColor || nextForm.themeColor,
-          };
-          const enhancedMeta = {
-            ...nextSiteMeta,
-            ...(copy.siteMeta || {}),
-            seoTitle: copy.seoTitle || nextSiteMeta.seoTitle,
-            seoDescription: copy.seoDescription || nextSiteMeta.seoDescription,
-            generationSource: "ai",
-          };
-          skipAutosave.current = true;
-          formRef.current = enhancedForm;
-          setForm(enhancedForm);
-          setSiteMeta(enhancedMeta);
-          setCompletenessScore(
-            analyzeWebsiteCompleteness(enhancedForm, enhancedMeta).score,
-          );
-          void handleSave({ ...enhancedForm, siteMeta: enhancedMeta }, { silent: true });
+
+          void handleSave({ ...workingForm, siteMeta: workingMeta }, { silent: true });
           showNotice(t.generateFullDone);
         } catch (copyErr) {
           if (copyErr?.name !== "AbortError") {
@@ -938,58 +985,56 @@ export default function WebsiteBuilderClient() {
       const basePrompt = String(prompt || imagePrompt || "").trim();
       if (!basePrompt) throw new Error("No gallery prompt provided");
 
-      const prompts = Array.from(
-        { length: total },
-        (_, i) => `${basePrompt}, variation ${i + 1}`,
-      );
+      const current = formRef.current || form;
+      const remainingSlots = MAX_FEATURED_GALLERY - (current.galleryPhotos || []).length;
+      if (remainingSlots <= 0) return 0;
 
-      const generatedPhotos = (
-        await runWithConcurrency(prompts, WEBSITE_GALLERY_CONCURRENCY, async (p) => {
-          const current = formRef.current || form;
-          if ((current.galleryPhotos || []).length >= MAX_FEATURED_GALLERY) return null;
+      const batchCount = Math.min(total, remainingSlots);
+      const res = await apiFetch("/api/website-builder/generate-images-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: basePrompt,
+          count: batchCount,
+          style: imageStyle,
+          mediaKind: "gallery",
+          draft: true,
+        }),
+        timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS * Math.ceil(batchCount / 2),
+      });
+      const payload = await getJsonOrThrow(res, t.errorGenerateImage);
+      const images = Array.isArray(payload?.data?.images) ? payload.data.images : [];
 
-          const res = await apiFetch("/api/website-builder/generate-image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              prompt: p,
-              style: imageStyle,
-              mediaKind: "gallery",
-              draft: true,
-            }),
-            timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
-          });
-          const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-          const imageSrc = String(payload?.data?.imageUrl || payload?.data?.imageDataUrl || "");
+      const newPhotos = images
+        .map((row, i) => {
+          const imageSrc = String(row?.imageUrl || row?.imageDataUrl || "");
           if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
             return null;
           }
-
           return {
-            id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            id: `ai-${Date.now()}-${i}`,
             src: imageSrc,
             thumbnail: imageSrc,
-            alt: String(payload?.data?.alt || basePrompt).slice(0, 160),
+            alt: String(row?.alt || basePrompt).slice(0, 160),
             persisted: /^https?:\/\//i.test(imageSrc),
           };
         })
-      ).filter(Boolean);
+        .filter(Boolean);
 
-      if (generatedPhotos.length === 0) return 0;
+      if (newPhotos.length === 0) return 0;
 
-      const current = formRef.current || form;
       const nextForm = {
         ...current,
         galleryPhotos: normalizeGalleryPhotos([
           ...(current.galleryPhotos || []),
-          ...generatedPhotos,
+          ...newPhotos,
         ]).slice(0, MAX_FEATURED_GALLERY),
       };
       skipAutosave.current = true;
       formRef.current = nextForm;
       setForm(nextForm);
       await handleSave(nextForm, { silent: true });
-      return generatedPhotos.length;
+      return newPhotos.length;
     },
     [form, imagePrompt, imageStyle, t, handleSave],
   );
@@ -1607,9 +1652,14 @@ export default function WebsiteBuilderClient() {
 
       <div className={styles.workspaceVisual}>
         <div className={styles.visualStage} aria-label="Website preview">
-          {(notice || error || autoSaved) && (
+          {(notice || error || autoSaved || copyEnhancing) && (
             <div className={styles.visualToast}>
               {notice ? <div className={styles.notice}>{notice}</div> : null}
+              {copyEnhancing ? (
+                <div className={styles.notice} data-testid="website-copy-enhancing">
+                  {t.copyEnhancingHint || t.genStepCopyEnhance}
+                </div>
+              ) : null}
               {error ? <div className={styles.error}>{error}</div> : null}
               {autoSaved ? <div className={styles.savePulse}>{t.savedAuto}</div> : null}
             </div>

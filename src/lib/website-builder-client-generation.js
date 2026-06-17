@@ -58,3 +58,62 @@ export function findFirstEmptyHeroSlotIndex(heroPhotos = []) {
   }
   return -1;
 }
+
+export const WEBSITE_COPY_SECTIONS = ["hero", "services", "trust", "seo"];
+
+/** Merge partial AI section payloads into form + siteMeta. */
+export function mergeWebsiteCopySection(baseForm, baseSiteMeta, sectionData = {}) {
+  const nextForm = { ...baseForm };
+  const nextSiteMeta = { ...baseSiteMeta };
+
+  if (sectionData.headline) nextForm.headline = sectionData.headline;
+  if (sectionData.subheadline) nextForm.subheadline = sectionData.subheadline;
+  if (sectionData.aboutText) nextForm.aboutText = sectionData.aboutText;
+  if (sectionData.ctaText) nextForm.ctaText = sectionData.ctaText;
+  if (sectionData.services?.length) nextForm.services = sectionData.services;
+  if (sectionData.trustBadges?.length) nextForm.trustBadges = sectionData.trustBadges;
+  if (sectionData.themeColor) nextForm.themeColor = sectionData.themeColor;
+
+  if (sectionData.siteMeta && typeof sectionData.siteMeta === "object") {
+    Object.assign(nextSiteMeta, sectionData.siteMeta);
+  }
+  if (sectionData.seoTitle) nextSiteMeta.seoTitle = sectionData.seoTitle;
+  if (sectionData.seoDescription) nextSiteMeta.seoDescription = sectionData.seoDescription;
+
+  return { nextForm, nextSiteMeta };
+}
+
+/**
+ * Enhance website copy with parallel section requests — hero text appears first.
+ */
+export async function enhanceWebsiteCopyParallel({
+  apiFetch,
+  getJsonOrThrow,
+  catalogServices = [],
+  signal,
+  timeoutMs,
+  onSectionComplete,
+}) {
+  const sections = WEBSITE_COPY_SECTIONS;
+
+  await Promise.allSettled(
+    sections.map(async (section) => {
+      try {
+        const res = await apiFetch("/api/website-builder/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section, services: catalogServices }),
+          timeoutMs,
+          signal,
+        });
+        const payload = await getJsonOrThrow(res, `Failed to enhance ${section}`);
+        if (typeof onSectionComplete === "function") {
+          await onSectionComplete(section, payload?.data || {});
+        }
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        console.warn(`[website-builder] copy section "${section}" skipped`, error?.message || error);
+      }
+    }),
+  );
+}
