@@ -78,9 +78,17 @@ export async function GET(request) {
       String(process.env.STRIPE_WEBHOOK_SECRET || "").trim() &&
       String(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "").trim(),
   );
+  out.stripe.webhookSecretCount = [
+    process.env.STRIPE_WEBHOOK_SECRET,
+    process.env.STRIPE_WEBHOOK_SECRET_PREVIOUS,
+    process.env.STRIPE_WEBHOOK_SECRETS,
+  ].filter((value) => String(value || "").trim()).length;
   if (!out.stripe.ok) {
     out.stripe.hint =
       "Stripe is missing one of: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.";
+  } else {
+    out.stripe.hint =
+      "Live webhook URL: https://fieldbaseapp.net/api/payments/webhooks/stripe — signing secret must match Stripe Dashboard → Developers → Webhooks (live mode). During rotation, set STRIPE_WEBHOOK_SECRET_PREVIOUS to the old secret.";
   }
   out.stripe.connectEnabled =
     String(process.env.STRIPE_CONNECT_ENABLED || "").toLowerCase() === "true";

@@ -414,7 +414,11 @@ async function isDuplicateStripeWebhookEvent(eventId) {
       error.code === "42P01" ||
       String(error.message || "").includes("stripe_webhook_events");
     if (missingTable) return false;
-    throw new Error(error.message);
+    console.warn(
+      "[stripe-webhook-processing] duplicate check failed",
+      error.message,
+    );
+    return false;
   }
 
   return Boolean(data?.id);
@@ -951,7 +955,12 @@ async function dispatchStripeWebhookEvent(event) {
   const sessionAmount = Number((session.amount_total || 0) / 100);
 
   if (!paymentId || !tenantId || !contractorId || !invoiceId) {
-    return jsonResponse({ success: false, error: "Missing Stripe payment metadata" }, 400);
+    return jsonResponse({
+      success: true,
+      ignored: true,
+      reason: "Missing FieldBase payment metadata",
+      eventType: event.type,
+    });
   }
 
   const access = await requireWebhookPaymentResources({
@@ -983,7 +992,18 @@ async function dispatchStripeWebhookEvent(event) {
   }
 
   if (!payment) {
-    return jsonResponse({ success: false, error: "Payment not found" }, 404);
+    console.warn("[stripe-webhook-processing] payment not found for webhook", {
+      paymentId,
+      invoiceId,
+      tenantId,
+      sessionId: session.id,
+    });
+    return jsonResponse({
+      success: true,
+      ignored: true,
+      reason: "Payment not found",
+      eventType: event.type,
+    });
   }
 
   if (
