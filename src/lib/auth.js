@@ -58,9 +58,30 @@ export function verifyPassword(password, stored) {
   }
 }
 
+const JWT_STANDARD_CLAIMS = new Set([
+  "exp",
+  "iat",
+  "nbf",
+  "aud",
+  "iss",
+  "sub",
+  "jti",
+]);
+
+/** jwt.verify returns standard claims that must not be passed back into jwt.sign. */
+export function normalizeSessionPayloadForSigning(payload = {}) {
+  const clean = { ...(payload && typeof payload === "object" ? payload : {}) };
+  for (const key of JWT_STANDARD_CLAIMS) {
+    delete clean[key];
+  }
+  delete clean.sv;
+  return clean;
+}
+
 export function createSessionToken(payload) {
   const sessionSecret = assertSessionSecret();
-  return jwt.sign({ ...payload, sv: SESSION_VERSION }, sessionSecret, {
+  const normalized = normalizeSessionPayloadForSigning(payload);
+  return jwt.sign({ ...normalized, sv: SESSION_VERSION }, sessionSecret, {
     algorithm: "HS256",
     expiresIn: SESSION_TTL_SECONDS,
     issuer: JWT_ISSUER,

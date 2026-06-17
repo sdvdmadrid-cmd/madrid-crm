@@ -74,6 +74,7 @@ export async function performClientLogout({
     }
 
     await supabase.auth.signOut().catch(() => {});
+    logoutInFlight = false;
     performAuthHardNavigate(redirectTo);
   } catch (error) {
     console.error("[auth] logout failed", error);
