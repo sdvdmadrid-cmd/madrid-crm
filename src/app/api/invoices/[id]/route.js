@@ -2,6 +2,7 @@ import {
   computeInvoicePaymentState,
   normalizeMoney,
   normalizePaymentMethod,
+  resolveInvoiceStatus,
 } from "@/lib/invoice-payments";
 import { findEstimateForNumber } from "@/lib/estimate-invoice-linking";
 import {
@@ -64,9 +65,11 @@ function serialize(doc) {
     updatedAt: doc.updated_at || null,
   };
 
+  const paymentState = computeInvoicePaymentState(base);
   return {
     ...base,
-    ...computeInvoicePaymentState(base),
+    ...paymentState,
+    status: resolveInvoiceStatus({ ...base, ...paymentState }),
   };
 }
 
@@ -184,15 +187,26 @@ export async function PATCH(request, { params }) {
     const merged = {
       amount: "amount" in body ? body.amount : existing.amount,
       payments: existing.payments,
+      dueDate:
+        "dueDate" in body
+          ? body.dueDate
+          : existing.due_date
+            ? String(existing.due_date).slice(0, 10)
+            : "",
       preferredPaymentMethod:
         "preferredPaymentMethod" in body
           ? body.preferredPaymentMethod
           : existing.preferred_payment_method,
+      status: "status" in body ? body.status : existing.status,
     };
 
     const paymentState = computeInvoicePaymentState(merged);
     const normalizedAmount = normalizeMoney(merged.amount);
     const amountCents = Math.round(normalizedAmount * 100);
+    const resolvedStatus = resolveInvoiceStatus(
+      { ...merged, ...paymentState },
+      { requestedStatus: merged.status },
+    );
 
     const updateRow = {
       updated_at: new Date().toISOString(),
@@ -202,7 +216,7 @@ export async function PATCH(request, { params }) {
       payments: paymentState.payments,
       paid_amount: paymentState.paidAmount,
       balance_due: paymentState.balanceDue,
-      status: paymentState.status,
+      status: resolvedStatus,
       subtotal_cents: amountCents,
       tax_cents: 0,
       total_cents: amountCents,

@@ -241,6 +241,9 @@ export async function POST(request, { params }) {
     if (sendResult.success) {
       updatePayload.invoice_email_sent_at = nowIso;
       updatePayload.invoice_email_sent_to = recipientEmail;
+      if (!["Paid", "Partial", "Cancelled"].includes(invoice.status || "")) {
+        updatePayload.status = "Sent";
+      }
     }
 
     let updateQuery = supabaseAdmin

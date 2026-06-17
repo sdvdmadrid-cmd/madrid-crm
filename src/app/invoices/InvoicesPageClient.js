@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
-import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import {
   escapeHtml,
   openPrintableHtmlDocument,
@@ -32,6 +31,11 @@ import {
   normalizeInvoiceLineItemsForSave,
   sumInvoiceLineItemsTotals,
 } from "@/lib/invoice-line-items";
+import {
+  COMPUTED_INVOICE_STATUSES,
+  normalizeMoney,
+  resolveInvoiceStatus,
+} from "@/lib/invoice-payments";
 import { buildFieldBasePoweredByHtml } from "@/lib/fieldbase-document-branding";
 import { buildInvoicePartyHtmlBlock } from "@/lib/invoice-party";
 import { buildInvoicePaymentInstructions } from "@/lib/invoice-client-payment-instructions";
@@ -48,24 +52,44 @@ const initialInvoice = {
   quoteNumber: "",
   amount: "",
   dueDate: "",
-  status: "Unpaid",
-  preferredPaymentMethod: "bank_transfer",
+  status: "Draft",
+  preferredPaymentMethod: "cash",
   lineItems: [createInvoiceLineItem("line-1")],
   notes: "",
   internalNotes: "",
 };
 
 const PAYMENT_METHOD_VALUES = [
-  "bank_transfer",
-  "credit_card",
-  "debit_card",
   "cash",
   "check",
+  "credit_card",
+  "bank_transfer",
   "zelle",
   "venmo",
   "paypal",
   "other",
 ];
+
+const INVOICE_STATUS_VALUES = [
+  "Draft",
+  "Sent",
+  "Viewed",
+  "Partial",
+  "Paid",
+  "Overdue",
+  "Cancelled",
+];
+
+const invoiceStatusOptions = (t) =>
+  INVOICE_STATUS_VALUES.map((value) => ({
+    value,
+    label:
+      t(`invoices.statusOptions.${value}`) ||
+      t(`invoices.statusOptions.${value === "Partial" ? "PartiallyPaid" : value}`) ||
+      value,
+  }));
+
+const formatUsd = (value) => `$${Number(value || 0).toFixed(2)}`;
 
 const paymentMethodOptions = (t) =>
   PAYMENT_METHOD_VALUES.map((value) => ({
@@ -156,6 +180,40 @@ export default function InvoicesPageClient({ initialList = null }) {
   const canEditInvoices = capabilities.canManageSensitiveData;
   const canManageInvoicePayments = capabilities.canManageSensitiveData;
   const formSectionRef = useRef(null);
+
+  const selectedInvoice = useMemo(
+    () => invoices.find((invoice) => invoice._id === selectedId) || null,
+    [invoices, selectedId],
+  );
+
+  const formTotals = useMemo(() => {
+    const lineSubtotal = sumInvoiceLineItemsTotals(form.lineItems);
+    const total = normalizeMoney(form.amount) || lineSubtotal;
+    const tax = 0;
+    const paid = Number(selectedInvoice?.paidAmount || 0);
+    const balance = Math.max(0, Number((total - paid).toFixed(2)));
+    return {
+      subtotal: lineSubtotal > 0 ? lineSubtotal : total,
+      tax,
+      total,
+      paid,
+      balance,
+    };
+  }, [form.amount, form.lineItems, selectedInvoice]);
+
+  const effectiveStatus = useMemo(
+    () =>
+      resolveInvoiceStatus(
+        {
+          ...form,
+          payments: selectedInvoice?.payments || [],
+        },
+        { requestedStatus: form.status },
+      ),
+    [form, selectedInvoice],
+  );
+
+  const statusIsComputed = COMPUTED_INVOICE_STATUSES.has(effectiveStatus);
 
   const visibleInvoices = useMemo(() => {
     let list = invoices;
@@ -493,7 +551,7 @@ export default function InvoicesPageClient({ initialList = null }) {
       quoteNumber: invoice.quoteNumber || "",
       amount: invoice.amount || "",
       dueDate: invoice.dueDate || "",
-      status: invoice.status || "Unpaid",
+      status: invoice.status || "Sent",
       preferredPaymentMethod: invoice.preferredPaymentMethod || "bank_transfer",
       lineItems: normalizeInvoiceLineItemsForForm(invoice.lineItems),
       notes: invoice.notes || "",
@@ -810,199 +868,406 @@ export default function InvoicesPageClient({ initialList = null }) {
             className={styles.card}
             data-testid="invoices-form-section"
           >
-            <h2 className={styles.cardTitle}>
-              {selectedId
-                ? t("invoices.formTitleEdit")
-                : t("invoices.formTitleNew")}
-            </h2>
+            <div className={styles.formHeaderRow}>
+              <h2 className={styles.cardTitle}>
+                {selectedId
+                  ? t("invoices.formTitleEdit")
+                  : t("invoices.formTitleNew")}
+              </h2>
+              {selectedId ? (
+                <div className={styles.formHeaderActions}>
+                  <a
+                    href={`/api/invoices/${selectedId}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.btnGhost}
+                    data-testid="invoice-form-pdf-preview"
+                  >
+                    {t("invoices.buttons.pdfPreview", {
+                      defaultValue: "PDF preview",
+                    })}
+                  </a>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    data-testid="invoice-form-print"
+                    onClick={() => {
+                      if (selectedInvoice) void openPrintableInvoice(selectedInvoice);
+                    }}
+                  >
+                    {t("invoices.buttons.printInvoice")}
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div className={styles.formDocumentLayout}>
-              <div className={styles.formDocumentMain}>
-                <DocumentStyleEditor
-                  label={t("invoices.labels.workPerformed", {
-                    defaultValue: "Work Performed",
-                  })}
-                  value={form.notes}
-                  onChange={(notes) => setForm({ ...form, notes })}
-                  placeholder={t("invoices.placeholders.workPerformed", {
-                    defaultValue:
-                      "Describe services, materials, labor, and project details shown on the invoice.",
-                  })}
-                  data-testid="invoice-work-performed-editor"
-                  toolbar={
+              <div className={styles.formDocumentPrimary}>
+                <div className={styles.invoiceFieldsGrid}>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="invoice-number">
+                      {t("invoices.labels.invoiceNumber", {
+                        defaultValue: "Invoice number",
+                      })}
+                    </label>
+                    <input
+                      id="invoice-number"
+                      placeholder={t("invoices.placeholders.invoiceNumberAuto")}
+                      value={form.invoiceNumber}
+                      onChange={(e) =>
+                        setForm({ ...form, invoiceNumber: e.target.value })
+                      }
+                      className={styles.field}
+                    />
+                    <p className={styles.formHint}>
+                      {t("invoices.hints.invoiceNumberAuto", {
+                        defaultValue: "Leave blank to auto-generate.",
+                      })}
+                    </p>
+                  </div>
+
+                  <div className={`${styles.formField} ${styles.formFieldSpan2}`}>
+                    <label className={styles.formLabel} htmlFor="invoice-client">
+                      {t("invoices.labels.client", { defaultValue: "Client" })}
+                    </label>
+                    <ClientPickerField
+                      id="invoice-client"
+                      className={styles.clientPicker}
+                      variant="dark"
+                      clientId={form.clientId || ""}
+                      displayValue={form.clientName}
+                      showHint
+                      placeholder={t("invoices.placeholders.client")}
+                      onChange={({ clientId, clientName, displayValue, client }) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          clientId: clientId || "",
+                          clientName: clientName || displayValue || "",
+                          clientEmail: client?.email || prev.clientEmail || "",
+                        }))
+                      }
+                    />
+                  </div>
+
+                  {form.clientName && !form.clientId ? (
+                    <p
+                      className={`${styles.clientLinkWarning} ${styles.formFieldSpanFull}`}
+                      role="status"
+                    >
+                      {t("invoices.warnings.clientNotLinked")}
+                    </p>
+                  ) : null}
+
+                  <div className={`${styles.formField} ${styles.formFieldSpan2}`}>
+                    <label className={styles.formLabel} htmlFor="invoice-title">
+                      {t("invoices.labels.invoiceTitle", {
+                        defaultValue: "Invoice title",
+                      })}
+                    </label>
+                    <input
+                      id="invoice-title"
+                      placeholder={t("invoices.placeholders.invoiceTitle")}
+                      value={form.invoiceTitle}
+                      onChange={(e) =>
+                        setForm({ ...form, invoiceTitle: e.target.value })
+                      }
+                      className={styles.field}
+                    />
+                  </div>
+
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="invoice-quote">
+                      {t("invoices.labels.quoteNumber", {
+                        defaultValue: "Estimate / quote #",
+                      })}
+                    </label>
+                    <input
+                      id="invoice-quote"
+                      placeholder={t("invoices.placeholders.quoteNumber")}
+                      value={form.quoteNumber}
+                      onChange={(e) =>
+                        setForm({ ...form, quoteNumber: e.target.value })
+                      }
+                      onBlur={(e) => lookupEstimate(e.target.value)}
+                      className={styles.field}
+                    />
+                  </div>
+
+                  {quoteLookupLoading ? (
+                    <p className={`${styles.quoteSearching} ${styles.formFieldSpanFull}`}>
+                      {t("invoices.messages.searchingEstimate", {
+                        defaultValue: "Searching estimates…",
+                      })}
+                    </p>
+                  ) : null}
+
+                  {quoteLookup ? (
+                    <div className={`${styles.quoteLookup} ${styles.formFieldSpanFull}`}>
+                      <span>
+                        <strong>{quoteLookup.estimateNumber}</strong> —{" "}
+                        {quoteLookup.clientName || "Unknown client"}
+                        {quoteLookup.total > 0 &&
+                          ` · $${Number(quoteLookup.total).toFixed(2)}`}
+                      </span>
+                      {quoteLookup.clientName && !form.clientName ? (
+                        <button
+                          type="button"
+                          className={styles.quoteLookupBtn}
+                          onClick={() => {
+                            setForm((f) => ({
+                              ...f,
+                              clientName: quoteLookup.clientName,
+                              quoteNumber: quoteLookup.estimateNumber,
+                            }));
+                            setQuoteLookup(null);
+                          }}
+                        >
+                          {t("invoices.buttons.useClient", {
+                            defaultValue: "Use client",
+                          })}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="invoice-amount">
+                      {t("invoices.labels.amount")}
+                    </label>
+                    <input
+                      id="invoice-amount"
+                      inputMode="decimal"
+                      placeholder={t("invoices.placeholders.amount")}
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                      className={styles.field}
+                    />
+                  </div>
+
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="invoice-due-date">
+                      {t("invoices.labels.dueDate")}
+                    </label>
+                    <input
+                      id="invoice-due-date"
+                      type="date"
+                      value={form.dueDate}
+                      onChange={(e) =>
+                        setForm({ ...form, dueDate: e.target.value })
+                      }
+                      className={styles.field}
+                    />
+                  </div>
+
+                  {selectedInvoice?.createdAt ? (
+                    <div className={styles.formField}>
+                      <span className={styles.formLabel}>
+                        {t("invoices.labels.invoiceDate", {
+                          defaultValue: "Invoice date",
+                        })}
+                      </span>
+                      <div className={styles.statusReadOnly}>
+                        {String(selectedInvoice.createdAt).slice(0, 10)}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="invoice-payment-method">
+                      {t("invoices.labels.preferredMethod")}
+                    </label>
+                    <select
+                      id="invoice-payment-method"
+                      value={form.preferredPaymentMethod}
+                      onChange={(e) =>
+                        setForm({ ...form, preferredPaymentMethod: e.target.value })
+                      }
+                      className={styles.field}
+                    >
+                      {paymentMethodOptions(t).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="invoice-status">
+                      {t("invoices.labels.status", { defaultValue: "Status" })}
+                    </label>
+                    {statusIsComputed ? (
+                      <>
+                        <div className={styles.statusReadOnly} id="invoice-status">
+                          {t(`invoices.statusOptions.${effectiveStatus}`, {
+                            defaultValue:
+                              effectiveStatus === "Partial"
+                                ? "Partially paid"
+                                : effectiveStatus,
+                          })}
+                        </div>
+                        <p className={styles.formHint}>
+                          {t("invoices.hints.statusComputed", {
+                            defaultValue:
+                              "Updated automatically from payments and due date.",
+                          })}
+                        </p>
+                      </>
+                    ) : (
+                      <select
+                        id="invoice-status"
+                        value={form.status}
+                        onChange={(e) =>
+                          setForm({ ...form, status: e.target.value })
+                        }
+                        className={styles.field}
+                      >
+                        {invoiceStatusOptions(t)
+                          .filter(
+                            (option) =>
+                              !COMPUTED_INVOICE_STATUSES.has(option.value),
+                          )
+                          .map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                <InvoiceLineItemsEditor
+                  lineItems={form.lineItems}
+                  onChange={handleLineItemsChange}
+                />
+
+                <div className={styles.invoiceSummary} data-testid="invoice-form-summary">
+                  <h3 className={styles.invoiceSummaryTitle}>
+                    {t("invoices.summary.title", {
+                      defaultValue: "Invoice summary",
+                    })}
+                  </h3>
+                  <div className={styles.invoiceSummaryGrid}>
+                    <div className={styles.invoiceSummaryRow}>
+                      <span className={styles.invoiceSummaryLabel}>
+                        {t("invoices.summary.subtotal", { defaultValue: "Subtotal" })}
+                      </span>
+                      <span className={styles.invoiceSummaryValue}>
+                        {formatUsd(formTotals.subtotal)}
+                      </span>
+                    </div>
+                    <div className={styles.invoiceSummaryRow}>
+                      <span className={styles.invoiceSummaryLabel}>
+                        {t("invoices.summary.tax", { defaultValue: "Tax" })}
+                      </span>
+                      <span className={styles.invoiceSummaryValue}>
+                        {formatUsd(formTotals.tax)}
+                      </span>
+                    </div>
+                    <div className={styles.invoiceSummaryRow}>
+                      <span className={styles.invoiceSummaryLabel}>
+                        {t("invoices.summary.total", { defaultValue: "Total" })}
+                      </span>
+                      <span className={styles.invoiceSummaryValue}>
+                        {formatUsd(formTotals.total)}
+                      </span>
+                    </div>
+                    <div className={styles.invoiceSummaryRow}>
+                      <span className={styles.invoiceSummaryLabel}>
+                        {t("invoices.summary.amountPaid", {
+                          defaultValue: "Amount paid",
+                        })}
+                      </span>
+                      <span className={styles.invoiceSummaryValueAccent}>
+                        {formatUsd(formTotals.paid)}
+                      </span>
+                    </div>
+                    <div className={styles.invoiceSummaryRow}>
+                      <span className={styles.invoiceSummaryLabel}>
+                        {t("invoices.summary.balanceDue", {
+                          defaultValue: "Balance due",
+                        })}
+                      </span>
+                      <span className={styles.invoiceSummaryValueDue}>
+                        {formatUsd(formTotals.balance)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.internalNotesWrap}>
+                  <label className={styles.internalNotesLabel} htmlFor="invoice-internal-notes">
+                    {t("invoices.labels.internalNotes")}
+                    <span className={styles.internalNotesBadge}>
+                      {t("invoices.labels.staffOnly")}
+                    </span>
+                  </label>
+                  <p className={styles.internalNotesHint}>
+                    {t("invoices.hints.internalNotes")}
+                  </p>
+                  <textarea
+                    id="invoice-internal-notes"
+                    className={styles.internalNotesInput}
+                    value={form.internalNotes}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        internalNotes: e.target.value.slice(0, 4000),
+                      })
+                    }
+                    placeholder={t("invoices.placeholders.internalNotes")}
+                    rows={4}
+                    data-testid="invoice-internal-notes"
+                  />
+                </div>
+
+                <div className={styles.formActions}>
+                  <button
+                    type="button"
+                    onClick={saveInvoice}
+                    className={styles.btnPrimary}
+                  >
+                    {selectedId
+                      ? t("invoices.buttons.update")
+                      : t("invoices.buttons.save")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className={styles.btnGhost}
+                  >
+                    {t("invoices.buttons.clear")}
+                  </button>
+                </div>
+              </div>
+
+              <aside className={styles.formDocumentSecondary}>
+                <div className={styles.workPerformedPanel}>
+                  <div className={styles.workPerformedToolbar}>
+                    <label className={styles.formLabel} htmlFor="invoice-work-performed">
+                      {t("invoices.labels.workPerformed")}
+                    </label>
                     <button
                       type="button"
                       onClick={runInvoiceAI}
                       disabled={aiLoading}
-                      className={styles.btnAi}
+                      className={styles.btnAiCompact}
                       style={{ cursor: aiLoading ? "wait" : "pointer" }}
                     >
                       {aiLoading
                         ? t("invoices.buttons.aiLoading")
                         : t("invoices.buttons.ai")}
                     </button>
-                  }
-                />
-              </div>
-              <aside className={styles.formDocumentAside}>
-            <div className={styles.formGrid}>
-              <input
-                placeholder={t("invoices.placeholders.invoiceNumberAuto", {
-                  defaultValue: "Invoice number (leave blank to auto-generate)",
-                })}
-                value={form.invoiceNumber}
-                onChange={(e) =>
-                  setForm({ ...form, invoiceNumber: e.target.value })
-                }
-                className={styles.field}
-              />
-              <ClientPickerField
-                className={styles.clientPicker}
-                variant="dark"
-                clientId={form.clientId || ""}
-                displayValue={form.clientName}
-                showHint
-                placeholder={t("invoices.placeholders.client")}
-                onChange={({ clientId, clientName, displayValue, client }) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    clientId: clientId || "",
-                    clientName: clientName || displayValue || "",
-                    clientEmail: client?.email || prev.clientEmail || "",
-                  }))
-                }
-              />
-              {form.clientName && !form.clientId ? (
-                <p className={styles.clientLinkWarning} role="status">
-                  {t("invoices.warnings.clientNotLinked", {
-                    defaultValue:
-                      "Pick the client from the search list (not only typing the name) so billing and job site addresses appear on the invoice.",
-                  })}
-                </p>
-              ) : null}
-              <input
-                placeholder={t("invoices.placeholders.invoiceTitle")}
-                value={form.invoiceTitle}
-                onChange={(e) =>
-                  setForm({ ...form, invoiceTitle: e.target.value })
-                }
-                className={styles.field}
-              />
-              <input
-                placeholder={t("invoices.placeholders.quoteNumber", {
-                  defaultValue: "Estimate / quote # (e.g. EST-0002)",
-                })}
-                value={form.quoteNumber}
-                onChange={(e) =>
-                  setForm({ ...form, quoteNumber: e.target.value })
-                }
-                onBlur={(e) => lookupEstimate(e.target.value)}
-                className={styles.field}
-              />
-              {quoteLookupLoading && (
-                <div className={styles.quoteSearching}>Searching estimates…</div>
-              )}
-              {quoteLookup && (
-                <div className={styles.quoteLookup}>
-                  <span>
-                    <strong>{quoteLookup.estimateNumber}</strong> —{" "}
-                    {quoteLookup.clientName || "Unknown client"}
-                    {quoteLookup.total > 0 &&
-                      ` · $${Number(quoteLookup.total).toFixed(2)}`}
-                  </span>
-                  {quoteLookup.clientName && !form.clientName && (
-                    <button
-                      type="button"
-                      className={styles.quoteLookupBtn}
-                      onClick={() => {
-                        setForm((f) => ({
-                          ...f,
-                          clientName: quoteLookup.clientName,
-                          quoteNumber: quoteLookup.estimateNumber,
-                        }));
-                        setQuoteLookup(null);
-                      }}
-                    >
-                      Use client
-                    </button>
-                  )}
+                  </div>
+                  <textarea
+                    id="invoice-work-performed"
+                    className={styles.workPerformedInput}
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                    placeholder={t("invoices.placeholders.workPerformed")}
+                    data-testid="invoice-work-performed-editor"
+                  />
                 </div>
-              )}
-              <input
-                placeholder={t("invoices.placeholders.amount")}
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className={styles.field}
-              />
-              <input
-                type="date"
-                aria-label={t("invoices.labels.dueDate")}
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className={styles.field}
-              />
-              <select
-                value={form.preferredPaymentMethod}
-                onChange={(e) =>
-                  setForm({ ...form, preferredPaymentMethod: e.target.value })
-                }
-                className={styles.field}
-              >
-                {paymentMethodOptions(t).map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <InvoiceLineItemsEditor
-                lineItems={form.lineItems}
-                onChange={handleLineItemsChange}
-              />
-              <div className={styles.internalNotesWrap}>
-                <label className={styles.internalNotesLabel} htmlFor="invoice-internal-notes">
-                  {t("invoices.labels.internalNotes", { defaultValue: "Internal notes" })}
-                  <span className={styles.internalNotesBadge}>
-                    {t("invoices.labels.staffOnly", { defaultValue: "Staff only" })}
-                  </span>
-                </label>
-                <p className={styles.internalNotesHint}>
-                  {t("invoices.hints.internalNotes", {
-                    defaultValue:
-                      "Private to your team. Never shown on PDFs, emails, payment links, or client views.",
-                  })}
-                </p>
-                <textarea
-                  id="invoice-internal-notes"
-                  className={styles.internalNotesInput}
-                  value={form.internalNotes}
-                  onChange={(e) =>
-                    setForm({ ...form, internalNotes: e.target.value.slice(0, 4000) })
-                  }
-                  placeholder={t("invoices.placeholders.internalNotes", {
-                    defaultValue: "Billing context, follow-ups, or office reminders…",
-                  })}
-                  rows={4}
-                  data-testid="invoice-internal-notes"
-                />
-              </div>
-              <div className={styles.formActions}>
-                <button
-                  type="button"
-                  onClick={saveInvoice}
-                  className={styles.btnPrimary}
-                >
-                  {selectedId
-                    ? t("invoices.buttons.update")
-                    : t("invoices.buttons.save")}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className={styles.btnGhost}
-                >
-                  {t("invoices.buttons.clear")}
-                </button>
-              </div>
-            </div>
               </aside>
             </div>
           </section>
