@@ -481,6 +481,67 @@ const PACKS = {
   },
 };
 
+/** Curated Unsplash URLs for instant preview — no OpenAI wait. */
+const INDUSTRY_STOCK_IMAGES = {
+  cleaning: [
+    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1527515637462-cff94ee9661?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1628177142898-93e36e4e3a50?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=1200&h=800&fit=crop&q=80",
+  ],
+  landscaping_hardscaping: [
+    "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1558904541-efa843a96f01?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1598902108854-10e335adac99?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1585320806291-8a20410a9dea?w=1200&h=800&fit=crop&q=80",
+  ],
+  roofing: [
+    "https://images.unsplash.com/photo-1632776675305-f0c8d2f4a086?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&h=800&fit=crop&q=80",
+  ],
+  painting: [
+    "https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1589939705382-41e0207a4270?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1565182999561-18d7dc1c56c8?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1200&h=800&fit=crop&q=80",
+  ],
+  plumbing: [
+    "https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1585704032915-c3400ca276e9?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop&q=80",
+  ],
+  hvac: [
+    "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200&h=800&fit=crop&q=80",
+  ],
+  electrical: [
+    "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1473341304170-971d2125aba1?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&h=800&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop&q=80",
+  ],
+};
+
+const DEFAULT_STOCK_IMAGES = [
+  "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=800&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1200&h=800&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=1200&h=800&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&h=800&fit=crop&q=80",
+];
+
+/** Stock photo URL for instant website preview (no AI image generation). */
+export function getIndustryStockImageUrl(pack, index = 0) {
+  const key = pack?.key || "";
+  const list = INDUSTRY_STOCK_IMAGES[key] || DEFAULT_STOCK_IMAGES;
+  const idx = Math.max(0, Number(index) || 0);
+  return list[idx % list.length] || DEFAULT_STOCK_IMAGES[0];
+}
+
 /** Terms that indicate the WRONG industry when found in copy for a given pack key */
 const CROSS_INDUSTRY_FORBIDDEN = {
   cleaning: [
@@ -694,7 +755,7 @@ export function createDefaultHeroPhotoSlots(pack) {
   const presets = pack.imagePresets || [];
   return Array.from({ length: HERO_SLOT_COUNT }, (_, index) => ({
     id: `hero-${index}`,
-    src: "",
+    src: getIndustryStockImageUrl(pack, index),
     alt: pack.label ? `${pack.label} project ${index + 1}` : `Project ${index + 1}`,
     prompt: presets[index % presets.length] || presets[0] || "",
   }));

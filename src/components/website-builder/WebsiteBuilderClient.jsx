@@ -24,7 +24,10 @@ import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
 import {
   findFirstEmptyHeroSlotIndex,
   mergeFullSiteIntoDraft,
+  runWithConcurrency,
+  WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
   WEBSITE_FULL_GENERATE_TIMEOUT_MS,
+  WEBSITE_GALLERY_CONCURRENCY,
   WEBSITE_HERO_IMAGE_TIMEOUT_MS,
 } from "@/lib/website-builder-client-generation";
 import {
@@ -146,6 +149,7 @@ export default function WebsiteBuilderClient() {
   const generatingLockRef = useRef(false);
   const imageEnhanceAbortRef = useRef(null);
   const [imageEnhancing, setImageEnhancing] = useState(false);
+  const [copyEnhancing, setCopyEnhancing] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageStyle, setImageStyle] = useState("realistic");
   const [saving, setSaving] = useState(false);
@@ -760,23 +764,23 @@ export default function WebsiteBuilderClient() {
     skipAutosave.current = true;
 
     setGenerating(true);
-    setGenProgress(t.genStepCopy);
+    setGenProgress(t.genStepInstant || t.genStepCopy);
     setError("");
 
-    try {
-      const catalogServices = (form.services || []).slice(0, 20).map((s) => ({
-        name: s?.name || "",
-        description: s?.description || "",
-      }));
-      const currentForm = formRef.current || form;
+    const catalogServices = (form.services || []).slice(0, 20).map((s) => ({
+      name: s?.name || "",
+      description: s?.description || "",
+    }));
+    const currentForm = formRef.current || form;
 
+    try {
       const res = await apiFetch("/api/website-builder/generate-full", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           services: catalogServices,
           currentForm,
-          enhanceCopy: true,
+          enhanceCopy: false,
         }),
         timeoutMs: WEBSITE_FULL_GENERATE_TIMEOUT_MS,
         signal: abort.signal,
@@ -801,28 +805,66 @@ export default function WebsiteBuilderClient() {
       setSelectedPreviewSection(null);
       setMobileTab("preview");
 
-      setGenProgress(t.genStepSave);
-      await handleSave({ ...nextForm, siteMeta: nextSiteMeta }, { silent: true });
-
-      const source = String(d.source || "instant");
-      showNotice(
-        source === "ai" ? t.generateFullDone : t.generateInstantDone,
-      );
+      showNotice(t.generateInstantDone);
+      void handleSave({ ...nextForm, siteMeta: nextSiteMeta }, { silent: true });
 
       setGenerating(false);
       setGenProgress("");
       generatingLockRef.current = false;
       generationAbortRef.current = null;
+      skipAutosave.current = false;
 
-      const heroIndex = findFirstEmptyHeroSlotIndex(nextForm.heroPhotos);
-      if (heroIndex >= 0 && aiConfigOk) {
-        const prompt = String(
-          nextForm.heroPhotos[heroIndex]?.prompt || imagePresets[heroIndex] || "",
-        ).trim();
-        if (prompt) {
-          const imgAbort = new AbortController();
-          imageEnhanceAbortRef.current = imgAbort;
-          void runOptionalHeroImageEnhancement(heroIndex, prompt, imgAbort.signal);
+      if (featureAiDescription && aiConfigOk && !abort.signal.aborted) {
+        setCopyEnhancing(true);
+        setGenProgress(t.genStepCopyEnhance || t.genStepCopy);
+        try {
+          const enhanceRes = await apiFetch("/api/website-builder/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ section: "all", services: catalogServices }),
+            timeoutMs: WEBSITE_COPY_ENHANCE_TIMEOUT_MS,
+            signal: abort.signal,
+          });
+          const enhancePayload = await getJsonOrThrow(enhanceRes, t.errorGenerate);
+          const copy = enhancePayload.data || {};
+          const enhancedForm = {
+            ...(formRef.current || nextForm),
+            headline: copy.headline || formRef.current?.headline || nextForm.headline,
+            subheadline: copy.subheadline || formRef.current?.subheadline || nextForm.subheadline,
+            aboutText: copy.aboutText || formRef.current?.aboutText || nextForm.aboutText,
+            ctaText: copy.ctaText || formRef.current?.ctaText || nextForm.ctaText,
+            services: copy.services?.length
+              ? copy.services
+              : formRef.current?.services || nextForm.services,
+            trustBadges: copy.trustBadges?.length
+              ? copy.trustBadges
+              : formRef.current?.trustBadges || nextForm.trustBadges,
+            themeColor: copy.themeColor || formRef.current?.themeColor || nextForm.themeColor,
+          };
+          const enhancedMeta = {
+            ...nextSiteMeta,
+            ...(copy.siteMeta || {}),
+            seoTitle: copy.seoTitle || nextSiteMeta.seoTitle,
+            seoDescription: copy.seoDescription || nextSiteMeta.seoDescription,
+            generationSource: "ai",
+          };
+          skipAutosave.current = true;
+          formRef.current = enhancedForm;
+          setForm(enhancedForm);
+          setSiteMeta(enhancedMeta);
+          setCompletenessScore(
+            analyzeWebsiteCompleteness(enhancedForm, enhancedMeta).score,
+          );
+          void handleSave({ ...enhancedForm, siteMeta: enhancedMeta }, { silent: true });
+          showNotice(t.generateFullDone);
+        } catch (copyErr) {
+          if (copyErr?.name !== "AbortError") {
+            console.warn("[website-builder] copy enhance skipped:", copyErr?.message || copyErr);
+          }
+        } finally {
+          setCopyEnhancing(false);
+          setGenProgress("");
+          skipAutosave.current = false;
         }
       }
     } catch (err) {
@@ -836,17 +878,16 @@ export default function WebsiteBuilderClient() {
       generationAbortRef.current = null;
       setGenerating(false);
       setGenProgress("");
+      skipAutosave.current = false;
     }
   }, [
     featureAiDescription,
     form,
-    imagePresets,
     siteMeta,
     aiConfigOk,
     t,
     showNotice,
     handleSave,
-    runOptionalHeroImageEnhancement,
   ]);
 
   const generateHeroImageForAgent = useCallback(
@@ -897,46 +938,58 @@ export default function WebsiteBuilderClient() {
       const basePrompt = String(prompt || imagePrompt || "").trim();
       if (!basePrompt) throw new Error("No gallery prompt provided");
 
-      let generated = 0;
-      for (let i = 0; i < total; i += 1) {
-        const current = formRef.current || form;
-        if ((current.galleryPhotos || []).length >= MAX_FEATURED_GALLERY) break;
+      const prompts = Array.from(
+        { length: total },
+        (_, i) => `${basePrompt}, variation ${i + 1}`,
+      );
 
-        const res = await apiFetch("/api/website-builder/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: `${basePrompt}, variation ${i + 1}`,
-            style: imageStyle,
-            mediaKind: "gallery",
-          }),
-          timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
-        });
-        const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-        const imageSrc = String(payload?.data?.imageUrl || payload?.data?.imageDataUrl || "");
-        if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) continue;
+      const generatedPhotos = (
+        await runWithConcurrency(prompts, WEBSITE_GALLERY_CONCURRENCY, async (p) => {
+          const current = formRef.current || form;
+          if ((current.galleryPhotos || []).length >= MAX_FEATURED_GALLERY) return null;
 
-        const newPhoto = {
-          id: `ai-${Date.now()}-${i}`,
-          src: imageSrc,
-          thumbnail: imageSrc,
-          alt: String(payload?.data?.alt || basePrompt).slice(0, 160),
-          persisted: /^https?:\/\//i.test(imageSrc),
-        };
-        const nextForm = {
-          ...current,
-          galleryPhotos: normalizeGalleryPhotos([
-            ...(current.galleryPhotos || []),
-            newPhoto,
-          ]).slice(0, MAX_FEATURED_GALLERY),
-        };
-        skipAutosave.current = true;
-        formRef.current = nextForm;
-        setForm(nextForm);
-        generated += 1;
-      }
-      if (generated > 0) await handleSave(formRef.current, { silent: true });
-      return generated;
+          const res = await apiFetch("/api/website-builder/generate-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: p,
+              style: imageStyle,
+              mediaKind: "gallery",
+              draft: true,
+            }),
+            timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+          });
+          const payload = await getJsonOrThrow(res, t.errorGenerateImage);
+          const imageSrc = String(payload?.data?.imageUrl || payload?.data?.imageDataUrl || "");
+          if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
+            return null;
+          }
+
+          return {
+            id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            src: imageSrc,
+            thumbnail: imageSrc,
+            alt: String(payload?.data?.alt || basePrompt).slice(0, 160),
+            persisted: /^https?:\/\//i.test(imageSrc),
+          };
+        })
+      ).filter(Boolean);
+
+      if (generatedPhotos.length === 0) return 0;
+
+      const current = formRef.current || form;
+      const nextForm = {
+        ...current,
+        galleryPhotos: normalizeGalleryPhotos([
+          ...(current.galleryPhotos || []),
+          ...generatedPhotos,
+        ]).slice(0, MAX_FEATURED_GALLERY),
+      };
+      skipAutosave.current = true;
+      formRef.current = nextForm;
+      setForm(nextForm);
+      await handleSave(nextForm, { silent: true });
+      return generatedPhotos.length;
     },
     [form, imagePrompt, imageStyle, t, handleSave],
   );

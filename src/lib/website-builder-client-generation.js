@@ -1,6 +1,29 @@
 /** Client timeouts for Website Builder generation. */
-export const WEBSITE_FULL_GENERATE_TIMEOUT_MS = 22_000;
+export const WEBSITE_FULL_GENERATE_TIMEOUT_MS = 10_000;
+export const WEBSITE_COPY_ENHANCE_TIMEOUT_MS = 22_000;
 export const WEBSITE_HERO_IMAGE_TIMEOUT_MS = 90_000;
+export const WEBSITE_GALLERY_CONCURRENCY = 3;
+
+/** Run async tasks with a concurrency limit. */
+export async function runWithConcurrency(items, limit, worker) {
+  const list = Array.isArray(items) ? items : [];
+  if (list.length === 0) return [];
+
+  const results = new Array(list.length);
+  let nextIndex = 0;
+  const poolSize = Math.max(1, Math.min(limit, list.length));
+
+  async function runWorker() {
+    while (nextIndex < list.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(list[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: poolSize }, () => runWorker()));
+  return results;
+}
 
 export function mergeFullSiteIntoDraft({ form, siteMeta, data }) {
   const d = data || {};

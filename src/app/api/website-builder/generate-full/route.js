@@ -74,13 +74,21 @@ export async function POST(request) {
     body.currentForm && typeof body.currentForm === "object" ? body.currentForm : {};
   const enhanceCopy = body.enhanceCopy !== false;
 
-  const [profileRaw, websiteResult] = await Promise.all([
+  const [profileRaw, websiteResult, catalogResult] = await Promise.all([
     getCompanyProfileByTenant({ tenantId: access.tenantDbId }),
     supabaseAdmin
       .from("contractor_websites")
       .select("site_meta")
       .eq("tenant_id", access.tenantDbId)
       .maybeSingle(),
+    supabaseAdmin
+      .from("services_catalog")
+      .select("name, description, price_min, price_max")
+      .eq("tenant_id", access.tenantDbId)
+      .order("updated_at", { ascending: false })
+      .limit(24)
+      .then(({ data }) => data || [])
+      .catch(() => []),
   ]);
 
   const profile = withDefaultCompanyProfile(profileRaw, access.tenantDbId);
@@ -91,27 +99,16 @@ export async function POST(request) {
   const industryKey = resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta);
   const pack = getWebsiteBuilderPack(industryKey);
 
-  let catalogServices = [];
-  try {
-    const { data: catalogRows } = await supabaseAdmin
-      .from("services_catalog")
-      .select("name, description, price_min, price_max")
-      .eq("tenant_id", access.tenantDbId)
-      .order("updated_at", { ascending: false })
-      .limit(24);
-    catalogServices = (catalogRows || []).map((row) => ({
-      name: row.name || "",
-      description: row.description || "",
-      price:
-        row.price_min && row.price_max
+  const catalogServices = (catalogResult || []).map((row) => ({
+    name: row.name || "",
+    description: row.description || "",
+    price:
+      row.price_min && row.price_max
+        ? `From $${row.price_min}`
+        : row.price_min
           ? `From $${row.price_min}`
-          : row.price_min
-            ? `From $${row.price_min}`
-            : "",
-    }));
-  } catch {
-    catalogServices = [];
-  }
+          : "",
+  }));
 
   const mergedForm = {
     ...existingForm,
