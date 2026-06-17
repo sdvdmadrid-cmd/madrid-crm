@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/client-auth";
+import { isClientLoggedOut } from "@/lib/auth-logout-guard.js";
 
 const REFRESH_MS = 120_000;
 
@@ -70,6 +71,7 @@ export default function OwnerUsageDashboard() {
   const [refreshedAt, setRefreshedAt] = useState(null);
 
   const load = useCallback(async () => {
+    if (isClientLoggedOut()) return;
     setError("");
     try {
       const res = await apiFetch("/api/owner/usage", { cache: "no-store" });
@@ -88,8 +90,13 @@ export default function OwnerUsageDashboard() {
   }, []);
 
   useEffect(() => {
+    if (isClientLoggedOut()) return undefined;
     load();
-    const id = setInterval(load, REFRESH_MS);
+    const id = setInterval(() => {
+      if (!isClientLoggedOut()) {
+        load();
+      }
+    }, REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
 

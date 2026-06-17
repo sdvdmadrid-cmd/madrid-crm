@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { isClientLoggedOut } from "@/lib/auth-logout-guard.js";
 import {
   formatPaymentMethodLabel,
   paymentMethodIcon,
@@ -44,6 +45,7 @@ export default function OwnerPaymentCardsClient() {
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
+    if (isClientLoggedOut()) return;
     setLoading(true);
     setError("");
     try {
@@ -65,6 +67,7 @@ export default function OwnerPaymentCardsClient() {
   }, [from, to, methodType, search]);
 
   useEffect(() => {
+    if (isClientLoggedOut()) return undefined;
     load();
   }, [load]);
 

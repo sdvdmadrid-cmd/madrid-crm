@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
+import { isClientLoggedOut } from "@/lib/auth-logout-guard.js";
 
 const COPY = {
   en: {
@@ -103,6 +104,7 @@ export default function AdminAiMonitoringClient() {
   const [metrics, setMetrics] = useState(null);
 
   const load = async () => {
+    if (isClientLoggedOut()) return;
     setLoading(true);
     setError("");
     try {
@@ -119,6 +121,7 @@ export default function AdminAiMonitoringClient() {
   };
 
   useEffect(() => {
+    if (isClientLoggedOut()) return undefined;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

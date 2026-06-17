@@ -2,21 +2,8 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { apiFetch } from "@/lib/client-auth";
-import { markClientLoggedOut } from "@/lib/auth-logout-guard.js";
-import { performAuthHardNavigate } from "@/lib/auth-nav";
-import { supabase } from "@/lib/supabase";
+import { performClientLogout } from "@/lib/auth-logout-client";
 import styles from "./OwnerShell.module.css";
-
-function clearOwnerClientState() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem("user-industry");
-  } catch {
-    // ignore
-  }
-  window.dispatchEvent(new CustomEvent("auth:logout"));
-}
 
 export default function OwnerLogoutButton({ variant = "sidebar" }) {
   const { t } = useTranslation();
@@ -25,17 +12,7 @@ export default function OwnerLogoutButton({ variant = "sidebar" }) {
   function handleLogout() {
     if (submitting) return;
     setSubmitting(true);
-
-    clearOwnerClientState();
-    markClientLoggedOut();
-
-    void apiFetch("/api/auth/logout", {
-      method: "POST",
-      suppressUnauthorizedEvent: true,
-    }).catch(() => {});
-    void supabase.auth.signOut().catch(() => {});
-
-    performAuthHardNavigate("/login");
+    void performClientLogout();
   }
 
   const className =
@@ -48,6 +25,7 @@ export default function OwnerLogoutButton({ variant = "sidebar" }) {
       onClick={handleLogout}
       disabled={submitting}
       aria-label={t("ownerNav.logout")}
+      data-testid={variant === "header" ? "owner-logout-header-btn" : "owner-logout-sidebar-btn"}
     >
       <span className={styles.ownerLogoutIcon} aria-hidden>
         ⎋

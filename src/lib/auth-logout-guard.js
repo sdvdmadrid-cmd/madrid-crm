@@ -35,3 +35,39 @@ export function isClientLoggedOut() {
     return false;
   }
 }
+
+let logoutAbortController = null;
+
+/** Abort in-flight authenticated API calls when logout begins. */
+export function abortInFlightAuthRequests() {
+  if (typeof AbortController === "undefined") return;
+  logoutAbortController?.abort();
+  logoutAbortController = new AbortController();
+}
+
+export function getLogoutAbortSignal() {
+  return logoutAbortController?.signal;
+}
+
+function mergeAbortSignals(...signals) {
+  const active = signals.filter((signal) => signal && !signal.aborted);
+  if (active.length === 0) return undefined;
+  if (active.length === 1) return active[0];
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.any === "function") {
+    return AbortSignal.any(active);
+  }
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  for (const signal of active) {
+    if (signal.aborted) {
+      controller.abort();
+      break;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
+  return controller.signal;
+}
+
+export function mergeApiFetchSignals(signal) {
+  return mergeAbortSignals(signal, getLogoutAbortSignal());
+}

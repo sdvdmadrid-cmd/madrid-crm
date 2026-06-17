@@ -53,4 +53,38 @@ test.describe("auth login/logout flow", () => {
     await devLogin(page, "admin", "/dashboard");
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 45_000 });
   });
+
+  test("platform owner logout reaches login without staying on owner overview", async ({
+    page,
+  }) => {
+    await devLogin(page, "super_admin", "/owner/overview");
+    await expect(page).toHaveURL(/\/owner\/overview/, { timeout: 45_000 });
+
+    await page.getByRole("banner").getByRole("button", { name: /sign out/i }).click();
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    await expect(page.locator("#login-email")).toBeVisible({ timeout: 20_000 });
+
+    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByText(/login activity unavailable/i)).toHaveCount(0);
+    await expect(page.getByText(/ai monitoring/i)).toHaveCount(0);
+  });
+
+  test("contractor logout from dashboard reaches login without permission errors", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await devLogin(page, "admin", "/dashboard");
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 45_000 });
+
+    const logoutBtn = page.getByTestId("sidebar-logout-btn");
+    await logoutBtn.evaluate((el) => el.click());
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
+    await expect(page.locator("#login-email")).toBeVisible({ timeout: 20_000 });
+
+    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByText(/unauthenticated/i)).toHaveCount(0);
+    await expect(page.getByText(/403/i)).toHaveCount(0);
+  });
 });

@@ -1,3 +1,8 @@
+import {
+  isClientLoggedOut,
+  mergeApiFetchSignals,
+} from "@/lib/auth-logout-guard.js";
+
 export async function apiFetch(input, init = {}) {
   const {
     suppressUnauthorizedEvent = false,
@@ -6,15 +11,33 @@ export async function apiFetch(input, init = {}) {
     ...fetchInit
   } = init;
 
+  if (isClientLoggedOut()) {
+    const target = String(input);
+    const isLogoutRequest =
+      target.includes("/api/auth/logout") ||
+      init?.allowWhileLoggedOut === true;
+    if (!isLogoutRequest) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthenticated" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+  }
+
   const controller = timeoutMs > 0 ? new AbortController() : null;
   const timeoutId =
     controller && typeof setTimeout === "function"
       ? setTimeout(() => controller.abort(), timeoutMs)
       : null;
 
+  const mergedSignal = mergeApiFetchSignals(signal || controller?.signal);
+
   const response = await fetch(input, {
     ...fetchInit,
-    signal: signal || controller?.signal,
+    signal: mergedSignal,
   }).finally(() => {
     if (timeoutId) clearTimeout(timeoutId);
   });

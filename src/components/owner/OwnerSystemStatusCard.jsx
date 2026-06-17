@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/client-auth";
+import { isClientLoggedOut } from "@/lib/auth-logout-guard.js";
 
 const CHECK_LABELS = {
   openai: "OpenAI (AI website, AI image generation)",
@@ -39,6 +40,7 @@ export default function OwnerSystemStatusCard() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    if (isClientLoggedOut()) return;
     setLoading(true);
     setError("");
     try {
@@ -59,6 +61,7 @@ export default function OwnerSystemStatusCard() {
   }, []);
 
   useEffect(() => {
+    if (isClientLoggedOut()) return undefined;
     load();
   }, [load]);
 
