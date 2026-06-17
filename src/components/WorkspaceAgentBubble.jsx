@@ -190,6 +190,7 @@ export default function WorkspaceAgentBubble({
           getJsonOrThrow,
           runGenerateFull: () => wbAi?.runGenerateFull?.(),
           generateHeroImage: (payload) => wbAi?.generateHeroImage?.(payload),
+          generateHeroImagesBatch: (payload) => wbAi?.generateHeroImagesBatch?.(payload),
           generateGalleryImages: (payload) => wbAi?.generateGalleryImages?.(payload),
           removeGalleryImage: (payload) => wbAi?.removeGalleryImage?.(payload),
           removeHeroImage: (payload) => wbAi?.removeHeroImage?.(payload),

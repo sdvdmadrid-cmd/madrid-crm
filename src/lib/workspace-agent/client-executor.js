@@ -27,13 +27,15 @@ export async function executeWorkspaceActions(actions = [], helpers = {}) {
     getJsonOrThrow,
     runGenerateFull,
     generateHeroImage,
+    generateHeroImagesBatch,
     generateGalleryImages,
     removeGalleryImage,
     removeHeroImage,
   } = helpers;
   const safeActions = Array.isArray(actions) ? actions : [];
 
-  for (const action of safeActions) {
+  for (let actionIndex = 0; actionIndex < safeActions.length; actionIndex += 1) {
+    const action = safeActions[actionIndex];
     const type = String(action?.type || "").trim();
     const payload = action?.payload && typeof action.payload === "object" ? action.payload : {};
     const summary = String(action?.summary || "").trim();
@@ -45,9 +47,34 @@ export async function executeWorkspaceActions(actions = [], helpers = {}) {
     }
 
     if (type === "website.generateHeroImage" && generateHeroImage) {
+      const heroBatch = [];
+      while (
+        actionIndex < safeActions.length &&
+        String(safeActions[actionIndex]?.type || "").trim() === "website.generateHeroImage"
+      ) {
+        const item = safeActions[actionIndex];
+        heroBatch.push(
+          item?.payload && typeof item.payload === "object" ? item.payload : {},
+        );
+        actionIndex += 1;
+      }
+      actionIndex -= 1;
+
       try {
-        await generateHeroImage(payload);
-        summaries.push(summary || "Generated hero image");
+        if (generateHeroImagesBatch && heroBatch.length > 1) {
+          const count = await generateHeroImagesBatch(heroBatch);
+          summaries.push(summary || `Generated ${count} hero image(s)`);
+        } else {
+          for (const heroPayload of heroBatch) {
+            await generateHeroImage(heroPayload);
+          }
+          summaries.push(
+            summary ||
+              (heroBatch.length > 1
+                ? `Generated ${heroBatch.length} hero image(s)`
+                : "Generated hero image"),
+          );
+        }
       } catch (err) {
         summaries.push(err?.message || "Hero image generation failed");
       }

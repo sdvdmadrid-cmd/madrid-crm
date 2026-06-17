@@ -5,15 +5,7 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
-import {
-  getCompanyProfileByTenant,
-  withDefaultCompanyProfile,
-} from "@/lib/company-profile-store";
-import {
-  getWebsiteBuilderPack,
-  resolveWebsiteIndustryForWebsite,
-} from "@/lib/website-builder-industry";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { resolveWebsiteImageContext } from "@/lib/website-builder-image-context";
 import { generateWebsiteImagesBatch } from "@/lib/website-builder-image-generation";
 import { assertSafeText } from "@/lib/input-sanitizer";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
@@ -67,23 +59,9 @@ export async function POST(request) {
     return Response.json({ success: false, error: "Image prompt is required" }, { status: 400 });
   }
 
-  const profile = withDefaultCompanyProfile(
-    await getCompanyProfileByTenant({ tenantId: access.tenantDbId }),
+  const { pack, websiteSlug, companyName } = await resolveWebsiteImageContext(
     access.tenantDbId,
   );
-  const { data: websiteRow } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("slug, site_meta")
-    .eq("tenant_id", access.tenantDbId)
-    .maybeSingle();
-
-  const pack = getWebsiteBuilderPack(
-    resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta),
-  );
-  const websiteSlug = String(websiteRow?.slug || "draft").trim();
-  const companyName = String(
-    profile?.publicDisplayName || profile?.companyName || "",
-  ).trim();
 
   try {
     const images = await generateWebsiteImagesBatch({

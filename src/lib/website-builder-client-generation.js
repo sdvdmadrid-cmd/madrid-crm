@@ -2,7 +2,22 @@
 export const WEBSITE_FULL_GENERATE_TIMEOUT_MS = 10_000;
 export const WEBSITE_COPY_ENHANCE_TIMEOUT_MS = 22_000;
 export const WEBSITE_HERO_IMAGE_TIMEOUT_MS = 90_000;
-export const WEBSITE_GALLERY_CONCURRENCY = 3;
+export const WEBSITE_GALLERY_CONCURRENCY = 4;
+export const WEBSITE_GALLERY_BATCH_DEFAULT = 3;
+
+/** Stock placeholder images from instant site generation. */
+export function isWebsiteStockImageUrl(src) {
+  const value = String(src || "").trim();
+  return value.includes("images.unsplash.com/");
+}
+
+function heroSlotNeedsAiImage(src) {
+  const value = String(src || "").trim();
+  if (!value) return true;
+  if (value.startsWith("data:image/")) return false;
+  if (isWebsiteStockImageUrl(value)) return true;
+  return !value.startsWith("http");
+}
 
 /** Run async tasks with a concurrency limit. */
 export async function runWithConcurrency(items, limit, worker) {
@@ -49,14 +64,63 @@ export function mergeFullSiteIntoDraft({ form, siteMeta, data }) {
 
 /** First empty hero slot index, or -1 if all filled. */
 export function findFirstEmptyHeroSlotIndex(heroPhotos = []) {
+  const slots = findHeroSlotsForAiEnhancement(heroPhotos);
+  return slots.length > 0 ? slots[0].index : -1;
+}
+
+/** Hero slots that should be upgraded from stock/empty to AI images. */
+export function findHeroSlotsForAiEnhancement(heroPhotos = [], imagePresets = []) {
+  const slots = [];
   for (let i = 0; i < heroPhotos.length; i += 1) {
     const src = String(heroPhotos[i]?.src || "").trim();
-    if (!src.startsWith("http") && !src.startsWith("data:image/")) {
-      const prompt = String(heroPhotos[i]?.prompt || "").trim();
-      if (prompt) return i;
+    const prompt = String(heroPhotos[i]?.prompt || imagePresets[i] || "").trim();
+    if (!prompt) continue;
+    if (heroSlotNeedsAiImage(src)) {
+      slots.push({ index: i, prompt });
     }
   }
-  return -1;
+  return slots;
+}
+
+/** Request parallel image generation from the batch API. */
+export async function requestWebsiteImagesBatch({
+  apiFetch,
+  getJsonOrThrow,
+  prompts = [],
+  style = "realistic",
+  mediaKind = "gallery",
+  draft = true,
+  timeoutMs = WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+  signal,
+  errorMessage = "Image generation failed",
+}) {
+  const list = (Array.isArray(prompts) ? prompts : [])
+    .map((entry) => String(entry?.prompt || entry || "").trim())
+    .filter(Boolean);
+  if (list.length === 0) return [];
+
+  const res = await apiFetch("/api/website-builder/generate-images-batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompts: list,
+      style,
+      mediaKind,
+      draft,
+    }),
+    timeoutMs,
+    signal,
+  });
+  const payload = await getJsonOrThrow(res, errorMessage);
+  return Array.isArray(payload?.data?.images) ? payload.data.images : [];
+}
+
+export function resolveWebsiteImageSrc(row) {
+  return String(row?.imageUrl || row?.imageDataUrl || "").trim();
+}
+
+export function isValidWebsiteImageSrc(src) {
+  return src.startsWith("data:image/") || /^https?:\/\//i.test(src);
 }
 
 export const WEBSITE_COPY_SECTIONS = ["hero", "services", "trust", "seo"];

@@ -5,19 +5,13 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { isPlatformFeatureEnabled } from "@/lib/platform-feature-flags";
-import {
-  getCompanyProfileByTenant,
-  withDefaultCompanyProfile,
-} from "@/lib/company-profile-store";
-import {
-  getWebsiteBuilderPack,
-  resolveWebsiteIndustryForWebsite,
-} from "@/lib/website-builder-industry";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { resolveWebsiteImageContext } from "@/lib/website-builder-image-context";
 import { generateWebsiteImage } from "@/lib/website-builder-image-generation";
 import { assertSafeText } from "@/lib/input-sanitizer";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
 import { getRequestLanguage } from "@/lib/ai-service";
+
+export const maxDuration = 90;
 
 function badRequest(error) {
   return Response.json({ success: false, error }, { status: 400 });
@@ -50,29 +44,13 @@ export async function POST(request) {
     return badRequest("Image prompt is required");
   }
 
-  const profile = withDefaultCompanyProfile(
-    await getCompanyProfileByTenant({
-      tenantId: access.tenantDbId,
-    }),
+  const { pack, websiteSlug, companyName } = await resolveWebsiteImageContext(
     access.tenantDbId,
   );
-  const { data: websiteRow } = await supabaseAdmin
-    .from("contractor_websites")
-    .select("slug, site_meta")
-    .eq("tenant_id", access.tenantDbId)
-    .maybeSingle();
-
-  const pack = getWebsiteBuilderPack(
-    resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta),
-  );
-  const websiteSlug = String(websiteRow?.slug || "draft").trim();
   const mediaKind =
     String(body.mediaKind || "hero").trim() === "gallery" ? "gallery" : "hero";
   const styleHint = String(body.style || "realistic").trim().slice(0, 40);
   const draft = body.publish !== true && body.draft !== false;
-  const companyName = String(
-    profile?.publicDisplayName || profile?.companyName || "",
-  ).trim();
 
   try {
     const result = await generateWebsiteImage({

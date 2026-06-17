@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getIndustryStockImageUrl, getWebsiteBuilderPack } from "../../src/lib/website-builder-industry.js";
 import {
+  findHeroSlotsForAiEnhancement,
+  isWebsiteStockImageUrl,
   mergeWebsiteCopySection,
   runWithConcurrency,
 } from "../../src/lib/website-builder-client-generation.js";
@@ -53,5 +55,32 @@ describe("website-builder speed helpers", () => {
     });
     assert.match(prompt, /cleaning/i);
     assert.match(prompt, /Acme Clean/);
+  });
+
+  it("detects stock placeholder hero images", () => {
+    assert.equal(
+      isWebsiteStockImageUrl(
+        "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200",
+      ),
+      true,
+    );
+    assert.equal(isWebsiteStockImageUrl("https://cdn.example.com/hero.jpg"), false);
+  });
+
+  it("findHeroSlotsForAiEnhancement includes stock and empty slots", () => {
+    const slots = findHeroSlotsForAiEnhancement(
+      [
+        {
+          src: "https://images.unsplash.com/photo-123?w=1200",
+          prompt: "kitchen clean",
+        },
+        { src: "https://cdn.example.com/custom.jpg", prompt: "custom" },
+        { src: "", prompt: "empty slot" },
+      ],
+      [],
+    );
+    assert.equal(slots.length, 2);
+    assert.equal(slots[0].index, 0);
+    assert.equal(slots[1].index, 2);
   });
 });
