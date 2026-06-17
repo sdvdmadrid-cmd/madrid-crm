@@ -287,6 +287,7 @@ export async function POST(request) {
       tax_cents: 0,
       total_cents: amountCents,
       notes: String(body.notes || "").trim(),
+      internal_notes: String(body.internalNotes || "").trim(),
       preferred_payment_method: normalizePaymentMethod(
         body.preferredPaymentMethod,
       ),

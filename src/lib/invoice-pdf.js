@@ -163,7 +163,7 @@ export async function buildInvoicePdfBuffer({
 
   if (invoice.notes) {
     doc.moveDown(0.8);
-    doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text("Notes");
+    doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a").text("Work Performed");
     doc.font("Helvetica").fontSize(10).fillColor("#475569").text(String(invoice.notes), {
       width: pageWidth,
     });
