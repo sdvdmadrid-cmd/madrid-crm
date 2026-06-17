@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { formatClientPickerLabel } from "@/lib/client-search";
@@ -724,7 +725,52 @@ function NewEstimatePageInner() {
         ) : null}
 
         <div className={styles.grid}>
-          <div className={styles.colStack}>
+        <section className={`${styles.card} ${styles.cardDocument} ${styles.documentPrimary}`}>
+          <DocumentStyleEditor
+            label="Job Description (optional)"
+            value={jobDescription}
+            onChange={setJobDescription}
+            placeholder="Describe the work — scope, materials, special instructions..."
+            data-testid="estimate-job-description"
+            toolbar={
+              <button
+                type="button"
+                disabled={aiDescLoading}
+                className={styles.btnAi}
+                onClick={async () => {
+                  const raw = jobDescription.trim();
+                  if (!raw) {
+                    setStatusMessage("Write a few words first, then AI will polish it.");
+                    return;
+                  }
+                  setAiDescLoading(true);
+                  try {
+                    const res = await apiFetch("/api/ai/description", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ input: raw }),
+                    });
+                    const json = await getJsonOrThrow(res, "AI unavailable.");
+                    const nextDescription = String(json?.data?.description || "").trim();
+                    if (nextDescription) setJobDescription(nextDescription);
+                  } catch (err) {
+                    setStatusMessage(err.message || "AI unavailable.");
+                  } finally {
+                    setAiDescLoading(false);
+                  }
+                }}
+              >
+                {aiDescLoading ? "Polishing..." : "Optimize with AI"}
+              </button>
+            }
+          />
+          <p className={styles.cardHint} style={{ marginTop: 12 }}>
+            The first line becomes the service name on the customer PDF (instead of
+            &quot;Base Price&quot;). Use bullet lines (- item) for a readable scope list.
+          </p>
+        </section>
+
+          <div className={`${styles.colStack} ${styles.colStackMain}`}>
         <section className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>Client</h2>
@@ -921,54 +967,6 @@ function NewEstimatePageInner() {
               <p className={styles.billingNote}>Using service address as billing address.</p>
             )}
           </div>
-        </section>
-
-        <section className={styles.card}>
-          <div className={styles.aiRow}>
-            <h2 className={styles.cardTitle}>
-              Job Description <span className={styles.cardHint}>(optional)</span>
-            </h2>
-            <button
-              type="button"
-              disabled={aiDescLoading}
-              className={styles.btnAi}
-              onClick={async () => {
-                const raw = jobDescription.trim();
-                if (!raw) {
-                  setStatusMessage("Write a few words first, then AI will polish it.");
-                  return;
-                }
-                setAiDescLoading(true);
-                try {
-                  const res = await apiFetch("/api/ai/description", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ input: raw }),
-                  });
-                  const json = await getJsonOrThrow(res, "AI unavailable.");
-                  const nextDescription = String(json?.data?.description || "").trim();
-                  if (nextDescription) setJobDescription(nextDescription);
-                } catch (err) {
-                  setStatusMessage(err.message || "AI unavailable.");
-                } finally {
-                  setAiDescLoading(false);
-                }
-              }}
-            >
-              {aiDescLoading ? "Polishing..." : "Optimize with AI"}
-            </button>
-          </div>
-          <textarea
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Describe the work — scope, materials, special instructions..."
-            rows={6}
-            className={styles.textarea}
-          />
-          <p className={styles.cardHint} style={{ marginTop: 8 }}>
-            The first line becomes the service name on the customer PDF (instead of
-            &quot;Base Price&quot;). Use bullet lines (- item) for a readable scope list.
-          </p>
         </section>
           </div>
 

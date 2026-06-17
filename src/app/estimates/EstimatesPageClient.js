@@ -13,6 +13,7 @@ import {
   normalizeClientsListPayload,
 } from "@/lib/clients-list-response";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import "@/i18n";
 import {
   escapeHtml,
@@ -206,7 +207,25 @@ export default function EstimatesPageClient({ initialList = null }) {
     }
   }
 
-  // History for the currently-selected estimate (paquete J). We fetch it
+  async function saveContractBodyEdits() {
+    if (!contractSavedId || !contractPrintBody.trim() || contractBusy) return;
+    setContractBusy(true);
+    setContractMessage("");
+    try {
+      await apiFetch(`/api/contracts/${contractSavedId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: contractPrintBody.trim() }),
+      }).then((res) => getJsonOrThrow(res, "Unable to save contract text."));
+      setContractMessage("Contract text updated.");
+    } catch (err) {
+      setContractMessage(err?.message || "Unable to save contract text.");
+    } finally {
+      setContractBusy(false);
+    }
+  }
+
+  // History for the currently-selected estimate
   // on demand only when the detail panel is open, so the list view stays
   // light.
   const [revisions, setRevisions] = useState([]);
@@ -1211,6 +1230,28 @@ export default function EstimatesPageClient({ initialList = null }) {
                               View all contracts
                             </Link>
                           </>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {contractPrintBody ? (
+                      <div style={{ marginTop: 14 }}>
+                        <DocumentStyleEditor
+                          label="Contract document"
+                          value={contractPrintBody}
+                          onChange={setContractPrintBody}
+                          placeholder="Contract text will appear here after generation…"
+                          data-testid="contract-document-editor"
+                        />
+                        {contractSavedId ? (
+                          <button
+                            type="button"
+                            onClick={saveContractBodyEdits}
+                            disabled={contractBusy}
+                            className={ws.btnSecondary}
+                            style={{ marginTop: 10 }}
+                          >
+                            {contractBusy ? "Saving…" : "Save contract text"}
+                          </button>
                         ) : null}
                       </div>
                     ) : null}
