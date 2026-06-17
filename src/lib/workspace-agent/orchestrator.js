@@ -351,7 +351,7 @@ export async function runWorkspaceAgentTurn({
         ...historyMessages,
         { role: "user", content: prompt },
       ],
-      maxTokens: onWebsite ? 1800 : 1200,
+      maxTokens: onWebsite ? 900 : 1200,
       temperature: onWebsite ? 0.4 : 0.35,
     });
     raw = response.text || "";

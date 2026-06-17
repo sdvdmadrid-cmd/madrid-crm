@@ -114,7 +114,7 @@ export function executeWebsiteIntents(intentIds, { context, snapshot, userMessag
       summaries.push("Building your complete website (layout, copy, branding)");
       planSteps.push("Generate full site from your industry pack with AI-enhanced copy");
       answerParts.push(
-        "I'm generating a complete modern website with professional layout, services, trust badges, and SEO-ready copy. This takes about 15–30 seconds.",
+        "I'm generating a complete modern website with professional layout, services, trust badges, and SEO-ready copy. Your draft should appear in a few seconds.",
       );
     }
 

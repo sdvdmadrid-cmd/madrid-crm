@@ -1,6 +1,7 @@
 import {
   buildIndustryWebsiteDefaults,
   createDefaultHeroPhotoSlots,
+  getIndustryStockImageUrl,
   getWebsiteBuilderPack,
   normalizeHeroPhotos,
   personalizeGeneratedContent,
@@ -23,7 +24,7 @@ export const WEBSITE_SECTIONS = [
 ];
 
 /** Server-side cap for optional AI copy enhancement during full-site generate. */
-export const WEBSITE_AI_COPY_TIMEOUT_MS = 12_000;
+export const WEBSITE_AI_COPY_TIMEOUT_MS = 8_000;
 
 export function analyzeWebsiteCompleteness(form = {}, meta = {}) {
   const heroPhotos = Array.isArray(form.heroPhotos) ? form.heroPhotos : [];
@@ -105,12 +106,11 @@ export function buildInstantSiteFromIndustry(pack, profile, existingForm = {}) {
     const prompt = String(
       existing?.prompt || slot.prompt || pack.imagePresets[index] || "",
     ).slice(0, 320);
+    const hasExistingImage =
+      existingSrc.startsWith("http") || existingSrc.startsWith("data:image/");
     return {
       id: slot.id,
-      src:
-        existingSrc.startsWith("http") || existingSrc.startsWith("data:image/")
-          ? existingSrc
-          : "",
+      src: hasExistingImage ? existingSrc : getIndustryStockImageUrl(pack, index),
       alt: String(existing?.alt || `${pack.label} project ${index + 1}`).slice(0, 160),
       prompt,
     };
@@ -120,7 +120,16 @@ export function buildInstantSiteFromIndustry(pack, profile, existingForm = {}) {
     ? existingForm.galleryPhotos
     : [];
   const galleryPrompts = pack.imagePresets.slice(0, 2);
-  const galleryPhotos = existingGallery.length > 0 ? existingGallery : [];
+  const galleryPhotos =
+    existingGallery.length > 0
+      ? existingGallery
+      : [0, 1].map((index) => ({
+          id: `stock-gallery-${index}`,
+          src: getIndustryStockImageUrl(pack, index + 2),
+          thumbnail: getIndustryStockImageUrl(pack, index + 2),
+          alt: `${pack.label} project photo ${index + 1}`,
+          persisted: true,
+        }));
 
   const city = String(profile?.businessCity || profile?.city || "").trim();
   const companyName =

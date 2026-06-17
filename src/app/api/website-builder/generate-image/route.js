@@ -128,6 +128,11 @@ export async function POST(request) {
   const mediaKind =
     String(body.mediaKind || "hero").trim() === "gallery" ? "gallery" : "hero";
   const styleHint = String(body.style || "realistic").trim().slice(0, 40);
+  const useDraftSize = body.publish !== true && body.draft !== false;
+  const imageSize = useDraftSize
+    ? String(process.env.OPENAI_IMAGE_DRAFT_SIZE || "512x512").trim()
+    : IMAGE_SIZE;
+  const imageTimeoutMs = useDraftSize ? 35_000 : 60_000;
   const companyName = String(
     profile?.publicDisplayName || profile?.companyName || "",
   ).trim();
@@ -148,9 +153,9 @@ export async function POST(request) {
       {
         model: IMAGE_MODEL,
         prompt: finalPrompt,
-        size: IMAGE_SIZE,
+        size: imageSize,
       },
-      { timeout: 60_000 },
+      { timeout: imageTimeoutMs },
     );
 
     const first = response?.data?.[0] || null;

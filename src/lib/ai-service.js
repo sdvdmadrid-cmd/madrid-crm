@@ -13,6 +13,32 @@ const MAX_REQUEST_TOKENS = Number(process.env.AI_MAX_TOKENS_HARD_LIMIT || 1600);
 const REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 18000);
 const MAX_RETRIES = Number(process.env.AI_RETRY_LIMIT || 2);
 const SPEND_ALERT_THRESHOLDS = [70, 85, 100];
+const SPEND_CACHE_TTL_MS = 60_000;
+/** @type {Map<string, { spend: number, expiresAt: number }>} */
+const tenantSpendCache = new Map();
+
+async function getTenantMonthlySpendUsdCached(tenantId) {
+  const tenantKey = String(tenantId || "unknown").trim() || "unknown";
+  const hit = tenantSpendCache.get(tenantKey);
+  if (hit && Date.now() < hit.expiresAt) {
+    return hit.spend;
+  }
+
+  const spend = await getTenantMonthlySpendUsd(tenantId);
+  tenantSpendCache.set(tenantKey, {
+    spend,
+    expiresAt: Date.now() + SPEND_CACHE_TTL_MS,
+  });
+  return spend;
+}
+
+function recordTenantSpendEstimate(tenantId, totalSpendUsd) {
+  const tenantKey = String(tenantId || "unknown").trim() || "unknown";
+  tenantSpendCache.set(tenantKey, {
+    spend: Number(totalSpendUsd || 0),
+    expiresAt: Date.now() + SPEND_CACHE_TTL_MS,
+  });
+}
 
 const MODEL_COST_PER_1K = {
   "gpt-4.1-mini": { input: 0.0004, output: 0.0016 },
@@ -162,8 +188,8 @@ export async function runAiCompletion({
     throw err;
   }
 
-  const monthlySpend = await getTenantMonthlySpendUsd(tenantKey);
-  await emitSpendThresholdAlerts({
+  const monthlySpend = await getTenantMonthlySpendUsdCached(tenantKey);
+  void emitSpendThresholdAlerts({
     tenantId: tenantKey,
     userId: actor,
     totalSpendUsd: monthlySpend,
@@ -175,7 +201,7 @@ export async function runAiCompletion({
     throw err;
   }
 
-  await writeAuditLog({
+  void writeAuditLog({
     userId: actor,
     tenantId: tenantKey,
     action: "ai.request.started",
@@ -186,7 +212,7 @@ export async function runAiCompletion({
       monthlySpendUsd: monthlySpend,
       monthlyCapUsd: MONTHLY_SPEND_CAP_USD,
     },
-  });
+  }).catch(() => {});
 
   const client = getOpenAiClient();
 
@@ -211,8 +237,9 @@ export async function runAiCompletion({
       const responseTimeMs = Date.now() - startedAt;
       const totalSpendUsd = Number((monthlySpend + estimatedCostUsd).toFixed(6));
       const utilizationPercent = computeUtilizationPercent(totalSpendUsd);
+      recordTenantSpendEstimate(tenantKey, totalSpendUsd);
 
-      await writeAuditLog({
+      void writeAuditLog({
         userId: actor,
         tenantId: tenantKey,
         action: "ai.request.completed",
@@ -228,9 +255,9 @@ export async function runAiCompletion({
           responseTimeMs,
           finishReason: completion?.choices?.[0]?.finish_reason || null,
         },
-      });
+      }).catch(() => {});
 
-      await emitSpendThresholdAlerts({
+      void emitSpendThresholdAlerts({
         tenantId: tenantKey,
         userId: actor,
         totalSpendUsd,

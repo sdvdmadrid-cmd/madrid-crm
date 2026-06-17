@@ -12,6 +12,12 @@ async function getSupabaseAdminClient() {
 }
 
 const TABLE = "platform_feature_flags";
+const FLAG_MAP_CACHE_TTL_MS = 60_000;
+let flagMapCache = { map: null, expiresAt: 0 };
+
+export function invalidatePlatformFeatureFlagCache() {
+  flagMapCache = { map: null, expiresAt: 0 };
+}
 
 export const DEFAULT_PLATFORM_FEATURE_FLAGS = [
   {
@@ -139,11 +145,22 @@ export async function listPlatformFeatureFlags() {
 }
 
 export async function getPlatformFeatureFlagMap() {
+  if (flagMapCache.map && Date.now() < flagMapCache.expiresAt) {
+    return flagMapCache.map;
+  }
+
   const flags = await listPlatformFeatureFlags();
-  return flags.reduce((acc, flag) => {
+  const map = flags.reduce((acc, flag) => {
     acc[flag.key] = flag.enabled === true;
     return acc;
   }, {});
+
+  flagMapCache = {
+    map,
+    expiresAt: Date.now() + FLAG_MAP_CACHE_TTL_MS,
+  };
+
+  return map;
 }
 
 export async function isPlatformFeatureEnabled(key, fallback = true) {
@@ -178,4 +195,6 @@ export async function upsertPlatformFeatureFlag({ key, enabled, description = ""
   if (error) {
     throw new Error(error.message);
   }
+
+  invalidatePlatformFeatureFlagCache();
 }
