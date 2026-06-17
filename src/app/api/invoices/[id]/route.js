@@ -52,6 +52,7 @@ function serialize(doc) {
     dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
     lineItems: Array.isArray(doc.items) ? doc.items : [],
     notes: doc.notes || "",
+    internalNotes: doc.internal_notes || "",
     preferredPaymentMethod: normalizePaymentMethod(
       doc.preferred_payment_method,
     ),
@@ -296,6 +297,8 @@ export async function PATCH(request, { params }) {
       updateRow.items = normalizeInvoiceLineItemsForSave(body.lineItems);
     }
     if ("notes" in body) updateRow.notes = String(body.notes || "");
+    if ("internalNotes" in body)
+      updateRow.internal_notes = String(body.internalNotes || "");
 
     updateRow.estimate_id = estimateId;
     updateRow.quote_id = quoteId;

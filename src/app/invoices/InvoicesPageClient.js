@@ -52,6 +52,7 @@ const initialInvoice = {
   preferredPaymentMethod: "bank_transfer",
   lineItems: [createInvoiceLineItem("line-1")],
   notes: "",
+  internalNotes: "",
 };
 
 const PAYMENT_METHOD_VALUES = [
@@ -238,7 +239,7 @@ export default function InvoicesPageClient({ initialList = null }) {
         <tr><th>${escapeHtml(t("invoices.labels.status", { defaultValue: "Status" }))}</th><td>${escapeHtml(printableInvoice.status || "")}</td></tr>
       </tbody></table>
       ${lineTable}
-      ${printableInvoice.notes ? `<p><strong>${escapeHtml(t("invoices.placeholders.notes", { defaultValue: "Notes" }))}</strong><br/>${escapeHtml(printableInvoice.notes)}</p>` : ""}
+      ${printableInvoice.notes ? `<p><strong>${escapeHtml(t("invoices.labels.workPerformed", { defaultValue: "Work Performed" }))}</strong><br/>${escapeHtml(printableInvoice.notes)}</p>` : ""}
       ${buildFieldBasePoweredByHtml()}`;
     const opened = openPrintableHtmlDocument({
       title: `Invoice ${printableInvoice.invoiceNumber || ""}`,
@@ -496,6 +497,7 @@ export default function InvoicesPageClient({ initialList = null }) {
       preferredPaymentMethod: invoice.preferredPaymentMethod || "bank_transfer",
       lineItems: normalizeInvoiceLineItemsForForm(invoice.lineItems),
       notes: invoice.notes || "",
+      internalNotes: invoice.internalNotes || "",
     });
     setSelectedId(invoice._id);
     setQuoteLookup(null);
@@ -816,13 +818,16 @@ export default function InvoicesPageClient({ initialList = null }) {
             <div className={styles.formDocumentLayout}>
               <div className={styles.formDocumentMain}>
                 <DocumentStyleEditor
-                  label={t("invoices.placeholders.notes", {
-                    defaultValue: "Invoice notes & description",
+                  label={t("invoices.labels.workPerformed", {
+                    defaultValue: "Work Performed",
                   })}
                   value={form.notes}
                   onChange={(notes) => setForm({ ...form, notes })}
-                  placeholder={t("invoices.placeholders.notes")}
-                  data-testid="invoice-notes-editor"
+                  placeholder={t("invoices.placeholders.workPerformed", {
+                    defaultValue:
+                      "Describe services, materials, labor, and project details shown on the invoice.",
+                  })}
+                  data-testid="invoice-work-performed-editor"
                   toolbar={
                     <button
                       type="button"
@@ -841,7 +846,9 @@ export default function InvoicesPageClient({ initialList = null }) {
               <aside className={styles.formDocumentAside}>
             <div className={styles.formGrid}>
               <input
-                placeholder={t("invoices.placeholders.invoiceNumber")}
+                placeholder={t("invoices.placeholders.invoiceNumberAuto", {
+                  defaultValue: "Invoice number (leave blank to auto-generate)",
+                })}
                 value={form.invoiceNumber}
                 onChange={(e) =>
                   setForm({ ...form, invoiceNumber: e.target.value })
@@ -881,7 +888,9 @@ export default function InvoicesPageClient({ initialList = null }) {
                 className={styles.field}
               />
               <input
-                placeholder="Estimate / Quote # (e.g. EST-0002 or #2)"
+                placeholder={t("invoices.placeholders.quoteNumber", {
+                  defaultValue: "Estimate / quote # (e.g. EST-0002)",
+                })}
                 value={form.quoteNumber}
                 onChange={(e) =>
                   setForm({ ...form, quoteNumber: e.target.value })
@@ -926,6 +935,7 @@ export default function InvoicesPageClient({ initialList = null }) {
               />
               <input
                 type="date"
+                aria-label={t("invoices.labels.dueDate")}
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
                 className={styles.field}
@@ -947,6 +957,33 @@ export default function InvoicesPageClient({ initialList = null }) {
                 lineItems={form.lineItems}
                 onChange={handleLineItemsChange}
               />
+              <div className={styles.internalNotesWrap}>
+                <label className={styles.internalNotesLabel} htmlFor="invoice-internal-notes">
+                  {t("invoices.labels.internalNotes", { defaultValue: "Internal notes" })}
+                  <span className={styles.internalNotesBadge}>
+                    {t("invoices.labels.staffOnly", { defaultValue: "Staff only" })}
+                  </span>
+                </label>
+                <p className={styles.internalNotesHint}>
+                  {t("invoices.hints.internalNotes", {
+                    defaultValue:
+                      "Private to your team. Never shown on PDFs, emails, payment links, or client views.",
+                  })}
+                </p>
+                <textarea
+                  id="invoice-internal-notes"
+                  className={styles.internalNotesInput}
+                  value={form.internalNotes}
+                  onChange={(e) =>
+                    setForm({ ...form, internalNotes: e.target.value.slice(0, 4000) })
+                  }
+                  placeholder={t("invoices.placeholders.internalNotes", {
+                    defaultValue: "Billing context, follow-ups, or office reminders…",
+                  })}
+                  rows={4}
+                  data-testid="invoice-internal-notes"
+                />
+              </div>
               <div className={styles.formActions}>
                 <button
                   type="button"

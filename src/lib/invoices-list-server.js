@@ -38,6 +38,7 @@ export function serializeInvoiceRow(doc) {
     dueDate: doc.due_date ? String(doc.due_date).slice(0, 10) : "",
     lineItems: Array.isArray(doc.items) ? doc.items : [],
     notes: doc.notes || "",
+    internalNotes: doc.internal_notes || "",
     preferredPaymentMethod: normalizePaymentMethod(doc.preferred_payment_method),
     payments: Array.isArray(doc.payments) ? doc.payments : [],
     paidAmount: Number(doc.paid_amount || 0),

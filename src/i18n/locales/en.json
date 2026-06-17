@@ -1764,10 +1764,14 @@
     "listTitle": "Invoice list",
     "placeholders": {
       "invoiceNumber": "Invoice number",
+      "invoiceNumberAuto": "Invoice number (leave blank to auto-generate)",
       "client": "Client",
       "invoiceTitle": "Invoice title",
+      "quoteNumber": "Estimate / quote # (e.g. EST-0002)",
       "amount": "Amount",
       "lineItems": "Service lines (one per line, optional)",
+      "workPerformed": "Describe services, materials, labor, and project details shown on the invoice.",
+      "internalNotes": "Billing context, follow-ups, or office reminders…",
       "notes": "Internal notes",
       "paymentAmount": "Amount",
       "reference": "Reference",
@@ -1849,6 +1853,9 @@
       "balance": "Balance",
       "preferredMethod": "Preferred method",
       "dueDate": "Due date",
+      "workPerformed": "Work Performed",
+      "internalNotes": "Internal notes",
+      "staffOnly": "Staff only",
       "noDate": "No date",
       "paymentFormTitle": "Register payment",
       "paymentRefPrefix": "ref"
@@ -1868,6 +1875,12 @@
       "balanceDue": "Balance due"
     },
     "empty": "No invoices to display.",
+    "hints": {
+      "internalNotes": "Private to your team. Never shown on PDFs, emails, payment links, or client views."
+    },
+    "warnings": {
+      "clientNotLinked": "Pick the client from the search list (not only typing the name) so billing and job site addresses appear on the invoice."
+    },
     "errors": {
       "invalidAmount": "Enter a valid amount greater than 0.",
       "paymentExceedsBalance": "Payment exceeds the pending balance",
