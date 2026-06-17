@@ -65,6 +65,23 @@ Up to 4 trust badges only. Do NOT generate customer reviews, testimonials, names
 `.trim();
   }
 
+  if (section === "seo") {
+    return `
+Company: ${ctx.companyName}
+Industry: ${pack.label}
+City: ${ctx.city || "local area"}
+${forbiddenNote}
+
+Return JSON only:
+{
+  "seoTitle": "max 60 chars",
+  "seoDescription": "max 155 chars",
+  "footerTagline": "max 16 words",
+  "serviceAreas": ["up to 6"]
+}
+`.trim();
+  }
+
   return `
 Company name: ${ctx.companyName}
 Industry: ${pack.label} (${pack.key}) — THIS IS THE ONLY ALLOWED INDUSTRY
@@ -162,7 +179,7 @@ export async function POST(request) {
         { role: "system", content: buildIndustryAiSystemPrompt(pack) },
         { role: "user", content: userPrompt },
       ],
-      maxTokens: section === "hero" ? 280 : 900,
+      maxTokens: section === "hero" ? 280 : section === "seo" ? 320 : 900,
       temperature: 0.35,
     });
     raw = response.text || "{}";
@@ -256,6 +273,25 @@ export async function POST(request) {
       data: {
         testimonials: [],
         trustBadges: content.trustBadges,
+      },
+    });
+  }
+
+  if (section === "seo") {
+    const city = String(profile.businessCity || profile.city || "").trim();
+    return Response.json({
+      success: true,
+      data: {
+        siteMeta: {
+          seoTitle: String(parsed.seoTitle || defaults.headline).slice(0, 70),
+          seoDescription: String(parsed.seoDescription || defaults.subheadline).slice(0, 160),
+          footerTagline: String(parsed.footerTagline || "").slice(0, 120),
+          serviceAreas: Array.isArray(parsed.serviceAreas)
+            ? parsed.serviceAreas.slice(0, 6)
+            : city
+              ? [city, `${city} metro`]
+              : [],
+        },
       },
     });
   }

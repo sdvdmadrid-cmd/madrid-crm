@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getIndustryStockImageUrl, getWebsiteBuilderPack } from "../../src/lib/website-builder-industry.js";
-import { runWithConcurrency } from "../../src/lib/website-builder-client-generation.js";
+import {
+  mergeWebsiteCopySection,
+  runWithConcurrency,
+} from "../../src/lib/website-builder-client-generation.js";
+import { buildWebsiteImagePrompt } from "../../src/lib/website-builder-image-generation.js";
 
 describe("website-builder speed helpers", () => {
   it("returns stock image URLs per industry", () => {
@@ -24,5 +28,30 @@ describe("website-builder speed helpers", () => {
     });
 
     assert.equal(maxInFlight <= 2, true);
+  });
+
+  it("mergeWebsiteCopySection merges hero and seo fields", () => {
+    const { nextForm, nextSiteMeta } = mergeWebsiteCopySection(
+      { headline: "Old", services: [] },
+      { seoTitle: "Old SEO" },
+      {
+        headline: "New headline",
+        siteMeta: { seoTitle: "New SEO", seoDescription: "Desc" },
+      },
+    );
+    assert.equal(nextForm.headline, "New headline");
+    assert.equal(nextSiteMeta.seoTitle, "New SEO");
+    assert.equal(nextSiteMeta.seoDescription, "Desc");
+  });
+
+  it("buildWebsiteImagePrompt includes industry guardrails", () => {
+    const pack = getWebsiteBuilderPack("cleaning");
+    const prompt = buildWebsiteImagePrompt({
+      pack,
+      companyName: "Acme Clean",
+      safePrompt: "sparkling kitchen",
+    });
+    assert.match(prompt, /cleaning/i);
+    assert.match(prompt, /Acme Clean/);
   });
 });

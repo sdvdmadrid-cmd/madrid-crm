@@ -14,14 +14,12 @@ import {
   resolveWebsiteIndustryForWebsite,
 } from "@/lib/website-builder-industry";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { generateWebsiteImage } from "@/lib/website-builder-image-generation";
+import { generateWebsiteImagesBatch } from "@/lib/website-builder-image-generation";
 import { assertSafeText } from "@/lib/input-sanitizer";
 import { buildAiErrorPayload, normalizeAiErrorCode } from "@/lib/ai-errors";
 import { getRequestLanguage } from "@/lib/ai-service";
 
-function badRequest(error) {
-  return Response.json({ success: false, error }, { status: 400 });
-}
+export const maxDuration = 300;
 
 export async function POST(request) {
   const websiteBuilderEnabled = await isPlatformFeatureEnabled("feature_website_builder", true);
@@ -45,15 +43,32 @@ export async function POST(request) {
   if (!canWrite(access.role)) return forbiddenResponse();
 
   const body = await request.json().catch(() => ({}));
-  const safePrompt = assertSafeText("prompt", body.prompt || "", 320).trim();
-  if (!safePrompt) {
-    return badRequest("Image prompt is required");
+  const basePrompt = assertSafeText("prompt", body.prompt || body.basePrompt || "", 320).trim();
+  const count = Math.min(10, Math.max(1, Number(body.count) || 1));
+  const styleHint = String(body.style || "realistic").trim().slice(0, 40);
+  const mediaKind =
+    String(body.mediaKind || "gallery").trim() === "hero" ? "hero" : "gallery";
+  const draft = body.publish !== true && body.draft !== false;
+
+  const explicitPrompts = Array.isArray(body.prompts)
+    ? body.prompts
+        .map((entry) => assertSafeText("prompt", entry?.prompt || entry || "", 320).trim())
+        .filter(Boolean)
+    : [];
+
+  const prompts =
+    explicitPrompts.length > 0
+      ? explicitPrompts.slice(0, 10)
+      : basePrompt
+        ? Array.from({ length: count }, (_, i) => `${basePrompt}, variation ${i + 1}`)
+        : [];
+
+  if (prompts.length === 0) {
+    return Response.json({ success: false, error: "Image prompt is required" }, { status: 400 });
   }
 
   const profile = withDefaultCompanyProfile(
-    await getCompanyProfileByTenant({
-      tenantId: access.tenantDbId,
-    }),
+    await getCompanyProfileByTenant({ tenantId: access.tenantDbId }),
     access.tenantDbId,
   );
   const { data: websiteRow } = await supabaseAdmin
@@ -66,21 +81,17 @@ export async function POST(request) {
     resolveWebsiteIndustryForWebsite(profile, websiteRow?.site_meta),
   );
   const websiteSlug = String(websiteRow?.slug || "draft").trim();
-  const mediaKind =
-    String(body.mediaKind || "hero").trim() === "gallery" ? "gallery" : "hero";
-  const styleHint = String(body.style || "realistic").trim().slice(0, 40);
-  const draft = body.publish !== true && body.draft !== false;
   const companyName = String(
     profile?.publicDisplayName || profile?.companyName || "",
   ).trim();
 
   try {
-    const result = await generateWebsiteImage({
+    const images = await generateWebsiteImagesBatch({
       tenantId: access.tenantDbId,
       websiteSlug,
       pack,
       companyName,
-      prompt: safePrompt,
+      prompts,
       style: styleHint,
       mediaKind,
       draft,
@@ -89,10 +100,14 @@ export async function POST(request) {
     return Response.json({
       success: true,
       data: {
-        imageDataUrl: result.imageDataUrl,
-        imageUrl: result.imageUrl,
-        persisted: result.persisted,
-        alt: result.alt,
+        images: images.map((row) => ({
+          imageUrl: row.imageUrl,
+          imageDataUrl: row.imageDataUrl,
+          persisted: row.persisted,
+          alt: row.alt,
+        })),
+        generated: images.length,
+        requested: prompts.length,
       },
     });
   } catch (error) {
@@ -102,7 +117,7 @@ export async function POST(request) {
         code,
         language: getRequestLanguage(request, "en"),
         status: Number(error?.status || 502),
-        technicalMessage: error?.message || "AI image generation failed",
+        technicalMessage: error?.message || "Batch image generation failed",
       }),
       { status: Number(error?.status || 502) },
     );
