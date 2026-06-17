@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import {
   escapeHtml,
   openPrintableHtmlDocument,
@@ -40,6 +41,9 @@ export default function ContractsPage() {
   const [error, setError] = useState("");
   const [listSearch, setListSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [bodyDraftById, setBodyDraftById] = useState({});
+  const [bodySavingId, setBodySavingId] = useState("");
+  const [bodySaveMessage, setBodySaveMessage] = useState("");
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
@@ -100,6 +104,30 @@ export default function ContractsPage() {
     }
     return ["all", ...options];
   }, [contracts]);
+
+  async function saveContractBody(contractId) {
+    const body = String(bodyDraftById[contractId] || "").trim();
+    if (!contractId || !body) return;
+    setBodySavingId(contractId);
+    setBodySaveMessage("");
+    try {
+      await apiFetch(`/api/contracts/${contractId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      }).then((res) => getJsonOrThrow(res, t("contracts.errors.saveBody")));
+      setContracts((rows) =>
+        rows.map((row) =>
+          String(row.id || row._id) === String(contractId) ? { ...row, body } : row,
+        ),
+      );
+      setBodySaveMessage(t("contracts.bodySaved"));
+    } catch (err) {
+      setBodySaveMessage(err?.message || t("contracts.errors.saveBody"));
+    } finally {
+      setBodySavingId("");
+    }
+  }
 
   return (
     <main className={`${ws.page} ${styles.page}`}>
@@ -255,11 +283,39 @@ export default function ContractsPage() {
                   </div>
                 </div>
                 {contract.body ? (
-                  <details className={styles.bodyDetails}>
+                  <details
+                    className={styles.bodyDetails}
+                    onToggle={(event) => {
+                      if (event.currentTarget.open) {
+                        setBodyDraftById((prev) => ({
+                          ...prev,
+                          [id]: String(prev[id] ?? contract.body ?? ""),
+                        }));
+                      }
+                    }}
+                  >
                     <summary className={styles.bodySummary}>
                       {t("contracts.previewToggle")}
                     </summary>
-                    <div className={styles.bodyPreview}>{contract.body}</div>
+                    <DocumentStyleEditor
+                      label={t("contracts.documentLabel", { defaultValue: "Contract document" })}
+                      value={bodyDraftById[id] ?? contract.body}
+                      onChange={(next) =>
+                        setBodyDraftById((prev) => ({ ...prev, [id]: next }))
+                      }
+                      data-testid={`contract-body-editor-${id}`}
+                    />
+                    <button
+                      type="button"
+                      className={ws.btnSecondary}
+                      style={{ marginTop: 10 }}
+                      disabled={bodySavingId === id}
+                      onClick={() => saveContractBody(id)}
+                    >
+                      {bodySavingId === id
+                        ? t("contracts.savingBody")
+                        : t("contracts.saveBody")}
+                    </button>
                   </details>
                 ) : null}
               </article>

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import JobProjectPlPanel from "@/components/jobs/JobProjectPlPanel";
 import {
   escapeHtml,
@@ -802,13 +803,15 @@ export default function JobsPageClient({ initialList = null }) {
               inputClass={jobStyles.formInput}
             />
           </div>
-          <textarea
-            className={`${jobStyles.formInput} ${jobStyles.formTextarea}`}
-            placeholder={t("jobs.placeholders.scopeDetails")}
-            aria-label={t("jobs.placeholders.scopeDetails")}
-            value={form.scopeDetails}
-            onChange={(e) => setForm({ ...form, scopeDetails: e.target.value })}
-          />
+          <div className={jobStyles.documentEditorRow}>
+            <DocumentStyleEditor
+              label={t("jobs.placeholders.scopeDetails")}
+              value={form.scopeDetails}
+              onChange={(scopeDetails) => setForm({ ...form, scopeDetails })}
+              placeholder={t("jobs.placeholders.scopeDetails")}
+              data-testid="job-scope-editor"
+            />
+          </div>
           <div className={jobStyles.formGridSplit}>
             <input
               className={jobStyles.formInput}
@@ -1037,18 +1040,21 @@ export default function JobsPageClient({ initialList = null }) {
                 {proposalLoading ? "Generating..." : "Generate Proposal (AI)"}
               </button>
             </div>
-            <textarea
+            <DocumentStyleEditor
+              label="Proposal context (optional)"
               value={proposalContext}
-              onChange={(e) => setProposalContext(e.target.value)}
+              onChange={setProposalContext}
               placeholder="Optional context for AI (materials, warranty terms, exclusions, payment rules)..."
-              className={`${jobStyles.textAreaDark} ${jobStyles.textAreaContext}`}
+              minHeight={280}
+              data-testid="job-proposal-context"
             />
             {proposalDraft ? (
-              <textarea
+              <DocumentStyleEditor
+                label="Generated proposal"
                 value={proposalDraft}
-                onChange={(e) => setProposalDraft(e.target.value)}
+                onChange={setProposalDraft}
                 placeholder="Generated proposal will appear here"
-                className={`${jobStyles.textAreaDark} ${jobStyles.textAreaProposal}`}
+                data-testid="job-proposal-draft"
               />
             ) : null}
           </div>

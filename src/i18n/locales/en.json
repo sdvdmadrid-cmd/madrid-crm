@@ -1706,6 +1706,10 @@
       "refresh": "Refresh list"
     },
     "previewToggle": "Preview agreement text",
+    "documentLabel": "Contract document",
+    "saveBody": "Save contract text",
+    "savingBody": "Saving…",
+    "bodySaved": "Contract text saved.",
     "buttons": {
       "print": "Print contract",
       "downloadPdf": "Download PDF",
@@ -1714,7 +1718,8 @@
       "openEstimate": "Open estimate"
     },
     "errors": {
-      "load": "Unable to load contracts"
+      "load": "Unable to load contracts",
+      "saveBody": "Unable to save contract text"
     }
   },
   "invoices": {

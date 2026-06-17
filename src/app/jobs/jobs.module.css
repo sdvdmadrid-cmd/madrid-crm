@@ -76,6 +76,8 @@
   border-radius: 14px;
   background: rgba(76, 29, 149, 0.18);
   border: 1px solid rgba(139, 92, 246, 0.35);
+  display: grid;
+  gap: 16px;
 }
 
 .proposalBox strong {
@@ -335,6 +337,12 @@
   min-height: 90px;
   resize: vertical;
   line-height: 1.45;
+}
+
+.documentEditorRow {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
 }
 
 .checkboxLabel {

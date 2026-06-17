@@ -171,6 +171,25 @@
   gap: 12px;
 }
 
+.formDocumentLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 24px;
+  align-items: start;
+}
+
+.formDocumentMain {
+  min-width: 0;
+}
+
+.formDocumentAside {
+  position: sticky;
+  top: 88px;
+  max-height: calc(100vh - 104px);
+  overflow-y: auto;
+  min-width: 0;
+}
+
 .lineItemsSection {
   grid-column: 1 / -1;
   padding: 14px;
@@ -672,6 +691,16 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .formDocumentLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .formDocumentAside {
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .formGrid {

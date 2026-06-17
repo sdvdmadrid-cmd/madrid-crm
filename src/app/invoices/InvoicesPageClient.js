@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
+import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import {
   escapeHtml,
   openPrintableHtmlDocument,
@@ -812,6 +813,32 @@ export default function InvoicesPageClient({ initialList = null }) {
                 ? t("invoices.formTitleEdit")
                 : t("invoices.formTitleNew")}
             </h2>
+            <div className={styles.formDocumentLayout}>
+              <div className={styles.formDocumentMain}>
+                <DocumentStyleEditor
+                  label={t("invoices.placeholders.notes", {
+                    defaultValue: "Invoice notes & description",
+                  })}
+                  value={form.notes}
+                  onChange={(notes) => setForm({ ...form, notes })}
+                  placeholder={t("invoices.placeholders.notes")}
+                  data-testid="invoice-notes-editor"
+                  toolbar={
+                    <button
+                      type="button"
+                      onClick={runInvoiceAI}
+                      disabled={aiLoading}
+                      className={styles.btnAi}
+                      style={{ cursor: aiLoading ? "wait" : "pointer" }}
+                    >
+                      {aiLoading
+                        ? t("invoices.buttons.aiLoading")
+                        : t("invoices.buttons.ai")}
+                    </button>
+                  }
+                />
+              </div>
+              <aside className={styles.formDocumentAside}>
             <div className={styles.formGrid}>
               <input
                 placeholder={t("invoices.placeholders.invoiceNumber")}
@@ -920,24 +947,7 @@ export default function InvoicesPageClient({ initialList = null }) {
                 lineItems={form.lineItems}
                 onChange={handleLineItemsChange}
               />
-              <textarea
-                placeholder={t("invoices.placeholders.notes")}
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className={styles.fieldTextareaNotes}
-              />
               <div className={styles.formActions}>
-                <button
-                  type="button"
-                  onClick={runInvoiceAI}
-                  disabled={aiLoading}
-                  className={styles.btnAi}
-                  style={{ cursor: aiLoading ? "wait" : "pointer" }}
-                >
-                  {aiLoading
-                    ? t("invoices.buttons.aiLoading")
-                    : t("invoices.buttons.ai")}
-                </button>
                 <button
                   type="button"
                   onClick={saveInvoice}
@@ -955,6 +965,8 @@ export default function InvoicesPageClient({ initialList = null }) {
                   {t("invoices.buttons.clear")}
                 </button>
               </div>
+            </div>
+              </aside>
             </div>
           </section>
         : null}

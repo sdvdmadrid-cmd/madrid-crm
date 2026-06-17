@@ -124,3 +124,16 @@
     font-size: 16px !important;
   }
 }
+
+/* Document-style editor: white paper, dark text (overrides workspace form defaults) */
+.fb-workspace [data-document-editor="true"] textarea,
+.fb-page [data-document-editor="true"] textarea {
+  color: #111827 !important;
+  caret-color: #111827 !important;
+  background: #ffffff !important;
+}
+
+.fb-workspace [data-document-editor="true"] textarea::placeholder,
+.fb-page [data-document-editor="true"] textarea::placeholder {
+  color: #9ca3af !important;
+}
