@@ -105,6 +105,7 @@ export default function DocumentStyleEditor({
           readOnly={readOnly}
           className={styles.textarea}
           style={{ minHeight: `${minHeight}px` }}
+          data-doc-editor-canvas="true"
           data-testid={testId}
         />
       </div>

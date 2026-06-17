@@ -725,51 +725,6 @@ function NewEstimatePageInner() {
         ) : null}
 
         <div className={styles.grid}>
-        <section className={`${styles.card} ${styles.cardDocument} ${styles.documentPrimary}`}>
-          <DocumentStyleEditor
-            label="Job Description (optional)"
-            value={jobDescription}
-            onChange={setJobDescription}
-            placeholder="Describe the work — scope, materials, special instructions..."
-            data-testid="estimate-job-description"
-            toolbar={
-              <button
-                type="button"
-                disabled={aiDescLoading}
-                className={styles.btnAi}
-                onClick={async () => {
-                  const raw = jobDescription.trim();
-                  if (!raw) {
-                    setStatusMessage("Write a few words first, then AI will polish it.");
-                    return;
-                  }
-                  setAiDescLoading(true);
-                  try {
-                    const res = await apiFetch("/api/ai/description", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ input: raw }),
-                    });
-                    const json = await getJsonOrThrow(res, "AI unavailable.");
-                    const nextDescription = String(json?.data?.description || "").trim();
-                    if (nextDescription) setJobDescription(nextDescription);
-                  } catch (err) {
-                    setStatusMessage(err.message || "AI unavailable.");
-                  } finally {
-                    setAiDescLoading(false);
-                  }
-                }}
-              >
-                {aiDescLoading ? "Polishing..." : "Optimize with AI"}
-              </button>
-            }
-          />
-          <p className={styles.cardHint} style={{ marginTop: 12 }}>
-            The first line becomes the service name on the customer PDF (instead of
-            &quot;Base Price&quot;). Use bullet lines (- item) for a readable scope list.
-          </p>
-        </section>
-
           <div className={`${styles.colStack} ${styles.colStackMain}`}>
         <section className={styles.card}>
           <div className={styles.cardHead}>
@@ -969,6 +924,51 @@ function NewEstimatePageInner() {
           </div>
         </section>
           </div>
+
+        <section className={`${styles.card} ${styles.cardDocument} ${styles.documentPrimary}`}>
+          <DocumentStyleEditor
+            label="Job Description (optional)"
+            value={jobDescription}
+            onChange={setJobDescription}
+            placeholder="Describe the work — scope, materials, special instructions..."
+            data-testid="estimate-job-description"
+            toolbar={
+              <button
+                type="button"
+                disabled={aiDescLoading}
+                className={styles.btnAi}
+                onClick={async () => {
+                  const raw = jobDescription.trim();
+                  if (!raw) {
+                    setStatusMessage("Write a few words first, then AI will polish it.");
+                    return;
+                  }
+                  setAiDescLoading(true);
+                  try {
+                    const res = await apiFetch("/api/ai/description", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ input: raw }),
+                    });
+                    const json = await getJsonOrThrow(res, "AI unavailable.");
+                    const nextDescription = String(json?.data?.description || "").trim();
+                    if (nextDescription) setJobDescription(nextDescription);
+                  } catch (err) {
+                    setStatusMessage(err.message || "AI unavailable.");
+                  } finally {
+                    setAiDescLoading(false);
+                  }
+                }}
+              >
+                {aiDescLoading ? "Polishing..." : "Optimize with AI"}
+              </button>
+            }
+          />
+          <p className={styles.cardHint} style={{ marginTop: 12 }}>
+            The first line becomes the service name on the customer PDF (instead of
+            &quot;Base Price&quot;). Use bullet lines (- item) for a readable scope list.
+          </p>
+        </section>
 
           <div className={`${styles.colStack} ${styles.asideSticky}`}>
         <section className={styles.card}>
