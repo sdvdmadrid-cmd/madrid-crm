@@ -5,6 +5,23 @@ import path from "node:path";
 
 const root = process.cwd();
 
+test("createSessionToken strips JWT standard claims before signing", () => {
+  const src = readFileSync(path.join(root, "src/lib/auth.js"), "utf8");
+  assert.match(src, /normalizeSessionPayloadForSigning/);
+  assert.match(src, /delete clean\.sv/);
+  assert.match(src, /const normalized = normalizeSessionPayloadForSigning\(payload\)/);
+});
+
+test("AuthShell clears client logout guard on auth entry pages", () => {
+  const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
+  assert.match(src, /if \(!hasMounted \|\| !isAuthEntryPage\) return;\s*clearClientLoggedOut\(\)/s);
+});
+
+test("AuthShell redirects protected routes when client logout guard is active", () => {
+  const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
+  assert.match(src, /isClientLoggedOut\(\)[\s\S]*performAuthHardNavigate\("\/login"\)/);
+});
+
 test("middleware login redirect requires app session cookie, not Supabase alone", () => {
   const src = readFileSync(path.join(root, "middleware.js"), "utf8");
   const loginBlock = src.slice(

@@ -763,6 +763,9 @@ export default function AuthShell({ children }) {
     if (isClientLoggedOut()) {
       console.log("SESSION FOUND", false, "(client logout guard)");
       setAuthUser(null);
+      if (!isAuthEntryPage && !isPublicPage) {
+        performAuthHardNavigate("/login");
+      }
       return;
     }
 
@@ -858,7 +861,7 @@ export default function AuthShell({ children }) {
         setAuthBootError(BOOT_FAILSAFE_MESSAGE);
       }
     }
-  }, [normalizeSessionUser]);
+  }, [normalizeSessionUser, isAuthEntryPage, isPublicPage]);
 
   const runAuthBootstrap = useCallback(async ({ force = false } = {}) => {
     if (!force && authUserRef.current?.userId) {
@@ -898,7 +901,10 @@ export default function AuthShell({ children }) {
   }, [runAuthBootstrap]);
 
   const handleBootLogout = useCallback(() => {
-    void performClientLogout();
+    clearClientLoggedOut();
+    void performClientLogout().catch(() => {
+      performAuthHardNavigate("/login");
+    });
   }, []);
 
   // Persist industry to localStorage so catalog pages can read it without an extra fetch
@@ -954,6 +960,11 @@ export default function AuthShell({ children }) {
   ]);
 
   useEffect(() => {
+    if (!hasMounted || !isAuthEntryPage) return;
+    clearClientLoggedOut();
+  }, [hasMounted, isAuthEntryPage]);
+
+  useEffect(() => {
     if (!hasMounted || !isOwnerCommandCenter) return;
     if (isClientLoggedOut()) {
       performAuthHardNavigate("/login");
@@ -962,6 +973,7 @@ export default function AuthShell({ children }) {
 
   useEffect(() => {
     if (!authChecked || authUser || isPublicPage || isAuthEntryPage) return;
+    if (isClientLoggedOut()) return;
     const timeoutId = window.setTimeout(() => {
       if (!authUserRef.current) {
         console.warn("AUTH BOOT FAILSAFE", AUTH_BOOT_FAILSAFE_MS, "ms elapsed");
@@ -1351,6 +1363,15 @@ export default function AuthShell({ children }) {
   }
 
   if (!authUser && !isAuthEntryPage && !isSubscribePage && !isOwnerCommandCenter) {
+    if (isClientLoggedOut()) {
+      performAuthHardNavigate("/login");
+      return (
+        <AuthBootShell
+          dark={isPremiumWorkspace}
+          loadingLabel="Redirecting to sign in…"
+        />
+      );
+    }
     return (
       <AuthBootShell
         dark={isPremiumWorkspace}
