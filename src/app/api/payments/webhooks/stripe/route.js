@@ -1,112 +1,127 @@
+import { after } from "next/server";
 import Stripe from "stripe";
 import { INNGEST_EVENTS, isInngestEnabled, sendInngestEvent } from "@/lib/inngest";
 import { processStripeWebhookEvent } from "@/lib/stripe-webhook-processing";
 import {
   getStripeSecretKey,
-  getStripeWebhookSecret,
+  getStripeWebhookSecrets,
+  verifyStripeWebhookPayload,
 } from "@/lib/stripe-payments";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
-const SYNC_SUBSCRIPTION_EVENT_TYPES = new Set([
+const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
+  "checkout.session.expired",
+  "payment_intent.succeeded",
+  "payment_intent.processing",
+  "payment_intent.payment_failed",
+  "payment_intent.canceled",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
   "invoice.payment_succeeded",
   "invoice.payment_failed",
   "invoice.paid",
+  "account.updated",
 ]);
+
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function queueStripeWebhookProcessing(event) {
+  if (isInngestEnabled()) {
+    const queued = await sendInngestEvent(INNGEST_EVENTS.STRIPE_WEBHOOK, {
+      stripeEventId: event.id,
+      event,
+    });
+    if (queued) {
+      return { mode: "inngest" };
+    }
+  }
+
+  after(async () => {
+    try {
+      await processStripeWebhookEvent(event);
+    } catch (error) {
+      console.error(
+        "[api/payments/webhooks/stripe][after] processing failed",
+        event?.id || "unknown",
+        event?.type || "unknown",
+        error,
+      );
+    }
+  });
+
+  return { mode: "after" };
+}
+
 export async function POST(request) {
   try {
     const secret = getStripeSecretKey();
-    const webhookSecret = getStripeWebhookSecret();
-    if (!secret || !webhookSecret) {
-      return new Response(
-        JSON.stringify({
+    const webhookSecrets = getStripeWebhookSecrets();
+    if (!secret || webhookSecrets.length === 0) {
+      return jsonResponse(
+        {
           success: false,
           error: "Missing Stripe webhook configuration",
-        }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
+        },
+        500,
       );
     }
 
     const stripe = new Stripe(secret);
     const signature = request.headers.get("stripe-signature") || "";
     if (!signature) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           success: false,
           error: "Missing stripe-signature header",
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        },
+        400,
       );
     }
 
     const body = await request.text();
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch {
+    const event = verifyStripeWebhookPayload(stripe, body, signature);
+    if (!event) {
       console.error(
         "[api/payments/webhooks/stripe][POST] Invalid Stripe webhook signature",
+        { secretCount: webhookSecrets.length },
       );
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(
+        {
           success: false,
           error: "Invalid Stripe webhook signature",
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        },
+        400,
       );
     }
 
-    if (
-      ![
-        "checkout.session.completed",
-        "checkout.session.async_payment_succeeded",
-        "checkout.session.async_payment_failed",
-        "checkout.session.expired",
-        "payment_intent.succeeded",
-        "payment_intent.processing",
-        "payment_intent.payment_failed",
-        "payment_intent.canceled",
-        "customer.subscription.created",
-        "customer.subscription.updated",
-        "customer.subscription.deleted",
-        "invoice.payment_succeeded",
-        "invoice.payment_failed",
-        "invoice.paid",
-        "account.updated",
-      ].includes(event.type)
-    ) {
-      return new Response(
-        JSON.stringify({ success: true, ignored: true, eventType: event.type }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
+    if (!HANDLED_EVENT_TYPES.has(event.type)) {
+      return jsonResponse({ success: true, ignored: true, eventType: event.type });
     }
 
-    if (isInngestEnabled() && !SYNC_SUBSCRIPTION_EVENT_TYPES.has(event.type)) {
-      const queued = await sendInngestEvent(INNGEST_EVENTS.STRIPE_WEBHOOK, {
-        stripeEventId: event.id,
-        event,
-      });
-      if (queued) {
-        return new Response(
-          JSON.stringify({ success: true, queued: true, eventType: event.type }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
-    }
-    return await processStripeWebhookEvent(event);
+    const delivery = await queueStripeWebhookProcessing(event);
+    return jsonResponse({
+      success: true,
+      received: true,
+      eventType: event.type,
+      eventId: event.id,
+      delivery: delivery.mode,
+    });
   } catch (error) {
     console.error("[api/payments/webhooks/stripe][POST] error", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+    return jsonResponse(
+      { success: false, error: error.message },
+      500,
     );
   }
 }

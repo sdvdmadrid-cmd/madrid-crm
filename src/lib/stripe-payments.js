@@ -26,6 +26,10 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
+import {
+  collectStripeWebhookSecrets,
+  verifyStripeWebhookPayload as verifyStripeWebhookPayloadCore,
+} from "@/lib/stripe-webhook-verify";
 
 const CLIENTS = "clients";
 const INVOICES = "invoices";
@@ -138,8 +142,26 @@ export function getStripeSecretKey() {
   return getServerEnvValue("STRIPE_SECRET_KEY");
 }
 
+export function getStripeWebhookSecrets() {
+  const env = {
+    STRIPE_WEBHOOK_SECRET: getServerEnvValue("STRIPE_WEBHOOK_SECRET"),
+    STRIPE_WEBHOOK_SECRET_PREVIOUS: getServerEnvValue("STRIPE_WEBHOOK_SECRET_PREVIOUS"),
+    STRIPE_WEBHOOK_SECRETS: getServerEnvValue("STRIPE_WEBHOOK_SECRETS"),
+  };
+  return collectStripeWebhookSecrets(env);
+}
+
 export function getStripeWebhookSecret() {
-  return getServerEnvValue("STRIPE_WEBHOOK_SECRET");
+  return getStripeWebhookSecrets()[0] || "";
+}
+
+export function verifyStripeWebhookPayload(stripe, rawBody, signature) {
+  return verifyStripeWebhookPayloadCore(
+    stripe,
+    rawBody,
+    signature,
+    getStripeWebhookSecrets(),
+  );
 }
 
 export function getStripeServerClient() {
