@@ -32,6 +32,23 @@ test("performClientLogout awaits server logout before hard navigate", () => {
   assert.match(src, /postServerLogout/);
 });
 
+test("apiFetch allows login while post-logout client guard is active", () => {
+  const guardSrc = readFileSync(path.join(root, "src/lib/auth-logout-guard.js"), "utf8");
+  const clientSrc = readFileSync(path.join(root, "src/lib/client-auth.js"), "utf8");
+  assert.match(guardSrc, /isAuthEntryApiRequest/);
+  assert.match(guardSrc, /\/api\/auth\/login/);
+  assert.match(clientSrc, /isAuthEntryApiRequest\(target\)/);
+});
+
+test("AuthShell clears client logout guard before login submit", () => {
+  const src = readFileSync(path.join(root, "src/components/AuthShell.js"), "utf8");
+  const loginBlock = src.slice(
+    src.indexOf("const submitLogin = async () =>"),
+    src.indexOf("const submitRegister = async () =>"),
+  );
+  assert.match(loginBlock, /clearClientLoggedOut\(\)/);
+});
+
 test("OwnerLogoutButton uses centralized performClientLogout", () => {
   const src = readFileSync(
     path.join(root, "src/components/owner/OwnerLogoutButton.js"),

@@ -1,4 +1,5 @@
 import {
+  isAuthEntryApiRequest,
   isClientLoggedOut,
   mergeApiFetchSignals,
 } from "@/lib/auth-logout-guard.js";
@@ -13,10 +14,11 @@ export async function apiFetch(input, init = {}) {
 
   if (isClientLoggedOut()) {
     const target = String(input);
-    const isLogoutRequest =
+    const isAllowedWhileLoggedOut =
       target.includes("/api/auth/logout") ||
+      isAuthEntryApiRequest(target) ||
       init?.allowWhileLoggedOut === true;
-    if (!isLogoutRequest) {
+    if (!isAllowedWhileLoggedOut) {
       return new Response(
         JSON.stringify({ success: false, error: "Unauthenticated" }),
         {

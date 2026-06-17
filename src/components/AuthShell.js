@@ -1016,6 +1016,7 @@ export default function AuthShell({ children }) {
     setSubmitting(true);
     setError("");
     setNotice("");
+    clearClientLoggedOut();
     try {
       const res = await apiFetch("/api/auth/login", {
         method: "POST",
@@ -1089,6 +1090,7 @@ export default function AuthShell({ children }) {
     setSubmitting(true);
     setError("");
     setNotice("");
+    clearClientLoggedOut();
 
     const password = String(registerForm.password || "");
     if (password.length < 8) {
