@@ -87,6 +87,49 @@
   box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
 }
 
+/* Document-style editor: always white paper + dark text (focus, hover, typing) */
+.fb-workspace [data-document-editor="true"],
+.fb-page [data-document-editor="true"] {
+  --doc-editor-label: #64748b;
+}
+
+.fb-workspace [data-document-editor="true"] [class*="paper"],
+.fb-page [data-document-editor="true"] [class*="paper"] {
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+}
+
+.fb-workspace [data-document-editor="true"] textarea,
+.fb-workspace [data-document-editor="true"] textarea:hover,
+.fb-workspace [data-document-editor="true"] textarea:focus,
+.fb-workspace [data-document-editor="true"] textarea:focus-visible,
+.fb-page [data-document-editor="true"] textarea,
+.fb-page [data-document-editor="true"] textarea:hover,
+.fb-page [data-document-editor="true"] textarea:focus,
+.fb-page [data-document-editor="true"] textarea:focus-visible {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827 !important;
+  background: #ffffff !important;
+  border-color: #d1d5db !important;
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.22) !important;
+}
+
+.fb-workspace [data-document-editor="true"] textarea::placeholder,
+.fb-page [data-document-editor="true"] textarea::placeholder {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
+  opacity: 1;
+}
+
+.fb-workspace [data-document-editor="true"] textarea:-webkit-autofill,
+.fb-workspace [data-document-editor="true"] textarea:-webkit-autofill:focus,
+.fb-page [data-document-editor="true"] textarea:-webkit-autofill,
+.fb-page [data-document-editor="true"] textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111827 !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+}
+
 /* Estimate builder (canonical form) */
 .fb-workspace .fb-estimate-form {
   color: var(--fb-text);
@@ -123,17 +166,4 @@
   .fb-workspace select {
     font-size: 16px !important;
   }
-}
-
-/* Document-style editor: white paper, dark text (overrides workspace form defaults) */
-.fb-workspace [data-document-editor="true"] textarea,
-.fb-page [data-document-editor="true"] textarea {
-  color: #111827 !important;
-  caret-color: #111827 !important;
-  background: #ffffff !important;
-}
-
-.fb-workspace [data-document-editor="true"] textarea::placeholder,
-.fb-page [data-document-editor="true"] textarea::placeholder {
-  color: #9ca3af !important;
 }
