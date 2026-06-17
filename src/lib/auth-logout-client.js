@@ -1,11 +1,11 @@
-import { apiFetch } from "@/lib/client-auth";
 import { performAuthHardNavigate } from "@/lib/auth-nav";
 import { supabase } from "@/lib/supabase";
 import {
   abortInFlightAuthRequests,
-  getLogoutAbortSignal,
   markClientLoggedOut,
 } from "@/lib/auth-logout-guard.js";
+
+let logoutInFlight = false;
 
 function dispatchAuthLogout() {
   if (typeof window === "undefined") return;
@@ -21,6 +21,23 @@ function clearLogoutClientStorage() {
   }
 }
 
+async function postServerLogout() {
+  const response = await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Logout failed (${response.status})`);
+  }
+  const payload = await response.json().catch(() => null);
+  if (payload && payload.success === false) {
+    throw new Error(payload.error || "Logout failed");
+  }
+  return response;
+}
+
 /**
  * End the session server-side first, then hard-navigate to login.
  * Navigating before /api/auth/logout completes leaves the session cookie valid;
@@ -31,6 +48,8 @@ export async function performClientLogout({
   clearIndustry = true,
 } = {}) {
   if (typeof window === "undefined") return;
+  if (logoutInFlight) return;
+  logoutInFlight = true;
 
   abortInFlightAuthRequests();
   markClientLoggedOut();
@@ -39,14 +58,26 @@ export async function performClientLogout({
   }
   dispatchAuthLogout();
 
-  await Promise.allSettled([
-    apiFetch("/api/auth/logout", {
-      method: "POST",
-      suppressUnauthorizedEvent: true,
-      signal: getLogoutAbortSignal(),
-    }),
-    supabase.auth.signOut(),
-  ]);
+  try {
+    let serverLogoutError = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await postServerLogout();
+        serverLogoutError = null;
+        break;
+      } catch (error) {
+        serverLogoutError = error;
+      }
+    }
+    if (serverLogoutError) {
+      throw serverLogoutError;
+    }
 
-  performAuthHardNavigate(redirectTo);
+    await supabase.auth.signOut().catch(() => {});
+    performAuthHardNavigate(redirectTo);
+  } catch (error) {
+    console.error("[auth] logout failed", error);
+    logoutInFlight = false;
+    throw error;
+  }
 }

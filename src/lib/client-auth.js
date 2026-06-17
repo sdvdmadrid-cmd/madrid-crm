@@ -37,6 +37,7 @@ export async function apiFetch(input, init = {}) {
 
   const response = await fetch(input, {
     ...fetchInit,
+    credentials: fetchInit.credentials ?? "include",
     signal: mergedSignal,
   }).finally(() => {
     if (timeoutId) clearTimeout(timeoutId);

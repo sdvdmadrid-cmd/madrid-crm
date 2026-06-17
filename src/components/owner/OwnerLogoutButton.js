@@ -12,7 +12,9 @@ export default function OwnerLogoutButton({ variant = "sidebar" }) {
   function handleLogout() {
     if (submitting) return;
     setSubmitting(true);
-    void performClientLogout();
+    void performClientLogout().catch(() => {
+      setSubmitting(false);
+    });
   }
 
   const className =

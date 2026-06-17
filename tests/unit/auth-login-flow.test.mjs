@@ -24,11 +24,12 @@ test("AuthShell logout clears Supabase browser session", () => {
 
 test("performClientLogout awaits server logout before hard navigate", () => {
   const src = readFileSync(path.join(root, "src/lib/auth-logout-client.js"), "utf8");
-  const awaitIndex = src.indexOf("await Promise.allSettled");
+  const awaitIndex = src.indexOf("await postServerLogout()");
   const navigateIndex = src.indexOf("performAuthHardNavigate(redirectTo)");
   assert.ok(awaitIndex >= 0);
   assert.ok(navigateIndex > awaitIndex);
-  assert.match(src, /\/api\/auth\/logout/);
+  assert.match(src, /credentials:\s*"include"/);
+  assert.match(src, /postServerLogout/);
 });
 
 test("OwnerLogoutButton uses centralized performClientLogout", () => {
