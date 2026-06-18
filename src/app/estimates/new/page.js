@@ -4,8 +4,14 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
 import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
-import DocumentStyleEditor from "@/components/workspace/DocumentStyleEditor";
 import PlacesAutocomplete from "@/components/PlacesAutocomplete";
+import {
+  computeInvoiceLineItemTotal,
+  createInvoiceLineItem,
+  normalizeInvoiceLineItemsForForm,
+  normalizeInvoiceLineItemsForSave,
+  sumInvoiceLineItemsTotals,
+} from "@/lib/invoice-line-items";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { formatClientPickerLabel } from "@/lib/client-search";
 import styles from "./estimates-new.module.css";
@@ -16,6 +22,122 @@ import {
 } from "@/lib/form-autofill-guard";
 
 const CLIENT_PREFIXES = ["", "Mr.", "Mrs.", "Ms.", "Dr."];
+
+const ESTIMATE_STATUS_LABELS = {
+  draft: "Draft",
+  sent: "Sent",
+  approved: "Approved",
+  declined: "Declined",
+  changes_requested: "Changes requested",
+};
+
+function splitEstimateDocumentText(noteText) {
+  const text = String(noteText || "").trim();
+  if (!text) {
+    return { workDescription: "", scopeOfWork: "", additionalNotes: "" };
+  }
+
+  const scopeMarker = "\n\nScope of work:\n";
+  const notesMarker = "\n\nNotes:\n";
+  const scopeIdx = text.indexOf(scopeMarker);
+  const notesIdx = text.indexOf(notesMarker);
+
+  if (scopeIdx === -1 && notesIdx === -1) {
+    return { workDescription: text, scopeOfWork: "", additionalNotes: "" };
+  }
+
+  const workDescription = (
+    scopeIdx >= 0 ? text.slice(0, scopeIdx) : notesIdx >= 0 ? text.slice(0, notesIdx) : text
+  ).trim();
+
+  let scopeOfWork = "";
+  if (scopeIdx >= 0) {
+    const scopeEnd = notesIdx > scopeIdx ? notesIdx : text.length;
+    scopeOfWork = text.slice(scopeIdx + scopeMarker.length, scopeEnd).trim();
+  }
+
+  let additionalNotes = "";
+  if (notesIdx >= 0) {
+    additionalNotes = text.slice(notesIdx + notesMarker.length).trim();
+  }
+
+  return { workDescription, scopeOfWork, additionalNotes };
+}
+
+function joinEstimateDocumentText(workDescription, scopeOfWork, additionalNotes) {
+  const parts = [];
+  const work = String(workDescription || "").trim();
+  const scope = String(scopeOfWork || "").trim();
+  const notes = String(additionalNotes || "").trim();
+  if (work) parts.push(work);
+  if (scope) parts.push(`Scope of work:\n${scope}`);
+  if (notes) parts.push(`Notes:\n${notes}`);
+  return parts.join("\n\n");
+}
+
+function servicesToLineItems(services = [], fallbackSubtotal = 0) {
+  const rows = Array.isArray(services) ? services : [];
+  const billable = rows.filter(
+    (item) => String(item?.id || "").toLowerCase() !== "discount",
+  );
+
+  if (billable.length === 0) {
+    const amount = Math.max(0, toNumber(fallbackSubtotal, 0));
+    if (amount <= 0) return [createInvoiceLineItem("line-1")];
+    return normalizeInvoiceLineItemsForForm([
+      {
+        id: "line-1",
+        description: "Services",
+        quantity: 1,
+        unitPrice: amount,
+      },
+    ]);
+  }
+
+  return normalizeInvoiceLineItemsForForm(
+    billable.map((item, index) => ({
+      id: item.id || `line-${index + 1}`,
+      description: item.name || item.description || "",
+      quantity: item.qty ?? item.quantity ?? 1,
+      unitPrice: item.unitPrice ?? item.price ?? 0,
+    })),
+  );
+}
+
+function buildServicesFromLineItems(lineItems, discountAmount, discountType, discountNumber) {
+  const normalized = normalizeInvoiceLineItemsForSave(lineItems);
+  const services = normalized.map((item, index) => {
+    const qty = toNumber(item.quantity ?? item.qty, 1);
+    const unitPrice = toNumber(item.unitPrice, 0);
+    const price = Number((qty * unitPrice).toFixed(2));
+    return {
+      id: item.id || `line-${index + 1}`,
+      name: String(item.description || item.label || "Service").trim() || "Service",
+      qty,
+      unitPrice,
+      price,
+    };
+  });
+
+  if (discountAmount > 0) {
+    services.push({
+      id: "discount",
+      name: "Discount",
+      qty: 1,
+      unitPrice: -discountAmount,
+      price: -discountAmount,
+      discountType,
+      discountValue: discountNumber,
+    });
+  }
+
+  return services;
+}
+
+function formatEstimateStatus(status) {
+  const key = String(status || "draft").trim().toLowerCase();
+  return ESTIMATE_STATUS_LABELS[key] || key.replace(/_/g, " ");
+}
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -130,7 +252,11 @@ function NewEstimatePageInner() {
   const [billingZip, setBillingZip] = useState("");
   const [sameAsBilling, setSameAsBilling] = useState(true);
 
-  const [jobDescription, setJobDescription] = useState("");
+  const [workDescription, setWorkDescription] = useState("");
+  const [scopeOfWork, setScopeOfWork] = useState("");
+  const [additionalNotes, setAdditionalNotes] = useState("");
+  const [lineItems, setLineItems] = useState([createInvoiceLineItem("line-1")]);
+  const [estimateCreatedAt, setEstimateCreatedAt] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [discountType, setDiscountType] = useState("amount");
   const [discount, setDiscount] = useState("");
@@ -170,7 +296,20 @@ function NewEstimatePageInner() {
   );
   const [editHydrating, setEditHydrating] = useState(Boolean(editId));
 
-  const basePriceNumber = useMemo(() => Math.max(0, toNumber(basePrice, 0)), [basePrice]);
+  const lineItemsTotal = useMemo(
+    () => sumInvoiceLineItemsTotals(lineItems),
+    [lineItems],
+  );
+
+  const handleLineItemsChange = (nextItems) => {
+    setLineItems(nextItems);
+    const total = sumInvoiceLineItemsTotals(nextItems);
+    if (total > 0) setBasePrice(String(total));
+  };
+  const basePriceNumber = useMemo(
+    () => Math.max(0, toNumber(basePrice, 0) || lineItemsTotal),
+    [basePrice, lineItemsTotal],
+  );
   const discountNumber = useMemo(() => Math.max(0, toNumber(discount, 0)), [discount]);
   const discountAmount = useMemo(() => {
     if (discountType === "percent") {
@@ -188,6 +327,15 @@ function NewEstimatePageInner() {
     return Number(((subtotal * rate) / 100).toFixed(2));
   }, [subtotal, taxRate]);
   const estimateTotal = useMemo(() => Number((subtotal + taxAmount).toFixed(2)), [subtotal, taxAmount]);
+
+  const combinedDocumentText = useMemo(
+    () =>
+      joinEstimateDocumentText(workDescription, scopeOfWork, additionalNotes).trim(),
+    [workDescription, scopeOfWork, additionalNotes],
+  );
+
+  const displayEstimateDate =
+    estimateCreatedAt || new Date().toISOString().slice(0, 10);
 
   function applyClient(client) {
     if (!client) return;
@@ -276,7 +424,14 @@ function NewEstimatePageInner() {
         setClientPhone(e.clientPhone || "");
 
         setStreetName(e.address || "");
-        setJobDescription(e.notes || "");
+        const parsedNotes = splitEstimateDocumentText(e.notes || "");
+        setWorkDescription(parsedNotes.workDescription);
+        setScopeOfWork(parsedNotes.scopeOfWork);
+        setAdditionalNotes(parsedNotes.additionalNotes);
+        setLineItems(servicesToLineItems(e.services, e.subtotal));
+        setEstimateCreatedAt(
+          e.createdAt ? String(e.createdAt).slice(0, 10) : "",
+        );
 
         const inferred = inferBaseAndDiscount(e.services, e.subtotal);
         setBasePrice(String(inferred.basePrice || ""));
@@ -355,7 +510,7 @@ function NewEstimatePageInner() {
       ]
         .filter(Boolean)
         .join("\n\n");
-      if (scopeLines) setJobDescription(scopeLines);
+      if (scopeLines) setWorkDescription(scopeLines);
 
       const subtotal = Number(draft.subtotal) || 0;
       if (subtotal > 0) setBasePrice(String(subtotal.toFixed(2)));
@@ -413,7 +568,10 @@ function NewEstimatePageInner() {
     billingState,
     billingZip,
     sameAsBilling,
-    jobDescription,
+    workDescription,
+    scopeOfWork,
+    additionalNotes,
+    lineItems,
     basePrice,
     discountType,
     discount,
@@ -431,7 +589,9 @@ function NewEstimatePageInner() {
       errors.clientEmail = "Enter a valid email address.";
     }
     if (!streetName.trim()) errors.streetName = "Service address is required.";
-    if (basePriceNumber <= 0) errors.basePrice = "Enter a base price greater than $0.";
+    if (basePriceNumber <= 0 && lineItemsTotal <= 0) {
+      errors.basePrice = "Add at least one line item with a price greater than $0.";
+    }
     if (discountType === "percent" && discountNumber > 100) {
       errors.discount = "Discount % cannot be greater than 100.";
     }
@@ -444,6 +604,7 @@ function NewEstimatePageInner() {
     clientEmail,
     streetName,
     basePriceNumber,
+    lineItemsTotal,
     discountType,
     discountNumber,
   ]);
@@ -536,27 +697,18 @@ function NewEstimatePageInner() {
           .filter(Boolean)
           .join(", ");
 
-    const services = [
-      {
-        id: "base_price",
-        name: "Base Price",
-        qty: 1,
-        unitPrice: basePriceNumber,
-        price: basePriceNumber,
-      },
-    ];
+    const combinedNotes = joinEstimateDocumentText(
+      workDescription,
+      scopeOfWork,
+      additionalNotes,
+    ).trim();
 
-    if (discountAmount > 0) {
-      services.push({
-        id: "discount",
-        name: "Discount",
-        qty: 1,
-        unitPrice: -discountAmount,
-        price: -discountAmount,
-        discountType,
-        discountValue: discountNumber,
-      });
-    }
+    const services = buildServicesFromLineItems(
+      lineItems,
+      discountAmount,
+      discountType,
+      discountNumber,
+    );
 
     const payload = {
       clientName: fullClientName,
@@ -573,8 +725,8 @@ function NewEstimatePageInner() {
         text: sendViaText,
       },
       status: nextStatus,
-      notes: jobDescription.trim(),
-      serviceTitle: deriveServiceTitleFromScope(jobDescription.trim()),
+      notes: combinedNotes,
+      serviceTitle: deriveServiceTitleFromScope(combinedNotes),
       clientUuid: selectedClientId || clientIdParam || "",
     };
 
@@ -633,7 +785,10 @@ function NewEstimatePageInner() {
         // overwrite fields we just persisted.
         editHydrationTokenRef.current += 1;
         const savedNotes = String(serialized.notes || payload.notes || "").trim();
-        setJobDescription(savedNotes);
+        const parsedSaved = splitEstimateDocumentText(savedNotes);
+        setWorkDescription(parsedSaved.workDescription);
+        setScopeOfWork(parsedSaved.scopeOfWork);
+        setAdditionalNotes(parsedSaved.additionalNotes);
         setEditingStatus(serialized.status || editingStatus);
         setStatusMessage("Estimate saved.");
         return;
@@ -725,368 +880,509 @@ function NewEstimatePageInner() {
         ) : null}
 
         <div className={styles.grid}>
-          <div className={`${styles.colStack} ${styles.colStackMain}`}>
-        <section className={styles.card}>
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>Client</h2>
-            <span className={styles.cardHint}>Search to auto-fill contact &amp; address</span>
-          </div>
-
-          <div className={styles.searchWrap}>
-            <ClientSearchAutocomplete
-              limit={25}
-              clearOnSelect={false}
-              showHint={false}
-              value={clientSearchLabel}
-              onValueChange={setClientSearchLabel}
-              onClear={() => {
-                setSelectedClientId("");
-                setClientSearchLabel("");
-              }}
-              onSelect={applyClient}
-              placeholder="Search clients by name, email, phone, or address…"
-            />
-          </div>
-
-          <div className={styles.fieldRow}>
-            <select
-              value={clientPrefix}
-              onChange={(e) => setClientPrefix(e.target.value)}
-              aria-label="Client prefix"
-              className={styles.select}
-            >
-              {CLIENT_PREFIXES.map((p) => (
-                <option key={p} value={p}>{p || "-"}</option>
-              ))}
-            </select>
-            <input
-              value={clientFirstName}
-              onChange={(e) => setClientFirstName(e.target.value)}
-              onBlur={() => touchField("clientFirstName")}
-              placeholder="First name"
-              aria-label="Client first name"
-              aria-invalid={showError("clientFirstName") ? "true" : "false"}
-              className={`${styles.input} ${styles.inputGrow}`}
-              {...autofillGuardProps("firstName")}
-            />
-            <input
-              value={clientLastName}
-              onChange={(e) => setClientLastName(e.target.value)}
-              placeholder="Last name"
-              aria-label="Client last name"
-              className={`${styles.input} ${styles.inputGrow}`}
-              {...autofillGuardProps("lastName")}
-            />
-          </div>
-          {showError("clientFirstName") ? (
-            <p className={styles.errorText}>{showError("clientFirstName")}</p>
-          ) : null}
-          <label className={styles.field}>
-            Email
-            <input
-              type="email"
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              onBlur={() => touchField("clientEmail")}
-              placeholder="Email to send the estimate link"
-              aria-label="Client email"
-              aria-invalid={showError("clientEmail") ? "true" : "false"}
-              className={styles.input}
-              {...autofillGuardProps("email")}
-            />
-          </label>
-          {showError("clientEmail") ? (
-            <p className={styles.errorText}>{showError("clientEmail")}</p>
-          ) : null}
-          <label className={styles.field}>
-            Phone
-            <input
-              type="tel"
-              value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
-              placeholder="Mobile or office number"
-              aria-label="Client phone"
-              className={styles.input}
-              {...autofillGuardProps("tel")}
-            />
-          </label>
-        </section>
-
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Service Address</h2>
-          <PlacesAutocomplete
-            id="service-address"
-            value={streetName}
-            onChange={setStreetName}
-            onSelect={(place) => {
-              setStreetName(place.street || "");
-              if (place.city) setCity(place.city);
-              if (place.state) setStateField(place.state);
-              if (place.zip) setZipCode(place.zip);
-            }}
-            placeholder="Start typing address..."
-            inputClass={styles.input}
-          />
-          {showError("streetName") ? (
-            <p className={styles.errorText}>{showError("streetName")}</p>
-          ) : null}
-          <div className={styles.addressGrid}>
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="City"
-              aria-label="City"
-              className={styles.input}
-              {...autofillGuardProps("city")}
-            />
-            <input
-              value={stateField}
-              onChange={(e) => setStateField(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="ST"
-              maxLength={2}
-              aria-label="State (2-letter code, e.g. TX). Auto-fills sales tax."
-              className={styles.input}
-              {...autofillGuardProps("state")}
-            />
-            <input
-              value={zipCode}
-              onChange={(e) => setZipCode(e.target.value)}
-              placeholder="ZIP"
-              aria-label="ZIP code"
-              inputMode="numeric"
-              className={styles.input}
-              {...autofillGuardProps("zip")}
-            />
-          </div>
-
-          <div className="mt-4">
-            <div className={styles.cardHead}>
-              <div className={styles.cardTitle} style={{ textTransform: "none", letterSpacing: 0, fontSize: "14px" }}>
-                Billing Address
+          <aside className={styles.sidebar}>
+            <section className={`${styles.card} ${styles.cardCompact}`}>
+              <div className={styles.cardHead}>
+                <h2 className={styles.cardTitle}>Client information</h2>
               </div>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={sameAsBilling}
-                  onChange={(e) => setSameAsBilling(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
-                />
-                Same as service address
-              </label>
-            </div>
-            {!sameAsBilling ? (
-              <>
-                <PlacesAutocomplete
-                  id="billing-address"
-                  value={billingStreetName}
-                  onChange={setBillingStreetName}
-                  onSelect={(place) => {
-                    setBillingStreetName(place.street || "");
-                    if (place.city) setBillingCity(place.city);
-                    if (place.state) setBillingState(place.state);
-                    if (place.zip) setBillingZip(place.zip);
+              <div className={styles.searchWrap}>
+                <ClientSearchAutocomplete
+                  limit={25}
+                  clearOnSelect={false}
+                  showHint={false}
+                  value={clientSearchLabel}
+                  onValueChange={setClientSearchLabel}
+                  onClear={() => {
+                    setSelectedClientId("");
+                    setClientSearchLabel("");
                   }}
-                  placeholder="Start typing billing address..."
-                  inputClass={styles.input}
+                  onSelect={applyClient}
+                  placeholder="Search clients…"
                 />
-                <div className={styles.addressGrid}>
-                  <input
-                    value={billingCity}
-                    onChange={(e) => setBillingCity(e.target.value)}
-                    placeholder="City"
-                    aria-label="Billing city"
-                    className={styles.input}
-                    {...autofillGuardProps("billingCity")}
-                  />
-                  <input
-                    value={billingState}
-                    onChange={(e) => setBillingState(e.target.value.toUpperCase().slice(0, 2))}
-                    placeholder="ST"
-                    maxLength={2}
-                    aria-label="Billing state"
-                    className={styles.input}
-                    {...autofillGuardProps("billingState")}
-                  />
-                  <input
-                    value={billingZip}
-                    onChange={(e) => setBillingZip(e.target.value)}
-                    placeholder="ZIP"
-                    aria-label="Billing ZIP"
-                    inputMode="numeric"
-                    className={styles.input}
-                    {...autofillGuardProps("billingZip")}
-                  />
+              </div>
+              <div className={styles.fieldRow}>
+                <select
+                  value={clientPrefix}
+                  onChange={(e) => setClientPrefix(e.target.value)}
+                  aria-label="Client prefix"
+                  className={styles.select}
+                >
+                  {CLIENT_PREFIXES.map((p) => (
+                    <option key={p} value={p}>{p || "-"}</option>
+                  ))}
+                </select>
+                <input
+                  value={clientFirstName}
+                  onChange={(e) => setClientFirstName(e.target.value)}
+                  onBlur={() => touchField("clientFirstName")}
+                  placeholder="First name"
+                  aria-label="Client first name"
+                  aria-invalid={showError("clientFirstName") ? "true" : "false"}
+                  className={`${styles.input} ${styles.inputGrow}`}
+                  {...autofillGuardProps("firstName")}
+                />
+                <input
+                  value={clientLastName}
+                  onChange={(e) => setClientLastName(e.target.value)}
+                  placeholder="Last name"
+                  aria-label="Client last name"
+                  className={`${styles.input} ${styles.inputGrow}`}
+                  {...autofillGuardProps("lastName")}
+                />
+              </div>
+              {showError("clientFirstName") ? (
+                <p className={styles.errorText}>{showError("clientFirstName")}</p>
+              ) : null}
+            </section>
+
+            <section className={`${styles.card} ${styles.cardCompact}`}>
+              <h2 className={styles.cardTitle}>Contact details</h2>
+              <label className={`${styles.field} ${styles.fieldTight}`}>
+                Email
+                <input
+                  type="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  onBlur={() => touchField("clientEmail")}
+                  placeholder="Email for estimate link"
+                  aria-label="Client email"
+                  aria-invalid={showError("clientEmail") ? "true" : "false"}
+                  className={styles.input}
+                  {...autofillGuardProps("email")}
+                />
+              </label>
+              {showError("clientEmail") ? (
+                <p className={styles.errorText}>{showError("clientEmail")}</p>
+              ) : null}
+              <label className={`${styles.field} ${styles.fieldTight}`}>
+                Phone
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="Mobile or office"
+                  aria-label="Client phone"
+                  className={styles.input}
+                  {...autofillGuardProps("tel")}
+                />
+              </label>
+            </section>
+
+            <section className={`${styles.card} ${styles.cardCompact}`}>
+              <h2 className={styles.cardTitle}>Property address</h2>
+              <PlacesAutocomplete
+                id="service-address"
+                value={streetName}
+                onChange={setStreetName}
+                onSelect={(place) => {
+                  setStreetName(place.street || "");
+                  if (place.city) setCity(place.city);
+                  if (place.state) setStateField(place.state);
+                  if (place.zip) setZipCode(place.zip);
+                }}
+                placeholder="Street address"
+                inputClass={styles.input}
+              />
+              {showError("streetName") ? (
+                <p className={styles.errorText}>{showError("streetName")}</p>
+              ) : null}
+              <div className={styles.addressGrid}>
+                <input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                  aria-label="City"
+                  className={styles.input}
+                  {...autofillGuardProps("city")}
+                />
+                <input
+                  value={stateField}
+                  onChange={(e) => setStateField(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="ST"
+                  maxLength={2}
+                  aria-label="State"
+                  className={styles.input}
+                  {...autofillGuardProps("state")}
+                />
+                <input
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="ZIP"
+                  aria-label="ZIP code"
+                  inputMode="numeric"
+                  className={styles.input}
+                  {...autofillGuardProps("zip")}
+                />
+              </div>
+              <div className={styles.billingSubhead}>
+                <div className={styles.cardHead}>
+                  <span className={styles.cardTitle} style={{ textTransform: "none", letterSpacing: 0, fontSize: "13px" }}>
+                    Billing address
+                  </span>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={sameAsBilling}
+                      onChange={(e) => setSameAsBilling(e.target.checked)}
+                    />
+                    Same as service
+                  </label>
                 </div>
-              </>
-            ) : (
-              <p className={styles.billingNote}>Using service address as billing address.</p>
-            )}
-          </div>
-        </section>
-          </div>
+                {!sameAsBilling ? (
+                  <>
+                    <PlacesAutocomplete
+                      id="billing-address"
+                      value={billingStreetName}
+                      onChange={setBillingStreetName}
+                      onSelect={(place) => {
+                        setBillingStreetName(place.street || "");
+                        if (place.city) setBillingCity(place.city);
+                        if (place.state) setBillingState(place.state);
+                        if (place.zip) setBillingZip(place.zip);
+                      }}
+                      placeholder="Billing street"
+                      inputClass={styles.input}
+                    />
+                    <div className={styles.addressGrid}>
+                      <input
+                        value={billingCity}
+                        onChange={(e) => setBillingCity(e.target.value)}
+                        placeholder="City"
+                        aria-label="Billing city"
+                        className={styles.input}
+                        {...autofillGuardProps("billingCity")}
+                      />
+                      <input
+                        value={billingState}
+                        onChange={(e) => setBillingState(e.target.value.toUpperCase().slice(0, 2))}
+                        placeholder="ST"
+                        maxLength={2}
+                        aria-label="Billing state"
+                        className={styles.input}
+                        {...autofillGuardProps("billingState")}
+                      />
+                      <input
+                        value={billingZip}
+                        onChange={(e) => setBillingZip(e.target.value)}
+                        placeholder="ZIP"
+                        aria-label="Billing ZIP"
+                        inputMode="numeric"
+                        className={styles.input}
+                        {...autofillGuardProps("billingZip")}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <p className={styles.billingNote}>Using service address for billing.</p>
+                )}
+              </div>
+            </section>
 
-        <section className={`${styles.card} ${styles.cardDocument} ${styles.documentPrimary}`}>
-          <DocumentStyleEditor
-            label="Job Description (optional)"
-            value={jobDescription}
-            onChange={setJobDescription}
-            placeholder="Describe the work — scope, materials, special instructions..."
-            data-testid="estimate-job-description"
-            toolbar={
-              <button
-                type="button"
-                disabled={aiDescLoading}
-                className={styles.btnAi}
-                onClick={async () => {
-                  const raw = jobDescription.trim();
-                  if (!raw) {
-                    setStatusMessage("Write a few words first, then AI will polish it.");
-                    return;
-                  }
-                  setAiDescLoading(true);
-                  try {
-                    const res = await apiFetch("/api/ai/description", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ input: raw }),
-                    });
-                    const json = await getJsonOrThrow(res, "AI unavailable.");
-                    const nextDescription = String(json?.data?.description || "").trim();
-                    if (nextDescription) setJobDescription(nextDescription);
-                  } catch (err) {
-                    setStatusMessage(err.message || "AI unavailable.");
-                  } finally {
-                    setAiDescLoading(false);
-                  }
-                }}
-              >
-                {aiDescLoading ? "Polishing..." : "Optimize with AI"}
-              </button>
-            }
-          />
-          <p className={styles.cardHint} style={{ marginTop: 12 }}>
-            The first line becomes the service name on the customer PDF (instead of
-            &quot;Base Price&quot;). Use bullet lines (- item) for a readable scope list.
-          </p>
-        </section>
-
-          <div className={`${styles.colStack} ${styles.asideSticky}`}>
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>Pricing (USD)</h2>
-
-          <div className={styles.channels}>
-            <span className={styles.cardHint} style={{ margin: 0 }}>Send via</span>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={sendViaEmail}
-                onChange={(e) => setSendViaEmail(e.target.checked)}
-              />
-              Email
-            </label>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={sendViaText}
-                onChange={(e) => setSendViaText(e.target.checked)}
-              />
-              Text message
-            </label>
-          </div>
-
-          <div className={styles.pricingGrid}>
-            <label className={styles.field}>
-              Base price ($)
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={basePrice}
-                onChange={(e) => setBasePrice(e.target.value)}
-                onBlur={() => touchField("basePrice")}
-                placeholder="0.00"
-                aria-invalid={showError("basePrice") ? "true" : "false"}
-                className={styles.input}
-              />
+            <section className={`${styles.card} ${styles.cardCompact}`}>
+              <h2 className={styles.cardTitle}>Estimate settings</h2>
+              <div className={styles.metaGrid}>
+                <div>
+                  <span className={styles.cardTitle} style={{ display: "block", marginBottom: 4 }}>
+                    Status
+                  </span>
+                  <span className={styles.statusBadge}>
+                    {formatEstimateStatus(editingStatus || "draft")}
+                  </span>
+                </div>
+                <div>
+                  <span className={styles.cardTitle} style={{ display: "block", marginBottom: 4 }}>
+                    Date
+                  </span>
+                  <div className={styles.metaReadOnly}>{displayEstimateDate}</div>
+                </div>
+              </div>
+              <div className={styles.channels}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={sendViaEmail}
+                    onChange={(e) => setSendViaEmail(e.target.checked)}
+                  />
+                  Send via email
+                </label>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={sendViaText}
+                    onChange={(e) => setSendViaText(e.target.checked)}
+                  />
+                  Send via text
+                </label>
+              </div>
+              <div className={styles.pricingGrid}>
+                <label className={`${styles.field} ${styles.fieldTight}`}>
+                  Discount type
+                  <select
+                    value={discountType}
+                    onChange={(e) =>
+                      setDiscountType(e.target.value === "percent" ? "percent" : "amount")
+                    }
+                    className={styles.select}
+                    style={{ width: "100%", marginTop: 5 }}
+                  >
+                    <option value="amount">Fixed ($)</option>
+                    <option value="percent">Percent (%)</option>
+                  </select>
+                </label>
+                <label className={`${styles.field} ${styles.fieldTight}`}>
+                  Discount {discountType === "percent" ? "(%)" : "($)"}
+                  <input
+                    type="number"
+                    min="0"
+                    max={discountType === "percent" ? "100" : undefined}
+                    step="0.01"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    onBlur={() => touchField("discount")}
+                    placeholder="0"
+                    className={styles.input}
+                  />
+                  {showError("discount") ? (
+                    <span className={styles.errorText}>{showError("discount")}</span>
+                  ) : null}
+                </label>
+                <label className={`${styles.field} ${styles.fieldTight}`} style={{ gridColumn: "1 / -1" }}>
+                  Tax (%)
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={taxRate}
+                    onChange={(e) => {
+                      taxRateManualRef.current = true;
+                      setTaxRate(e.target.value);
+                    }}
+                    placeholder="0"
+                    className={styles.input}
+                  />
+                  {stateField && !taxRateManualRef.current ? (
+                    <span className={styles.cardHint}>Auto-filled from {stateField}</span>
+                  ) : null}
+                </label>
+              </div>
+              <div className={styles.totalsGrid}>
+                <div className={styles.totalBox}>
+                  <div className={styles.totalLabel}>Subtotal</div>
+                  <div className={styles.totalValue}>{formatMoney(subtotal)}</div>
+                </div>
+                <div className={styles.totalBox}>
+                  <div className={styles.totalLabel}>Discount</div>
+                  <div className={styles.totalValue}>-{formatMoney(discountAmount)}</div>
+                </div>
+                <div className={styles.totalBox}>
+                  <div className={styles.totalLabel}>Tax</div>
+                  <div className={styles.totalValue}>{formatMoney(taxAmount)}</div>
+                </div>
+              </div>
+              <div className={styles.totalBox} style={{ marginTop: 10 }}>
+                <div className={styles.totalLabel}>Estimate total</div>
+                <div className={`${styles.totalValue} ${styles.totalValueAccent}`}>
+                  {formatMoney(estimateTotal)}
+                </div>
+              </div>
               {showError("basePrice") ? (
-                <span className={styles.errorText}>{showError("basePrice")}</span>
+                <p className={styles.errorText}>{showError("basePrice")}</p>
               ) : null}
-            </label>
+            </section>
+          </aside>
 
-            <label className={styles.field}>
-              Discount type
-              <select
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value === "percent" ? "percent" : "amount")}
-                className={styles.select}
-                style={{ width: "100%", marginTop: 6 }}
-              >
-                <option value="amount">Fixed ($)</option>
-                <option value="percent">Percent (%)</option>
-              </select>
-            </label>
-
-            <label className={styles.field}>
-              Discount {discountType === "percent" ? "(%)" : "($)"}
-              <input
-                type="number"
-                min="0"
-                max={discountType === "percent" ? "100" : undefined}
-                step="0.01"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                onBlur={() => touchField("discount")}
-                placeholder="0"
-                className={styles.input}
+          <div className={styles.mainContent}>
+            <section className={`${styles.contentSection} ${styles.contentSectionPrimary}`}>
+              <div className={styles.contentSectionHead}>
+                <h2 className={styles.contentLabel}>Work description</h2>
+                <button
+                  type="button"
+                  disabled={aiDescLoading}
+                  className={styles.btnAi}
+                  onClick={async () => {
+                    const raw = workDescription.trim();
+                    if (!raw) {
+                      setStatusMessage("Write a few words first, then AI will polish it.");
+                      return;
+                    }
+                    setAiDescLoading(true);
+                    try {
+                      const res = await apiFetch("/api/ai/description", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ input: raw }),
+                      });
+                      const json = await getJsonOrThrow(res, "AI unavailable.");
+                      const nextDescription = String(json?.data?.description || "").trim();
+                      if (nextDescription) setWorkDescription(nextDescription);
+                    } catch (err) {
+                      setStatusMessage(err.message || "AI unavailable.");
+                    } finally {
+                      setAiDescLoading(false);
+                    }
+                  }}
+                >
+                  {aiDescLoading ? "Polishing..." : "Optimize with AI"}
+                </button>
+              </div>
+              <textarea
+                id="estimate-work-description"
+                className={styles.contentTextarea}
+                value={workDescription}
+                onChange={(e) => setWorkDescription(e.target.value)}
+                placeholder="Describe the project, goals, and overall work for the customer estimate…"
+                data-testid="estimate-job-description"
               />
-              {showError("discount") ? (
-                <span className={styles.errorText}>{showError("discount")}</span>
-              ) : null}
-            </label>
+              <p className={styles.cardHint} style={{ marginTop: 10 }}>
+                The first line becomes the service name on the customer PDF.
+              </p>
+            </section>
 
-            <label className={styles.field}>
-              Tax (%)
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
-                value={taxRate}
-                onChange={(e) => {
-                  taxRateManualRef.current = true;
-                  setTaxRate(e.target.value);
-                }}
-                placeholder="0"
-                className={styles.input}
+            <section className={styles.contentSection}>
+              <h2 className={styles.contentLabel}>Scope of work</h2>
+              <textarea
+                id="estimate-scope-of-work"
+                className={`${styles.contentTextarea} ${styles.contentTextareaMedium}`}
+                value={scopeOfWork}
+                onChange={(e) => setScopeOfWork(e.target.value)}
+                placeholder="List tasks and materials — one item per line, e.g.&#10;- Remove old fixtures&#10;- Install new vanity and faucet"
+                data-testid="estimate-scope-of-work"
               />
-              {stateField && !taxRateManualRef.current ? (
-                <span className={styles.cardHint}>Auto-filled from {stateField}</span>
-              ) : null}
-            </label>
-          </div>
+            </section>
 
-          <div className={styles.totalsGrid}>
-            <div className={styles.totalBox}>
-              <div className={styles.totalLabel}>Subtotal</div>
-              <div className={styles.totalValue}>{formatMoney(subtotal)}</div>
-            </div>
-            <div className={styles.totalBox}>
-              <div className={styles.totalLabel}>Discount</div>
-              <div className={styles.totalValue}>-{formatMoney(discountAmount)}</div>
-            </div>
-            <div className={styles.totalBox}>
-              <div className={styles.totalLabel}>Tax</div>
-              <div className={styles.totalValue}>{formatMoney(taxAmount)}</div>
-            </div>
-          </div>
+            <section className={styles.contentSection}>
+              <h2 className={styles.contentLabel}>Notes</h2>
+              <textarea
+                id="estimate-additional-notes"
+                className={`${styles.contentTextarea} ${styles.contentTextareaSmall}`}
+                value={additionalNotes}
+                onChange={(e) => setAdditionalNotes(e.target.value)}
+                placeholder="Special instructions, exclusions, or scheduling notes for the customer…"
+                data-testid="estimate-additional-notes"
+              />
+            </section>
 
-          <div className={`${styles.totalBox} mt-4`}>
-            <div className={styles.totalLabel}>Estimate total (USD)</div>
-            <div className={`${styles.totalValue} ${styles.totalValueAccent}`}>
-              {formatMoney(estimateTotal)}
-            </div>
-          </div>
-        </section>
+            <section className={styles.lineItemsSection} data-testid="estimate-line-items-section">
+              <div className={styles.cardHead}>
+                <h2 className={styles.contentLabel}>Line items</h2>
+                <p className={styles.cardHint} style={{ margin: 0 }}>
+                  Pricing updates automatically from line totals.
+                </p>
+              </div>
+              <div className={styles.lineItemsTableWrap}>
+                <table className={styles.lineItemsTable}>
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th>Qty</th>
+                      <th>Unit price</th>
+                      <th>Line total</th>
+                      <th aria-hidden="true" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((row, index) => {
+                      const lineTotal = computeInvoiceLineItemTotal(row);
+                      return (
+                        <tr key={row.id || `row-${index}`} data-testid="estimate-line-item-row">
+                          <td>
+                            <input
+                              type="text"
+                              className={styles.lineItemField}
+                              value={row.description || row.label || ""}
+                              placeholder="Labor, materials, etc."
+                              data-testid="estimate-line-item-description"
+                              onChange={(event) => {
+                                const next = lineItems.map((item, rowIndex) =>
+                                  rowIndex === index
+                                    ? {
+                                        ...item,
+                                        description: event.target.value,
+                                        label: event.target.value,
+                                      }
+                                    : item,
+                                );
+                                handleLineItemsChange(next);
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className={styles.lineItemFieldQty}
+                              value={row.quantity ?? row.qty ?? 1}
+                              onChange={(event) => {
+                                const quantity = event.target.value;
+                                const next = lineItems.map((item, rowIndex) =>
+                                  rowIndex === index
+                                    ? { ...item, quantity, qty: quantity }
+                                    : item,
+                                );
+                                handleLineItemsChange(next);
+                              }}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className={styles.lineItemFieldMoney}
+                              value={row.unitPrice ?? ""}
+                              onChange={(event) => {
+                                const next = lineItems.map((item, rowIndex) =>
+                                  rowIndex === index
+                                    ? { ...item, unitPrice: event.target.value }
+                                    : item,
+                                );
+                                handleLineItemsChange(next);
+                              }}
+                            />
+                          </td>
+                          <td className={styles.lineItemTotalCell}>
+                            {formatMoney(lineTotal)}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className={styles.lineItemRemoveBtn}
+                              disabled={lineItems.length <= 1}
+                              aria-label="Remove line"
+                              onClick={() => {
+                                const next = lineItems.filter((_, rowIndex) => rowIndex !== index);
+                                handleLineItemsChange(
+                                  next.length > 0 ? next : [createInvoiceLineItem()],
+                                );
+                              }}
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className={styles.lineItemsFooter}>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  data-testid="estimate-add-line-item"
+                  onClick={() =>
+                    handleLineItemsChange([...lineItems, createInvoiceLineItem()])
+                  }
+                >
+                  Add line item
+                </button>
+                <p className={styles.lineItemsSum} data-testid="estimate-line-items-total">
+                  Line items subtotal: {formatMoney(lineItemsTotal)}
+                </p>
+              </div>
+            </section>
           </div>
         </div>
       </form>
@@ -1103,7 +1399,7 @@ function NewEstimatePageInner() {
           taxAmount={taxAmount}
           discountAmount={discountAmount}
           basePrice={basePriceNumber}
-          jobDescription={jobDescription.trim()}
+          jobDescription={combinedDocumentText}
           serviceAddress={[streetName.trim(), city.trim(), [stateField.trim(), zipCode.trim()].filter(Boolean).join(" ")].filter(Boolean).join(", ")}
           saving={saving}
           onCancel={() => setPreviewOpen(false)}

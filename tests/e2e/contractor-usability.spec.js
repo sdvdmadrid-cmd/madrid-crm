@@ -72,7 +72,8 @@ test.describe("Contractor usability — core CRM workflows", () => {
 
   test("estimates: create draft via UI, find in kanban search, edit persists", async ({
     page,
-  }) => {
+  }, testInfo) => {
+    testInfo.setTimeout(60_000);
     const stamp = Date.now();
     const clientName = `UX Est Client ${stamp}`;
 
@@ -102,7 +103,9 @@ test.describe("Contractor usability — core CRM workflows", () => {
       timeout: 15_000,
     });
 
-    await page.getByLabel("Base price ($)").fill("1500");
+    const lineRow = page.getByTestId("estimate-line-item-row").first();
+    await lineRow.getByTestId("estimate-line-item-description").fill("Services");
+    await lineRow.locator('input[type="number"]').nth(1).fill("1500");
     await page.getByRole("button", { name: /Save as draft/i }).click();
 
     await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
@@ -124,18 +127,33 @@ test.describe("Contractor usability — core CRM workflows", () => {
     await expect(page.getByText(/Loading estimate/i)).toBeHidden({ timeout: 15_000 });
 
     const scopeNote = `UX scope note ${stamp}`;
-    await page.getByPlaceholder(/Describe the work/i).fill(scopeNote);
+    await page.getByTestId("estimate-job-description").fill(scopeNote);
+    const patchDone = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "PATCH" &&
+        /\/api\/estimates\/\d+/.test(resp.url()) &&
+        resp.ok(),
+    );
     await page.getByRole("button", { name: /Save as draft/i }).click();
-    await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
-    await expect(page.getByPlaceholder(/Describe the work/i)).toHaveValue(scopeNote, {
+    await patchDone;
+    await expect(page.getByText(/Estimate saved/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("estimate-job-description")).toHaveValue(scopeNote, {
       timeout: 10_000,
     });
 
     await page.goto("/estimates", { waitUntil: "domcontentloaded" });
     await page.getByLabel("Search estimates").fill(clientName);
     await page.getByLabel("Hide test data").uncheck();
+    const detailFetch = page.waitForResponse(
+      (resp) =>
+        resp.request().method() === "GET" &&
+        /\/api\/estimates\/\d+/.test(resp.url()) &&
+        resp.ok(),
+    );
     await page.getByRole("button", { name: new RegExp(clientName) }).click();
-    await expect(page.getByText(scopeNote)).toBeVisible({ timeout: 10_000 });
+    await detailFetch;
+    await expect(page.getByText("Job description")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(scopeNote)).toBeVisible({ timeout: 15_000 });
   });
 
   test("estimates kanban: status filter and clientId URL scope", async ({ page }) => {
