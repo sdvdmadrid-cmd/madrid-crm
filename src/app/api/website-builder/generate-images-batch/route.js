@@ -79,6 +79,7 @@ export async function POST(request) {
       success: true,
       data: {
         images: images.map((row) => ({
+          promptIndex: row.promptIndex,
           imageUrl: row.imageUrl,
           imageDataUrl: row.imageDataUrl,
           persisted: row.persisted,

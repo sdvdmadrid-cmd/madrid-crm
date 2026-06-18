@@ -10,6 +10,7 @@ import BuilderWorkflowStepper from "@/components/website-builder/BuilderWorkflow
 import PlatformZoneBanner from "@/components/workspace/PlatformZoneBanner";
 import { WebsiteBuilderEditProvider } from "@/components/website-builder/WebsiteBuilderEditContext";
 import WebsiteBuilderSetupPanel from "@/components/website-builder/WebsiteBuilderSetupPanel";
+import WebsiteBuilderLaunch from "@/components/website-builder/WebsiteBuilderLaunch";
 import Link from "next/link";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import {
@@ -23,7 +24,7 @@ import {
 import { analyzeWebsiteCompleteness } from "@/lib/website-builder-generation";
 import {
   enhanceWebsiteCopyParallel,
-  findHeroSlotsForAiEnhancement,
+  findWebsiteImageEnhancementPlan,
   isValidWebsiteImageSrc,
   mergeFullSiteIntoDraft,
   mergeWebsiteCopySection,
@@ -753,18 +754,19 @@ export default function WebsiteBuilderClient() {
     showNotice(t.generateCancelled);
   }, [t, showNotice]);
 
-  const runBackgroundHeroImageEnhancement = useCallback(
+  const runBackgroundImageEnhancement = useCallback(
     async (imagePresetsList, signal) => {
       if (!aiConfigOk || signal?.aborted) return;
 
       const current = formRef.current;
       if (!current) return;
 
-      const slots = findHeroSlotsForAiEnhancement(
+      const plan = findWebsiteImageEnhancementPlan(
         current.heroPhotos || [],
+        current.galleryPhotos || [],
         imagePresetsList,
       );
-      if (slots.length === 0) return;
+      if (plan.length === 0) return;
 
       imageEnhanceAbortRef.current?.abort();
       const enhanceAbort = new AbortController();
@@ -779,15 +781,20 @@ export default function WebsiteBuilderClient() {
       const combinedSignal = enhanceAbort.signal;
 
       setImageEnhancing(true);
-      setGenProgress(t.genStepHero || t.generatingImage);
+      setGenProgress(
+        plan.length > 1
+          ? t.genStepGallery?.replace("{n}", "1").replace("{total}", String(plan.length)) ||
+              t.genStepHero
+          : t.genStepHero || t.generatingImage,
+      );
 
       try {
         const images = await requestWebsiteImagesBatch({
           apiFetch,
           getJsonOrThrow,
-          prompts: slots.map((slot) => slot.prompt),
+          prompts: plan.map((slot) => slot.prompt),
           style: imageStyle,
-          mediaKind: "hero",
+          mediaKind: "gallery",
           draft: true,
           timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
           signal: combinedSignal,
@@ -798,25 +805,45 @@ export default function WebsiteBuilderClient() {
 
         const working = formRef.current || current;
         const updatedHero = [...(working.heroPhotos || [])];
+        const updatedGallery = [...(working.galleryPhotos || [])];
 
-        images.forEach((row, imageIndex) => {
-          const slot = slots[imageIndex];
-          if (!slot) return;
+        images.forEach((row) => {
+          const planIndex = Number(row?.promptIndex);
+          const entry = Number.isFinite(planIndex) ? plan[planIndex] : null;
+          if (!entry) return;
           const imageSrc = resolveWebsiteImageSrc(row);
           if (!isValidWebsiteImageSrc(imageSrc)) return;
-          updatedHero[slot.index] = {
-            ...updatedHero[slot.index],
+
+          if (entry.kind === "gallery") {
+            updatedGallery[entry.index] = {
+              ...updatedGallery[entry.index],
+              id: updatedGallery[entry.index]?.id || `ai-gallery-${entry.index}`,
+              src: imageSrc,
+              thumbnail: imageSrc,
+              alt: String(row?.alt || entry.prompt).slice(0, 160),
+              prompt: entry.prompt,
+              persisted: /^https?:\/\//i.test(imageSrc),
+            };
+            return;
+          }
+
+          updatedHero[entry.index] = {
+            ...updatedHero[entry.index],
             src: imageSrc,
-            alt: String(row?.alt || slot.prompt).slice(0, 160),
-            prompt: slot.prompt,
+            alt: String(row?.alt || entry.prompt).slice(0, 160),
+            prompt: entry.prompt,
           };
         });
 
-        const withHero = { ...working, heroPhotos: updatedHero };
+        const withImages = {
+          ...working,
+          heroPhotos: updatedHero,
+          galleryPhotos: normalizeGalleryPhotos(updatedGallery),
+        };
         skipAutosave.current = true;
-        formRef.current = withHero;
-        setForm(withHero);
-        void handleSave({ ...withHero, siteMeta }, { silent: true });
+        formRef.current = withImages;
+        setForm(withImages);
+        void handleSave({ ...withImages, siteMeta }, { silent: true });
       } catch (err) {
         if (err?.name !== "AbortError") {
           /* optional — site already usable with stock images */
@@ -963,7 +990,7 @@ export default function WebsiteBuilderClient() {
 
       if (aiConfigOk && !abort.signal.aborted) {
         postInstantTasks.push(
-          runBackgroundHeroImageEnhancement(imagePresets, abort.signal),
+          runBackgroundImageEnhancement(imagePresets, abort.signal),
         );
       }
 
@@ -989,7 +1016,7 @@ export default function WebsiteBuilderClient() {
     siteMeta,
     aiConfigOk,
     imagePresets,
-    runBackgroundHeroImageEnhancement,
+    runBackgroundImageEnhancement,
     t,
     showNotice,
     handleSave,
@@ -1004,14 +1031,18 @@ export default function WebsiteBuilderClient() {
       ).trim();
       if (!resolvedPrompt) throw new Error("No image prompt available");
 
-      const res = await apiFetch("/api/website-builder/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: resolvedPrompt, style: imageStyle, mediaKind: "hero" }),
+      const res = await requestWebsiteImagesBatch({
+        apiFetch,
+        getJsonOrThrow,
+        prompts: [resolvedPrompt],
+        style: imageStyle,
+        mediaKind: "hero",
+        draft: true,
         timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+        errorMessage: t.errorGenerateImage,
       });
-      const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-      const imageSrc = String(payload?.data?.imageUrl || payload?.data?.imageDataUrl || "");
+      const row = res[0];
+      const imageSrc = resolveWebsiteImageSrc(row);
       if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
         throw new Error(t.errorGenerateImage);
       }
@@ -1024,7 +1055,7 @@ export default function WebsiteBuilderClient() {
       heroPhotos[index] = {
         ...heroPhotos[index],
         src: imageSrc,
-        alt: String(payload?.data?.alt || resolvedPrompt).slice(0, 160),
+        alt: String(row?.alt || resolvedPrompt).slice(0, 160),
         prompt: resolvedPrompt,
       };
       nextForm.heroPhotos = heroPhotos;
@@ -1071,8 +1102,9 @@ export default function WebsiteBuilderClient() {
 
       const nextForm = { ...current };
       const heroPhotos = [...(nextForm.heroPhotos || slots)];
-      images.forEach((row, imageIndex) => {
-        const entry = plan[imageIndex];
+      images.forEach((row) => {
+        const planIndex = Number(row?.promptIndex);
+        const entry = Number.isFinite(planIndex) ? plan[planIndex] : null;
         if (!entry) return;
         const imageSrc = resolveWebsiteImageSrc(row);
         if (!isValidWebsiteImageSrc(imageSrc)) return;
@@ -1270,16 +1302,18 @@ export default function WebsiteBuilderClient() {
       }
       setGeneratingSlotId(slot.id);
       try {
-        const res = await apiFetch("/api/website-builder/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, style: imageStyle, mediaKind: "hero" }),
+        const images = await requestWebsiteImagesBatch({
+          apiFetch,
+          getJsonOrThrow,
+          prompts: [prompt],
+          style: imageStyle,
+          mediaKind: "hero",
+          draft: true,
           timeoutMs: WEBSITE_HERO_IMAGE_TIMEOUT_MS,
+          errorMessage: t.errorGenerateImage,
         });
-        const payload = await getJsonOrThrow(res, t.errorGenerateImage);
-        const imageSrc = String(
-          payload?.data?.imageUrl || payload?.data?.imageDataUrl || "",
-        );
+        const row = images[0];
+        const imageSrc = resolveWebsiteImageSrc(row);
         if (!imageSrc.startsWith("data:image/") && !/^https?:\/\//i.test(imageSrc)) {
           throw new Error(t.errorGenerateImage);
         }
@@ -1290,7 +1324,7 @@ export default function WebsiteBuilderClient() {
         nextForm.heroPhotos[index] = {
           ...nextForm.heroPhotos[index],
           src: imageSrc,
-          alt: String(payload?.data?.alt || prompt).slice(0, 160),
+          alt: String(row?.alt || prompt).slice(0, 160),
           prompt,
         };
         skipAutosave.current = true;
@@ -1575,6 +1609,12 @@ export default function WebsiteBuilderClient() {
   const siteHasDraft =
     editorMode === "edit" || completenessScore >= 40 || Boolean(String(form.headline || "").trim());
 
+  const handleOpenWorkspaceAgent = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("fieldbase:open-workspace-agent"));
+    }
+  }, []);
+
   const handleWorkflowStep = useCallback((stepId) => {
     setBuilderStep(stepId);
     if (stepId <= 1) {
@@ -1622,6 +1662,15 @@ export default function WebsiteBuilderClient() {
     if (!window.confirm(t.regenerateConfirm)) return;
     handleGenerateFullSite();
   }, [t.regenerateConfirm, handleGenerateFullSite]);
+
+  const handleLaunchGenerate = useCallback(() => {
+    if (siteHasDraft) {
+      handleRegenerateWithConfirm();
+      return;
+    }
+    void handleGenerateFullSite();
+  }, [siteHasDraft, handleRegenerateWithConfirm, handleGenerateFullSite]);
+
   const frameClass =
     device === "tablet"
       ? styles.previewFrameTablet
@@ -1823,6 +1872,22 @@ export default function WebsiteBuilderClient() {
               {t.visualEditHint}
             </p>
           ) : null}
+          {builderStep === 2 ? (
+            <div className={styles.launchOverlayWrap} data-testid="website-builder-launch">
+              <WebsiteBuilderLaunch
+                t={t}
+                companyProfile={companyProfile}
+                themeColor={theme}
+                generating={generating}
+                genProgress={genProgress}
+                completenessScore={completenessScore}
+                hasExistingDraft={siteHasDraft}
+                onGenerate={handleLaunchGenerate}
+                onOpenAssistant={handleOpenWorkspaceAgent}
+                onCancel={generating ? handleCancelGeneration : undefined}
+              />
+            </div>
+          ) : null}
           <div className={styles.previewScrollFull}>
             <div className={`${styles.previewFrame} ${frameClass}`}>
               <WebsiteBuilderPreview
@@ -1873,7 +1938,7 @@ export default function WebsiteBuilderClient() {
                   serviceCount={(form.services || []).length}
                   galleryCount={(form.galleryPhotos || []).length}
                   logoUrl={logoUrl}
-                  onContinue={() => handleWorkflowStep(3)}
+                  onContinue={() => handleWorkflowStep(2)}
                   onCompanyProfileChange={(nextProfile) =>
                     setCompanyProfile(nextProfile)
                   }
@@ -1883,6 +1948,24 @@ export default function WebsiteBuilderClient() {
               <>
                 <div className={styles.editorPanelHeader}>
                   <p className={styles.editorPanelTitle}>{t.editLabel}</p>
+                  <div className={styles.editorAiRow}>
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnGhost}`}
+                      disabled={generating || saving}
+                      onClick={handleRegenerateWithConfirm}
+                    >
+                      {t.regenerateCopy}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnGhost}`}
+                      disabled={generating || saving}
+                      onClick={handleOpenWorkspaceAgent}
+                    >
+                      {t.launchOpenAi}
+                    </button>
+                  </div>
                   <div className={styles.sectionNav}>
                     {[
                       ["all", t.sectionNavAll],

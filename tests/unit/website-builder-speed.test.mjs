@@ -2,7 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getIndustryStockImageUrl, getWebsiteBuilderPack } from "../../src/lib/website-builder-industry.js";
 import {
+  findGallerySlotsForAiEnhancement,
   findHeroSlotsForAiEnhancement,
+  findWebsiteImageEnhancementPlan,
   isWebsiteStockImageUrl,
   mergeWebsiteCopySection,
   runWithConcurrency,
@@ -82,5 +84,31 @@ describe("website-builder speed helpers", () => {
     assert.equal(slots.length, 2);
     assert.equal(slots[0].index, 0);
     assert.equal(slots[1].index, 2);
+  });
+
+  it("findGallerySlotsForAiEnhancement upgrades stock gallery photos", () => {
+    const slots = findGallerySlotsForAiEnhancement(
+      [
+        {
+          src: "https://images.unsplash.com/photo-abc?w=1200",
+          alt: "Project photo",
+          prompt: "finished bathroom",
+        },
+      ],
+      [],
+    );
+    assert.equal(slots.length, 1);
+    assert.equal(slots[0].prompt, "finished bathroom");
+  });
+
+  it("findWebsiteImageEnhancementPlan batches hero and gallery slots", () => {
+    const plan = findWebsiteImageEnhancementPlan(
+      [{ src: "", prompt: "hero shot" }],
+      [{ src: "https://images.unsplash.com/x", prompt: "gallery shot" }],
+      [],
+    );
+    assert.equal(plan.length, 2);
+    assert.equal(plan[0].kind, "hero");
+    assert.equal(plan[1].kind, "gallery");
   });
 });

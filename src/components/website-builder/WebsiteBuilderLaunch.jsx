@@ -8,11 +8,13 @@ export default function WebsiteBuilderLaunch({
   t,
   companyProfile,
   onGenerate,
+  onOpenAssistant,
   onCancel,
   generating,
   genProgress,
   completenessScore,
   themeColor = "#1d4ed8",
+  hasExistingDraft = false,
 }) {
   const logoUrl = resolveCompanyLogoUrl(companyProfile);
   const companyName =
@@ -46,8 +48,22 @@ export default function WebsiteBuilderLaunch({
             disabled={generating}
             onClick={onGenerate}
           >
-            {generating ? genProgress || t.generatingFull : t.generateFull}
+            {generating
+              ? genProgress || t.generatingFull
+              : hasExistingDraft
+                ? t.generateFullRebuild || t.generateFull
+                : t.generateFull}
           </button>
+          {onOpenAssistant ? (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost}`}
+              disabled={generating}
+              onClick={onOpenAssistant}
+            >
+              {t.launchOpenAi}
+            </button>
+          ) : null}
           {generating && onCancel ? (
             <button
               type="button"
@@ -76,6 +92,9 @@ export default function WebsiteBuilderLaunch({
           <li>{t.launchBulletCompany2}</li>
           <li>{t.launchBulletCompany3}</li>
         </ul>
+        {onOpenAssistant && t.launchOpenAiHint ? (
+          <p className={styles.launchHint}>{t.launchOpenAiHint}</p>
+        ) : null}
       </div>
     </div>
   );

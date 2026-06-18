@@ -9,7 +9,7 @@ export const WEBSITE_BUILDER_UI = {
     stepSetupBullet3: "Upload real project photos for gallery and portfolio",
     stepSetupEditProfile: "Edit business profile",
     stepSetupEditServices: "Manage services",
-    stepSetupContinue: "Continue to editor →",
+    stepSetupContinue: "Continue to AI draft →",
     logoTitle: "Company logo",
     logoSub:
       "Show up like a real business. Your logo lands on invoices, estimates, quotes, and your public site.",
@@ -40,7 +40,8 @@ export const WEBSITE_BUILDER_UI = {
     publishLive: "Publish website",
     savingAuto: "Saving…",
     generate: "Refresh copy",
-    generateFull: "Rebuild draft",
+    generateFull: "Build my website with AI",
+    generateFullRebuild: "Rebuild draft with AI",
     editSite: "Edit website",
     regenerateCopy: "Refresh page copy",
     regenerateConfirm:
@@ -78,6 +79,11 @@ export const WEBSITE_BUILDER_UI = {
     launchBulletCompany1: "Logo and contact info on every page",
     launchBulletCompany2: "Services from your catalog — real offerings",
     launchBulletCompany3: "SEO, lead form, and gallery for your business",
+    launchOpenAi: "Chat with AI Website Designer",
+    launchOpenAiHint:
+      "Prefer conversation? Open the assistant (bottom-right) and try “Build my cleaning company website” or “/build”.",
+    setupAiHint:
+      "Next step: AI builds your first draft from your profile and services — you can also chat with the AI Website Designer.",
     editingCompanyWebsite: "Editing website for",
     reviewsEmptyTitle: "No reviews published yet.",
     reviewsEmptyBody:
@@ -239,7 +245,8 @@ export const WEBSITE_BUILDER_UI = {
     title: "Constructor de Sitio Web",
     subtitle: "Sitios con IA en un clic para tu oficio — luego ajusta y publica.",
     generate: "Regenerar textos",
-    generateFull: "Generar mi sitio web",
+    generateFull: "Crear mi sitio web con IA",
+    generateFullRebuild: "Regenerar borrador con IA",
     editSite: "Editar sitio",
     regenerateCopy: "Actualizar textos IA",
     regenerateConfirm:
@@ -283,6 +290,11 @@ export const WEBSITE_BUILDER_UI = {
     launchBulletCompany1: "Logo, nombre y contacto en cada página",
     launchBulletCompany2: "Servicios de tu catálogo — ofertas reales, sin relleno",
     launchBulletCompany3: "SEO, formulario de leads y galería de tu negocio",
+    launchOpenAi: "Chatear con el diseñador web IA",
+    launchOpenAiHint:
+      "¿Prefieres conversar? Abre el asistente (abajo a la derecha) y prueba “Crea el sitio de mi empresa de limpieza” o “/build”.",
+    setupAiHint:
+      "Siguiente paso: la IA crea tu primer borrador con tu perfil y servicios — también puedes chatear con el diseñador web IA.",
     editingCompanyWebsite: "Editando sitio de",
     reviewsEmptyTitle: "Aún no hay reseñas publicadas.",
     reviewsEmptyBody:

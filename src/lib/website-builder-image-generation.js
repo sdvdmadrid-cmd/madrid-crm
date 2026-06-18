@@ -10,7 +10,7 @@ export const WEBSITE_IMAGE_DRAFT_SIZE = String(
 ).trim();
 export const WEBSITE_IMAGE_BATCH_CONCURRENCY = Math.max(
   1,
-  Math.min(5, Number(process.env.WEBSITE_IMAGE_BATCH_CONCURRENCY || 4)),
+  Math.min(6, Number(process.env.WEBSITE_IMAGE_BATCH_CONCURRENCY || 6)),
 );
 const IMAGE_MAX_RETRIES = Math.max(0, Math.min(3, Number(process.env.WEBSITE_IMAGE_RETRY_LIMIT || 2)));
 
@@ -151,7 +151,7 @@ export async function generateWebsiteImage({
 
   const useDraftSize = draft !== false;
   const imageSize = useDraftSize ? WEBSITE_IMAGE_DRAFT_SIZE : WEBSITE_IMAGE_SIZE;
-  const imageTimeoutMs = useDraftSize ? 28_000 : 55_000;
+  const imageTimeoutMs = useDraftSize ? 20_000 : 50_000;
   const finalPrompt = buildWebsiteImagePrompt({
     pack,
     companyName,
@@ -237,6 +237,7 @@ export async function generateWebsiteImagesBatch({
       try {
         results[index] = {
           ok: true,
+          promptIndex: index,
           ...(await generateWebsiteImage({
             tenantId,
             websiteSlug,
@@ -251,6 +252,7 @@ export async function generateWebsiteImagesBatch({
       } catch (error) {
         results[index] = {
           ok: false,
+          promptIndex: index,
           error: error instanceof Error ? error.message : "Image generation failed",
         };
       }
