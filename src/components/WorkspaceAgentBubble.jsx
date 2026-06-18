@@ -262,7 +262,7 @@ export default function WorkspaceAgentBubble({
   const panelWidth = "min(92vw, 440px)";
 
   return (
-    <div style={{ position: "fixed", right: 18, bottom: 18, zIndex: 1200 }}>
+    <div style={{ position: "fixed", right: 18, bottom: 18, zIndex: onWebsiteBuilder ? 1600 : 1200 }}>
       {isOpen ? (
         <section
           style={{

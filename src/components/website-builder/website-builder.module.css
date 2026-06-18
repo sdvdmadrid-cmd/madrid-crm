@@ -301,6 +301,82 @@
   line-height: 1.5;
 }
 
+.aiCommandBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 46, 129, 0.55));
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35);
+}
+
+.aiCommandBarCopy {
+  display: grid;
+  gap: 4px;
+  min-width: min(100%, 280px);
+  flex: 1 1 240px;
+}
+
+.aiCommandBarTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #e0e7ff;
+  letter-spacing: -0.02em;
+}
+
+.aiCommandBarHint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #c7d2fe;
+}
+
+.aiCommandBarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 1 auto;
+}
+
+.btnAiPrimary {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
+}
+
+.btnAiPrimary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btnAiGhost {
+  border: 1px solid rgba(199, 210, 254, 0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #e0e7ff;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.btnAiGhost:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .setupActions {
   display: flex;
   flex-wrap: wrap;
