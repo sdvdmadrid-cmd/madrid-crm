@@ -128,6 +128,7 @@ export function buildInstantSiteFromIndustry(pack, profile, existingForm = {}) {
           src: getIndustryStockImageUrl(pack, index + 2),
           thumbnail: getIndustryStockImageUrl(pack, index + 2),
           alt: `${pack.label} project photo ${index + 1}`,
+          prompt: String(galleryPrompts[index] || pack.imagePresets[index + 2] || "").slice(0, 320),
           persisted: true,
         }));
 

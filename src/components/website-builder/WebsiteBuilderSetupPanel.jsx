@@ -69,6 +69,8 @@ export default function WebsiteBuilderSetupPanel({
         <li>{t.stepSetupBullet3}</li>
       </ul>
 
+      {t.setupAiHint ? <p className={styles.setupAiHint}>{t.setupAiHint}</p> : null}
+
       <div className={styles.setupActions}>
         <Link href="/settings" className={`${styles.btn} ${styles.btnGhost}`}>
           {t.stepSetupEditProfile}

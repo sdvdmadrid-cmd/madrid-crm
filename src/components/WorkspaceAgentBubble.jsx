@@ -144,6 +144,12 @@ export default function WorkspaceAgentBubble({
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading, pendingPlan]);
 
+  useEffect(() => {
+    const open = () => setIsOpen(true);
+    window.addEventListener("fieldbase:open-workspace-agent", open);
+    return () => window.removeEventListener("fieldbase:open-workspace-agent", open);
+  }, []);
+
   const runAgent = async ({ message, confirmPlan = null }) => {
     const prompt = String(message || "").trim();
     if (!prompt && !confirmPlan) return;
@@ -531,7 +537,7 @@ export default function WorkspaceAgentBubble({
           cursor: "pointer",
         }}
       >
-        {isOpen ? t.close : t.open}
+        {isOpen ? t.close : onWebsiteBuilder && t.titleWebsite ? t.titleWebsite : t.open}
       </button>
     </div>
   );

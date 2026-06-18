@@ -115,6 +115,33 @@ export async function requestWebsiteImagesBatch({
   return Array.isArray(payload?.data?.images) ? payload.data.images : [];
 }
 
+/** Gallery slots that should be upgraded from stock/empty to AI images. */
+export function findGallerySlotsForAiEnhancement(galleryPhotos = [], imagePresets = []) {
+  const slots = [];
+  for (let i = 0; i < galleryPhotos.length; i += 1) {
+    const photo = galleryPhotos[i] || {};
+    const src = String(photo.src || "").trim();
+    const prompt = String(
+      photo.prompt || imagePresets[i + 2] || photo.alt || "",
+    ).trim();
+    if (!prompt) continue;
+    if (heroSlotNeedsAiImage(src)) {
+      slots.push({ index: i, prompt, kind: "gallery" });
+    }
+  }
+  return slots;
+}
+
+/** Hero + gallery slots for a single parallel batch request. */
+export function findWebsiteImageEnhancementPlan(heroPhotos = [], galleryPhotos = [], imagePresets = []) {
+  const heroSlots = findHeroSlotsForAiEnhancement(heroPhotos, imagePresets).map((slot) => ({
+    ...slot,
+    kind: "hero",
+  }));
+  const gallerySlots = findGallerySlotsForAiEnhancement(galleryPhotos, imagePresets);
+  return [...heroSlots, ...gallerySlots];
+}
+
 export function resolveWebsiteImageSrc(row) {
   return String(row?.imageUrl || row?.imageDataUrl || "").trim();
 }
