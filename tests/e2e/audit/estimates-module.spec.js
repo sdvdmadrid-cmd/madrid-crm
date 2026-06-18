@@ -150,18 +150,20 @@ test.describe("Estimates module audit", () => {
     });
 
     const scopeNote = `Editor scope ${stamp}`;
-    await page.getByPlaceholder(/Describe the work/i).fill(scopeNote);
-    await page.getByLabel("Base price ($)").fill("2200");
+    await page.getByTestId("estimate-job-description").fill(scopeNote);
+    const lineRow = page.getByTestId("estimate-line-item-row").first();
+    await lineRow.getByTestId("estimate-line-item-description").fill("Services");
+    await lineRow.locator('input[type="number"]').nth(1).fill("2200");
     await page.getByRole("button", { name: /Save as draft/i }).click();
     await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
 
-    await expect(page.getByPlaceholder(/Describe the work/i)).toHaveValue(scopeNote, {
+    await expect(page.getByTestId("estimate-job-description")).toHaveValue(scopeNote, {
       timeout: 10_000,
     });
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByText(/Loading estimate/i)).toBeHidden({ timeout: 15_000 });
-    await expect(page.getByPlaceholder(/Describe the work/i)).toHaveValue(scopeNote, {
+    await expect(page.getByTestId("estimate-job-description")).toHaveValue(scopeNote, {
       timeout: 15_000,
     });
 
@@ -296,7 +298,9 @@ test.describe("Estimates module audit", () => {
       timeout: 15_000,
     });
 
-    await page.getByLabel("Base price ($)").fill("950");
+    const lineRow = page.getByTestId("estimate-line-item-row").first();
+    await lineRow.getByTestId("estimate-line-item-description").fill("Services");
+    await lineRow.locator('input[type="number"]').nth(1).fill("950");
     await page.getByRole("button", { name: /Save as draft/i }).click();
     await expect(page).toHaveURL(/\/estimates\/new\?edit=/, { timeout: 20_000 });
 
@@ -321,7 +325,9 @@ test.describe("Estimates module audit", () => {
     await expect(page.getByLabel("Client first name")).toHaveValue(/.+/, {
       timeout: 15_000,
     });
-    await page.getByLabel("Base price ($)").fill("1100");
+    const lineRow = page.getByTestId("estimate-line-item-row").first();
+    await lineRow.getByTestId("estimate-line-item-description").fill("Services");
+    await lineRow.locator('input[type="number"]').nth(1).fill("1100");
     await page.getByLabel(/Save and send to client/i).click();
     await expect(
       page.getByRole("dialog", { name: /Preview estimate before sending/i }),
@@ -402,7 +408,8 @@ test.describe("Estimates module audit", () => {
       const saveSend = page.getByLabel(/Save and send to client/i);
       await saveSend.scrollIntoViewIfNeeded();
       await expect(saveSend).toBeVisible();
-      await expect(page.getByText("Base price ($)")).toBeVisible();
+      await expect(page.getByTestId("estimate-job-description")).toBeVisible();
+      await expect(page.getByTestId("estimate-line-items-section")).toBeVisible();
     });
   }
 });
