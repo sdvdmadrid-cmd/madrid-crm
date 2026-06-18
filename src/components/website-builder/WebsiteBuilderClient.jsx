@@ -1738,6 +1738,27 @@ export default function WebsiteBuilderClient() {
           </p>
         </div>
         <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.btnAiPrimary}
+            disabled={generating || copyEnhancing}
+            onClick={handleLaunchGenerate}
+            data-testid="website-builder-ai-build"
+          >
+            {generating || copyEnhancing
+              ? genProgress || t.generatingFull
+              : siteHasDraft
+                ? t.generateFullRebuild || t.generateFull
+                : t.generateFull}
+          </button>
+          <button
+            type="button"
+            className={styles.btnAiGhost}
+            onClick={handleOpenWorkspaceAgent}
+            data-testid="website-builder-ai-chat"
+          >
+            {t.aiCommandChat || t.launchOpenAi}
+          </button>
           {(() => {
             const dirty = hasUnpublishedChanges;
             const liveAndSynced = published && !dirty;
@@ -1830,6 +1851,34 @@ export default function WebsiteBuilderClient() {
       </div>
 
       <BuilderWorkflowStepper activeStep={builderStep} onStepClick={handleWorkflowStep} />
+
+      <div className={styles.aiCommandBar} data-testid="website-builder-ai-bar">
+        <div className={styles.aiCommandBarCopy}>
+          <p className={styles.aiCommandBarTitle}>{t.aiCommandBarTitle}</p>
+          <p className={styles.aiCommandBarHint}>{t.aiCommandBarHint}</p>
+        </div>
+        <div className={styles.aiCommandBarActions}>
+          <button
+            type="button"
+            className={styles.btnAiPrimary}
+            disabled={generating || copyEnhancing}
+            onClick={handleLaunchGenerate}
+          >
+            {generating || copyEnhancing
+              ? genProgress || t.generatingFull
+              : siteHasDraft
+                ? t.generateFullRebuild || t.generateFull
+                : t.generateFull}
+          </button>
+          <button
+            type="button"
+            className={styles.btnAiGhost}
+            onClick={handleOpenWorkspaceAgent}
+          >
+            {t.aiCommandChat || t.launchOpenAi}
+          </button>
+        </div>
+      </div>
       </div>
 
       <div className={styles.workspaceVisual}>

@@ -84,6 +84,10 @@ export const WEBSITE_BUILDER_UI = {
       "Prefer conversation? Open the assistant (bottom-right) and try “Build my cleaning company website” or “/build”.",
     setupAiHint:
       "Next step: AI builds your first draft from your profile and services — you can also chat with the AI Website Designer.",
+    aiCommandBarTitle: "AI Website Designer",
+    aiCommandBarHint:
+      "Build or redesign your site in one click, or chat to change copy, images, SEO, and sections.",
+    aiCommandChat: "Open AI chat",
     editingCompanyWebsite: "Editing website for",
     reviewsEmptyTitle: "No reviews published yet.",
     reviewsEmptyBody:
@@ -295,6 +299,10 @@ export const WEBSITE_BUILDER_UI = {
       "¿Prefieres conversar? Abre el asistente (abajo a la derecha) y prueba “Crea el sitio de mi empresa de limpieza” o “/build”.",
     setupAiHint:
       "Siguiente paso: la IA crea tu primer borrador con tu perfil y servicios — también puedes chatear con el diseñador web IA.",
+    aiCommandBarTitle: "Diseñador web con IA",
+    aiCommandBarHint:
+      "Crea o rediseña tu sitio en un clic, o chatea para cambiar textos, imágenes, SEO y secciones.",
+    aiCommandChat: "Abrir chat IA",
     editingCompanyWebsite: "Editando sitio de",
     reviewsEmptyTitle: "Aún no hay reseñas publicadas.",
     reviewsEmptyBody:
