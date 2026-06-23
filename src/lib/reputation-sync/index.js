@@ -9,19 +9,14 @@ import {
   resolveYelpBusinessId,
 } from "@/lib/reputation-sync/yelp";
 import { upsertSyncedReviews } from "@/lib/reputation-sync/upsert";
+import {
+  getReputationSyncAvailability,
+  sanitizeSyncPlatformResult,
+  serializeReviewSourcesForClient,
+} from "@/lib/reputation-sync/user-facing";
 
 export function serializeReviewSource(row) {
-  if (!row) return null;
-  return {
-    tenantId: row.tenant_id,
-    googlePlaceId: row.google_place_id || "",
-    googleProfileUrl: row.google_profile_url || "",
-    yelpBusinessId: row.yelp_business_id || "",
-    yelpProfileUrl: row.yelp_profile_url || "",
-    lastSyncAt: row.last_sync_at || null,
-    lastSyncStatus: row.last_sync_status || {},
-    updatedAt: row.updated_at,
-  };
+  return serializeReviewSourcesForClient(row);
 }
 
 export async function getReviewSources(tenantId) {

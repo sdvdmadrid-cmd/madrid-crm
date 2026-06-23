@@ -3,6 +3,7 @@ import {
   getReviewSources,
   upsertReviewSources,
 } from "@/lib/reputation-sync";
+import { getReputationSyncAvailability } from "@/lib/reputation-sync/user-facing";
 import { parseYelpBusinessIdFromUrl } from "@/lib/reputation-sync/yelp";
 
 export async function GET(request) {
@@ -11,7 +12,12 @@ export async function GET(request) {
 
   try {
     const data = await getReviewSources(auth.ctx.tenantDbId);
-    return privateJson({ success: true, data });
+    return privateJson({
+      success: true,
+      data: data
+        ? { ...data, syncAvailability: getReputationSyncAvailability() }
+        : { syncAvailability: getReputationSyncAvailability() },
+    });
   } catch (error) {
     console.error("[api/reputation/sources][GET]", error);
     return privateJson({ success: false, error: "Failed to load sources" }, { status: 500 });

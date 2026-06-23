@@ -30,6 +30,70 @@ export function buildExternalId(platform, payload = {}) {
   return `${platform}:${time}:${author}`.slice(0, 200);
 }
 
+const GOOGLE_UNAVAILABLE =
+  "Google review sync is temporarily unavailable. Contact FieldBase support if you need help.";
+const YELP_UNAVAILABLE =
+  "Yelp review sync is temporarily unavailable. Contact FieldBase support if you need help.";
+
+/** Map internal sync errors to contractor-safe copy. */
+export function sanitizeReputationSyncError(error, platform = "") {
+  const raw = String(error || "").trim();
+  if (!raw) return "";
+
+  const lower = raw.toLowerCase();
+  const plat = String(platform || "").toLowerCase();
+
+  if (
+    lower.includes("google_places_api_key") ||
+    (plat === "google" && lower.includes("not configured"))
+  ) {
+    return GOOGLE_UNAVAILABLE;
+  }
+
+  if (
+    lower.includes("yelp_fusion_api_key") ||
+    (plat === "yelp" && lower.includes("not configured"))
+  ) {
+    return YELP_UNAVAILABLE;
+  }
+
+  if (/_api_key/i.test(raw) || /api_key.*missing/i.test(lower)) {
+    return plat === "yelp"
+      ? YELP_UNAVAILABLE
+      : plat === "google"
+        ? GOOGLE_UNAVAILABLE
+        : "Review sync is temporarily unavailable. Contact FieldBase support if you need help.";
+  }
+
+  if (lower.includes("connect a google business")) {
+    return "Connect your Google business first, then sync again.";
+  }
+
+  if (lower.includes("connect yelp")) {
+    return "Add your Yelp business page URL first, then sync again.";
+  }
+
+  return raw;
+}
+
+export function sanitizeSyncPlatformResult(result, platform) {
+  if (!result || typeof result !== "object") return result;
+  if (!result.error) return result;
+  return {
+    ...result,
+    error: sanitizeReputationSyncError(result.error, platform),
+  };
+}
+
+export function sanitizeLastSyncStatus(status = {}) {
+  if (!status || typeof status !== "object") return {};
+  const next = {};
+  for (const [platform, result] of Object.entries(status)) {
+    next[platform] = sanitizeSyncPlatformResult(result, platform);
+  }
+  return next;
+}
+
 export function normalizeSyncedReviewRow({
   tenantId,
   platform,
