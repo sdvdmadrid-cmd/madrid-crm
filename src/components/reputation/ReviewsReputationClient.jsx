@@ -140,6 +140,7 @@ export default function ReviewsReputationClient() {
       if (r.yelp?.ok) parts.push(`Yelp: ${r.yelp.count || 0} reviews`);
       else if (r.yelp?.error) parts.push(`Yelp: ${r.yelp.error}`);
       setNotice(parts.length ? parts.join(" · ") : "Sync complete.");
+      if (json.data?.sources) setSources(json.data.sources);
       await load();
     } catch (err) {
       setError(err.message || "Sync failed");
@@ -193,6 +194,13 @@ export default function ReviewsReputationClient() {
   };
 
   const syncedReviews = reviews.filter((r) => r.metadata?.syncSource === "api");
+  const syncAvailability = sources?.syncAvailability ?? {
+    google: false,
+    yelp: false,
+    any: false,
+    all: false,
+  };
+  const syncDisabled = !syncAvailability.any;
   const filteredSyncedReviews = useMemo(() => {
     const q = reviewSearch.trim().toLowerCase();
     if (!q) return syncedReviews;
@@ -251,17 +259,33 @@ export default function ReviewsReputationClient() {
 
       {!loading && tab === "connect" ? (
         <div className={rep.connectGrid}>
+          {syncDisabled ? (
+            <div className={rep.syncUnavailableBanner} role="status">
+              <strong>Review sync is not available yet</strong>
+              <p>
+                Google and Yelp import is being enabled on FieldBase. You can still save your
+                business links below and use <strong>Social links</strong> on your public website.
+                Only real reviews synced from Google or Yelp appear on your site — never AI or
+                template text from the website builder.
+              </p>
+            </div>
+          ) : null}
+
           <div className={rep.importCard}>
             <h3>Google Business</h3>
             <p className={rep.muted}>
               Search your business, select it, then sync. Reviews are pulled from Google Places
               (public data, up to 5 recent reviews per sync).
             </p>
+            {!syncAvailability.google ? (
+              <p className={rep.muted}>Google sync is temporarily unavailable.</p>
+            ) : null}
             <input
               className={rep.input}
               placeholder="Search business name + city"
               value={googleSearch}
               onChange={(e) => setGoogleSearch(e.target.value)}
+              disabled={!syncAvailability.google}
             />
             {placeSuggestions.length > 0 ? (
               <ul className={rep.suggestList}>
@@ -287,6 +311,7 @@ export default function ReviewsReputationClient() {
               placeholder="Google Place ID (ChIJ…)"
               value={googlePlaceId}
               onChange={(e) => setGooglePlaceId(e.target.value)}
+              disabled={!syncAvailability.google}
             />
           </div>
 
@@ -296,6 +321,9 @@ export default function ReviewsReputationClient() {
               Paste your Yelp business page URL (yelp.com/biz/…). Yelp provides up to 3 review
               excerpts via their official API.
             </p>
+            {!syncAvailability.yelp ? (
+              <p className={rep.muted}>Yelp sync is temporarily unavailable.</p>
+            ) : null}
             <input
               className={rep.input}
               placeholder="https://www.yelp.com/biz/your-business"
@@ -311,25 +339,29 @@ export default function ReviewsReputationClient() {
             <button
               type="button"
               className={ws.btnPrimary}
-              disabled={syncing}
+              disabled={syncing || syncDisabled}
               onClick={() => runSync([])}
             >
               {syncing ? "Syncing…" : "Sync all platforms"}
             </button>
           </div>
-          <p className={rep.muted}>
-            Last sync: {lastSync}
-            {sources?.lastSyncStatus?.google?.error
-              ? ` · Google: ${sources.lastSyncStatus.google.error}`
-              : null}
-            {sources?.lastSyncStatus?.yelp?.error
-              ? ` · Yelp: ${sources.lastSyncStatus.yelp.error}`
-              : null}
-          </p>
-          <p className={rep.muted}>
-            Requires <code>GOOGLE_PLACES_API_KEY</code> and <code>YELP_FUSION_API_KEY</code> on
-            the server. AI or template quotes from the website builder are never shown as reviews.
-          </p>
+          {sources?.lastSyncAt ? (
+            <p className={rep.muted}>
+              Last sync: {lastSync}
+              {sources?.lastSyncStatus?.google?.error
+                ? ` · Google: ${sources.lastSyncStatus.google.error}`
+                : null}
+              {sources?.lastSyncStatus?.yelp?.error
+                ? ` · Yelp: ${sources.lastSyncStatus.yelp.error}`
+                : null}
+            </p>
+          ) : null}
+          {!syncDisabled ? (
+            <p className={rep.muted}>
+              Only verified Google and Yelp reviews appear on your public website. AI or template
+              quotes from the website builder are never shown as customer reviews.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

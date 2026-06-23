@@ -1,6 +1,10 @@
 import { privateJson, requirePrivateTenantApi } from "@/lib/api-zone-guard";
 import { syncTenantReviewsFromSources } from "@/lib/reputation-sync";
 import { syncTenantSocialLinksToWebsite } from "@/lib/reputation-store";
+import {
+  getReputationSyncAvailability,
+  sanitizeSyncPlatformResult,
+} from "@/lib/reputation-sync/user-facing";
 
 /**
  * POST /api/reputation/sync
@@ -28,7 +32,15 @@ export async function POST(request) {
 
     return privateJson({
       success: true,
-      data: payload,
+      data: {
+        ...payload,
+        results: {
+          google: sanitizeSyncPlatformResult(payload.results?.google, "google"),
+          yelp: sanitizeSyncPlatformResult(payload.results?.yelp, "yelp"),
+          totals: payload.results?.totals || { inserted: 0, updated: 0 },
+        },
+        syncAvailability: getReputationSyncAvailability(),
+      },
     });
   } catch (error) {
     console.error("[api/reputation/sync][POST]", error);

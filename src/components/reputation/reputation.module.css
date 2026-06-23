@@ -76,6 +76,29 @@
   gap: 0;
 }
 
+.syncUnavailableBanner {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(120, 53, 15, 0.35);
+  color: #fde68a;
+}
+
+.syncUnavailableBanner strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #fef3c7;
+  font-size: 0.95rem;
+}
+
+.syncUnavailableBanner p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #fcd34d;
+}
+
 .syncActions {
   display: flex;
   flex-wrap: wrap;
