@@ -54,33 +54,16 @@
   margin-bottom: 28px;
   padding: 28px 32px;
   border-radius: var(--fb-radius-2xl, 1.25rem);
-  border: 1px solid rgba(96, 165, 250, 0.22);
-  background: linear-gradient(
-    155deg,
-    rgba(62, 72, 94, 0.96) 0%,
-    rgba(48, 58, 78, 0.94) 100%
-  );
-  backdrop-filter: blur(20px) saturate(1.25);
-  box-shadow:
-    var(--fb-shadow-lg),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-    0 0 48px -12px rgba(59, 130, 246, 0.35);
+  border: 1px solid var(--fb-border, #e5e7eb);
+  background: #ffffff;
+  box-shadow: var(--fb-shadow-md);
   position: relative;
   overflow: visible;
   z-index: 10;
 }
 
 .topBar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.12) 0%,
-    transparent 42%,
-    rgba(16, 185, 129, 0.08) 100%
-  );
-  pointer-events: none;
+  display: none;
 }
 
 .topBar > * {
@@ -105,11 +88,7 @@
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.05;
-  color: var(--fb-text-heading, #f8fafc);
-  background: linear-gradient(180deg, #fff 0%, #cbd5e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .subtitle {
@@ -117,7 +96,7 @@
   max-width: 42ch;
   font-size: 15px;
   line-height: 1.55;
-  color: var(--fb-text-muted, #94a3b8);
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .workflowGuide {
@@ -126,7 +105,7 @@
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .quickActions {
@@ -173,10 +152,9 @@
 }
 
 .secondaryAction {
-  background: rgba(34, 40, 52, 0.85);
-  color: var(--fb-text, #e8ecf4);
-  border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.22));
-  backdrop-filter: blur(8px);
+  background: #ffffff;
+  color: var(--fb-text, #374151);
+  border: 1px solid var(--fb-border, #e5e7eb);
 }
 
 .moreActions {
@@ -191,10 +169,9 @@
 .moreActions summary {
   cursor: pointer;
   list-style: none;
-  background: rgba(34, 40, 52, 0.85);
-  color: var(--fb-text, #e8ecf4);
-  border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.22));
-  backdrop-filter: blur(8px);
+  background: #ffffff;
+  color: var(--fb-text, #374151);
+  border: 1px solid var(--fb-border, #e5e7eb);
 }
 
 .moreActions summary::-webkit-details-marker {
@@ -213,9 +190,9 @@
   min-width: 240px;
   padding: 6px;
   border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(15, 23, 42, 0.98);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--fb-border, #e5e7eb);
+  background: #ffffff;
+  box-shadow: var(--fb-shadow-lg);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -228,12 +205,12 @@
   text-decoration: none;
   font-size: 13px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--fb-text-heading, #111827);
   transition: background 0.15s ease;
 }
 
 .moreActionsItem:hover {
-  background: rgba(51, 65, 85, 0.55);
+  background: #f1f5f9;
 }
 
 .primaryAction:hover,
@@ -260,13 +237,8 @@
 .pillarCard {
   padding: 22px;
   border-radius: var(--fb-radius-2xl, 1.25rem);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: linear-gradient(
-    165deg,
-    rgba(38, 46, 60, 0.95) 0%,
-    rgba(28, 33, 43, 0.9) 100%
-  );
-  backdrop-filter: blur(16px);
+  border: 1px solid var(--fb-border, #e5e7eb);
+  background: #ffffff;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -327,7 +299,7 @@
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--fb-border);
-  background: rgba(34, 40, 52, 0.6);
+  background: #f8fafc;
   color: var(--fb-text);
   font-size: 12px;
   font-weight: 600;
@@ -337,8 +309,8 @@
 
 .pillarLink:hover {
   background: var(--fb-accent-blue-soft);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: #bfdbfe;
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #1d4ed8;
 }
 
 /* ─── Grid layout ─────────────────────────────────────────── */
@@ -355,21 +327,16 @@
 .span4 { grid-column: span 4; }
 
 .panel {
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  border: 1px solid var(--fb-border, #e5e7eb);
   border-radius: var(--fb-radius-2xl);
-  background: linear-gradient(
-    180deg,
-    rgba(36, 43, 56, 0.92) 0%,
-    rgba(28, 33, 43, 0.85) 100%
-  );
-  backdrop-filter: blur(18px) saturate(1.15);
-  box-shadow: var(--fb-shadow-md), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  background: #ffffff;
+  box-shadow: var(--fb-shadow-sm);
   padding: 24px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .panel:hover {
-  border-color: rgba(148, 163, 184, 0.18);
+  border-color: #d1d5db;
 }
 
 .sectionHead {
@@ -402,7 +369,7 @@
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--fb-border);
-  background: rgba(34, 40, 52, 0.5);
+  background: #f1f5f9;
   color: var(--fb-text-muted);
   font-size: 11px;
   font-weight: 600;
@@ -420,7 +387,8 @@
   padding: 22px;
   border-radius: var(--fb-radius-xl);
   border: 1px solid var(--fb-border);
-  background: linear-gradient(160deg, rgba(34, 40, 52, 0.9) 0%, rgba(28, 33, 43, 0.85) 100%);
+  background: #ffffff;
+  box-shadow: var(--fb-shadow-sm);
   transition: transform 0.2s var(--fb-ease), box-shadow 0.2s ease;
 }
 
@@ -441,13 +409,9 @@
 }
 
 .metricRevenue {
-  border-color: rgba(16, 185, 129, 0.25);
-  background: linear-gradient(
-    145deg,
-    rgba(6, 78, 59, 0.35) 0%,
-    rgba(28, 33, 43, 0.9) 55%
-  );
-  box-shadow: inset 0 1px 0 rgba(52, 211, 153, 0.12), 0 8px 32px rgba(0, 0, 0, 0.25);
+  border-color: rgba(22, 163, 74, 0.25);
+  background: linear-gradient(145deg, #f0fdf4 0%, #ffffff 55%);
+  box-shadow: var(--fb-shadow-sm);
 }
 
 .metricHead {
@@ -578,14 +542,14 @@
   gap: 12px;
   padding: 14px;
   border-radius: 14px;
-  border: 1px solid transparent;
-  background: rgba(28, 33, 43, 0.5);
+  border: 1px solid var(--fb-border, #e5e7eb);
+  background: #f8fafc;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .activityRow:hover {
-  background: rgba(34, 40, 52, 0.8);
-  border-color: var(--fb-border);
+  background: #f1f5f9;
+  border-color: #d1d5db;
 }
 
 .statusDot {
@@ -641,8 +605,8 @@
 
 .moduleCard:hover {
   transform: translateY(-4px);
-  border-color: rgba(59, 130, 246, 0.3);
-  box-shadow: var(--fb-shadow-md), 0 0 32px -12px var(--fb-glow-blue);
+  border-color: rgba(37, 99, 235, 0.25);
+  box-shadow: var(--fb-shadow-md);
 }
 
 .moduleIcon {
@@ -652,7 +616,7 @@
   display: grid;
   place-items: center;
   background: var(--fb-accent-blue-soft);
-  color: #93c5fd;
+  color: #2563eb;
   margin-bottom: 12px;
 }
 
@@ -673,7 +637,7 @@
 .moduleAction {
   font-size: 12px;
   font-weight: 700;
-  color: #7dd3fc;
+  color: #2563eb;
 }
 
 /* ─── Health / collections ──────────────────────────────── */
@@ -689,7 +653,7 @@
   padding: 16px 18px;
   border-radius: 14px;
   border: 1px solid var(--fb-border);
-  background: rgba(28, 33, 43, 0.55);
+  background: #f8fafc;
   color: var(--fb-text);
   font-size: 14px;
 }

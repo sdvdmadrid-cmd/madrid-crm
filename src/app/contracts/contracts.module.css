@@ -26,7 +26,7 @@
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(15, 23, 42, 0.65);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
 
@@ -40,7 +40,7 @@
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   background: rgba(15, 23, 42, 0.72);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
 
@@ -69,7 +69,7 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .contractMeta {

@@ -92,7 +92,7 @@
   border-radius: 12px;
   border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.2));
   background: rgba(15, 23, 42, 0.45);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
 
@@ -101,7 +101,7 @@
   border-radius: 12px;
   border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.2));
   background: rgba(15, 23, 42, 0.45);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
   font-weight: 600;
 }
@@ -365,7 +365,7 @@
   border-radius: var(--fb-radius-2xl);
   border: 1px solid var(--fb-border);
   min-height: 260px;
-  background: rgba(48, 58, 78, 0.6);
+  background: #f1f5f9;
 }
 
 .countPill {

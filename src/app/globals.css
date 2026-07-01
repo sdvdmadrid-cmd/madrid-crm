@@ -6,19 +6,19 @@
 
 :root {
   /* Backgrounds */
-  --background: #f4f5f7;
+  --background: #ffffff;
   --foreground: #111827;
 
-  /* Sidebar */
+  /* Sidebar — light */
   --sidebar-width: 240px;
-  --sidebar-bg: #1e293b; /* Dark blue */
-  --sidebar-border: rgba(255, 255, 255, 0.06);
-  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-item-active-bg: rgba(29, 78, 216, 0.15); /* Blue from landing page */
-  --sidebar-active-indicator: #1d4ed8;
-  --sidebar-text-muted: #64748b;
-  --sidebar-text: #94a3b8;
-  --sidebar-text-active: #f1f5f9;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --sidebar-item-hover: #f1f5f9;
+  --sidebar-item-active-bg: rgba(37, 99, 235, 0.08);
+  --sidebar-active-indicator: #2563eb;
+  --sidebar-text-muted: #6b7280;
+  --sidebar-text: #374151;
+  --sidebar-text-active: #2563eb;
 
   /* Brand */
   --primary: #1d4ed8; /* Blue from landing page */
