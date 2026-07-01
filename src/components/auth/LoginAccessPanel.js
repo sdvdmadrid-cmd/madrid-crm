@@ -1,6 +1,12 @@
 ﻿"use client";
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { sanitizeRedirectPath } from "@/lib/auth-redirect";
+
+const DEV_LOGIN_ENABLED =
+  process.env.NEXT_PUBLIC_DEV_LOGIN_ENABLED === "true";
 
 function isStrongPassword(value) {
   const password = String(value || "");
@@ -53,6 +59,13 @@ export default function LoginAccessPanel({
   onBackToLogin,
 }) {
   const { t } = useTranslation();
+  const [devRedirect, setDevRedirect] = useState("/dashboard");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setDevRedirect(sanitizeRedirectPath(params.get("redirect") || "/dashboard"));
+  }, []);
   const shouldHighlightForgotPassword = loginFailedAttempts >= 3;
   const passwordStrong = isStrongPassword(resetPasswordForm?.newPassword);
 
@@ -459,6 +472,32 @@ export default function LoginAccessPanel({
                 >
                   {t("auth.createAccountTab")}
                 </button>
+
+                {DEV_LOGIN_ENABLED ? (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      paddingTop: 16,
+                      borderTop: "1px dashed #e5e7eb",
+                      display: "grid",
+                      gap: 8,
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>
+                      Local dev — one-click sign in
+                    </p>
+                    <Link
+                      href={`/api/auth/dev-login?profile=admin&redirect=${encodeURIComponent(devRedirect)}`}
+                      style={{
+                        ...secondaryButtonStyle,
+                        textAlign: "center",
+                        textDecoration: "none",
+                      }}
+                    >
+                      Dev login (contractor)
+                    </Link>
+                  </div>
+                ) : null}
               </form>
             : null}
 

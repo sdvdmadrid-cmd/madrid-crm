@@ -17,7 +17,7 @@
 .title {
   margin: 0;
   font-size: 1.6rem;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .subtitle {
@@ -83,7 +83,7 @@
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(30, 41, 59, 0.85);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .formGrid textarea {

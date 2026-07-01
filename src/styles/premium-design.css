@@ -1,65 +1,55 @@
 /**
- * FieldBase Premium Design System
- * Daylight-friendly dark — charcoal / slate / graphite (Arc / Linear / Vercel)
- * Readable outdoors; never pure black.
+ * FieldBase Design System — Light theme (Jobber / Stripe / Linear inspired)
+ * White canvas, blue primary, generous whitespace.
  */
 
 :root {
-  /* Canvas — charcoal & gray-blue (brighter than midnight) */
-  --fb-bg-base: #1e2433;
-  --fb-bg-subtle: #232a3b;
-  --fb-bg-elevated: #2a3347;
-  --fb-bg-surface: #323d52;
-  --fb-bg-glass: rgba(42, 52, 72, 0.82);
-  --fb-bg-glass-strong: rgba(48, 58, 78, 0.94);
+  /* Canvas */
+  --fb-bg-base: #ffffff;
+  --fb-bg-subtle: #f8fafc;
+  --fb-bg-elevated: #ffffff;
+  --fb-bg-surface: #f1f5f9;
+  --fb-bg-glass: rgba(255, 255, 255, 0.92);
+  --fb-bg-glass-strong: rgba(255, 255, 255, 0.98);
 
-  /* Aliases for modules */
   --fb-bg: var(--fb-bg-base);
-  --fb-surface-elevated: var(--fb-bg-elevated);
-  --fb-surface-input: rgba(44, 54, 74, 0.95);
-  --fb-card-gradient: linear-gradient(
-    165deg,
-    rgba(58, 68, 90, 0.97) 0%,
-    rgba(42, 52, 72, 0.95) 100%
-  );
-  --fb-card-gradient-subtle: linear-gradient(
-    165deg,
-    rgba(52, 62, 82, 0.92) 0%,
-    rgba(38, 48, 66, 0.9) 100%
-  );
+  --fb-surface-elevated: #ffffff;
+  --fb-surface-input: #ffffff;
+  --fb-card-gradient: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  --fb-card-gradient-subtle: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 
-  /* Borders & ambient light — visible separation */
-  --fb-border: rgba(148, 163, 184, 0.2);
-  --fb-border-strong: rgba(148, 163, 184, 0.34);
-  --fb-border-glow: rgba(96, 165, 250, 0.38);
-  --fb-glow-blue: rgba(59, 130, 246, 0.38);
-  --fb-glow-emerald: rgba(45, 212, 168, 0.32);
-  --fb-glow-violet: rgba(139, 92, 246, 0.28);
-  --fb-glow-gold: rgba(245, 158, 11, 0.24);
+  /* Borders */
+  --fb-border: #e5e7eb;
+  --fb-border-strong: #d1d5db;
+  --fb-border-glow: rgba(37, 99, 235, 0.25);
+  --fb-glow-blue: rgba(37, 99, 235, 0.15);
+  --fb-glow-emerald: rgba(22, 163, 74, 0.12);
+  --fb-glow-violet: rgba(124, 58, 237, 0.1);
+  --fb-glow-gold: rgba(245, 158, 11, 0.12);
 
-  /* Typography — WCAG AA on charcoal surfaces (contractor all-day use) */
-  --fb-text: #e2e9f6;
-  --fb-text-muted: #b4c2d8;
-  --fb-text-subtle: #9aaac4;
-  --fb-text-heading: #f8fafc;
-  --fb-text-label: #d4deee;
-  --fb-text-placeholder: #9eb2cc;
-  --fb-text-helper: #b0bdd4;
+  /* Typography */
+  --fb-text: #111827;
+  --fb-text-muted: #6b7280;
+  --fb-text-subtle: #9ca3af;
+  --fb-text-heading: #0f172a;
+  --fb-text-label: #374151;
+  --fb-text-placeholder: #9ca3af;
+  --fb-text-helper: #6b7280;
   --fb-form-label: var(--fb-text-label);
-  --fb-input-surface: rgba(52, 64, 86, 0.98);
-  --fb-input-text: #f1f5fc;
+  --fb-input-surface: #ffffff;
+  --fb-input-text: #111827;
 
-  /* Refined accents */
-  --fb-accent-blue: #4f8cff;
-  --fb-accent-blue-soft: rgba(79, 140, 255, 0.14);
-  --fb-accent-emerald: #2dd4a8;
-  --fb-accent-emerald-soft: rgba(45, 212, 168, 0.12);
-  --fb-accent-violet: #a78bfa;
-  --fb-accent-violet-soft: rgba(167, 139, 250, 0.14);
-  --fb-accent-amber: #fbbf24;
-  --fb-accent-gold: #d4a853;
+  /* Accents */
+  --fb-accent-blue: #2563eb;
+  --fb-accent-blue-soft: rgba(37, 99, 235, 0.08);
+  --fb-accent-emerald: #16a34a;
+  --fb-accent-emerald-soft: rgba(22, 163, 74, 0.08);
+  --fb-accent-violet: #7c3aed;
+  --fb-accent-violet-soft: rgba(124, 58, 237, 0.08);
+  --fb-accent-amber: #d97706;
+  --fb-accent-gold: #ca8a04;
 
-  /* Spacing scale */
+  /* Spacing */
   --fb-space-1: 4px;
   --fb-space-2: 8px;
   --fb-space-3: 12px;
@@ -71,57 +61,47 @@
 
   /* Radius */
   --fb-radius-sm: 10px;
-  --fb-radius-md: 14px;
+  --fb-radius-md: 12px;
   --fb-radius-xl: 1rem;
-  --fb-radius-2xl: 1.35rem;
-  --fb-radius-3xl: 1.75rem;
+  --fb-radius-2xl: 1.25rem;
+  --fb-radius-3xl: 1.5rem;
 
-  /* Depth — softer, less muddy */
-  --fb-shadow-sm: 0 1px 3px rgba(15, 22, 38, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --fb-shadow-md: 0 8px 28px rgba(15, 22, 38, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.1);
-  --fb-shadow-lg: 0 20px 48px rgba(15, 22, 38, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.12);
-  --fb-shadow-glow-blue: 0 0 48px -10px var(--fb-glow-blue);
-  --fb-shadow-glow-emerald: 0 0 40px -10px var(--fb-glow-emerald);
+  /* Depth */
+  --fb-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --fb-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --fb-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.08), 0 4px 8px rgba(15, 23, 42, 0.04);
+  --fb-shadow-glow-blue: 0 4px 20px rgba(37, 99, 235, 0.15);
+  --fb-shadow-glow-emerald: 0 4px 20px rgba(22, 163, 74, 0.12);
 
   /* Motion */
   --fb-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --fb-ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
-  --fb-duration: 0.22s;
-  --fb-duration-slow: 0.38s;
+  --fb-duration: 0.2s;
+  --fb-duration-slow: 0.32s;
 
   --fb-sidebar-width: 260px;
-  --fb-font-display: "Plus Jakarta Sans", var(--font-geist-sans), "Inter", system-ui, sans-serif;
+  --fb-font-display: var(--font-geist-sans), "Inter", system-ui, sans-serif;
   --fb-font-body: var(--font-geist-sans), "Inter", system-ui, sans-serif;
 }
 
 /* ─── App shell ───────────────────────────────────────────── */
 .auth-shell-aside.fb-sidebar {
   width: var(--fb-sidebar-width);
-  background: linear-gradient(180deg, #2a3144 0%, #242b3c 50%, #1e2433 100%);
-  border-right: 1px solid var(--fb-border-strong);
-  backdrop-filter: blur(24px) saturate(1.35);
-  box-shadow: 8px 0 28px rgba(15, 22, 38, 0.2);
+  background: #ffffff;
+  border-right: 1px solid var(--fb-border);
+  box-shadow: 1px 0 0 rgba(15, 23, 42, 0.04);
 }
 
 .auth-shell-aside.fb-sidebar::before {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 90% 45% at 50% -5%, rgba(79, 140, 255, 0.14), transparent 65%),
-    radial-gradient(ellipse 60% 35% at 0% 100%, rgba(45, 212, 168, 0.06), transparent 55%);
+  background: none;
   pointer-events: none;
 }
 
 .auth-shell-aside.fb-sidebar::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(180deg, rgba(79, 140, 255, 0.35), transparent 40%, rgba(45, 212, 168, 0.15));
-  pointer-events: none;
+  display: none;
 }
 
 .fb-sidebar-brand {
@@ -148,24 +128,20 @@
 }
 
 .auth-shell-mobile-header.fb-mobile-header {
-  background: rgba(36, 44, 62, 0.94);
-  border-bottom: 1px solid var(--fb-border-strong);
-  backdrop-filter: blur(20px) saturate(1.3);
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--fb-border);
+  backdrop-filter: blur(12px);
 }
 
 .auth-shell-main.fb-workspace {
   font-family: var(--fb-font-body);
-  background:
-    radial-gradient(ellipse 100% 65% at 0% -15%, rgba(79, 140, 255, 0.14), transparent 55%),
-    radial-gradient(ellipse 75% 50% at 100% 0%, rgba(45, 212, 168, 0.1), transparent 50%),
-    radial-gradient(ellipse 50% 40% at 70% 100%, rgba(167, 139, 250, 0.08), transparent 45%),
-    linear-gradient(180deg, #222a3c 0%, var(--fb-bg-base) 35%, #1a2030 100%);
+  background: #f8fafc;
   color: var(--fb-text);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 .auth-shell-main.fb-workspace-light {
-  background: var(--fb-bg-base);
+  background: #f8fafc;
   color: var(--fb-text);
 }
 
@@ -189,22 +165,22 @@
 }
 
 .fb-sidebar .sb-link:hover {
-  background: rgba(79, 140, 255, 0.1);
+  background: var(--fb-accent-blue-soft);
   color: var(--fb-text-heading);
-  border-color: rgba(79, 140, 255, 0.18);
-  transform: translateX(3px);
+  border-color: transparent;
+  transform: translateX(2px);
 }
 
 .fb-sidebar .sb-link.sb-active {
-  background: linear-gradient(90deg, rgba(79, 140, 255, 0.28) 0%, rgba(79, 140, 255, 0.06) 100%);
-  color: #e8f0ff;
-  border-color: rgba(96, 165, 250, 0.35);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--fb-shadow-glow-blue);
+  background: var(--fb-accent-blue-soft);
+  color: var(--fb-accent-blue);
+  border-color: rgba(37, 99, 235, 0.15);
+  box-shadow: none;
 }
 
 .fb-sidebar .sb-link.sb-active::before {
-  background: linear-gradient(180deg, #7eb6ff, #4f8cff);
-  box-shadow: 0 0 14px var(--fb-glow-blue);
+  background: var(--fb-accent-blue);
+  box-shadow: none;
 }
 
 /* CRM breadcrumb */
@@ -216,18 +192,16 @@
   gap: 10px 16px;
 }
 
-.crm-nav-premium--dark .crm-nav-back,
 .crm-nav-premium .crm-nav-back {
-  color: #93c5fd;
+  color: var(--fb-accent-blue);
   font-weight: 600;
   font-size: 13px;
   text-decoration: none;
   transition: color var(--fb-duration) var(--fb-ease);
 }
 
-.crm-nav-premium--dark .crm-nav-back:hover,
 .crm-nav-premium .crm-nav-back:hover {
-  color: #dbeafe;
+  color: #1d4ed8;
 }
 
 .crm-nav-premium .crm-nav-trail {
@@ -308,22 +282,21 @@
   background: rgba(148, 163, 184, 0.38);
 }
 
-/* Tailwind legacy pages inside premium workspace */
+/* Tailwind legacy pages inside premium workspace — keep light utilities */
 .fb-workspace .bg-white,
 .fb-workspace .bg-slate-50,
 .fb-workspace .bg-gray-50 {
-  background: var(--fb-bg-glass-strong) !important;
-  backdrop-filter: blur(12px);
+  background: #ffffff !important;
 }
 
 .fb-workspace .bg-slate-100,
 .fb-workspace .bg-gray-100 {
-  background: rgba(48, 58, 78, 0.75) !important;
+  background: #f1f5f9 !important;
 }
 
 .fb-workspace .bg-gray-900,
 .fb-workspace .bg-slate-900 {
-  background: linear-gradient(135deg, #3b7dff, #1d4ed8) !important;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
   color: #fff !important;
 }
 
@@ -358,7 +331,7 @@
 
 .fb-workspace .hover\:bg-gray-50:hover,
 .fb-workspace .hover\:bg-gray-800:hover {
-  background: rgba(51, 65, 85, 0.75) !important;
+  background: #f8fafc !important;
 }
 
 .fb-workspace .text-violet-600 { color: var(--fb-accent-violet) !important; }
@@ -382,23 +355,22 @@
 }
 
 .fb-workspace .bg-red-50 {
-  background: rgba(244, 63, 94, 0.12) !important;
+  background: rgba(254, 226, 226, 0.8) !important;
 }
 .fb-workspace .border-red-200 {
-  border-color: rgba(251, 113, 133, 0.35) !important;
+  border-color: #fecaca !important;
 }
 .fb-workspace .text-red-800,
 .fb-workspace .text-red-700,
 .fb-workspace .text-red-400 {
-  color: #fda4af !important;
+  color: #dc2626 !important;
 }
 
 /* Shared CRM cards & forms */
 .fb-workspace .cf-card {
-  border: 1px solid var(--fb-border-strong);
+  border: 1px solid var(--fb-border);
   border-radius: var(--fb-radius-2xl);
-  background: var(--fb-card-gradient);
-  backdrop-filter: blur(20px) saturate(1.2);
+  background: #ffffff;
   box-shadow: var(--fb-shadow-md);
   color: var(--fb-text);
   transition:
@@ -408,7 +380,8 @@
 }
 
 .fb-workspace .cf-card:hover {
-  border-color: rgba(96, 165, 250, 0.22);
+  border-color: #cbd5e1;
+  box-shadow: var(--fb-shadow-lg);
 }
 
 .fb-workspace .cf-card h1,
@@ -444,15 +417,16 @@
 .fb-workspace .cf-card input:focus,
 .fb-workspace .cf-card textarea:focus,
 .fb-workspace .cf-card select:focus {
-  border-color: rgba(79, 140, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
   outline: none;
 }
 
 .fb-workspace .cf-panel {
-  border: 1px solid var(--fb-border-strong);
+  border: 1px solid var(--fb-border);
   border-radius: var(--fb-radius-xl);
-  background: rgba(48, 58, 78, 0.72);
+  background: #ffffff;
+  box-shadow: var(--fb-shadow-sm);
   transition:
     transform var(--fb-duration) var(--fb-ease),
     border-color var(--fb-duration) var(--fb-ease),
@@ -461,8 +435,8 @@
 
 .fb-workspace .cf-panel:hover {
   transform: translateY(-2px);
-  border-color: rgba(96, 165, 250, 0.25);
-  box-shadow: var(--fb-shadow-sm), 0 0 24px -8px var(--fb-glow-blue);
+  border-color: #cbd5e1;
+  box-shadow: var(--fb-shadow-md);
 }
 
 .fb-workspace .cf-client-card h3 {
@@ -484,8 +458,8 @@
   height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid var(--fb-border-strong);
-  background: rgba(52, 62, 82, 0.9);
+  border: 1px solid var(--fb-border);
+  background: #ffffff;
   color: var(--fb-text-heading);
   font-size: 12px;
   font-weight: 600;
@@ -498,25 +472,24 @@
 
 .fb-workspace .cf-action-btn:hover {
   background: var(--fb-accent-blue-soft);
-  border-color: rgba(96, 165, 250, 0.35);
+  border-color: rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
 
 .fb-workspace .cf-action-btn--danger {
-  border-color: rgba(248, 113, 113, 0.35);
-  color: #fecaca;
+  border-color: #fecaca;
+  color: #dc2626;
 }
 
 .fb-workspace .cf-action-btn--danger:hover {
-  background: rgba(127, 29, 29, 0.35);
+  background: #fef2f2;
 }
 
-/* Calendar — premium glass panel (readable on dark) */
+/* Calendar — light panel */
 .fb-workspace .fb-calendar-weather {
-  background: var(--fb-card-gradient) !important;
-  border: 1px solid var(--fb-border-strong) !important;
-  box-shadow: var(--fb-shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(20px) saturate(1.15) !important;
+  background: #ffffff !important;
+  border: 1px solid var(--fb-border) !important;
+  box-shadow: var(--fb-shadow-md) !important;
 }
 
 .fb-workspace .fb-calendar-weather .text-slate-800,
@@ -533,7 +506,7 @@
 
 .fb-workspace .fb-calendar-weather .bg-white,
 .fb-workspace .fb-calendar-weather .bg-slate-50 {
-  background: rgba(52, 62, 82, 0.85) !important;
+  background: #f8fafc !important;
 }
 
 .fb-workspace .fb-calendar-weather input,
@@ -542,9 +515,9 @@
 }
 
 .fb-workspace .fb-weather-badge {
-  background: rgba(58, 68, 90, 0.95) !important;
+  background: #f1f5f9 !important;
   color: var(--fb-text-heading) !important;
-  border-color: var(--fb-border-strong) !important;
+  border-color: var(--fb-border) !important;
 }
 
 /* Empty states */
@@ -557,17 +530,13 @@
   padding: 56px 28px;
   border-radius: var(--fb-radius-3xl);
   border: 1px dashed var(--fb-border-strong);
-  background: linear-gradient(180deg, rgba(52, 62, 82, 0.55), rgba(38, 48, 66, 0.45));
+  background: #f8fafc;
   position: relative;
   overflow: hidden;
 }
 
 .fb-empty::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(79, 140, 255, 0.08), transparent 70%);
-  pointer-events: none;
+  display: none;
 }
 
 .fb-empty-title {
@@ -587,7 +556,7 @@
   line-height: 1.6;
 }
 
-/* Calendar page — dark overrides for legacy Tailwind light utilities */
+/* Calendar page — light workspace */
 .fb-calendar-page {
   background: transparent;
   color: var(--fb-text);
@@ -595,19 +564,19 @@
 
 .fb-calendar-page .bg-white,
 .fb-calendar-page .bg-white\/95 {
-  background: rgba(28, 35, 50, 0.92) !important;
+  background: #ffffff !important;
   color: var(--fb-text-heading) !important;
 }
 
 .fb-calendar-page .bg-slate-50,
 .fb-calendar-page .bg-slate-50\/50 {
-  background: rgba(22, 28, 40, 0.75) !important;
+  background: #f8fafc !important;
 }
 
 .fb-calendar-page .border-slate-200,
 .fb-calendar-page .border-slate-300,
 .fb-calendar-page .border-violet-200 {
-  border-color: var(--fb-border-strong) !important;
+  border-color: var(--fb-border) !important;
 }
 
 .fb-calendar-page .text-slate-500,
@@ -620,13 +589,14 @@
 .fb-calendar-page input,
 .fb-calendar-page textarea,
 .fb-calendar-page select {
-  background: rgba(22, 28, 40, 0.9) !important;
+  background: #ffffff !important;
   color: var(--fb-text-heading) !important;
+  border-color: var(--fb-border) !important;
 }
 
 .fb-calendar-page .hover\:bg-slate-50:hover,
 .fb-calendar-page .hover\:bg-white:hover {
-  background: rgba(36, 44, 60, 0.9) !important;
+  background: #f1f5f9 !important;
 }
 
 @media (max-width: 768px) {

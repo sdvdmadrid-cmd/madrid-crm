@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import ClientPickerField from "@/components/clients/ClientPickerField";
 import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
+import InvoiceComposerForm from "@/components/invoices/InvoiceComposerForm";
 import InvoiceLineItemsEditor from "@/components/invoices/InvoiceLineItemsEditor";
 import styles from "./invoices.module.css";
 import UniversalShareButton from "@/components/UniversalShareButton";
@@ -44,6 +45,8 @@ import "@/i18n";
 
 const INVOICES_UI_PAGE_SIZE = 50;
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 const initialInvoice = {
   invoiceNumber: "",
   clientId: "",
@@ -51,6 +54,7 @@ const initialInvoice = {
   invoiceTitle: "",
   quoteNumber: "",
   amount: "",
+  invoiceDate: todayIso(),
   dueDate: "",
   status: "Draft",
   preferredPaymentMethod: "cash",
@@ -117,7 +121,6 @@ const REFERENCE_REQUIRED_METHODS = new Set([
   "paypal",
 ]);
 const NOTES_REQUIRED_METHODS = new Set(["cash", "other"]);
-const todayIso = () => new Date().toISOString().slice(0, 10);
 
 const initialPaymentDraft = (invoice) => ({
   amount: String(invoice.balanceDue || invoice.amount || ""),
@@ -163,6 +166,8 @@ export default function InvoicesPageClient({ initialList = null }) {
   const [listTotal, setListTotal] = useState(initialList?.total ?? 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
   const [paymentDraftById, setPaymentDraftById] = useState({});
   const [openPaymentFormId, setOpenPaymentFormId] = useState("");
   const [savingPaymentId, setSavingPaymentId] = useState("");
@@ -468,44 +473,95 @@ export default function InvoicesPageClient({ initialList = null }) {
   const [paymentNoticeTone, setPaymentNoticeTone] = useState("success");
 
   const resetForm = () => {
-    setForm(initialInvoice);
+    setForm({ ...initialInvoice, invoiceDate: todayIso() });
     setSelectedId(null);
     setQuoteLookup(null);
   };
 
-  const saveInvoice = async () => {
+  const persistInvoice = async () => {
     const clientErr = requireNonEmptyString(form.clientName, "Client");
     if (clientErr) {
       setError(clientErr);
-      return;
+      return null;
     }
-    if (!isPositiveMoney(form.amount)) {
-      setError(t("invoices.errors.invalidAmount", { defaultValue: "Enter a valid invoice amount." }));
-      return;
-    }
-    try {
-      const method = selectedId ? "PATCH" : "POST";
-      const url = selectedId ? `/api/invoices/${selectedId}` : "/api/invoices";
-      const res = await apiFetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          lineItems: normalizeInvoiceLineItemsForSave(form.lineItems),
+    const lineTotal = sumInvoiceLineItemsTotals(form.lineItems);
+    if (!isPositiveMoney(form.amount) && lineTotal <= 0) {
+      setError(
+        t("invoices.errors.invalidAmount", {
+          defaultValue: "Add at least one line item with an amount.",
         }),
-      });
-      const result = await getJsonOrThrow(res, t("invoices.errors.save"));
+      );
+      return null;
+    }
 
+    const payload = {
+      ...form,
+      amount: form.amount || String(lineTotal),
+      lineItems: normalizeInvoiceLineItemsForSave(form.lineItems),
+      status: form.status === "Draft" ? "Sent" : form.status,
+    };
+
+    const method = selectedId ? "PATCH" : "POST";
+    const url = selectedId ? `/api/invoices/${selectedId}` : "/api/invoices";
+    const res = await apiFetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await getJsonOrThrow(res, t("invoices.errors.save"));
+    return result.data;
+  };
+
+  const saveInvoice = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const saved = await persistInvoice();
+      if (!saved) return;
       setInvoices(
         selectedId
           ? invoices.map((invoice) =>
-              invoice._id === selectedId ? result.data : invoice,
+              invoice._id === selectedId ? saved : invoice,
             )
-          : [result.data, ...invoices],
+          : [saved, ...invoices],
       );
       resetForm();
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.saveFallback")));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sendInvoiceFromForm = async () => {
+    setSending(true);
+    setError("");
+    try {
+      const saved = await persistInvoice();
+      if (!saved) return;
+      setInvoices(
+        selectedId
+          ? invoices.map((invoice) =>
+              invoice._id === selectedId ? saved : invoice,
+            )
+          : [saved, ...invoices],
+      );
+      const recipientEmail = String(
+        saved.clientEmail || form.clientEmail || "",
+      )
+        .trim()
+        .toLowerCase();
+      const res = await apiFetch(`/api/invoices/${saved._id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(recipientEmail ? { recipientEmail } : {}),
+      });
+      await getJsonOrThrow(res, t("invoices.errors.sendInvoice"));
+      resetForm();
+    } catch (err) {
+      setError(mapUiError(err, t("invoices.errors.sendInvoiceFallback")));
+    } finally {
+      setSending(false);
     }
   };
 
@@ -544,6 +600,9 @@ export default function InvoicesPageClient({ initialList = null }) {
       invoiceTitle: invoice.invoiceTitle || "",
       quoteNumber: invoice.quoteNumber || "",
       amount: invoice.amount || "",
+      invoiceDate: invoice.createdAt
+        ? String(invoice.createdAt).slice(0, 10)
+        : todayIso(),
       dueDate: invoice.dueDate || "",
       status: invoice.status || "Sent",
       preferredPaymentMethod: invoice.preferredPaymentMethod || "bank_transfer",
@@ -806,7 +865,11 @@ export default function InvoicesPageClient({ initialList = null }) {
       <header className={styles.headerRow}>
         <div>
           <h1 className={styles.headerTitle}>{t("invoices.title")}</h1>
-          <p className={styles.headerSub}>{t("invoices.description")}</p>
+          <p className={styles.headerSub}>
+            {t("invoices.composer.subtitle", {
+              defaultValue: "Create and send an invoice in under a minute.",
+            })}
+          </p>
         </div>
         <div className={styles.headerActions}>
           <Link href="/invoices/summary" className={styles.btnGhost}>
@@ -894,376 +957,29 @@ export default function InvoicesPageClient({ initialList = null }) {
                 </div>
               ) : null}
             </div>
-            <div className={styles.formDocumentLayout}>
-              <div className={styles.formDocumentPrimary}>
-                <div className={styles.invoiceFieldsGrid}>
-                  <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="invoice-number">
-                      {t("invoices.labels.invoiceNumber", {
-                        defaultValue: "Invoice number",
-                      })}
-                    </label>
-                    <input
-                      id="invoice-number"
-                      placeholder={t("invoices.placeholders.invoiceNumberAuto")}
-                      value={form.invoiceNumber}
-                      onChange={(e) =>
-                        setForm({ ...form, invoiceNumber: e.target.value })
-                      }
-                      className={styles.field}
-                    />
-                    <p className={styles.formHint}>
-                      {t("invoices.hints.invoiceNumberAuto", {
-                        defaultValue: "Leave blank to auto-generate.",
-                      })}
-                    </p>
-                  </div>
-
-                  <div className={`${styles.formField} ${styles.formFieldSpan2}`}>
-                    <label className={styles.formLabel} htmlFor="invoice-client">
-                      {t("invoices.labels.client", { defaultValue: "Client" })}
-                    </label>
-                    <ClientPickerField
-                      id="invoice-client"
-                      className={styles.clientPicker}
-                      variant="dark"
-                      clientId={form.clientId || ""}
-                      displayValue={form.clientName}
-                      showHint
-                      placeholder={t("invoices.placeholders.client")}
-                      onChange={({ clientId, clientName, displayValue, client }) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          clientId: clientId || "",
-                          clientName: clientName || displayValue || "",
-                          clientEmail: client?.email || prev.clientEmail || "",
-                        }))
-                      }
-                    />
-                  </div>
-
-                  {form.clientName && !form.clientId ? (
-                    <p
-                      className={`${styles.clientLinkWarning} ${styles.formFieldSpanFull}`}
-                      role="status"
-                    >
-                      {t("invoices.warnings.clientNotLinked")}
-                    </p>
-                  ) : null}
-
-                  <div className={`${styles.formField} ${styles.formFieldSpan2}`}>
-                    <label className={styles.formLabel} htmlFor="invoice-title">
-                      {t("invoices.labels.invoiceTitle", {
-                        defaultValue: "Invoice title",
-                      })}
-                    </label>
-                    <input
-                      id="invoice-title"
-                      placeholder={t("invoices.placeholders.invoiceTitle")}
-                      value={form.invoiceTitle}
-                      onChange={(e) =>
-                        setForm({ ...form, invoiceTitle: e.target.value })
-                      }
-                      className={styles.field}
-                    />
-                  </div>
-
-                  <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="invoice-quote">
-                      {t("invoices.labels.quoteNumber", {
-                        defaultValue: "Estimate / quote #",
-                      })}
-                    </label>
-                    <input
-                      id="invoice-quote"
-                      placeholder={t("invoices.placeholders.quoteNumber")}
-                      value={form.quoteNumber}
-                      onChange={(e) =>
-                        setForm({ ...form, quoteNumber: e.target.value })
-                      }
-                      onBlur={(e) => lookupEstimate(e.target.value)}
-                      className={styles.field}
-                    />
-                  </div>
-
-                  {quoteLookupLoading ? (
-                    <p className={`${styles.quoteSearching} ${styles.formFieldSpanFull}`}>
-                      {t("invoices.messages.searchingEstimate", {
-                        defaultValue: "Searching estimates…",
-                      })}
-                    </p>
-                  ) : null}
-
-                  {quoteLookup ? (
-                    <div className={`${styles.quoteLookup} ${styles.formFieldSpanFull}`}>
-                      <span>
-                        <strong>{quoteLookup.estimateNumber}</strong> —{" "}
-                        {quoteLookup.clientName || "Unknown client"}
-                        {quoteLookup.total > 0 &&
-                          ` · $${Number(quoteLookup.total).toFixed(2)}`}
-                      </span>
-                      {quoteLookup.clientName && !form.clientName ? (
-                        <button
-                          type="button"
-                          className={styles.quoteLookupBtn}
-                          onClick={() => {
-                            setForm((f) => ({
-                              ...f,
-                              clientName: quoteLookup.clientName,
-                              quoteNumber: quoteLookup.estimateNumber,
-                            }));
-                            setQuoteLookup(null);
-                          }}
-                        >
-                          {t("invoices.buttons.useClient", {
-                            defaultValue: "Use client",
-                          })}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="invoice-amount">
-                      {t("invoices.labels.amount")}
-                    </label>
-                    <input
-                      id="invoice-amount"
-                      inputMode="decimal"
-                      placeholder={t("invoices.placeholders.amount")}
-                      value={form.amount}
-                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                      className={styles.field}
-                    />
-                  </div>
-
-                  <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="invoice-due-date">
-                      {t("invoices.labels.dueDate")}
-                    </label>
-                    <input
-                      id="invoice-due-date"
-                      type="date"
-                      value={form.dueDate}
-                      onChange={(e) =>
-                        setForm({ ...form, dueDate: e.target.value })
-                      }
-                      className={styles.field}
-                    />
-                  </div>
-
-                  {selectedInvoice?.createdAt ? (
-                    <div className={styles.formField}>
-                      <span className={styles.formLabel}>
-                        {t("invoices.labels.invoiceDate", {
-                          defaultValue: "Invoice date",
-                        })}
-                      </span>
-                      <div className={styles.statusReadOnly}>
-                        {String(selectedInvoice.createdAt).slice(0, 10)}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="invoice-payment-method">
-                      {t("invoices.labels.preferredMethod")}
-                    </label>
-                    <select
-                      id="invoice-payment-method"
-                      value={form.preferredPaymentMethod}
-                      onChange={(e) =>
-                        setForm({ ...form, preferredPaymentMethod: e.target.value })
-                      }
-                      className={styles.field}
-                    >
-                      {paymentMethodOptions(t).map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="invoice-status">
-                      {t("invoices.labels.status", { defaultValue: "Status" })}
-                    </label>
-                    {statusIsComputed ? (
-                      <>
-                        <div className={styles.statusReadOnly} id="invoice-status">
-                          {t(`invoices.statusOptions.${effectiveStatus}`, {
-                            defaultValue:
-                              effectiveStatus === "Partial"
-                                ? "Partially paid"
-                                : effectiveStatus,
-                          })}
-                        </div>
-                        <p className={styles.formHint}>
-                          {t("invoices.hints.statusComputed", {
-                            defaultValue:
-                              "Updated automatically from payments and due date.",
-                          })}
-                        </p>
-                      </>
-                    ) : (
-                      <select
-                        id="invoice-status"
-                        value={form.status}
-                        onChange={(e) =>
-                          setForm({ ...form, status: e.target.value })
-                        }
-                        className={styles.field}
-                      >
-                        {invoiceStatusOptions(t)
-                          .filter(
-                            (option) =>
-                              !COMPUTED_INVOICE_STATUSES.has(option.value),
-                          )
-                          .map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-                  </div>
-                </div>
-
-                <InvoiceLineItemsEditor
-                  lineItems={form.lineItems}
-                  onChange={handleLineItemsChange}
-                />
-
-                <div className={styles.invoiceSummary} data-testid="invoice-form-summary">
-                  <h3 className={styles.invoiceSummaryTitle}>
-                    {t("invoices.summary.title", {
-                      defaultValue: "Invoice summary",
-                    })}
-                  </h3>
-                  <div className={styles.invoiceSummaryGrid}>
-                    <div className={styles.invoiceSummaryRow}>
-                      <span className={styles.invoiceSummaryLabel}>
-                        {t("invoices.summary.subtotal", { defaultValue: "Subtotal" })}
-                      </span>
-                      <span className={styles.invoiceSummaryValue}>
-                        {formatUsd(formTotals.subtotal)}
-                      </span>
-                    </div>
-                    <div className={styles.invoiceSummaryRow}>
-                      <span className={styles.invoiceSummaryLabel}>
-                        {t("invoices.summary.tax", { defaultValue: "Tax" })}
-                      </span>
-                      <span className={styles.invoiceSummaryValue}>
-                        {formatUsd(formTotals.tax)}
-                      </span>
-                    </div>
-                    <div className={styles.invoiceSummaryRow}>
-                      <span className={styles.invoiceSummaryLabel}>
-                        {t("invoices.summary.total", { defaultValue: "Total" })}
-                      </span>
-                      <span className={styles.invoiceSummaryValue}>
-                        {formatUsd(formTotals.total)}
-                      </span>
-                    </div>
-                    <div className={styles.invoiceSummaryRow}>
-                      <span className={styles.invoiceSummaryLabel}>
-                        {t("invoices.summary.amountPaid", {
-                          defaultValue: "Amount paid",
-                        })}
-                      </span>
-                      <span className={styles.invoiceSummaryValueAccent}>
-                        {formatUsd(formTotals.paid)}
-                      </span>
-                    </div>
-                    <div className={styles.invoiceSummaryRow}>
-                      <span className={styles.invoiceSummaryLabel}>
-                        {t("invoices.summary.balanceDue", {
-                          defaultValue: "Balance due",
-                        })}
-                      </span>
-                      <span className={styles.invoiceSummaryValueDue}>
-                        {formatUsd(formTotals.balance)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.internalNotesWrap}>
-                  <label className={styles.internalNotesLabel} htmlFor="invoice-internal-notes">
-                    {t("invoices.labels.internalNotes")}
-                    <span className={styles.internalNotesBadge}>
-                      {t("invoices.labels.staffOnly")}
-                    </span>
-                  </label>
-                  <p className={styles.internalNotesHint}>
-                    {t("invoices.hints.internalNotes")}
-                  </p>
-                  <textarea
-                    id="invoice-internal-notes"
-                    className={styles.internalNotesInput}
-                    value={form.internalNotes}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        internalNotes: e.target.value.slice(0, 4000),
-                      })
-                    }
-                    placeholder={t("invoices.placeholders.internalNotes")}
-                    rows={4}
-                    data-testid="invoice-internal-notes"
-                  />
-                </div>
-
-                <div className={styles.formActions}>
-                  <button
-                    type="button"
-                    onClick={saveInvoice}
-                    className={styles.btnPrimary}
-                  >
-                    {selectedId
-                      ? t("invoices.buttons.update")
-                      : t("invoices.buttons.save")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className={styles.btnGhost}
-                  >
-                    {t("invoices.buttons.clear")}
-                  </button>
-                </div>
-              </div>
-
-              <aside className={styles.formDocumentSecondary}>
-                <div className={styles.workPerformedPanel}>
-                  <div className={styles.workPerformedToolbar}>
-                    <label className={styles.formLabel} htmlFor="invoice-work-performed">
-                      {t("invoices.labels.workPerformed")}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={runInvoiceAI}
-                      disabled={aiLoading}
-                      className={styles.btnAiCompact}
-                      style={{ cursor: aiLoading ? "wait" : "pointer" }}
-                    >
-                      {aiLoading
-                        ? t("invoices.buttons.aiLoading")
-                        : t("invoices.buttons.ai")}
-                    </button>
-                  </div>
-                  <textarea
-                    id="invoice-work-performed"
-                    className={styles.workPerformedInput}
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder={t("invoices.placeholders.workPerformed")}
-                    data-testid="invoice-work-performed-editor"
-                  />
-                </div>
-              </aside>
-            </div>
+            <InvoiceComposerForm
+              form={form}
+              setForm={setForm}
+              formTotals={formTotals}
+              selectedId={selectedId}
+              selectedInvoice={selectedInvoice}
+              effectiveStatus={effectiveStatus}
+              statusIsComputed={statusIsComputed}
+              invoiceStatusOptions={invoiceStatusOptions(t).filter(
+                (option) =>
+                  statusIsComputed ||
+                  !COMPUTED_INVOICE_STATUSES.has(option.value),
+              )}
+              paymentMethodOptions={paymentMethodOptions(t)}
+              onLineItemsChange={handleLineItemsChange}
+              onSaveDraft={saveInvoice}
+              onSendInvoice={sendInvoiceFromForm}
+              onReset={resetForm}
+              onRunAi={runInvoiceAI}
+              aiLoading={aiLoading}
+              saving={saving}
+              sending={sending}
+            />
           </section>
         : null}
 

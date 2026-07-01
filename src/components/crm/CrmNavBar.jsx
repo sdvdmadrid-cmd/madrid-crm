@@ -21,7 +21,7 @@ export default function CrmNavBar() {
   const backHref = getBackFallbackPath(pathname);
   return (
     <nav
-      className={`crm-nav-bar crm-nav-premium crm-nav-premium--dark`}
+      className="crm-nav-bar crm-nav-premium"
       aria-label={t("nav.ariaLabel")}
     >
       <Link href={backHref} className="crm-nav-back">

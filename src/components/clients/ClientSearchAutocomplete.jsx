@@ -70,6 +70,9 @@ export default function ClientSearchAutocomplete({
   variant = "dark",
   showHint = true,
   listClassName = "",
+  allowCreate = false,
+  onCreateClient,
+  creatingClient = false,
 }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -337,6 +340,23 @@ export default function ClientSearchAutocomplete({
           {!loading && !error && options.length === 0 && query.trim() ? (
             <li className={css.empty} role="presentation">
               {t("clients.search.noResults")}
+              {allowCreate && onCreateClient ? (
+                <button
+                  type="button"
+                  className={css.createBtn}
+                  disabled={creatingClient}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onCreateClient();
+                  }}
+                >
+                  {creatingClient
+                    ? t("clients.search.creating", { defaultValue: "Creating…" })
+                    : t("clients.search.createNew", {
+                        defaultValue: "Create new client",
+                      })}
+                </button>
+              ) : null}
             </li>
           ) : null}
 

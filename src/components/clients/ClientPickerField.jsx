@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ClientSearchAutocomplete from "@/components/clients/ClientSearchAutocomplete";
+import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import {
   formatClientPickerLabel,
   formatClientSearchOption,
@@ -25,9 +26,11 @@ export default function ClientPickerField({
   variant = "light",
   className = "",
   children = null,
+  allowCreate = true,
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState(displayValue);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     setText(displayValue);
@@ -78,6 +81,23 @@ export default function ClientPickerField({
     });
   }, [emitChange]);
 
+  const handleCreateClient = useCallback(async () => {
+    const name = String(text || "").trim();
+    if (!name || creating) return;
+    setCreating(true);
+    try {
+      const res = await apiFetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const json = await getJsonOrThrow(res, t("clients.errors.save"));
+      handleSelect(json.data);
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, handleSelect, t, text]);
+
   const linked = Boolean(clientId);
 
   return (
@@ -97,6 +117,9 @@ export default function ClientPickerField({
           variant={variant}
           showHint={showHint}
           disabled={disabled}
+          allowCreate={allowCreate}
+          onCreateClient={handleCreateClient}
+          creatingClient={creating}
           placeholder={
             placeholder || t("clients.search.placeholderForm", { defaultValue: t("clients.search.placeholder") })
           }

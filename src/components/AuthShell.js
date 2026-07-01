@@ -55,6 +55,14 @@ const AUTH_BOOT_TIMEOUT_MS = 10_000;
 const AUTH_BOOT_FAILSAFE_MS = 5_000;
 const BOOT_FAILSAFE_MESSAGE = "Application failed to load.";
 
+function buildLoginRedirectUrl(path) {
+  const sanitized = sanitizeRedirectPath(path || "/dashboard");
+  if (!sanitized || sanitized.startsWith("/login")) {
+    return "/login";
+  }
+  return `/login?redirect=${encodeURIComponent(sanitized)}`;
+}
+
 function maskToken(value) {
   const raw = String(value || "");
   if (!raw) return null;
@@ -828,6 +836,15 @@ export default function AuthShell({ children }) {
         if (!authUserRef.current?.userId) {
           setAuthUser(null);
           if (res.status === 401) {
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+            if (!session && !isAuthEntryPage && !isPublicPage) {
+              performAuthHardNavigate(
+                buildLoginRedirectUrl(pathnameRef.current),
+              );
+              return;
+            }
             setAuthBootError(BOOT_FAILSAFE_MESSAGE);
           }
         }
@@ -873,6 +890,10 @@ export default function AuthShell({ children }) {
 
     if (bootstrapInFlightRef.current && !force) {
       await bootstrapInFlightRef.current;
+      if (!authBootstrappedRef.current) {
+        authBootstrappedRef.current = true;
+        setAuthChecked(true);
+      }
       return;
     }
 
@@ -972,11 +993,33 @@ export default function AuthShell({ children }) {
   }, [hasMounted, isOwnerCommandCenter]);
 
   useEffect(() => {
+    if (!hasMounted || !authChecked || authUser || isPublicPage || isAuthEntryPage) return;
+    if (authBootError) return;
+    if (isClientLoggedOut()) {
+      performAuthHardNavigate("/login");
+      return;
+    }
+    performAuthHardNavigate(buildLoginRedirectUrl(pathnameRef.current));
+  }, [
+    hasMounted,
+    authChecked,
+    authUser,
+    isPublicPage,
+    isAuthEntryPage,
+    authBootError,
+    pathname,
+  ]);
+
+  useEffect(() => {
     if (!authChecked || authUser || isPublicPage || isAuthEntryPage) return;
     if (isClientLoggedOut()) return;
     const timeoutId = window.setTimeout(() => {
       if (!authUserRef.current) {
         console.warn("AUTH BOOT FAILSAFE", AUTH_BOOT_FAILSAFE_MS, "ms elapsed");
+        if (!isPublicPage && !isAuthEntryPage) {
+          performAuthHardNavigate(buildLoginRedirectUrl(pathnameRef.current));
+          return;
+        }
         setAuthBootError((current) => current || BOOT_FAILSAFE_MESSAGE);
       }
     }, AUTH_BOOT_FAILSAFE_MS);
@@ -1363,8 +1406,7 @@ export default function AuthShell({ children }) {
   }
 
   if (!authUser && !isAuthEntryPage && !isSubscribePage && !isOwnerCommandCenter) {
-    if (isClientLoggedOut()) {
-      performAuthHardNavigate("/login");
+    if (isClientLoggedOut() || !authBootError) {
       return (
         <AuthBootShell
           dark={isPremiumWorkspace}
@@ -1375,7 +1417,7 @@ export default function AuthShell({ children }) {
     return (
       <AuthBootShell
         dark={isPremiumWorkspace}
-        error={authBootError || BOOT_FAILSAFE_MESSAGE}
+        error={authBootError}
         onRetry={handleBootRetry}
         onLogout={handleBootLogout}
       />
@@ -1804,6 +1846,14 @@ export default function AuthShell({ children }) {
 
   const isWebsiteBuilderRoute = Boolean(pathname?.startsWith("/website"));
 
+  const shellBrandColor = isPremiumWorkspace ? "#111827" : "#F9FAFB";
+  const shellControlColor = isPremiumWorkspace ? "#374151" : "#e2e8f0";
+  const shellControlBorder = isPremiumWorkspace ? "#e5e7eb" : "rgba(148,163,184,0.3)";
+  const shellControlBg = isPremiumWorkspace ? "#ffffff" : "rgba(148,163,184,0.12)";
+  const shellUserPillBg = isPremiumWorkspace ? "#f1f5f9" : "rgba(148,163,184,0.12)";
+  const shellUserPillBorder = isPremiumWorkspace ? "#e5e7eb" : "rgba(148,163,184,0.22)";
+  const shellSelectOptionBg = isPremiumWorkspace ? "#ffffff" : "#1F2937";
+
   const shellBody = (
     <div
       className="auth-shell"
@@ -1859,7 +1909,7 @@ export default function AuthShell({ children }) {
           </div>
           <span
             style={{
-              color: "#F9FAFB",
+              color: shellBrandColor,
               fontWeight: 700,
               fontSize: 15,
               letterSpacing: "-0.3px",
@@ -1877,9 +1927,9 @@ export default function AuthShell({ children }) {
             width: 38,
             height: 38,
             borderRadius: 10,
-            border: "1px solid rgba(148,163,184,0.3)",
-            background: "rgba(148,163,184,0.12)",
-            color: "#e2e8f0",
+            border: `1px solid ${shellControlBorder}`,
+            background: shellControlBg,
+            color: shellControlColor,
             display: "grid",
             placeItems: "center",
             cursor: "pointer",
@@ -1965,7 +2015,7 @@ export default function AuthShell({ children }) {
             </div>
             <span
               style={{
-                color: "#F9FAFB",
+                color: shellBrandColor,
                 fontWeight: 700,
                 fontSize: 15,
                 letterSpacing: "-0.4px",
@@ -1982,8 +2032,8 @@ export default function AuthShell({ children }) {
             style={{
               padding: "10px 12px",
               borderRadius: 12,
-              background: "rgba(148,163,184,0.12)",
-              border: "1px solid rgba(148,163,184,0.22)",
+              background: shellUserPillBg,
+              border: `1px solid ${shellUserPillBorder}`,
               display: "flex",
               alignItems: "center",
               gap: 10,
@@ -2010,7 +2060,7 @@ export default function AuthShell({ children }) {
             <div style={{ overflow: "hidden", flex: 1 }}>
               <div
                 style={{
-                  color: "#F9FAFB",
+                  color: shellBrandColor,
                   fontSize: 13,
                   fontWeight: 600,
                   whiteSpace: "nowrap",
@@ -2222,9 +2272,9 @@ export default function AuthShell({ children }) {
                   width: "100%",
                   padding: "7px 10px",
                   borderRadius: 8,
-                  border: "1px solid rgba(148,163,184,0.24)",
-                  background: "rgba(148,163,184,0.12)",
-                  color: "#e2e8f0",
+                  border: `1px solid ${shellControlBorder}`,
+                  background: shellControlBg,
+                  color: shellControlColor,
                   fontSize: 13,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -2234,7 +2284,7 @@ export default function AuthShell({ children }) {
                   <option
                     key={opt.value}
                     value={opt.value}
-                    style={{ background: "#1F2937" }}
+                    style={{ background: shellSelectOptionBg }}
                   >
                     {opt.label}
                   </option>

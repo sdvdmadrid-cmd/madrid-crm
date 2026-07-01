@@ -12,7 +12,7 @@
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   background: rgba(15, 23, 42, 0.85);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -151,7 +151,7 @@
 .optionName {
   font-size: 15px;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   line-height: 1.3;
 }
 
@@ -172,8 +172,27 @@
 .empty {
   padding: 14px;
   font-size: 14px;
-  color: #94a3b8;
+  color: #6b7280;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.createBtn {
+  padding: 8px 14px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.createBtn:hover:not(:disabled) {
+  background: #dbeafe;
 }
 
 .hint {

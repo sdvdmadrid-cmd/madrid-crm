@@ -11,10 +11,11 @@
   gap: 10px;
   padding: 24px 26px;
   border-radius: 1.2rem;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(28, 33, 43, 0.9);
+  border: 1px solid var(--fb-border, #e5e7eb);
+  background: #ffffff;
   text-decoration: none;
   color: inherit;
+  box-shadow: var(--fb-shadow-sm);
   transition:
     transform 0.18s ease,
     border-color 0.18s ease,
@@ -23,35 +24,35 @@
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--fb-shadow-md);
 }
 
 .card_emerald:hover {
-  border-color: rgba(45, 212, 168, 0.45);
+  border-color: rgba(22, 163, 74, 0.35);
 }
 
 .card_blue:hover {
-  border-color: rgba(96, 165, 250, 0.45);
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
 .card_amber:hover {
-  border-color: rgba(245, 158, 11, 0.45);
+  border-color: rgba(217, 119, 6, 0.35);
 }
 
 .card_violet:hover {
-  border-color: rgba(167, 139, 250, 0.45);
+  border-color: rgba(124, 58, 237, 0.35);
 }
 
 .cardTitle {
   margin: 0;
   font-size: 1.2rem;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .cardDesc {
   margin: 0;
   flex: 1;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   line-height: 1.55;
   font-size: 14px;
 }
@@ -60,9 +61,5 @@
   margin-top: 8px;
   font-size: 13px;
   font-weight: 700;
-  color: #93c5fd;
-}
-
-.card_emerald .cardCta {
-  color: #6ee7b7;
+  color: #2563eb;
 }

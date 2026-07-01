@@ -19,7 +19,7 @@
 .tabActive {
   background: rgba(59, 130, 246, 0.2);
   border-color: rgba(96, 165, 250, 0.5);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .muted {
@@ -139,7 +139,7 @@
 
 .importCard h3 {
   margin: 0 0 8px;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .input,
@@ -150,7 +150,7 @@
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   background: rgba(15, 23, 42, 0.6);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
   box-sizing: border-box;
 }

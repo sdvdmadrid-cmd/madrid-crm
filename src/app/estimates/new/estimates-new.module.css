@@ -2,8 +2,8 @@
   min-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
-  background: var(--fb-bg-base, #1e2433);
-  color: var(--fb-text, #e2e9f6);
+  background: var(--fb-bg-base, #ffffff);
+  color: var(--fb-text, #111827);
 }
 
 .header {
@@ -16,16 +16,16 @@
   gap: 16px;
   flex-wrap: wrap;
   padding: 14px clamp(16px, 2.5vw, 28px);
-  border-bottom: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.34));
-  background: var(--fb-bg-glass-strong, rgba(48, 58, 78, 0.94));
-  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--fb-border, #e5e7eb);
+  background: #ffffff;
+  box-shadow: var(--fb-shadow-sm);
 }
 
 .headerTitle {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 800;
-  color: var(--fb-text-heading, #f8fafc);
+  color: var(--fb-text-heading, #0f172a);
   letter-spacing: -0.02em;
 }
 

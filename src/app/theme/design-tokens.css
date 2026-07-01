@@ -4,16 +4,16 @@
   --background: #f4f5f7;
   --foreground: #111827;
 
-  /* Sidebar */
+  /* Sidebar — light CRM shell */
   --sidebar-width: 240px;
-  --sidebar-bg: #0f172a;
-  --sidebar-border: rgba(255, 255, 255, 0.06);
-  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-item-active-bg: rgba(22, 163, 74, 0.15);
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --sidebar-item-hover: #f1f5f9;
+  --sidebar-item-active-bg: rgba(22, 163, 74, 0.1);
   --sidebar-active-indicator: #16a34a;
-  --sidebar-text-muted: #64748b;
-  --sidebar-text: #94a3b8;
-  --sidebar-text-active: #f1f5f9;
+  --sidebar-text-muted: #6b7280;
+  --sidebar-text: #374151;
+  --sidebar-text-active: #111827;
 
   /* Brand */
   --primary: #16a34a;
