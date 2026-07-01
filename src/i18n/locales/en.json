@@ -1801,7 +1801,7 @@
     },
     "buttons": {
       "newInvoice": "+ New invoice",
-      "ai": "AI complete invoice",
+      "ai": "Generate work description",
       "aiLoading": "AI generating...",
       "save": "Save",
       "update": "Update",

@@ -149,7 +149,7 @@ function IconTrash() {
 }
 
 export default function InvoicesPageClient({ initialList = null }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { capabilities } = useCurrentUserAccess();
   const stripePublishableConfigured = Boolean(
@@ -517,24 +517,18 @@ export default function InvoicesPageClient({ initialList = null }) {
       const res = await apiFetch("/api/ai/invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          language: i18n.language,
+        }),
       });
       const result = await getJsonOrThrow(res, t("invoices.errors.ai"));
-      setForm((current) => ({
-        ...current,
-        amount: result.data.amount || current.amount,
-        dueDate: result.data.dueDate || current.dueDate,
-        invoiceTitle: result.data.invoiceTitle || current.invoiceTitle,
-        lineItems: result.data.lineItems?.length
-          ? normalizeInvoiceLineItemsForForm(result.data.lineItems)
-          : current.lineItems,
-        amount:
-          result.data.amount ||
-          (result.data.lineItems?.length
-            ? String(sumInvoiceLineItemsTotals(result.data.lineItems))
-            : current.amount),
-        notes: result.data.notes || current.notes,
-      }));
+      if (result.data?.notes) {
+        setForm((current) => ({
+          ...current,
+          notes: result.data.notes,
+        }));
+      }
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.aiFallback")));
     } finally {
