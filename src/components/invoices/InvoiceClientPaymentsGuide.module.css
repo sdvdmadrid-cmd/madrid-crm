@@ -8,7 +8,7 @@
     rgba(17, 24, 39, 0.95) 55%
   );
   overflow: hidden;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .header {
@@ -23,7 +23,7 @@
 .title {
   margin: 0;
   font-size: 1.15rem;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .subtitle {
@@ -43,7 +43,7 @@
 .btnGhost {
   border: 1px solid rgba(148, 163, 184, 0.28);
   background: rgba(30, 41, 59, 0.7);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   border-radius: 999px;
   padding: 8px 14px;
   font-size: 13px;
@@ -72,7 +72,7 @@
   align-items: start;
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.75);
+  background: #f8fafc;
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
@@ -93,7 +93,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .stepBody {
@@ -114,7 +114,7 @@
   margin: 0 0 10px;
   font-size: 14px;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .stripeStatus {
@@ -144,7 +144,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .checkOk {
@@ -159,7 +159,7 @@
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.85);
+  background: #ffffff;
   border: 1px dashed rgba(148, 163, 184, 0.28);
   font-size: 12px;
   color: #94a3b8;
@@ -177,7 +177,7 @@
   font-family: ui-monospace, monospace;
   font-size: 11px;
   word-break: break-all;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   flex: 1;
   min-width: 200px;
 }
@@ -192,11 +192,11 @@
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid rgba(20, 184, 166, 0.25);
-  background: rgba(15, 23, 42, 0.85);
+  background: #ffffff;
 }
 
 .collapsedText {
   margin: 0;
   font-size: 14px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }

@@ -91,7 +91,7 @@
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.2));
-  background: rgba(15, 23, 42, 0.45);
+  background: #f8fafc;
   color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
@@ -100,7 +100,7 @@
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.2));
-  background: rgba(15, 23, 42, 0.45);
+  background: #f8fafc;
   color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
   font-weight: 600;
@@ -372,7 +372,7 @@
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--fb-border);
-  background: rgba(52, 62, 82, 0.85);
+  background: #ffffff;
   font-size: 13px;
   font-weight: 600;
   color: var(--fb-text-muted);

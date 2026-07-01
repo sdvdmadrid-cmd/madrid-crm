@@ -12,8 +12,8 @@
   gap: 16px;
   padding: 24px 28px;
   border-radius: 24px;
-  background: linear-gradient(135deg, #0f766e 0%, #134e4a 48%, #1e293b 100%);
-  color: #f8fafc;
+  background: linear-gradient(135deg, #f0fdfa 0%, #f8fafc 55%, #ffffff 100%);
+  color: var(--fb-text-heading, #0f172a);
   box-shadow: 0 24px 48px rgba(15, 118, 110, 0.22);
 }
 

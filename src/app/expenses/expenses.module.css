@@ -38,7 +38,7 @@
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   background: rgba(30, 41, 59, 0.75);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
@@ -54,13 +54,13 @@
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 12px;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
 }
 
 .cardTitle {
   margin: 0 0 12px;
   font-size: 1rem;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .formGrid {
@@ -73,7 +73,7 @@
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .formGrid input,
@@ -116,7 +116,7 @@
 
 .btnGhost {
   background: rgba(30, 41, 59, 0.75);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .tableWrap {
@@ -134,7 +134,7 @@
   padding: 10px 8px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
   text-align: left;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .table th {

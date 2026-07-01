@@ -180,7 +180,7 @@
 
 .badge-secondary {
   background: rgba(100, 116, 139, 0.25);
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .invoicesList {
@@ -194,7 +194,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: rgba(34, 40, 52, 0.55);
+  background: #f8fafc;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
@@ -257,7 +257,7 @@
 }
 
 .buttonSecondary {
-  background: rgba(34, 40, 52, 0.85);
+  background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.2);
   color: #e8ecf4;
   margin-top: 1rem;

@@ -66,10 +66,10 @@
   --fb-radius-2xl: 1.25rem;
   --fb-radius-3xl: 1.5rem;
 
-  /* Depth */
-  --fb-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --fb-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.04);
-  --fb-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.08), 0 4px 8px rgba(15, 23, 42, 0.04);
+  /* Depth — soft, lightweight shadows */
+  --fb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --fb-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --fb-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.06);
   --fb-shadow-glow-blue: 0 4px 20px rgba(37, 99, 235, 0.15);
   --fb-shadow-glow-emerald: 0 4px 20px rgba(22, 163, 74, 0.12);
 

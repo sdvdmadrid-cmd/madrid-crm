@@ -18,7 +18,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .stripCompact .item {

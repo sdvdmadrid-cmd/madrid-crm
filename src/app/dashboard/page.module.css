@@ -501,8 +501,8 @@
   gap: 10px;
   padding: 16px;
   border-radius: var(--fb-radius-xl);
-  border: 1px solid var(--fb-border);
-  background: rgba(52, 62, 82, 0.72);
+  border: 1px solid var(--fb-border, #e5e7eb);
+  background: #f8fafc;
 }
 
 .chartBarCol {

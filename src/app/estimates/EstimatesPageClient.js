@@ -1122,9 +1122,9 @@ export default function EstimatesPageClient({ initialList = null }) {
                             marginTop: 4,
                             padding: "6px 8px",
                             borderRadius: 6,
-                            border: "1px solid rgba(148,163,184,0.3)",
-                            background: "#111827",
-                            color: "#e2e8f0",
+                            border: "1px solid #e5e7eb",
+                            background: "#ffffff",
+                            color: "#374151",
                           }}
                         />
                       </label>
@@ -1140,9 +1140,9 @@ export default function EstimatesPageClient({ initialList = null }) {
                             marginTop: 4,
                             padding: "6px 8px",
                             borderRadius: 6,
-                            border: "1px solid rgba(148,163,184,0.3)",
-                            background: "#111827",
-                            color: "#e2e8f0",
+                            border: "1px solid #e5e7eb",
+                            background: "#ffffff",
+                            color: "#374151",
                           }}
                         />
                       </label>
@@ -1158,9 +1158,9 @@ export default function EstimatesPageClient({ initialList = null }) {
                           marginTop: 4,
                           padding: "6px 8px",
                           borderRadius: 6,
-                          border: "1px solid rgba(148,163,184,0.3)",
-                          background: "#111827",
-                          color: "#e2e8f0",
+                          border: "1px solid #e5e7eb",
+                          background: "#ffffff",
+                          color: "#374151",
                         }}
                       >
                         <option value="en">English</option>

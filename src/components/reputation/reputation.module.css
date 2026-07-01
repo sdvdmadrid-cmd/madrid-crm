@@ -66,7 +66,7 @@
   padding: 20px;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.45);
+  background: #f8fafc;
   margin-bottom: 24px;
 }
 
@@ -82,7 +82,7 @@
   border-radius: 12px;
   border: 1px solid rgba(251, 191, 36, 0.45);
   background: rgba(120, 53, 15, 0.35);
-  color: #fde68a;
+  color: #92400e;
 }
 
 .syncUnavailableBanner strong {
@@ -122,7 +122,7 @@
   padding: 10px 14px;
   border: none;
   background: rgba(30, 41, 59, 0.6);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-size: 14px;
   cursor: pointer;
 }
@@ -149,7 +149,7 @@
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.6);
+  background: #f8fafc;
   color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
   box-sizing: border-box;
@@ -171,7 +171,7 @@
   padding: 18px;
   border-radius: 14px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.35);
+  background: #f1f5f9;
 }
 
 .reviewHead {
@@ -189,7 +189,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .badgePin {
@@ -199,11 +199,11 @@
 
 .badgeHide {
   background: rgba(239, 68, 68, 0.15);
-  color: #fecaca;
+  color: #991b1b;
 }
 
 .quote {
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   line-height: 1.6;
   margin: 0 0 12px;
 }
@@ -230,6 +230,6 @@
 .socialLabel {
   text-transform: capitalize;
   font-weight: 700;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   font-size: 14px;
 }

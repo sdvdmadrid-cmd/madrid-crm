@@ -16,7 +16,7 @@
   --accent-violet: #7c3aed;
   --danger: #dc2626;
   --success: #16a34a;
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
   min-height: calc(100vh - 48px);
   color: var(--text);
