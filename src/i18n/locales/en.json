@@ -1804,6 +1804,10 @@
       "ai": "Generate work description",
       "aiLoading": "AI generating...",
       "save": "Save",
+      "saveDraft": "Save draft",
+      "sendInvoice": "Send invoice",
+      "sending": "Sending…",
+      "saving": "Saving…",
       "update": "Update",
       "clear": "Clear",
       "printInvoice": "Print invoice",
@@ -1850,6 +1854,8 @@
       "unitPrice": "Unit price",
       "lineTotal": "Line total",
       "add": "Add line item",
+      "addItem": "+ Add item",
+      "addAnother": "Add another item",
       "remove": "Remove line",
       "subtotal": "Line items subtotal"
     },
@@ -1897,6 +1903,24 @@
       "balanceDue": "Balance due"
     },
     "empty": "No invoices to display.",
+    "builder": {
+      "backToList": "Back to Invoices",
+      "unsaved": "Unsaved changes",
+      "autoSaved": "Draft saved",
+      "leaveConfirm": "You have unsaved changes. Leave without saving?"
+    },
+    "menu": {
+      "view": "View",
+      "duplicate": "Duplicate",
+      "open": "Invoice actions"
+    },
+    "composer": {
+      "subtitle": "Create and send an invoice in under a minute.",
+      "advancedOptions": "Advanced options",
+      "saveDraft": "Save draft",
+      "attachmentsHint": "Attachments and custom fields can be added after saving the invoice."
+    },
+    "confirmDelete": "Delete this invoice?",
     "hints": {
       "internalNotes": "Private to your team. Never shown on PDFs, emails, payment links, or client views.",
       "invoiceNumberAuto": "Leave blank to auto-generate.",

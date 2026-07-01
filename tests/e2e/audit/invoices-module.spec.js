@@ -20,6 +20,19 @@ function getInvoiceCard(page, marker) {
   }).first();
 }
 
+async function openNewInvoiceBuilder(page) {
+  await page.getByTestId("invoices-new-button").click();
+  await expect(page.getByTestId("invoices-form-section")).toBeVisible();
+}
+
+async function openInvoiceAdvanced(page) {
+  await page.getByRole("button", { name: /Advanced options/i }).click();
+}
+
+async function openInvoiceCardMenu(page, card) {
+  await card.getByRole("button", { name: /Invoice actions/i }).click();
+}
+
 async function createClient(api, stamp) {
   const clientName = `Inv Audit Client ${stamp}`;
   const clientRes = await api.post(`${ORIGIN}/api/clients`, {
@@ -57,8 +70,9 @@ test.describe("Invoices module audit", () => {
     test(`layout: ${viewport.name} — form and list search`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await expect(page.getByTestId("invoices-new-button")).toBeVisible();
-      await expect(page.getByTestId("invoices-form-section")).toBeVisible();
+      await openNewInvoiceBuilder(page);
       await expect(page.getByRole("combobox", { name: /Search clients/i })).toBeVisible();
+      await page.getByTestId("invoice-builder-back").click();
       await expect(page.getByLabel(/Search invoices/i)).toBeVisible();
       await expect(page.getByRole("heading", { name: /Invoice list/i })).toBeVisible();
     });
@@ -73,12 +87,15 @@ test.describe("Invoices module audit", () => {
     const clientName = `UI Inv Client ${stamp}`;
 
     const title = `Audit title ${stamp}`;
+    await openNewInvoiceBuilder(page);
+    await openInvoiceAdvanced(page);
     await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
     await page.getByLabel(/^Invoice title$/i).fill(title);
     await page.getByLabel(/^Amount$/i).fill("880");
     await page.getByLabel(/^Due date$/i).fill("2026-12-15");
-    await page.getByRole("button", { name: /^Save$/i }).click();
+    await page.getByRole("button", { name: /Save draft/i }).click();
+    await page.getByTestId("invoice-builder-back").click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
@@ -91,7 +108,7 @@ test.describe("Invoices module audit", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByLabel(/Search invoices/i).fill(clientName);
     await expect(getInvoiceCard(page, clientName)).toBeVisible({ timeout: 15_000 });
-    await expect(getInvoiceCard(page, title)).toBeVisible();
+    await expect(getInvoiceCard(page, invNum)).toBeVisible();
   });
 
   test("edit invoice — update amount persists after reload", async ({ page }) => {
@@ -99,22 +116,28 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-EDIT-${stamp}`;
 
     const clientName = `Edit Inv ${stamp}`;
+    await openNewInvoiceBuilder(page);
+    await openInvoiceAdvanced(page);
     await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
     await page.getByLabel(/^Amount$/i).fill("400");
     await page.getByLabel(/^Due date$/i).fill("2026-11-01");
-    await page.getByRole("button", { name: /^Save$/i }).click();
+    await page.getByRole("button", { name: /Save draft/i }).click();
+    await page.getByTestId("invoice-builder-back").click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
     await expect(card).toBeVisible({ timeout: 15_000 });
 
-    await card.getByRole("button", { name: /^Edit$/i }).click();
+    await openInvoiceCardMenu(page, card);
+    await page.getByRole("menuitem", { name: /^Edit$/i }).click();
     await expect(page.getByRole("heading", { name: /Edit invoice/i })).toBeVisible();
+    await openInvoiceAdvanced(page);
     await page.getByLabel(/^Amount$/i).fill("550");
     await page.getByRole("button", { name: /^Update$/i }).click();
+    await page.getByTestId("invoice-builder-back").click();
 
-    await expect(page.getByRole("heading", { name: /New invoice/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /Invoice list/i })).toBeVisible({
       timeout: 10_000,
     });
     await page.getByLabel(/Search invoices/i).fill(clientName);
@@ -190,23 +213,27 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-PAY-${stamp}`;
 
     const clientName = `Pay Client ${stamp}`;
+    await openNewInvoiceBuilder(page);
+    await openInvoiceAdvanced(page);
     await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
     await page.getByLabel(/^Amount$/i).fill("200");
     await page.getByLabel(/^Due date$/i).fill("2026-08-01");
-    await page.getByRole("button", { name: /^Save$/i }).click();
+    await page.getByRole("button", { name: /Save draft/i }).click();
+    await page.getByTestId("invoice-builder-back").click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
     await expect(card).toBeVisible({ timeout: 15_000 });
 
-    await card.getByRole("button", { name: /^Register payment$/i }).click();
-    await expect(card.getByRole("button", { name: /Save payment/i })).toBeVisible();
+    await openInvoiceCardMenu(page, card);
+    await page.getByRole("menuitem", { name: /^Register payment$/i }).click();
+    await expect(page.getByRole("button", { name: /Save payment/i })).toBeVisible();
 
-    await card.locator("select").selectOption("cash");
-    await card.getByPlaceholder("Amount", { exact: true }).fill("75");
-    await card.getByPlaceholder("Notes", { exact: true }).fill("Cash on site");
-    await card.getByRole("button", { name: /Save payment/i }).click();
+    await page.getByTestId("invoice-payment-modal").locator("select").selectOption("cash");
+    await page.getByTestId("invoice-payment-modal").getByPlaceholder("Amount", { exact: true }).fill("75");
+    await page.getByTestId("invoice-payment-modal").getByPlaceholder("Notes", { exact: true }).fill("Cash on site");
+    await page.getByRole("button", { name: /Save payment/i }).click();
 
     await expect(card.getByText(/Partial/i).first()).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText(/Paid: \$75\.00/)).toBeVisible();
@@ -219,6 +246,8 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-LINES-${stamp}`;
     const clientName = `Lines Client ${stamp}`;
 
+    await openNewInvoiceBuilder(page);
+    await openInvoiceAdvanced(page);
     await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
     await page.getByLabel(/^Due date$/i).fill("2026-12-20");
@@ -231,16 +260,18 @@ test.describe("Invoices module audit", () => {
     await numberInputs.nth(1).fill("175");
 
     await expect(page.getByTestId("invoice-line-items-total")).toContainText("$350.00");
+    await openInvoiceAdvanced(page);
     await expect(page.getByLabel(/^Amount$/i)).toHaveValue("350");
 
-    await page.getByRole("button", { name: /^Save$/i }).click();
+    await page.getByRole("button", { name: /Save draft/i }).click();
+    await page.getByTestId("invoice-builder-back").click();
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByText(/Site labor/)).toBeVisible();
     await expect(card.getByText(/Amount: \$350/)).toBeVisible();
 
-    await card.getByRole("button", { name: /^Edit$/i }).click();
+    await openInvoiceCardMenu(page, card);
+    await page.getByRole("menuitem", { name: /^Edit$/i }).click();
     await expect(page.getByTestId("invoice-line-items-section")).toBeVisible();
     await expect(page.getByTestId("invoice-line-item-description").first()).toHaveValue(
       "Site labor",
@@ -254,11 +285,14 @@ test.describe("Invoices module audit", () => {
     const invNum = `INV-NOLINES-${stamp}`;
     const clientName = `No Lines ${stamp}`;
 
+    await openNewInvoiceBuilder(page);
+    await openInvoiceAdvanced(page);
     await page.getByLabel(/^Invoice number$/i).fill(invNum);
     await page.getByRole("combobox", { name: /Search clients/i }).fill(clientName);
     await page.getByLabel(/^Amount$/i).fill("99");
     await page.getByLabel(/^Due date$/i).fill("2026-12-01");
-    await page.getByRole("button", { name: /^Save$/i }).click();
+    await page.getByRole("button", { name: /Save draft/i }).click();
+    await page.getByTestId("invoice-builder-back").click();
 
     await page.getByLabel(/Search invoices/i).fill(clientName);
     const card = getInvoiceCard(page, clientName);
