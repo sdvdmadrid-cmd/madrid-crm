@@ -2,16 +2,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import ClientPickerField from "@/components/clients/ClientPickerField";
+import InvoiceBuilder from "@/components/invoices/InvoiceBuilder";
 import InvoiceClientPaymentsGuide from "@/components/invoices/InvoiceClientPaymentsGuide";
-import InvoiceComposerForm from "@/components/invoices/InvoiceComposerForm";
-import InvoiceLineItemsEditor from "@/components/invoices/InvoiceLineItemsEditor";
+import InvoiceListCard from "@/components/invoices/InvoiceListCard";
 import styles from "./invoices.module.css";
-import UniversalShareButton from "@/components/UniversalShareButton";
 import { useTranslation } from "react-i18next";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { useCurrentUserAccess } from "@/lib/current-user-client";
-import DocumentPdfActions from "@/components/workspace/DocumentPdfActions";
 import {
   escapeHtml,
   openPrintableHtmlDocument,
@@ -25,9 +22,7 @@ import {
 import {
   computeInvoiceLineItemTotal,
   createInvoiceLineItem,
-  formatInvoiceLineItemsForList,
   getInvoiceLineItemDescription,
-  hasDisplayableInvoiceLineItems,
   normalizeInvoiceLineItemsForForm,
   normalizeInvoiceLineItemsForSave,
   sumInvoiceLineItemsTotals,
@@ -130,26 +125,6 @@ const initialPaymentDraft = (invoice) => ({
   notes: "",
 });
 
-function IconPencil() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
-    </svg>
-  );
-}
-
-function IconTrash() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h18" />
-      <path d="M8 6V4h8v2" />
-      <path d="M19 6l-1 14H6L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
-    </svg>
-  );
-}
 
 export default function InvoicesPageClient({ initialList = null }) {
   const { t, i18n } = useTranslation();
@@ -180,11 +155,20 @@ export default function InvoicesPageClient({ initialList = null }) {
   const [quoteLookupLoading, setQuoteLookupLoading] = useState(false);
   const [listSearch, setListSearch] = useState("");
   const debouncedListSearch = useDebouncedValue(listSearch.trim(), 300);
+  const [view, setView] = useState("list");
+  const [autoSaveLabel, setAutoSaveLabel] = useState("");
+  const savedSnapshotRef = useRef(JSON.stringify(initialInvoice));
+  const autoSavingRef = useRef(false);
 
   const filterClientId = String(searchParams.get("clientId") || "").trim();
   const canEditInvoices = capabilities.canManageSensitiveData;
   const canManageInvoicePayments = capabilities.canManageSensitiveData;
-  const formSectionRef = useRef(null);
+  const builderOpen = view === "builder" && canEditInvoices;
+
+  const isDirty = useMemo(
+    () => JSON.stringify(form) !== savedSnapshotRef.current,
+    [form],
+  );
 
   const selectedInvoice = useMemo(
     () => invoices.find((invoice) => invoice._id === selectedId) || null,
@@ -473,12 +457,34 @@ export default function InvoicesPageClient({ initialList = null }) {
   const [paymentNoticeTone, setPaymentNoticeTone] = useState("success");
 
   const resetForm = () => {
-    setForm({ ...initialInvoice, invoiceDate: todayIso() });
+    const next = { ...initialInvoice, invoiceDate: todayIso() };
+    setForm(next);
     setSelectedId(null);
     setQuoteLookup(null);
+    savedSnapshotRef.current = JSON.stringify(next);
+    setAutoSaveLabel("");
   };
 
-  const persistInvoice = async () => {
+  const closeBuilder = () => {
+    if (isDirty) {
+      const leave = window.confirm(
+        t("invoices.builder.leaveConfirm", {
+          defaultValue:
+            "You have unsaved changes. Leave without saving?",
+        }),
+      );
+      if (!leave) return;
+    }
+    resetForm();
+    setView("list");
+  };
+
+  const openNewInvoice = () => {
+    resetForm();
+    setView("builder");
+  };
+
+  const persistInvoice = async ({ asDraft = true } = {}) => {
     const clientErr = requireNonEmptyString(form.clientName, "Client");
     if (clientErr) {
       setError(clientErr);
@@ -498,7 +504,11 @@ export default function InvoicesPageClient({ initialList = null }) {
       ...form,
       amount: form.amount || String(lineTotal),
       lineItems: normalizeInvoiceLineItemsForSave(form.lineItems),
-      status: form.status === "Draft" ? "Sent" : form.status,
+      status: asDraft
+        ? "Draft"
+        : form.status === "Draft"
+          ? "Sent"
+          : form.status,
     };
 
     const method = selectedId ? "PATCH" : "POST";
@@ -512,24 +522,56 @@ export default function InvoicesPageClient({ initialList = null }) {
     return result.data;
   };
 
-  const saveInvoice = async () => {
-    setSaving(true);
+  const applySavedInvoice = (saved) => {
+    setInvoices(
+      selectedId
+        ? invoices.map((invoice) =>
+            invoice._id === selectedId ? saved : invoice,
+          )
+        : [saved, ...invoices.filter((item) => item._id !== saved._id)],
+    );
+    setSelectedId(saved._id);
+    savedSnapshotRef.current = JSON.stringify(form);
+  };
+
+  const saveDraft = async ({ silent = false } = {}) => {
+    if (autoSavingRef.current) return null;
+    if (!silent) setSaving(true);
+    autoSavingRef.current = true;
     setError("");
     try {
-      const saved = await persistInvoice();
-      if (!saved) return;
-      setInvoices(
-        selectedId
-          ? invoices.map((invoice) =>
-              invoice._id === selectedId ? saved : invoice,
-            )
-          : [saved, ...invoices],
-      );
-      resetForm();
+      const saved = await persistInvoice({ asDraft: true });
+      if (!saved) return null;
+      applySavedInvoice(saved);
+      if (silent) {
+        setAutoSaveLabel(
+          t("invoices.builder.autoSaved", { defaultValue: "Draft saved" }),
+        );
+      }
+      return saved;
+    } catch (err) {
+      if (!silent) {
+        setError(mapUiError(err, t("invoices.errors.saveFallback")));
+      }
+      return null;
+    } finally {
+      autoSavingRef.current = false;
+      if (!silent) setSaving(false);
+    }
+  };
+
+  const previewInvoice = async () => {
+    setError("");
+    try {
+      let id = selectedId;
+      if (!id) {
+        const saved = await saveDraft({ silent: true });
+        id = saved?._id;
+      }
+      if (!id) return;
+      window.open(`/api/invoices/${id}/pdf`, "_blank", "noopener,noreferrer");
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.saveFallback")));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -537,15 +579,9 @@ export default function InvoicesPageClient({ initialList = null }) {
     setSending(true);
     setError("");
     try {
-      const saved = await persistInvoice();
+      const saved = await persistInvoice({ asDraft: true });
       if (!saved) return;
-      setInvoices(
-        selectedId
-          ? invoices.map((invoice) =>
-              invoice._id === selectedId ? saved : invoice,
-            )
-          : [saved, ...invoices],
-      );
+      applySavedInvoice(saved);
       const recipientEmail = String(
         saved.clientEmail || form.clientEmail || "",
       )
@@ -558,6 +594,7 @@ export default function InvoicesPageClient({ initialList = null }) {
       });
       await getJsonOrThrow(res, t("invoices.errors.sendInvoice"));
       resetForm();
+      setView("list");
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.sendInvoiceFallback")));
     } finally {
@@ -593,10 +630,11 @@ export default function InvoicesPageClient({ initialList = null }) {
   };
 
   const editInvoice = (invoice) => {
-    setForm({
+    const nextForm = {
       invoiceNumber: invoice.invoiceNumber || "",
       clientId: invoice.clientId || "",
       clientName: invoice.clientName || "",
+      clientEmail: invoice.clientEmail || "",
       invoiceTitle: invoice.invoiceTitle || "",
       quoteNumber: invoice.quoteNumber || "",
       amount: invoice.amount || "",
@@ -609,10 +647,42 @@ export default function InvoicesPageClient({ initialList = null }) {
       lineItems: normalizeInvoiceLineItemsForForm(invoice.lineItems),
       notes: invoice.notes || "",
       internalNotes: invoice.internalNotes || "",
-    });
+    };
+    setForm(nextForm);
     setSelectedId(invoice._id);
     setQuoteLookup(null);
+    savedSnapshotRef.current = JSON.stringify(nextForm);
+    setView("builder");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const duplicateInvoice = (invoice) => {
+    const nextForm = {
+      ...initialInvoice,
+      invoiceDate: todayIso(),
+      clientId: invoice.clientId || "",
+      clientName: invoice.clientName || "",
+      clientEmail: invoice.clientEmail || "",
+      invoiceTitle: invoice.invoiceTitle
+        ? `${invoice.invoiceTitle} (copy)`
+        : "",
+      quoteNumber: invoice.quoteNumber || "",
+      amount: invoice.amount || "",
+      dueDate: invoice.dueDate || "",
+      preferredPaymentMethod: invoice.preferredPaymentMethod || "bank_transfer",
+      lineItems: normalizeInvoiceLineItemsForForm(invoice.lineItems),
+      notes: invoice.notes || "",
+      internalNotes: invoice.internalNotes || "",
+      status: "Draft",
+    };
+    setForm(nextForm);
+    setSelectedId(null);
+    savedSnapshotRef.current = JSON.stringify(nextForm);
+    setView("builder");
+  };
+
+  const viewInvoice = (invoice) => {
+    window.open(`/api/invoices/${invoice._id}/pdf`, "_blank", "noopener,noreferrer");
   };
 
   const deleteInvoice = async (id) => {
@@ -620,7 +690,10 @@ export default function InvoicesPageClient({ initialList = null }) {
       const res = await apiFetch(`/api/invoices/${id}`, { method: "DELETE" });
       await getJsonOrThrow(res, t("invoices.errors.delete"));
       setInvoices(invoices.filter((invoice) => invoice._id !== id));
-      if (selectedId === id) resetForm();
+      if (selectedId === id) {
+        resetForm();
+        setView("list");
+      }
     } catch (err) {
       setError(mapUiError(err, t("invoices.errors.deleteFallback")));
     }
@@ -855,473 +928,378 @@ export default function InvoicesPageClient({ initialList = null }) {
     }
   }, []);
 
-  const focusNewInvoiceForm = () => {
-    resetForm();
-    formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  useEffect(() => {
+    if (!builderOpen || !isDirty) return undefined;
+    const timer = window.setTimeout(() => {
+      const lineTotal = sumInvoiceLineItemsTotals(form.lineItems);
+      if (!String(form.clientName || "").trim()) return;
+      if (!isPositiveMoney(form.amount) && lineTotal <= 0) return;
+      void saveDraft({ silent: true });
+    }, 2800);
+    return () => window.clearTimeout(timer);
+  }, [builderOpen, form, isDirty]);
+
+  useEffect(() => {
+    if (!builderOpen || !isDirty) return undefined;
+    const onBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [builderOpen, isDirty]);
+
+  useEffect(() => {
+    if (!builderOpen) return undefined;
+    const onKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveDraft();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        event.preventDefault();
+        void sendInvoiceFromForm();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [builderOpen, form, selectedId, invoices]);
 
   return (
-    <main className={styles.page}>
-      <header className={styles.headerRow}>
-        <div>
-          <h1 className={styles.headerTitle}>{t("invoices.title")}</h1>
-          <p className={styles.headerSub}>
-            {t("invoices.composer.subtitle", {
-              defaultValue: "Create and send an invoice in under a minute.",
-            })}
-          </p>
-        </div>
-        <div className={styles.headerActions}>
-          <Link href="/invoices/summary" className={styles.btnGhost}>
-            {t("sidebar.invoiceTotals", { defaultValue: "Invoice totals" })}
-          </Link>
-          {canEditInvoices ? (
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              data-testid="invoices-new-button"
-              onClick={focusNewInvoiceForm}
-            >
-              {t("invoices.buttons.newInvoice", { defaultValue: "+ New invoice" })}
-            </button>
-          ) : null}
-        </div>
-      </header>
-
-      {!canEditInvoices ? (
-        <p className={styles.muted} style={{ marginTop: 16 }}>
-          {t("invoices.readOnlyHint", {
-            defaultValue:
-              "You can view invoices here. Ask an admin to grant write access to create or edit invoices.",
-          })}
-        </p>
-      ) : null}
-
-      {canManageInvoicePayments ? (
-        <InvoiceClientPaymentsGuide
-          variant="contractor"
-          defaultExpanded={showClientPaymentsBanner}
+    <main className={`${styles.page}${builderOpen ? ` ${styles.pageBuilder}` : ""}`}>
+      {builderOpen ? (
+        <InvoiceBuilder
+          form={form}
+          setForm={setForm}
+          formTotals={formTotals}
+          selectedId={selectedId}
+          selectedInvoice={selectedInvoice}
+          effectiveStatus={effectiveStatus}
+          statusIsComputed={statusIsComputed}
+          invoiceStatusOptions={invoiceStatusOptions(t).filter(
+            (option) =>
+              statusIsComputed ||
+              !COMPUTED_INVOICE_STATUSES.has(option.value),
+          )}
+          paymentMethodOptions={paymentMethodOptions(t)}
+          onLineItemsChange={handleLineItemsChange}
+          onSaveDraft={() => saveDraft()}
+          onPreview={() => void previewInvoice()}
+          onSendInvoice={() => void sendInvoiceFromForm()}
+          onBack={closeBuilder}
+          onRunAi={runInvoiceAI}
+          aiLoading={aiLoading}
+          saving={saving}
+          sending={sending}
+          autoSaveLabel={autoSaveLabel}
+          isDirty={isDirty}
         />
       ) : null}
 
-      {paymentNotice ? (
-        <div
-          className={
-            paymentNoticeTone === "success"
-              ? styles.noticeSuccess
-              : styles.noticeInfo
-          }
-        >
-          {paymentNotice}
-        </div>
-      ) : null}
-
-      {error && <div className={styles.error}>{error}</div>}
-      {loading && <div className={styles.loading}>{t("invoices.loading")}</div>}
-
-      {canEditInvoices
-        ? <section
-            ref={formSectionRef}
-            className={styles.card}
-            data-testid="invoices-form-section"
-          >
-            <div className={styles.formHeaderRow}>
-              <h2 className={styles.cardTitle}>
-                {selectedId
-                  ? t("invoices.formTitleEdit")
-                  : t("invoices.formTitleNew")}
-              </h2>
-              {selectedId ? (
-                <div className={styles.formHeaderActions}>
-                  <a
-                    href={`/api/invoices/${selectedId}/pdf`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.btnGhost}
-                    data-testid="invoice-form-pdf-preview"
-                  >
-                    {t("invoices.buttons.pdfPreview", {
-                      defaultValue: "PDF preview",
-                    })}
-                  </a>
-                  <button
-                    type="button"
-                    className={styles.btnGhost}
-                    data-testid="invoice-form-print"
-                    onClick={() => {
-                      if (selectedInvoice) void openPrintableInvoice(selectedInvoice);
-                    }}
-                  >
-                    {t("invoices.buttons.printInvoice")}
-                  </button>
-                </div>
+      {!builderOpen ? (
+        <>
+          <header className={styles.headerRow}>
+            <div>
+              <h1 className={styles.headerTitle}>{t("invoices.title")}</h1>
+              <p className={styles.headerSub}>
+                {t("invoices.composer.subtitle", {
+                  defaultValue: "Create and send an invoice in under a minute.",
+                })}
+              </p>
+            </div>
+            <div className={styles.headerActions}>
+              <Link href="/invoices/summary" className={styles.btnGhost}>
+                {t("sidebar.invoiceTotals", { defaultValue: "Invoice totals" })}
+              </Link>
+              {canEditInvoices ? (
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  data-testid="invoices-new-button"
+                  onClick={openNewInvoice}
+                >
+                  {t("invoices.buttons.newInvoice", {
+                    defaultValue: "+ New invoice",
+                  })}
+                </button>
               ) : null}
             </div>
-            <InvoiceComposerForm
-              form={form}
-              setForm={setForm}
-              formTotals={formTotals}
-              selectedId={selectedId}
-              selectedInvoice={selectedInvoice}
-              effectiveStatus={effectiveStatus}
-              statusIsComputed={statusIsComputed}
-              invoiceStatusOptions={invoiceStatusOptions(t).filter(
-                (option) =>
-                  statusIsComputed ||
-                  !COMPUTED_INVOICE_STATUSES.has(option.value),
-              )}
-              paymentMethodOptions={paymentMethodOptions(t)}
-              onLineItemsChange={handleLineItemsChange}
-              onSaveDraft={saveInvoice}
-              onSendInvoice={sendInvoiceFromForm}
-              onReset={resetForm}
-              onRunAi={runInvoiceAI}
-              aiLoading={aiLoading}
-              saving={saving}
-              sending={sending}
-            />
-          </section>
-        : null}
+          </header>
 
-      <section className={styles.listSection}>
-        <h2 className={styles.listTitle}>{t("invoices.listTitle")}</h2>
-        <input
-          type="search"
-          value={listSearch}
-          onChange={(event) => setListSearch(event.target.value)}
-          placeholder={t("invoices.searchPlaceholder", {
-            defaultValue: "Search by invoice #, client, title, or status…",
-          })}
-          aria-label={t("invoices.searchLabel", { defaultValue: "Search invoices" })}
-          className={styles.listSearch}
-        />
-        {filterClientId ? (
-          <p className={styles.muted} style={{ marginBottom: 12 }}>
-            {t("invoices.filteredByClient", {
-              defaultValue: "Showing invoices for the selected client only.",
-            })}{" "}
-            <button
-              type="button"
-              className={styles.btnGhost}
-              onClick={() => router.push("/invoices")}
-            >
-              {t("invoices.clearClientFilter", { defaultValue: "Show all" })}
-            </button>
-          </p>
-        ) : null}
-        {listTotal > invoices.length && !listSearch.trim() && !filterClientId ? (
-          <button
-            type="button"
-            className={styles.btnGhost}
-            onClick={loadMoreInvoices}
-            disabled={loadingMore}
-            data-testid="invoices-load-more"
-          >
-            {loadingMore
-              ? t("invoices.loading")
-              : t("invoices.loadMore", { defaultValue: "Load more" })}
-          </button>
-        ) : null}
-        <div className={styles.listGrid}>
-          {visibleInvoices.length === 0 && !loading ? (
-            <p className={styles.muted}>
-              {listSearch.trim()
-                ? t("invoices.noSearchResults", {
-                    defaultValue: "No invoices match your search.",
-                  })
-                : t("invoices.empty", { defaultValue: "No invoices yet. Create one above." })}
+          {!canEditInvoices ? (
+            <p className={styles.muted} style={{ marginTop: 16 }}>
+              {t("invoices.readOnlyHint", {
+                defaultValue:
+                  "You can view invoices here. Ask an admin to grant write access to create or edit invoices.",
+              })}
             </p>
           ) : null}
-          {visibleInvoices.map((invoice) => (
-            <div key={invoice._id} data-testid="invoice-card" className={styles.invoiceCard}>
-              <div className={styles.invoiceCardHeader}>
-                <div>
-                  <h3 className={styles.invoiceTitle}>
-                    {invoice.invoiceNumber || t("invoices.labels.untitled")}
+
+          {canManageInvoicePayments ? (
+            <InvoiceClientPaymentsGuide
+              variant="contractor"
+              defaultExpanded={showClientPaymentsBanner}
+            />
+          ) : null}
+
+          {paymentNotice ? (
+            <div
+              className={
+                paymentNoticeTone === "success"
+                  ? styles.noticeSuccess
+                  : styles.noticeInfo
+              }
+            >
+              {paymentNotice}
+            </div>
+          ) : null}
+
+          {error && <div className={styles.error}>{error}</div>}
+          {loading && (
+            <div className={styles.loading}>{t("invoices.loading")}</div>
+          )}
+
+          <section className={styles.listSection}>
+            <h2 className={styles.listTitle}>{t("invoices.listTitle")}</h2>
+            <input
+              type="search"
+              value={listSearch}
+              onChange={(event) => setListSearch(event.target.value)}
+              placeholder={t("invoices.searchPlaceholder", {
+                defaultValue: "Search by invoice #, client, title, or status…",
+              })}
+              aria-label={t("invoices.searchLabel", {
+                defaultValue: "Search invoices",
+              })}
+              className={styles.listSearch}
+            />
+            {filterClientId ? (
+              <p className={styles.muted} style={{ marginBottom: 12 }}>
+                {t("invoices.filteredByClient", {
+                  defaultValue: "Showing invoices for the selected client only.",
+                })}{" "}
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  onClick={() => router.push("/invoices")}
+                >
+                  {t("invoices.clearClientFilter", { defaultValue: "Show all" })}
+                </button>
+              </p>
+            ) : null}
+            {listTotal > invoices.length &&
+            !listSearch.trim() &&
+            !filterClientId ? (
+              <button
+                type="button"
+                className={styles.btnGhost}
+                onClick={loadMoreInvoices}
+                disabled={loadingMore}
+                data-testid="invoices-load-more"
+              >
+                {loadingMore
+                  ? t("invoices.loading")
+                  : t("invoices.loadMore", { defaultValue: "Load more" })}
+              </button>
+            ) : null}
+            <div className={styles.listGrid}>
+              {visibleInvoices.length === 0 && !loading ? (
+                <p className={styles.muted}>
+                  {listSearch.trim()
+                    ? t("invoices.noSearchResults", {
+                        defaultValue: "No invoices match your search.",
+                      })
+                    : t("invoices.empty", {
+                        defaultValue: "No invoices yet. Create one above.",
+                      })}
+                </p>
+              ) : null}
+              {visibleInvoices.map((invoice) => (
+                <InvoiceListCard
+                  key={invoice._id}
+                  invoice={invoice}
+                  canEdit={canEditInvoices}
+                  canDelete={capabilities.canDeleteRecords}
+                  canManagePayments={canManageInvoicePayments}
+                  canSendExternal={capabilities.canSendExternalCommunications}
+                  stripeConfigured={stripePublishableConfigured}
+                  statusLabel={
+                    t(`invoices.statusOptions.${invoice.status}`) ||
+                    invoice.status
+                  }
+                  amountLabel={formatUsd(invoice.amount)}
+                  dueLabel={
+                    invoice.dueDate
+                      ? invoice.dueDate
+                      : t("invoices.labels.noDate")
+                  }
+                  onView={() => viewInvoice(invoice)}
+                  onEdit={() => editInvoice(invoice)}
+                  onDuplicate={() => duplicateInvoice(invoice)}
+                  onDownloadPdf={() => {
+                    window.open(
+                      `/api/invoices/${invoice._id}/pdf`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  }}
+                  onPrint={() => void openPrintableInvoice(invoice)}
+                  onSendEmail={() => sendInvoiceEmail(invoice)}
+                  onSendText={() => sendInvoiceText(invoice)}
+                  onShare={() => resolveInvoiceShareData(invoice)}
+                  onChargeOnline={() => payOnline(invoice)}
+                  onRegisterPayment={() => startRegisterPayment(invoice)}
+                  onDelete={() => {
+                    if (
+                      window.confirm(
+                        t("invoices.confirmDelete", {
+                          defaultValue: "Delete this invoice?",
+                        }),
+                      )
+                    ) {
+                      void deleteInvoice(invoice._id);
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {error && builderOpen ? (
+        <div className={styles.builderErrorToast}>{error}</div>
+      ) : null}
+
+      {openPaymentFormId ? (
+        <div className={styles.paymentModalBackdrop} data-testid="invoice-payment-modal">
+          <div className={styles.paymentModal}>
+            {(() => {
+              const invoice = invoices.find(
+                (item) => item._id === openPaymentFormId,
+              );
+              if (!invoice) return null;
+              return (
+                <>
+                  <h3 className={styles.paymentModalTitle}>
+                    {t("invoices.labels.paymentFormTitle")}
                   </h3>
-                  <p className={styles.muted}>
-                    {invoice.clientName} |{" "}
-                    {t(`invoices.statusOptions.${invoice.status}`) ||
-                      invoice.status}
+                  <p className={styles.paymentModalMeta}>
+                    {invoice.invoiceNumber} · {invoice.clientName}
                   </p>
-                  {invoice.invoiceTitle
-                    ? <p className={styles.muted}>{invoice.invoiceTitle}</p>
-                    : null}
-                  {invoice.clientAddress
-                    ? <p className={styles.muted}>
-                        {t("invoices.party.customerAddress", {
-                          defaultValue: "Customer",
-                        })}
-                        : {invoice.clientAddress}
-                      </p>
-                    : null}
-                  {invoice.propertyAddress
-                    ? <p className={styles.muted}>
-                        {t("invoices.party.propertyAddress", {
-                          defaultValue: "Job site",
-                        })}
-                        : {invoice.propertyAddress}
-                      </p>
-                    : null}
-                  {invoice.clientPhone
-                    ? <p className={styles.muted}>
-                        {t("invoices.party.phone", { defaultValue: "Phone" })}:{" "}
-                        {invoice.clientPhone}
-                      </p>
-                    : null}
-                  {invoice.quoteNumber
-                    ? <p className={styles.muted}>
-                        Quote ID: {invoice.quoteNumber}
-                      </p>
-                    : null}
-                  <p className={styles.muted}>
-                    {t("invoices.labels.amount")}: ${invoice.amount}
-                  </p>
-                  <p className={styles.muted}>
-                    {t("invoices.labels.paid")}: $
-                    {Number(invoice.paidAmount || 0).toFixed(2)} |
-                    {t("invoices.labels.balance")}: $
-                    {Number(invoice.balanceDue || invoice.amount || 0).toFixed(
-                      2,
-                    )}
-                  </p>
-                  <p className={styles.muted}>
-                    {t("invoices.labels.preferredMethod")}:{" "}
-                    {paymentMethodLabel(invoice.preferredPaymentMethod, t)}
-                  </p>
-                  <p className={styles.muted}>
-                    {t("invoices.labels.dueDate")}:{" "}
-                    {invoice.dueDate || t("invoices.labels.noDate")}
-                  </p>
-                  {hasDisplayableInvoiceLineItems(invoice.lineItems)
-                    ? <p className={styles.mutedPre}>
-                        {formatInvoiceLineItemsForList(invoice.lineItems)}
-                      </p>
-                    : null}
-                  {invoice.payments?.length
-                    ? <p className={styles.paymentsPre}>
-                        {invoice.payments
-                          .map(
-                            (item) =>
-                              `- ${item.date}: $${Number(item.amount || 0).toFixed(2)} (${paymentMethodLabel(item.method, t)})${item.reference ? ` ${t("invoices.labels.paymentRefPrefix")} ${item.reference}` : ""}`,
-                          )
-                          .join("\n")}
-                      </p>
-                    : null}
-                </div>
-                <div className={styles.actions}>
-                  <DocumentPdfActions
-                    pdfUrl={`/api/invoices/${invoice._id}/pdf`}
-                    printLabel={t("invoices.buttons.printInvoice", {
-                      defaultValue: "Print invoice",
-                    })}
-                    downloadLabel={t("invoices.buttons.downloadPdf", {
-                      defaultValue: "Download PDF",
-                    })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void openPrintableInvoice(invoice)}
-                    className={styles.btnIcon}
-                    aria-label={t("invoices.buttons.printBrowser", {
-                      defaultValue: "Print in browser",
-                    })}
-                  >
-                    {t("invoices.buttons.printBrowser", {
-                      defaultValue: "Print (browser)",
-                    })}
-                  </button>
-                  {capabilities.canSendExternalCommunications
-                    ? <button
-                        type="button"
-                        onClick={() => sendInvoiceEmail(invoice)}
-                        className={styles.btnTeal}
-                      >
-                        {t("invoices.buttons.sendInvoiceEmail")}
-                      </button>
-                    : null}
-                  {capabilities.canSendExternalCommunications
-                    ? <button
-                        type="button"
-                        onClick={() => sendInvoiceText(invoice)}
-                        className={styles.btnBlue}
-                      >
-                        {t("invoices.buttons.sendInvoiceText")}
-                      </button>
-                    : null}
-                  {capabilities.canSendExternalCommunications ? (
-                    <UniversalShareButton
-                      label={t("invoices.buttons.shareInvoice")}
-                      copiedLabel={t("invoices.messages.invoiceLinkCopied")}
-                      copyFailedLabel={t("invoices.errors.shareInvoiceFallback")}
-                      resolveShareData={() => resolveInvoiceShareData(invoice)}
-                      style={{
-                        padding: "10px 16px",
-                        minHeight: 0,
-                        borderRadius: "8px",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                      }}
-                    />
-                  ) : null}
-                  {canManageInvoicePayments &&
-                    stripePublishableConfigured
-                    ? <button
-                        type="button"
-                        onClick={() => payOnline(invoice)}
-                        className={styles.btnStripe}
-                      >
-                        {t("invoices.buttons.chargeOnline")}
-                      </button>
-                    : null}
-                  {canManageInvoicePayments
-                    ? <button
-                        type="button"
-                        onClick={() => startRegisterPayment(invoice)}
-                        className={styles.btnGreen}
-                      >
-                        {t("invoices.buttons.registerPayment")}
-                      </button>
-                    : null}
-                  {canEditInvoices
-                    ? <button
-                        type="button"
-                        onClick={() => editInvoice(invoice)}
-                        className={styles.btnIcon}
-                      >
-                        <IconPencil />
-                        {t("invoices.buttons.edit")}
-                      </button>
-                    : null}
-                  {capabilities.canDeleteRecords
-                    ? <button
-                        type="button"
-                        onClick={() => deleteInvoice(invoice._id)}
-                        className={styles.btnIconDanger}
-                      >
-                        <IconTrash />
-                        {t("invoices.buttons.delete")}
-                      </button>
-                    : null}
-                </div>
-              </div>
-              {openPaymentFormId === invoice._id
-                ? <div className={styles.paymentPanel}>
-                    <strong>{t("invoices.labels.paymentFormTitle")}</strong>
-                    <div className={styles.paymentGrid}>
-                      <input
-                        placeholder={t("invoices.placeholders.paymentAmount")}
-                        value={paymentDraftById[invoice._id]?.amount || ""}
-                        onChange={(e) =>
-                          setPaymentDraftById((current) => ({
-                            ...current,
-                            [invoice._id]: {
-                              ...(current[invoice._id] ||
-                                initialPaymentDraft(invoice)),
-                              amount: e.target.value,
-                            },
-                          }))
-                        }
-                        className={styles.fieldCompact}
-                      />
-                      <input
-                        type="date"
-                        value={
-                          paymentDraftById[invoice._id]?.date || todayIso()
-                        }
-                        onChange={(e) =>
-                          setPaymentDraftById((current) => ({
-                            ...current,
-                            [invoice._id]: {
-                              ...(current[invoice._id] ||
-                                initialPaymentDraft(invoice)),
-                              date: e.target.value,
-                            },
-                          }))
-                        }
-                        className={styles.fieldCompact}
-                      />
-                      <select
-                        value={
-                          paymentDraftById[invoice._id]?.method ||
-                          invoice.preferredPaymentMethod ||
-                          "bank_transfer"
-                        }
-                        onChange={(e) =>
-                          setPaymentDraftById((current) => ({
-                            ...current,
-                            [invoice._id]: {
-                              ...(current[invoice._id] ||
-                                initialPaymentDraft(invoice)),
-                              method: e.target.value,
-                            },
-                          }))
-                        }
-                        className={styles.fieldCompact}
-                      >
-                        {paymentMethodOptions(t).map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        placeholder={t("invoices.placeholders.reference")}
-                        value={paymentDraftById[invoice._id]?.reference || ""}
-                        onChange={(e) =>
-                          setPaymentDraftById((current) => ({
-                            ...current,
-                            [invoice._id]: {
-                              ...(current[invoice._id] ||
-                                initialPaymentDraft(invoice)),
-                              reference: e.target.value,
-                            },
-                          }))
-                        }
-                        className={styles.fieldCompact}
-                      />
-                    </div>
-                    <textarea
-                      placeholder={t("invoices.placeholders.paymentNotes")}
-                      value={paymentDraftById[invoice._id]?.notes || ""}
+                  <div className={styles.paymentGrid}>
+                    <input
+                      placeholder={t("invoices.placeholders.paymentAmount")}
+                      value={paymentDraftById[invoice._id]?.amount || ""}
                       onChange={(e) =>
                         setPaymentDraftById((current) => ({
                           ...current,
                           [invoice._id]: {
                             ...(current[invoice._id] ||
                               initialPaymentDraft(invoice)),
-                            notes: e.target.value,
+                            amount: e.target.value,
                           },
                         }))
                       }
-                      className={styles.fieldCompactTall}
+                      className={styles.fieldCompact}
                     />
-                    <div className={styles.formActions}>
-                      <button
-                        type="button"
-                        onClick={() => registerPayment(invoice)}
-                        disabled={savingPaymentId === invoice._id}
-                        className={styles.btnGreen}
-                      >
-                        {savingPaymentId === invoice._id
-                          ? t("invoices.buttons.savingPayment")
-                          : t("invoices.buttons.savePayment")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOpenPaymentFormId("")}
-                        className={styles.btnGhost}
-                      >
-                        {t("invoices.buttons.cancel")}
-                      </button>
-                    </div>
+                    <input
+                      type="date"
+                      value={
+                        paymentDraftById[invoice._id]?.date || todayIso()
+                      }
+                      onChange={(e) =>
+                        setPaymentDraftById((current) => ({
+                          ...current,
+                          [invoice._id]: {
+                            ...(current[invoice._id] ||
+                              initialPaymentDraft(invoice)),
+                            date: e.target.value,
+                          },
+                        }))
+                      }
+                      className={styles.fieldCompact}
+                    />
+                    <select
+                      value={
+                        paymentDraftById[invoice._id]?.method ||
+                        invoice.preferredPaymentMethod ||
+                        "bank_transfer"
+                      }
+                      onChange={(e) =>
+                        setPaymentDraftById((current) => ({
+                          ...current,
+                          [invoice._id]: {
+                            ...(current[invoice._id] ||
+                              initialPaymentDraft(invoice)),
+                            method: e.target.value,
+                          },
+                        }))
+                      }
+                      className={styles.fieldCompact}
+                    >
+                      {paymentMethodOptions(t).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      placeholder={t("invoices.placeholders.reference")}
+                      value={paymentDraftById[invoice._id]?.reference || ""}
+                      onChange={(e) =>
+                        setPaymentDraftById((current) => ({
+                          ...current,
+                          [invoice._id]: {
+                            ...(current[invoice._id] ||
+                              initialPaymentDraft(invoice)),
+                            reference: e.target.value,
+                          },
+                        }))
+                      }
+                      className={styles.fieldCompact}
+                    />
                   </div>
-                : null}
-            </div>
-          ))}
+                  <textarea
+                    placeholder={t("invoices.placeholders.paymentNotes")}
+                    value={paymentDraftById[invoice._id]?.notes || ""}
+                    onChange={(e) =>
+                      setPaymentDraftById((current) => ({
+                        ...current,
+                        [invoice._id]: {
+                          ...(current[invoice._id] ||
+                            initialPaymentDraft(invoice)),
+                          notes: e.target.value,
+                        },
+                      }))
+                    }
+                    className={styles.fieldCompactTall}
+                  />
+                  <div className={styles.formActions}>
+                    <button
+                      type="button"
+                      onClick={() => registerPayment(invoice)}
+                      disabled={savingPaymentId === invoice._id}
+                      className={styles.btnGreen}
+                    >
+                      {savingPaymentId === invoice._id
+                        ? t("invoices.buttons.savingPayment")
+                        : t("invoices.buttons.savePayment")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOpenPaymentFormId("")}
+                      className={styles.btnGhost}
+                    >
+                      {t("invoices.buttons.cancel")}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
-      </section>
+      ) : null}
     </main>
   );
 }
