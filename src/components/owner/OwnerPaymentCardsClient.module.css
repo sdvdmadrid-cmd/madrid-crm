@@ -1,13 +1,13 @@
 .page {
   display: grid;
   gap: 24px;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .hero {
   padding: 28px 32px;
   border-radius: 24px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(15, 118, 110, 0.28) 50%, rgba(15, 23, 42, 0.9) 100%);
+  background: linear-gradient(135deg, #eef2ff 0%, #f0fdfa 50%, #ffffff 100%);
   border: 1px solid rgba(148, 163, 184, 0.15);
 }
 
@@ -16,7 +16,7 @@
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .heroSub {
@@ -49,8 +49,8 @@
   padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(15, 23, 42, 0.65);
-  color: #f1f5f9;
+  background: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 0.95rem;
 }
 
@@ -83,7 +83,7 @@
   margin-top: 8px;
   font-size: 1.5rem;
   font-weight: 800;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .metricHint {
@@ -115,7 +115,7 @@
   margin: 0 0 16px;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .chartBars {
@@ -170,7 +170,7 @@
 .table td {
   padding: 12px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.08);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .table tr:hover td {
@@ -212,7 +212,7 @@
   align-items: center;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.45);
+  background: #f8fafc;
 }
 
 .loading,

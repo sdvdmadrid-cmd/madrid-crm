@@ -56,13 +56,13 @@
 .title {
   margin: 0 0 8px;
   font-size: 1.25rem;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .body {
   margin: 0 0 12px;
   max-width: 56ch;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -94,7 +94,7 @@
 }
 
 .secondary {
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   border: 1px solid rgba(148, 163, 184, 0.28);
   background: rgba(24, 30, 42, 0.85);
 }

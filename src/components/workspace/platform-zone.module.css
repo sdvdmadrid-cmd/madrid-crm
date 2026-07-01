@@ -27,7 +27,7 @@
   margin: 0 0 4px;
   font-weight: 800;
   font-size: 14px;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .body {

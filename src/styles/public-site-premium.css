@@ -373,7 +373,7 @@ html.ps-public-scroll body {
   overflow: hidden;
   position: relative;
   background: #e2e8f0;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition:
     transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.45s ease;
@@ -636,7 +636,7 @@ html.ps-public-scroll body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  background: rgba(15, 23, 42, 0.72);
+  background: #ffffff;
   color: #fff;
 }
 
@@ -883,7 +883,7 @@ html.ps-public-scroll body {
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(15, 23, 42, 0.45);
+  background: #f8fafc;
   color: #fff;
   font-size: 15px;
   transition:
@@ -899,7 +899,7 @@ html.ps-public-scroll body {
   outline: none;
   border-color: color-mix(in srgb, var(--theme) 70%, white);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme) 25%, transparent);
-  background: rgba(15, 23, 42, 0.65);
+  background: #f8fafc;
 }
 
 .ps-input.ps-invalid {
@@ -970,7 +970,7 @@ html.ps-public-scroll body {
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(15, 23, 42, 0.35);
+  background: #f1f5f9;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
@@ -987,7 +987,7 @@ html.ps-public-scroll body {
   border-radius: 14px;
   padding: 14px 16px;
   margin-bottom: 16px;
-  background: rgba(15, 23, 42, 0.35);
+  background: #f1f5f9;
 }
 
 .ps-review-row {
@@ -1028,7 +1028,7 @@ html.ps-public-scroll body {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: rgba(15, 23, 42, 0.72);
+  background: #ffffff;
   backdrop-filter: blur(8px);
   display: flex;
   align-items: flex-end;
@@ -1186,7 +1186,7 @@ html.ps-public-scroll body {
   width: 48px;
   height: 48px;
   border-radius: 999px;
-  background: #1e293b;
+  background: #ffffff;
   color: #fff;
   display: flex;
   align-items: center;
@@ -1386,7 +1386,7 @@ html.ps-public-scroll body {
   right: 0;
   z-index: 200;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-  background: rgba(15, 23, 42, 0.92);
+  background: #ffffff;
   backdrop-filter: blur(16px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);

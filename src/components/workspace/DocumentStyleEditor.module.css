@@ -33,7 +33,7 @@
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -113,7 +113,7 @@
   display: flex;
   flex-direction: column;
   padding: 20px 24px 28px;
-  background: rgba(15, 23, 42, 0.72);
+  background: #ffffff;
   backdrop-filter: blur(6px);
   box-sizing: border-box;
 }
@@ -126,7 +126,7 @@
 
 .rootFocus .label,
 .rootFocus .focusBtn {
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .rootFocus .paper {
@@ -154,7 +154,7 @@
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;

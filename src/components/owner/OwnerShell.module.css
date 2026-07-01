@@ -47,7 +47,7 @@
 .ownerBrandTitle {
   font-size: 0.95rem;
   font-weight: 800;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   letter-spacing: -0.02em;
 }
 
@@ -84,7 +84,7 @@
   border-radius: 12px;
   border: 1px solid rgba(248, 113, 113, 0.35);
   background: rgba(248, 113, 113, 0.08);
-  color: #fecaca;
+  color: #991b1b;
   font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
@@ -150,12 +150,12 @@
 
 .ownerNavLink:hover {
   background: rgba(148, 163, 184, 0.08);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .ownerNavLinkActive {
   background: linear-gradient(90deg, rgba(99, 102, 241, 0.22), rgba(15, 118, 110, 0.18));
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
@@ -198,7 +198,7 @@
   font-size: 1.65rem;
   font-weight: 800;
   letter-spacing: -0.03em;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .ownerHeaderActions {
@@ -210,7 +210,7 @@
   padding: 10px 16px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   text-decoration: none;
   font-size: 0.88rem;
   font-weight: 600;
@@ -219,7 +219,7 @@
 
 .ownerHeaderLink:hover {
   background: rgba(148, 163, 184, 0.1);
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .ownerContent {

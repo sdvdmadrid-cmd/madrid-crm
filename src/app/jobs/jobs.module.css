@@ -27,7 +27,7 @@
   cursor: pointer;
   font-size: 15px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   margin-bottom: 8px;
   list-style: none;
 }
@@ -67,7 +67,7 @@
 .estimatorBox {
   padding: 16px;
   border-radius: 14px;
-  background: rgba(52, 62, 82, 0.75);
+  background: #f8fafc;
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
@@ -99,7 +99,7 @@
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(30, 41, 59, 0.85);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -123,8 +123,8 @@
   padding: 12px 20px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(30, 41, 59, 0.8);
-  color: #e2e8f0;
+  background: #ffffff;
+  color: var(--fb-text, #374151);
   font-weight: 600;
   cursor: pointer;
 }
@@ -168,7 +168,7 @@
   padding: 22px;
   border-radius: var(--fb-radius-xl, 1.15rem);
   border: 1px solid var(--fb-border-strong);
-  background: linear-gradient(165deg, rgba(36, 44, 60, 0.98), rgba(18, 24, 36, 0.98));
+  background: #ffffff;
   box-shadow: var(--fb-shadow-lg, 0 24px 64px rgba(0, 0, 0, 0.55));
 }
 
@@ -302,7 +302,7 @@
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 23, 42, 0.65);
+  background: #f8fafc;
   color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
@@ -323,7 +323,7 @@
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(15, 23, 42, 0.72);
+  background: #ffffff;
   color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
@@ -349,7 +349,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   font-size: 14px;
   cursor: pointer;
 }
@@ -388,13 +388,13 @@
 }
 
 .estimatorPanel strong {
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .filesPanel {
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.75);
+  background: #f8fafc;
   padding: 14px;
   display: grid;
   gap: 12px;
@@ -402,7 +402,7 @@
 
 .filesPanelHeading {
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   margin-bottom: 8px;
 }
 
@@ -413,7 +413,7 @@
 
 .fileThumbName {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -432,7 +432,7 @@
 }
 
 .fileDocName {
-  color: #f1f5f9;
+  color: var(--fb-text-heading, #0f172a);
   font-weight: 600;
 }
 
@@ -445,7 +445,7 @@
   border-radius: 8px;
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(127, 29, 29, 0.35);
-  color: #fecaca;
+  color: #991b1b;
   font-size: 12px;
   font-weight: 700;
   padding: 6px 10px;
@@ -455,8 +455,8 @@
 .btnFileLink {
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(30, 41, 59, 0.8);
-  color: #e2e8f0;
+  background: #ffffff;
+  color: var(--fb-text, #374151);
   font-size: 12px;
   font-weight: 700;
   padding: 7px 10px;
@@ -475,7 +475,7 @@
   margin-top: 10px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
   overflow: hidden;
 }
 
@@ -485,7 +485,7 @@
   padding: 10px 12px;
   border: 0;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-weight: 700;
   cursor: pointer;
 }
@@ -553,7 +553,7 @@
   padding: 0;
   list-style: none;
   font-size: 13px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   display: grid;
   gap: 4px;
 }
@@ -566,7 +566,7 @@
 .plDetails {
   margin-top: 10px;
   font-size: 13px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .plEntryList {
@@ -600,13 +600,13 @@
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 12px;
   padding: 16px;
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
 }
 
 .financialSection h2 {
   margin: 0 0 12px;
   font-size: 1rem;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .expenseFormGrid {
@@ -620,8 +620,8 @@
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(30, 41, 59, 0.8);
-  color: #f1f5f9;
+  background: #ffffff;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .jobCardMeta {
@@ -643,7 +643,7 @@
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
@@ -661,7 +661,7 @@
   padding: 16px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
 }
 
 .photosUploadRow,
@@ -686,8 +686,8 @@
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(30, 41, 59, 0.8);
-  color: #f1f5f9;
+  background: #ffffff;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .hiddenFileInput {
@@ -699,7 +699,7 @@
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   background: rgba(30, 41, 59, 0.75);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   cursor: pointer;
   font-size: 13px;
 }
@@ -735,7 +735,7 @@
 
 .photosEmpty h2 {
   margin: 0 0 8px;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .photoGrid {
@@ -750,7 +750,7 @@
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
 }
 
 .photoThumbBtn {
@@ -758,7 +758,7 @@
   width: 100%;
   padding: 0;
   border: none;
-  background: #0f172a;
+  background: #ffffff;
   cursor: pointer;
   aspect-ratio: 4 / 3;
 }
@@ -781,7 +781,7 @@
 
 .photoCardMeta p {
   margin: 0;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .photoStageBadge {
@@ -805,7 +805,7 @@
 .photoTimelineDay h3 {
   margin: 0 0 8px;
   font-size: 14px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .photoTimelineList {
@@ -821,7 +821,7 @@
   padding: 8px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
   cursor: pointer;
   text-align: left;
   color: inherit;
@@ -837,7 +837,7 @@
 
 .photoTimelineItem strong {
   display: block;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-size: 13px;
 }
 
@@ -848,7 +848,7 @@
 
 .photoTimelineItem p {
   margin: 4px 0 0;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   font-size: 12px;
 }
 
@@ -869,7 +869,7 @@
   max-height: 92vh;
   overflow: auto;
   border-radius: 14px;
-  background: #0f172a;
+  background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.25);
   padding: 16px;
   display: grid;
@@ -882,7 +882,7 @@
   right: 10px;
   border: none;
   background: transparent;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
@@ -905,7 +905,7 @@
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .photoLightboxForm select,

@@ -20,10 +20,10 @@
 
 .panel {
   width: min(720px, 100%);
-  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 16px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .panelWide {
@@ -55,7 +55,7 @@
 
 .headerTitle {
   margin: 0;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -67,7 +67,7 @@
   height: 36px;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.6);
+  background: #f8fafc;
   color: #94a3b8;
   font-size: 20px;
   line-height: 1;
@@ -76,9 +76,9 @@
 }
 
 .closeBtn:hover:not(:disabled) {
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   border-color: rgba(148, 163, 184, 0.45);
-  background: rgba(30, 41, 59, 0.8);
+  background: #ffffff;
 }
 
 .closeBtn:disabled {
@@ -178,12 +178,12 @@
 }
 
 .stepBtn:hover:not(:disabled) {
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   background: rgba(30, 41, 59, 0.5);
 }
 
 .stepActive {
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   border-color: rgba(56, 189, 248, 0.45);
   background: rgba(14, 165, 233, 0.15);
 }
@@ -271,7 +271,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #0f172a;
+  background: #ffffff;
   color: #94a3b8;
   font-weight: 600;
   white-space: nowrap;
@@ -324,14 +324,14 @@
   word-break: normal;
   overflow-wrap: anywhere;
   line-height: 1.4;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .previewCellNowrap {
   display: block;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .selectInput {
@@ -340,15 +340,15 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: #1e293b;
-  color: #f8fafc;
+  background: #ffffff;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
   font-weight: 600;
 }
 
 .selectInput option {
-  background: #0f172a;
-  color: #f8fafc;
+  background: #ffffff;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .previewWarn {
@@ -357,7 +357,7 @@
   border-radius: 10px;
   border: 1px solid rgba(251, 191, 36, 0.45);
   background: rgba(251, 191, 36, 0.12);
-  color: #fde68a;
+  color: #92400e;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -381,18 +381,18 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
 }
 
 .errorSectionTitle {
   margin: 16px 0 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
 }
 
 .errorCell {
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   line-height: 1.45;
 }
 
@@ -450,7 +450,7 @@
 .summaryCard {
   padding: 14px 12px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.8);
+  background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.12);
   text-align: center;
 }
@@ -458,7 +458,7 @@
 .summaryValue {
   font-size: 24px;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-variant-numeric: tabular-nums;
 }
 

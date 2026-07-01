@@ -77,7 +77,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .cardTitle {
@@ -141,7 +141,7 @@
   border-radius: 8px;
   border: 1px solid rgba(251, 191, 36, 0.35);
   background: rgba(251, 191, 36, 0.12);
-  color: #fde68a;
+  color: #92400e;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -154,7 +154,7 @@
 
 .paymentsPre {
   margin: 8px 0 0;
-  color: #cbd5e1;
+  color: var(--fb-text-muted, #6b7280);
   white-space: pre-wrap;
 }
 
@@ -261,7 +261,7 @@
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(15, 23, 42, 0.55);
+  background: #f8fafc;
   color: var(--text-heading);
   font-size: 14px;
   font-weight: 600;
@@ -270,12 +270,9 @@
 .invoiceSummary {
   padding: 18px 20px;
   border-radius: 14px;
-  border: 1px solid rgba(96, 165, 250, 0.28);
-  background: linear-gradient(
-    145deg,
-    rgba(30, 41, 59, 0.92),
-    rgba(15, 23, 42, 0.88)
-  );
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .invoiceSummaryTitle {
@@ -284,7 +281,7 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #93c5fd;
+  color: #2563eb;
 }
 
 .invoiceSummaryGrid {
@@ -330,7 +327,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
-  background: rgba(15, 23, 42, 0.45);
+  background: #ffffff;
 }
 
 .workPerformedToolbar {
@@ -348,8 +345,8 @@
   font-weight: 600;
   cursor: pointer;
   font-size: 12px;
-  background: rgba(30, 41, 59, 0.8);
-  color: var(--text-muted);
+  background: #ffffff;
+  color: #2563eb;
   white-space: nowrap;
 }
 
@@ -378,7 +375,7 @@
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px dashed rgba(148, 163, 184, 0.45);
-  background: rgba(15, 23, 42, 0.35);
+  background: #f1f5f9;
 }
 
 .internalNotesLabel {
@@ -416,7 +413,7 @@
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: rgba(2, 6, 23, 0.55);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   padding: 10px 12px;
   font-size: 0.88rem;
   line-height: 1.5;
@@ -432,7 +429,7 @@
   padding: 16px 18px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(15, 23, 42, 0.45);
+  background: #f8fafc;
 }
 
 .lineItemsHeader {
@@ -570,8 +567,8 @@
 }
 
 .field option {
-  background: #1e293b;
-  color: #f1f5f9;
+  background: #ffffff;
+  color: var(--fb-text-heading, #0f172a);
 }
 
 .fieldTextarea {
@@ -692,7 +689,7 @@
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
-  background: #1e293b;
+  background: #ffffff;
   color: var(--fb-text-heading, #0f172a);
 }
 
@@ -714,7 +711,7 @@
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
-  background: rgba(30, 41, 59, 0.8);
+  background: #ffffff;
   color: var(--text);
 }
 
@@ -726,8 +723,8 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(30, 41, 59, 0.9);
-  color: #cbd5e1;
+  background: #ffffff;
+  color: var(--fb-text-muted, #6b7280);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -741,7 +738,7 @@
   padding: 0 10px;
   border-radius: 999px;
   border: 1px solid rgba(248, 113, 113, 0.45);
-  background: rgba(30, 41, 59, 0.9);
+  background: #ffffff;
   color: #fca5a5;
   font-size: 12px;
   font-weight: 600;
@@ -1609,7 +1606,7 @@
   padding: 28px;
   border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .builderSummaryRows {
@@ -1718,7 +1715,7 @@
   background: #fef2f2;
   color: #991b1b;
   font-size: 14px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   z-index: 80;
 }
 
@@ -1962,7 +1959,7 @@
   padding: 6px;
   border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid #f1f5f9;
 }
 
@@ -2011,7 +2008,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(15, 23, 42, 0.4);
+  background: rgba(15, 23, 42, 0.35);
   backdrop-filter: blur(4px);
 }
 
@@ -2020,7 +2017,7 @@
   padding: 28px;
   border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .paymentModalTitle {

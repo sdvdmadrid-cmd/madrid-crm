@@ -1,0 +1,40 @@
+/**
+ * Global light-surface guardrails for CRM workspace pages.
+ * Catches legacy dark module styles without rewriting every selector.
+ */
+
+.fb-workspace,
+.fb-page,
+.auth-shell-main.fb-workspace {
+  background: #f8fafc;
+  color: var(--fb-text, #111827);
+}
+
+.fb-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.fb-workspace textarea,
+.fb-workspace select,
+.fb-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+.fb-page textarea,
+.fb-page select {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+.fb-workspace input:focus,
+.fb-workspace textarea:focus,
+.fb-workspace select:focus,
+.fb-page input:focus,
+.fb-page textarea:focus,
+.fb-page select:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
+/* Soften modal / overlay backdrops */
+.fb-workspace [class*="backdrop"],
+.fb-workspace [class*="overlay"],
+.fb-page [class*="backdrop"],
+.fb-page [class*="overlay"] {
+  background: #f1f5f9 !important;
+}

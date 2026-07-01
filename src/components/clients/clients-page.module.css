@@ -12,8 +12,8 @@
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(15, 23, 42, 0.65);
-  color: #f8fafc;
+  background: #f8fafc;
+  color: var(--fb-text-heading, #0f172a);
   font-size: 14px;
 }
 
@@ -49,7 +49,7 @@
   flex-direction: column;
   border-radius: var(--fb-radius-xl, 1.15rem);
   border: 1px solid var(--fb-border-strong, rgba(148, 163, 184, 0.22));
-  background: linear-gradient(165deg, rgba(36, 44, 60, 0.98), rgba(18, 24, 36, 0.98));
+  background: #ffffff;
   box-shadow: var(--fb-shadow-lg, 0 24px 64px rgba(0, 0, 0, 0.55));
 }
 
@@ -75,7 +75,7 @@
   border: none;
   border-radius: 10px;
   background: rgba(51, 65, 85, 0.5);
-  color: #e2e8f0;
+  color: var(--fb-text, #374151);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
