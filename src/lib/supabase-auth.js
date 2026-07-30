@@ -9,6 +9,7 @@ import { resolveSubscriptionAccess } from "@/lib/subscription-access-core";
 import { ensureProfileForUser, getProfileByUserId } from "@/lib/profiles";
 
 let supabaseAdminClientPromise = null;
+const DEFAULT_DEV_ORIGIN = "http://localhost:3000";
 
 async function getSupabaseAdminClient() {
   if (!supabaseAdminClientPromise) {
@@ -321,19 +322,80 @@ function isLocalOrigin(origin) {
   }
 }
 
-function getForwardedRequestOrigin(request) {
-  const proto = String(request?.headers?.get("x-forwarded-proto") || "")
-    .trim()
-    .toLowerCase();
-  const host = String(request?.headers?.get("x-forwarded-host") || "")
-    .trim()
-    .toLowerCase();
+function getFirstHeaderValue(value) {
+  return String(value || "")
+    .split(",")[0]
+    .trim();
+}
 
-  if (!proto || !host) {
+function getProxyOrHostRequestOrigin(request) {
+  const forwardedProto = getFirstHeaderValue(
+    request?.headers?.get("x-forwarded-proto"),
+  ).toLowerCase();
+  const forwardedHost = getFirstHeaderValue(
+    request?.headers?.get("x-forwarded-host"),
+  ).toLowerCase();
+
+  if (forwardedProto && forwardedHost) {
+    return normalizeOrigin(`${forwardedProto}://${forwardedHost}`);
+  }
+
+  const directHost = getFirstHeaderValue(request?.headers?.get("host")).toLowerCase();
+  if (!directHost) {
     return "";
   }
 
-  return normalizeOrigin(`${proto}://${host}`);
+  let inferredProto = forwardedProto;
+  if (!inferredProto) {
+    inferredProto = normalizeOrigin(request?.url).startsWith("https://")
+      ? "https"
+      : process.env.NODE_ENV === "production"
+        ? "https"
+        : "http";
+  }
+
+  return normalizeOrigin(`${inferredProto}://${directHost}`);
+}
+
+function getHeaderRequestOrigin(request) {
+  const hostOrigin = getProxyOrHostRequestOrigin(request);
+  const isProduction = process.env.NODE_ENV === "production";
+  const originHeader = normalizeOrigin(request?.headers?.get("origin"));
+  if (
+    originHeader &&
+    (!isProduction || !hostOrigin || originHeader === hostOrigin)
+  ) {
+    return originHeader;
+  }
+
+  const refererHeader = normalizeOrigin(request?.headers?.get("referer"));
+  if (
+    refererHeader &&
+    (!isProduction || !hostOrigin || refererHeader === hostOrigin)
+  ) {
+    return refererHeader;
+  }
+
+  if (isProduction && hostOrigin) {
+    if (originHeader && originHeader !== hostOrigin) {
+      console.warn("[supabase-auth] Ignoring mismatched Origin header", {
+        originHeader,
+        hostOrigin,
+      });
+    }
+    if (refererHeader && refererHeader !== hostOrigin) {
+      console.warn("[supabase-auth] Ignoring mismatched Referer header", {
+        refererHeader,
+        hostOrigin,
+      });
+    }
+  }
+
+  return hostOrigin;
+}
+
+function isUsableRequestOrigin(origin, isProduction) {
+  return Boolean(origin) && (!isProduction || !isLocalOrigin(origin));
 }
 
 export function getRequestOrigin(request) {
@@ -356,18 +418,18 @@ export function getRequestOrigin(request) {
     }
   }
 
-  const forwardedOrigin = getForwardedRequestOrigin(request);
-  if (forwardedOrigin) {
-    return forwardedOrigin;
+  const headerOrigin = getHeaderRequestOrigin(request);
+  if (isUsableRequestOrigin(headerOrigin, isProduction)) {
+    return headerOrigin;
   }
 
   const requestOrigin = normalizeOrigin(request?.url);
-  if (requestOrigin && isProduction) {
+  if (isUsableRequestOrigin(requestOrigin, isProduction)) {
     return requestOrigin;
   }
 
-  if (!isProduction && requestOrigin) {
-    return requestOrigin;
+  if (!isProduction) {
+    return headerOrigin || requestOrigin || "";
   }
 
   return "";
@@ -394,14 +456,16 @@ function buildOriginCandidates(origin) {
 }
 
 export function getAuthCallbackUrl(origin) {
-  const productionCallback = "https://fieldbaseapp.net/auth/callback";
-  if (process.env.NODE_ENV === "production") {
-    return productionCallback;
+  const candidates = buildOriginCandidates(origin);
+  const baseOrigin = candidates[0];
+
+  if (baseOrigin) {
+    return `${baseOrigin}/auth/callback`;
   }
 
-  const candidates = buildOriginCandidates(origin);
-  const baseOrigin = candidates[0] || "http://localhost:3000";
-  return `${baseOrigin}/auth/callback`;
+  return process.env.NODE_ENV === "production"
+    ? ""
+    : `${DEFAULT_DEV_ORIGIN}/auth/callback`;
 }
 
 export async function generateSignupVerificationLink({ email, origin, userId }) {
@@ -415,6 +479,11 @@ export async function generateSignupVerificationLink({ email, origin, userId }) 
   // the app session directly — no Supabase SSR client involved.
   const { createEmailConfirmToken } = await import("@/lib/auth");
   const callbackUrl = getAuthCallbackUrl(origin);
+  if (!callbackUrl) {
+    throw new Error(
+      "Unable to determine the public app URL for verification links. Configure APP_URL or APP_BASE_URL, or access the app through its public URL.",
+    );
+  }
   const confirmToken = createEmailConfirmToken(userId, email);
   const verifyUrl = `${callbackUrl}?vt=${encodeURIComponent(confirmToken)}`;
 

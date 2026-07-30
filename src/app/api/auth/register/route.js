@@ -1,6 +1,7 @@
 import { normalizeAppRole } from "@/lib/access-control";
 import { isPlatformOperatorEmail } from "@/lib/platform-operator";
 import { buildSessionCookie, createSessionToken } from "@/lib/auth";
+import { createVerificationOriginUnavailableResponse } from "@/lib/auth-route-errors";
 import { getSessionFromRequest } from "@/lib/auth";
 import { upsertCompanyProfileForTenant } from "@/lib/company-profile-store";
 import { logEmailAttempt, sendEmail } from "@/lib/email";
@@ -149,7 +150,7 @@ export async function POST(request) {
           try {
             const origin = getRequestOrigin(request);
             if (!origin) {
-              throw new Error("APP_URL must be configured for verification links");
+              return createVerificationOriginUnavailableResponse();
             }
 
             const { verifyUrl } = await generateSignupVerificationLink({
@@ -292,6 +293,12 @@ export async function POST(request) {
     const assignedRole = isSuperAdmin
       ? "super_admin"
       : normalizeAppRole(finalRole);
+    const verificationOrigin = isSuperAdmin ? "" : getRequestOrigin(request);
+
+    if (!isSuperAdmin && !verificationOrigin) {
+      return createVerificationOriginUnavailableResponse();
+    }
+
     const now = new Date();
     const trialEnd = trialEndFromNow(now);
     const authPayload = {
@@ -347,7 +354,7 @@ export async function POST(request) {
       role: assignedRole,
     });
 
-    // Super admin skips email verification — they own the server config.
+    // Super admins are verified immediately and do not need an email-link origin.
     if (isSuperAdmin) {
       if (companyName) {
         await upsertCompanyProfileForTenant({
@@ -394,15 +401,9 @@ export async function POST(request) {
       }
     }
 
-    const origin = getRequestOrigin(request);
-    if (!origin) {
-      throw new Error(
-        "APP_URL must be configured for signup verification links",
-      );
-    }
     const { verifyUrl } = await generateSignupVerificationLink({
       email,
-      origin,
+      origin: verificationOrigin,
       userId: createdUser.id,
     });
 

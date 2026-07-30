@@ -1,4 +1,5 @@
-﻿import { logEmailAttempt, sendEmail } from "@/lib/email";
+import { createVerificationOriginUnavailableResponse } from "@/lib/auth-route-errors";
+import { logEmailAttempt, sendEmail } from "@/lib/email";
 import {
   findAuthUserByEmail,
   generateSignupVerificationLink,
@@ -32,7 +33,7 @@ export async function POST(request) {
 
     const origin = getRequestOrigin(request);
     if (!origin) {
-      throw new Error("APP_URL must be configured for verification links");
+      return createVerificationOriginUnavailableResponse();
     }
     const { verifyUrl } = await generateSignupVerificationLink({
       email,
