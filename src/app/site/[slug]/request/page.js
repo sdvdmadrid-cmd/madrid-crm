@@ -141,6 +141,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
             locale={locale}
             requireEmail
             themeColor={theme}
+            depositStatus={String(resolvedSearchParams?.deposit || "")}
           />
         </section>
       </div>

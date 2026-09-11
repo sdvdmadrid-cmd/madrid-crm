@@ -276,6 +276,13 @@ function LeadCard({
               <strong>{t.budget}:</strong> {item.budgetRange}
             </p>
           ) : null}
+          {item.packageLabel || item.packageTier ? (
+            <p className={li.contactLine}>
+              <strong>Package:</strong> {item.packageLabel || item.packageTier}
+              {item.packageTotal != null ? ` · $${Number(item.packageTotal).toFixed(0)}` : ""}
+              {item.depositStatus ? ` · deposit ${item.depositStatus}` : ""}
+            </p>
+          ) : null}
           {item.timeline ? (
             <p className={li.contactLine}>
               <strong>{t.timeline}:</strong> {item.timeline}

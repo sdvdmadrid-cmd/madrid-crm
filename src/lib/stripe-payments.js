@@ -572,24 +572,34 @@ export async function recordManualInvoicePayment({ access, body }) {
   return { invoice: serializeInvoiceRow(updated || access.invoice) };
 }
 
-export async function createStripeCheckoutSessionForAccess({
+export async function createStripeCheckoutSessionForInvoice({
   request,
-  access,
+  invoice,
   amount,
   source = "invoice_checkout",
+  successUrl = null,
+  cancelUrl = null,
+  userId = null,
 }) {
   const stripe = getStripeServerClient();
   if (!stripe) {
     return {
       response: buildResourceError("Missing STRIPE_SECRET_KEY", 500),
+      reason: "stripe_missing",
+      errorCode: "stripe_missing",
     };
   }
 
-  const paymentRows = await listInvoicePayments(
-    access.invoice.id,
-    access.invoice.tenant_id,
-  );
-  const paymentState = summarizeInvoicePayments(access.invoice, paymentRows);
+  if (!invoice?.id || !invoice?.tenant_id) {
+    return {
+      response: buildResourceError("Invoice is required", 400),
+      reason: "missing_invoice",
+      errorCode: "missing_invoice",
+    };
+  }
+
+  const paymentRows = await listInvoicePayments(invoice.id, invoice.tenant_id);
+  const paymentState = summarizeInvoicePayments(invoice, paymentRows);
   const explicitAmount = normalizeMoney(amount);
   const payableAmount =
     explicitAmount > 0 ? explicitAmount : paymentState.balanceDue;
@@ -600,6 +610,8 @@ export async function createStripeCheckoutSessionForAccess({
         "This invoice has no outstanding balance",
         400,
       ),
+      reason: "zero_total",
+      errorCode: "zero_total",
     };
   }
 
@@ -609,13 +621,15 @@ export async function createStripeCheckoutSessionForAccess({
         "Requested amount exceeds outstanding balance",
         400,
       ),
+      reason: "amount_exceeds_balance",
+      errorCode: "amount_exceeds_balance",
     };
   }
 
   const paymentId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
   const paymentTenantId = paymentTenantIdFromInvoice(
-    access.invoice,
+    invoice,
     "stripe-payments checkout session",
   );
 
@@ -626,28 +640,28 @@ export async function createStripeCheckoutSessionForAccess({
       id: paymentId,
       tenant_id: paymentTenantId,
       contractor_id: paymentTenantId,
-      user_id: access.context.userId || null,
-      invoice_id: access.invoice.id,
-      job_id: access.invoice.job_id || null,
-      client_id: access.invoice.client_id || null,
+      user_id: userId || null,
+      invoice_id: invoice.id,
+      job_id: invoice.job_id || null,
+      client_id: invoice.client_id || null,
       amount: payableAmount,
       currency: "usd",
       provider: "stripe",
       status: "pending",
       metadata: {
         source,
-        invoiceNumber: String(access.invoice.invoice_number || ""),
+        invoiceNumber: String(invoice.invoice_number || ""),
       },
-      created_by: access.context.userId || null,
+      created_by: userId || null,
       created_at: nowIso,
       updated_at: nowIso,
     });
 
   if (insertError) {
     logSupabaseError("[stripe-payments] payment insert error", insertError, {
-      invoiceId: access.invoice.id,
+      invoiceId: invoice.id,
       paymentId,
-      tenantId: access.invoice.tenant_id,
+      tenantId: invoice.tenant_id,
       source,
     });
     throw new Error(insertError.message);
@@ -655,6 +669,7 @@ export async function createStripeCheckoutSessionForAccess({
 
   const baseUrl = getRequestOrigin(request);
   if (!baseUrl) {
+    await supabaseAdmin.schema("public").from(PAYMENTS).delete().eq("id", paymentId);
     throw new Error(
       "APP_BASE_URL or APP_URL must be configured for Stripe checkout redirects",
     );
@@ -665,22 +680,37 @@ export async function createStripeCheckoutSessionForAccess({
   let connectAccountId = "";
   let applicationFeeCents = 0;
   if (isStripeConnectEnabled()) {
-    const connect = await getConnectStatusForTenant(access.invoice.tenant_id);
+    const connect = await getConnectStatusForTenant(invoice.tenant_id);
     if (!connect.onboarded || !connect.accountId) {
+      await supabaseAdmin.schema("public").from(PAYMENTS).delete().eq("id", paymentId);
       return {
         response: buildResourceError(
           "Connect your Stripe payout account before accepting card payments online.",
           400,
           CONNECT_PAYOUT_REQUIRED_CODE,
         ),
+        reason: "connect_required",
+        errorCode: CONNECT_PAYOUT_REQUIRED_CODE,
+        code: CONNECT_PAYOUT_REQUIRED_CODE,
       };
     }
     connectAccountId = connect.accountId;
     applicationFeeCents = computePlatformFeeCents(amountCents);
   }
 
+  const resolvedSuccessUrl = successUrl
+    ? successUrl.startsWith("http")
+      ? successUrl
+      : `${safeBase}${successUrl.startsWith("/") ? "" : "/"}${successUrl}`
+    : `${safeBase}/invoices?payment=success&invoiceId=${invoice.id}`;
+  const resolvedCancelUrl = cancelUrl
+    ? cancelUrl.startsWith("http")
+      ? cancelUrl
+      : `${safeBase}${cancelUrl.startsWith("/") ? "" : "/"}${cancelUrl}`
+    : `${safeBase}/invoices?payment=cancel&invoiceId=${invoice.id}`;
+
   try {
-    const stripe = requireStripeClient();
+    const stripeClient = requireStripeClient();
     const paymentIntentData = {
       statement_descriptor_suffix: getStatementDescriptorSuffix(),
     };
@@ -690,15 +720,15 @@ export async function createStripeCheckoutSessionForAccess({
       paymentIntentData.transfer_data = { destination: connectAccountId };
     }
 
-    const session = await stripe.checkout.sessions.create(
+    const session = await stripeClient.checkout.sessions.create(
       {
         mode: "payment",
         payment_method_types: ["card"],
-        success_url: `${safeBase}/invoices?payment=success&invoiceId=${access.invoice.id}`,
-        cancel_url: `${safeBase}/invoices?payment=cancel&invoiceId=${access.invoice.id}`,
+        success_url: resolvedSuccessUrl,
+        cancel_url: resolvedCancelUrl,
         payment_intent_data: paymentIntentData,
         customer_email:
-          String(access.invoice.client_email || "")
+          String(invoice.client_email || "")
             .trim()
             .toLowerCase() || undefined,
         client_reference_id: paymentId,
@@ -710,27 +740,27 @@ export async function createStripeCheckoutSessionForAccess({
               unit_amount: amountCents,
               product_data: {
                 name:
-                  access.invoice.invoice_title ||
-                  access.invoice.invoice_number ||
+                  invoice.invoice_title ||
+                  invoice.invoice_number ||
                   "Invoice payment",
-                description: `Invoice ${access.invoice.invoice_number || access.invoice.id} for ${access.invoice.client_name || "Client"}`,
+                description: `Invoice ${invoice.invoice_number || invoice.id} for ${invoice.client_name || "Client"}`,
               },
             },
           },
         ],
         metadata: {
           paymentId,
-          tenantId: access.invoice.tenant_id,
-          companyId: access.invoice.tenant_id,
-          contractorId: access.invoice.tenant_id,
-          contractor_id: access.invoice.tenant_id,
-          invoiceId: access.invoice.id,
-          invoice_id: access.invoice.id,
-          estimateId: access.invoice.estimate_id || "",
-          estimate_id: access.invoice.estimate_id || "",
-          jobId: access.invoice.job_id || "",
-          clientId: access.invoice.client_id || "",
-          invoiceNumber: String(access.invoice.invoice_number || ""),
+          tenantId: invoice.tenant_id,
+          companyId: invoice.tenant_id,
+          contractorId: invoice.tenant_id,
+          contractor_id: invoice.tenant_id,
+          invoiceId: invoice.id,
+          invoice_id: invoice.id,
+          estimateId: invoice.estimate_id || "",
+          estimate_id: invoice.estimate_id || "",
+          jobId: invoice.job_id || "",
+          clientId: invoice.client_id || "",
+          invoiceNumber: String(invoice.invoice_number || ""),
           paymentAmount: payableAmount.toFixed(2),
           source,
           stripeConnectAccountId: connectAccountId || "",
@@ -762,8 +792,8 @@ export async function createStripeCheckoutSessionForAccess({
             last_checkout_url: session.url || "",
             updated_at: new Date().toISOString(),
           })
-          .eq("id", access.invoice.id)
-          .eq("tenant_id", access.invoice.tenant_id),
+          .eq("id", invoice.id)
+          .eq("tenant_id", invoice.tenant_id),
       ]);
 
     if (paymentUpdateError) {
@@ -772,9 +802,8 @@ export async function createStripeCheckoutSessionForAccess({
         paymentUpdateError,
         {
           name: PUBLIC_BILLING_NAME,
-          description: plan.description || `${PUBLIC_BILLING_NAME} subscription`,
           paymentId,
-          tenantId: access.invoice.tenant_id,
+          tenantId: invoice.tenant_id,
         },
       );
       throw new Error(paymentUpdateError.message);
@@ -785,9 +814,9 @@ export async function createStripeCheckoutSessionForAccess({
         "[stripe-payments] invoice checkout update error",
         invoiceUpdateError,
         {
-          invoiceId: access.invoice.id,
+          invoiceId: invoice.id,
           paymentId,
-          tenantId: access.invoice.tenant_id,
+          tenantId: invoice.tenant_id,
         },
       );
       throw new Error(invoiceUpdateError.message);
@@ -807,6 +836,21 @@ export async function createStripeCheckoutSessionForAccess({
       .eq("id", paymentId);
     throw error;
   }
+}
+
+export async function createStripeCheckoutSessionForAccess({
+  request,
+  access,
+  amount,
+  source = "invoice_checkout",
+}) {
+  return createStripeCheckoutSessionForInvoice({
+    request,
+    invoice: access.invoice,
+    amount,
+    source,
+    userId: access.context?.userId || null,
+  });
 }
 
 /**

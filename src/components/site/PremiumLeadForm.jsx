@@ -14,7 +14,17 @@ import { normalizeWebsiteSlug, parsePublicWebsiteSlug } from "@/lib/public-websi
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 const MAX_PHOTOS = 3;
-const STEPS = 4;
+const STEPS = 5;
+
+function formatMoney(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "$0";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
+}
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -53,6 +63,7 @@ export default function PremiumLeadForm({
   requireEmail = false,
   themeColor: themeColorProp = "#1d4ed8",
   liveSubmit = true,
+  depositStatus = "",
 }) {
   const [canonicalSlug, setCanonicalSlug] = useState(() => parsePublicWebsiteSlug(slug));
   const [configLoading, setConfigLoading] = useState(Boolean(slug));
@@ -86,14 +97,28 @@ export default function PremiumLeadForm({
     contactPreference: "phone",
     photoDataUrl: "",
     photoDataUrls: [],
+    packageTier: "better",
     website: "",
     submissionId: "",
     formStartedAt: String(Date.now()),
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packages, setPackages] = useState(null);
+  const [packageDisclaimer, setPackageDisclaimer] = useState("");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [depositNotice, setDepositNotice] = useState(() => {
+    const status = String(depositStatus || "").trim().toLowerCase();
+    if (status === "success") {
+      return "Deposit received — thank you! We'll confirm your schedule shortly.";
+    }
+    if (status === "cancel") {
+      return "Deposit checkout was canceled. You can still submit a request below and pay later.";
+    }
+    return "";
+  });
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [turnstileRequired, setTurnstileRequired] = useState(false);
@@ -273,10 +298,55 @@ export default function PremiumLeadForm({
     });
   };
 
+  const loadPackages = async () => {
+    if (!canonicalSlug || !liveSubmit) return false;
+    setPackagesLoading(true);
+    setError("");
+    try {
+      const serviceNeeded = resolveLeadServiceNeeded(form.serviceNeeded, form.serviceOther);
+      const res = await fetch(
+        `/api/site/${encodeURIComponent(canonicalSlug)}/win-on-site/packages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            serviceNeeded,
+            turnstileToken,
+          }),
+        },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(mapLeadApiError(json, "Could not build package options."));
+      }
+      setPackages(json.packages || null);
+      setPackageDisclaimer(
+        json.disclaimer ||
+          "Prices are estimates. Your contractor will confirm the final quote before work begins.",
+      );
+      if (!form.packageTier) {
+        setForm((prev) => ({ ...prev, packageTier: "better" }));
+      }
+      return true;
+    } catch (err) {
+      setError(err.message || "Could not build package options.");
+      setPackages(null);
+      return false;
+    } finally {
+      setPackagesLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateStep(2)) {
       setStep(2);
+      return;
+    }
+    if (!form.packageTier) {
+      setError("Please choose a package.");
+      setStep(4);
       return;
     }
     if (!liveSubmit) {
@@ -313,7 +383,18 @@ export default function PremiumLeadForm({
         setCanonicalSlug(parsePublicWebsiteSlug(json.slug));
       }
       setLeadId(json.leadId || "");
+
+      if (json.checkoutUrl) {
+        window.location.href = json.checkoutUrl;
+        return;
+      }
+
       setSuccess(true);
+      if (json.depositSkipped) {
+        setDepositNotice(
+          "Request received. Online deposit isn’t available yet — we’ll confirm pricing and next steps by phone or email.",
+        );
+      }
       setForm({
         name: "",
         email: "",
@@ -330,6 +411,7 @@ export default function PremiumLeadForm({
         contactPreference: "phone",
         photoDataUrl: "",
         photoDataUrls: [],
+        packageTier: "better",
         website: "",
         submissionId:
           typeof crypto !== "undefined" && crypto.randomUUID
@@ -337,6 +419,7 @@ export default function PremiumLeadForm({
             : String(Date.now()),
         formStartedAt: String(Date.now()),
       });
+      setPackages(null);
       setStep(0);
       setTurnstileToken("");
       setTurnstileResetKey((k) => k + 1);
@@ -348,8 +431,12 @@ export default function PremiumLeadForm({
     }
   };
 
-  const goNext = () => {
+  const goNext = async () => {
     if (!validateStep(step)) return;
+    if (step === 3) {
+      const ok = await loadPackages();
+      if (!ok) return;
+    }
     setStep((s) => Math.min(s + 1, STEPS - 1));
   };
 
@@ -359,14 +446,16 @@ export default function PremiumLeadForm({
     stepsCopy.step1Title || "What do you need?",
     stepsCopy.step2Title || "Where is the project?",
     stepsCopy.step3Title || "How can we reach you?",
-    stepsCopy.step4Title || "Review & send",
+    stepsCopy.step4Title || "Photos & review",
+    stepsCopy.step5Title || "Choose your package",
   ];
 
   const stepSubs = [
     stepsCopy.step1Sub || "Pick your service and tell us about the job.",
     stepsCopy.step2Sub || "We use your address to schedule an on-site visit.",
     stepsCopy.step3Sub || "Your info stays private. No spam, ever.",
-    stepsCopy.step4Sub || "Optional photo helps us quote accurately.",
+    stepsCopy.step4Sub || "Optional photos help us quote accurately.",
+    stepsCopy.step5Sub || "Estimated packages — pick one to continue.",
   ];
 
   const reviewLines = useMemo(() => {
@@ -423,9 +512,11 @@ export default function PremiumLeadForm({
             </div>
             <h3 className="ps-lead-title">{stepsCopy.successTitle || "Request received!"}</h3>
             <p className="ps-lead-sub" style={{ marginBottom: 0 }}>
-              {companyName
-                ? fillCompany(stepsCopy.successBody || formCopy.success, companyName)
-                : formCopy.success}
+              {depositNotice
+                ? depositNotice
+                : companyName
+                  ? fillCompany(stepsCopy.successBody || formCopy.success, companyName)
+                  : formCopy.success}
             </p>
             {leadId ? (
               <p className="ps-lead-ref" style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
@@ -441,6 +532,20 @@ export default function PremiumLeadForm({
   return (
     <div className="ps-lead-wrap" style={{ "--theme": themeColor }}>
       <div className="ps-lead-card">
+        {depositNotice && !success ? (
+          <p
+            className="ps-lead-sub"
+            style={{
+              marginBottom: 12,
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: "#ecfdf5",
+              color: "#065f46",
+            }}
+          >
+            {depositNotice}
+          </p>
+        ) : null}
         <div className="ps-lead-trust">
           {trustPills.map((pill) => (
             <span key={pill} className="ps-lead-trust-pill">
@@ -792,6 +897,66 @@ export default function PremiumLeadForm({
                   </div>
                 ) : null}
               </div>
+            </>
+          ) : null}
+
+          {step === 4 ? (
+            <>
+              {packageDisclaimer ? (
+                <p className="ps-lead-sub" style={{ marginBottom: 12 }}>
+                  {packageDisclaimer}
+                </p>
+              ) : null}
+              <div
+                className="ps-package-grid"
+                style={{
+                  display: "grid",
+                  gap: 12,
+                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  marginBottom: 16,
+                }}
+              >
+                {["good", "better", "best"].map((tier) => {
+                  const pkg = packages?.[tier];
+                  if (!pkg) return null;
+                  const selected = form.packageTier === tier;
+                  return (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({ ...prev, packageTier: tier }))
+                      }
+                      style={{
+                        textAlign: "left",
+                        border: selected
+                          ? `2px solid ${themeColor}`
+                          : "1px solid #e2e8f0",
+                        borderRadius: 12,
+                        padding: 14,
+                        background: selected ? "#f8fafc" : "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        {pkg.label}
+                        {tier === "better" ? " · Recommended" : ""}
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
+                        {formatMoney(pkg.total)}
+                      </div>
+                      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 8 }}>
+                        Deposit today: {formatMoney(pkg.depositAmount)}
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "#334155" }}>
+                        {(pkg.highlights || []).slice(0, 3).map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    </button>
+                  );
+                })}
+              </div>
               {turnstileRequired || turnstileSiteKey ? (
                 <TurnstileField
                   siteKey={turnstileSiteKey}
@@ -804,17 +969,33 @@ export default function PremiumLeadForm({
 
           <div className="ps-lead-actions">
             {step > 0 ? (
-              <button type="button" className="ps-btn-back" onClick={goBack} disabled={loading}>
+              <button
+                type="button"
+                className="ps-btn-back"
+                onClick={goBack}
+                disabled={loading || packagesLoading}
+              >
                 {stepsCopy.back || "Back"}
               </button>
             ) : null}
             {step < STEPS - 1 ? (
-              <button type="button" className="ps-btn-next" onClick={goNext}>
-                {stepsCopy.continue || "Continue"} →
+              <button
+                type="button"
+                className="ps-btn-next"
+                onClick={goNext}
+                disabled={packagesLoading}
+              >
+                {packagesLoading
+                  ? "Building packages…"
+                  : `${stepsCopy.continue || "Continue"} →`}
               </button>
             ) : (
               <button type="submit" className="ps-btn-next" disabled={loading}>
-                {loading ? formCopy.sending : stepsCopy.submit || formCopy.send}
+                {loading
+                  ? formCopy.sending
+                  : form.packageTier && packages?.[form.packageTier]
+                    ? `Reserve with ${formatMoney(packages[form.packageTier].depositAmount)} deposit`
+                    : stepsCopy.submit || formCopy.send}
               </button>
             )}
           </div>

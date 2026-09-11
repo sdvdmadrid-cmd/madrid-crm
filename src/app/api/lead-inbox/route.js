@@ -22,6 +22,10 @@ function serializeLead(row) {
       ? row.photo_data_url
       : "");
   const draftEstimateId = String(metadata.draftEstimateId || "").trim() || null;
+  const winOnSite =
+    metadata.winOnSite && typeof metadata.winOnSite === "object"
+      ? metadata.winOnSite
+      : null;
   return {
     id: row.id,
     source: "website_lead",
@@ -39,6 +43,11 @@ function serializeLead(row) {
     photoUrls: photoUrls.length ? photoUrls : photoUrl ? [photoUrl] : [],
     photoDataUrl: row.photo_data_url || "",
     draftEstimateId,
+    packageTier: winOnSite?.packageTier || "",
+    packageLabel: winOnSite?.packageLabel || "",
+    packageTotal: winOnSite?.packageTotal || null,
+    depositAmount: winOnSite?.depositAmount || null,
+    depositStatus: winOnSite?.depositStatus || "",
     address: [row.address_line_1, row.city, row.state, row.zip_code]
       .filter(Boolean)
       .join(", "),
