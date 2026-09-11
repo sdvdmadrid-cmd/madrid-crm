@@ -27,6 +27,7 @@ import {
   createWinOnSiteEstimateForLead,
   mergeWinOnSiteLeadMetadata,
   normalizeLeadPhotoDataUrls,
+  normalizePreferredSlot,
   normalizeWinOnSitePackageTier,
 } from "@/lib/win-on-site";
 import crypto from "crypto";
@@ -549,6 +550,7 @@ export async function POST(request, { params }) {
       "en";
 
     const packageTier = normalizeWinOnSitePackageTier(payload.packageTier, "better");
+    const preferredSlot = normalizePreferredSlot(payload.preferredSlot);
 
     const draftResult = await createWinOnSiteEstimateForLead({
       request,
@@ -566,6 +568,7 @@ export async function POST(request, { params }) {
       photoUrls: storedPhotoUrls,
       existingMetadata: leadMetadata,
       packageTier,
+      preferredSlot,
     });
 
     let checkoutUrl = "";
@@ -623,6 +626,8 @@ export async function POST(request, { params }) {
         slug: canonicalSlug,
         estimateId,
         packageTier,
+        preferredSlot: preferredSlot || draftResult?.preferredSlot || null,
+        appointmentId: draftResult?.appointmentId || null,
         checkoutUrl: checkoutUrl || null,
         depositSkipped,
         depositSkipReason: depositSkipped ? depositSkipReason : null,

@@ -283,6 +283,16 @@ function LeadCard({
               {item.depositStatus ? ` · deposit ${item.depositStatus}` : ""}
             </p>
           ) : null}
+          {item.preferredSlot?.date ? (
+            <p className={li.contactLine}>
+              <strong>Preferred slot:</strong>{" "}
+              {item.preferredSlot.windowLabel || item.preferredSlot.window || ""}{" "}
+              {item.preferredSlot.date} {item.preferredSlot.time}
+              {item.preferredSlot.weather?.condition
+                ? ` · ${item.preferredSlot.weather.emoji || ""} ${item.preferredSlot.weather.condition}`
+                : ""}
+            </p>
+          ) : null}
           {item.timeline ? (
             <p className={li.contactLine}>
               <strong>{t.timeline}:</strong> {item.timeline}

@@ -98,6 +98,7 @@ export default function PremiumLeadForm({
     photoDataUrl: "",
     photoDataUrls: [],
     packageTier: "better",
+    preferredSlot: null,
     website: "",
     submissionId: "",
     formStartedAt: String(Date.now()),
@@ -107,6 +108,8 @@ export default function PremiumLeadForm({
   const [packagesLoading, setPackagesLoading] = useState(false);
   const [packages, setPackages] = useState(null);
   const [packageDisclaimer, setPackageDisclaimer] = useState("");
+  const [weatherSlots, setWeatherSlots] = useState([]);
+  const [weatherDisclaimer, setWeatherDisclaimer] = useState("");
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [depositNotice, setDepositNotice] = useState(() => {
@@ -304,9 +307,8 @@ export default function PremiumLeadForm({
     setError("");
     try {
       const serviceNeeded = resolveLeadServiceNeeded(form.serviceNeeded, form.serviceOther);
-      const res = await fetch(
-        `/api/site/${encodeURIComponent(canonicalSlug)}/win-on-site/packages`,
-        {
+      const [pkgRes, slotRes] = await Promise.all([
+        fetch(`/api/site/${encodeURIComponent(canonicalSlug)}/win-on-site/packages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -314,10 +316,18 @@ export default function PremiumLeadForm({
             serviceNeeded,
             turnstileToken,
           }),
-        },
-      );
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
+        }),
+        fetch(`/api/site/${encodeURIComponent(canonicalSlug)}/win-on-site/weather-slots`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+            serviceNeeded,
+          }),
+        }),
+      ]);
+      const json = await pkgRes.json().catch(() => ({}));
+      if (!pkgRes.ok) {
         throw new Error(mapLeadApiError(json, "Could not build package options."));
       }
       setPackages(json.packages || null);
@@ -325,6 +335,14 @@ export default function PremiumLeadForm({
         json.disclaimer ||
           "Prices are estimates. Your contractor will confirm the final quote before work begins.",
       );
+
+      const slotJson = await slotRes.json().catch(() => ({}));
+      const slots = Array.isArray(slotJson.slots) ? slotJson.slots : [];
+      setWeatherSlots(slots);
+      setWeatherDisclaimer(String(slotJson.disclaimer || ""));
+      if (slots.length && !form.preferredSlot) {
+        setForm((prev) => ({ ...prev, preferredSlot: slots[0] }));
+      }
       if (!form.packageTier) {
         setForm((prev) => ({ ...prev, packageTier: "better" }));
       }
@@ -332,6 +350,7 @@ export default function PremiumLeadForm({
     } catch (err) {
       setError(err.message || "Could not build package options.");
       setPackages(null);
+      setWeatherSlots([]);
       return false;
     } finally {
       setPackagesLoading(false);
@@ -412,6 +431,7 @@ export default function PremiumLeadForm({
         photoDataUrl: "",
         photoDataUrls: [],
         packageTier: "better",
+        preferredSlot: null,
         website: "",
         submissionId:
           typeof crypto !== "undefined" && crypto.randomUUID
@@ -420,6 +440,7 @@ export default function PremiumLeadForm({
         formStartedAt: String(Date.now()),
       });
       setPackages(null);
+      setWeatherSlots([]);
       setStep(0);
       setTurnstileToken("");
       setTurnstileResetKey((k) => k + 1);
@@ -957,6 +978,53 @@ export default function PremiumLeadForm({
                   );
                 })}
               </div>
+              {weatherSlots.length ? (
+                <div style={{ marginBottom: 16 }}>
+                  <p className="ps-label" style={{ marginBottom: 8 }}>
+                    Weather-safe visit window
+                  </p>
+                  {weatherDisclaimer ? (
+                    <p className="ps-lead-sub" style={{ marginBottom: 10, fontSize: 13 }}>
+                      {weatherDisclaimer}
+                    </p>
+                  ) : null}
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {weatherSlots.map((slot) => {
+                      const selected =
+                        form.preferredSlot?.date === slot.date &&
+                        form.preferredSlot?.time === slot.time;
+                      return (
+                        <button
+                          key={slot.id || `${slot.date}_${slot.time}`}
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, preferredSlot: slot }))
+                          }
+                          style={{
+                            textAlign: "left",
+                            border: selected
+                              ? `2px solid ${themeColor}`
+                              : "1px solid #e2e8f0",
+                            borderRadius: 10,
+                            padding: "10px 12px",
+                            background: selected ? "#f8fafc" : "#fff",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <strong>
+                            {slot.windowLabel || slot.window} · {slot.date} · {slot.time}
+                          </strong>
+                          <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                            {slot.weather?.emoji || ""}{" "}
+                            {slot.weather?.temp != null ? `${slot.weather.temp}°F` : ""}{" "}
+                            {slot.weather?.condition || slot.weather?.description || ""}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               {turnstileRequired || turnstileSiteKey ? (
                 <TurnstileField
                   siteKey={turnstileSiteKey}

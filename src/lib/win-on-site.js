@@ -30,6 +30,13 @@ import {
   selectWinOnSitePackage,
   WIN_ON_SITE_DEPOSIT_PERCENT,
 } from "@/lib/win-on-site-packages";
+import {
+  buildWinOnSiteWeatherSlots,
+  listUpcomingYmdDates,
+  normalizePreferredSlot,
+} from "@/lib/win-on-site-weather";
+import { todayLocalYmd } from "@/lib/local-date";
+import { resolveWeatherBatch, weatherPairKey } from "@/lib/weather-service";
 
 export {
   buildWinOnSitePrompt,
@@ -49,6 +56,96 @@ export {
   WIN_ON_SITE_DEPOSIT_PERCENT,
   WIN_ON_SITE_PACKAGE_TIERS,
 } from "@/lib/win-on-site-packages";
+
+export {
+  buildWinOnSiteWeatherSlots,
+  normalizePreferredSlot,
+  scoreWinOnSiteWeatherDay,
+} from "@/lib/win-on-site-weather";
+
+/**
+ * Suggest weather-safe visit slots for a public site lead location.
+ */
+export async function suggestWinOnSiteWeatherSlots({
+  location = "",
+  limit = 5,
+} = {}) {
+  const loc = String(location || "").trim();
+  if (loc.length < 3) {
+    return { ok: false, reason: "location_required", slots: [] };
+  }
+
+  const fromYmd = todayLocalYmd();
+  const dates = listUpcomingYmdDates({ fromYmd, days: 12, skipToday: true });
+  const items = dates.map((date) => ({ location: loc, date }));
+  const batch = await resolveWeatherBatch(items);
+  const weatherByDate = {};
+  for (const date of dates) {
+    const key = weatherPairKey(loc, date);
+    weatherByDate[date] = batch?.[key] || null;
+  }
+
+  const slots = buildWinOnSiteWeatherSlots({
+    weatherByDate,
+    fromYmd,
+    limit,
+  });
+
+  return {
+    ok: true,
+    location: loc,
+    slots,
+    disclaimer:
+      "Suggested windows avoid rain, storms, snow, high wind, and near-freeze days. Your contractor will confirm the final schedule.",
+  };
+}
+
+async function createWinOnSiteAppointmentForLead({
+  tenantId,
+  clientName = "",
+  serviceNeeded = "",
+  address = "",
+  preferredSlot = null,
+  leadId = null,
+} = {}) {
+  const slot = normalizePreferredSlot(preferredSlot);
+  if (!tenantId || !slot) return { ok: false, reason: "missing_slot" };
+
+  const nowIso = new Date().toISOString();
+  const title = `Site visit — ${serviceNeeded || "Website lead"}`.slice(0, 160);
+  const notes = [
+    "Created from Win on Site weather-safe booking",
+    leadId ? `Lead: ${leadId}` : "",
+    slot.weather?.condition
+      ? `Weather at suggest time: ${slot.weather.emoji || ""} ${slot.weather.condition} ${slot.weather.temp != null ? `${slot.weather.temp}°F` : ""}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const { data, error } = await supabaseAdmin
+    .from("appointments")
+    .insert({
+      tenant_id: tenantId,
+      title,
+      client: String(clientName || "Website lead").slice(0, 200),
+      date: slot.date,
+      time: slot.time,
+      status: "scheduled",
+      location: String(address || "").slice(0, 300),
+      notes,
+      created_at: nowIso,
+      updated_at: nowIso,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data?.id) {
+    console.warn("[win-on-site] appointment insert failed", error?.message || error);
+    return { ok: false, reason: "appointment_insert_failed" };
+  }
+  return { ok: true, appointmentId: data.id };
+}
 
 /**
  * Resolve a priced base draft without writing to DB (for package preview + submit).
@@ -152,6 +249,7 @@ export async function createWinOnSiteEstimateForLead({
   photoUrls = [],
   existingMetadata = {},
   packageTier = "better",
+  preferredSlot = null,
 } = {}) {
   try {
     if (!tenantId || !leadId) return { ok: false, reason: "missing_ids" };
@@ -171,6 +269,7 @@ export async function createWinOnSiteEstimateForLead({
     const packages = buildWinOnSitePackages(draft);
     const selectedTier = normalizeWinOnSitePackageTier(packageTier, "better");
     const selected = selectWinOnSitePackage(packages, selectedTier);
+    const slot = normalizePreferredSlot(preferredSlot);
 
     const services =
       Array.isArray(selected?.services) && selected.services.length
@@ -252,8 +351,28 @@ export async function createWinOnSiteEstimateForLead({
         depositPercent: WIN_ON_SITE_DEPOSIT_PERCENT,
         depositAmount: selected?.depositAmount || 0,
         depositStatus: "pending",
+        preferredSlot: slot,
       },
     });
+
+    let appointmentId = null;
+    if (slot) {
+      const appt = await createWinOnSiteAppointmentForLead({
+        tenantId,
+        clientName,
+        serviceNeeded,
+        address,
+        preferredSlot: slot,
+        leadId,
+      });
+      if (appt?.ok && appt.appointmentId) {
+        appointmentId = appt.appointmentId;
+        metadata.winOnSite = {
+          ...metadata.winOnSite,
+          appointmentId,
+        };
+      }
+    }
 
     const { error: metaError } = await supabaseAdmin
       .from("contractor_website_leads")
@@ -274,6 +393,8 @@ export async function createWinOnSiteEstimateForLead({
       packages,
       selectedPackage: selected,
       packageTier: selectedTier,
+      preferredSlot: slot,
+      appointmentId,
     };
   } catch (error) {
     console.warn("[win-on-site] create draft failed", error?.message || error);

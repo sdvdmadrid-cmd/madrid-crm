@@ -203,6 +203,10 @@ export function normalizeLeadPayload(body = {}) {
       .trim()
       .toLowerCase()
       .slice(0, 20),
+    preferredSlot:
+      body.preferredSlot && typeof body.preferredSlot === "object"
+        ? body.preferredSlot
+        : null,
     submissionId: String(body.submissionId || "").trim().slice(0, 64),
     website: String(body.website || "").trim().slice(0, 200),
     formStartedAt: body.formStartedAt,

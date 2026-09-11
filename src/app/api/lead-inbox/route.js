@@ -48,6 +48,8 @@ function serializeLead(row) {
     packageTotal: winOnSite?.packageTotal || null,
     depositAmount: winOnSite?.depositAmount || null,
     depositStatus: winOnSite?.depositStatus || "",
+    preferredSlot: winOnSite?.preferredSlot || null,
+    appointmentId: winOnSite?.appointmentId || null,
     address: [row.address_line_1, row.city, row.state, row.zip_code]
       .filter(Boolean)
       .join(", "),
