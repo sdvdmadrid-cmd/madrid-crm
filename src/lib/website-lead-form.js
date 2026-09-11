@@ -199,6 +199,10 @@ export function normalizeLeadPayload(body = {}) {
     photoDataUrls: Array.isArray(body.photoDataUrls)
       ? body.photoDataUrls.map((v) => String(v || "").trim()).filter(Boolean)
       : [],
+    packageTier: String(body.packageTier || "better")
+      .trim()
+      .toLowerCase()
+      .slice(0, 20),
     submissionId: String(body.submissionId || "").trim().slice(0, 64),
     website: String(body.website || "").trim().slice(0, 200),
     formStartedAt: body.formStartedAt,

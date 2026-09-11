@@ -23,9 +23,11 @@ import {
 } from "@/lib/website-lead-form";
 import { insertWebsiteLeadRow } from "@/lib/website-lead-persist";
 import {
+  createWinOnSiteDepositCheckout,
   createWinOnSiteEstimateForLead,
   mergeWinOnSiteLeadMetadata,
   normalizeLeadPhotoDataUrls,
+  normalizeWinOnSitePackageTier,
 } from "@/lib/win-on-site";
 import crypto from "crypto";
 
@@ -187,29 +189,8 @@ async function runWebsiteLeadSideEffects({
   cleanContactPreference,
   fullAddress,
   confirmLocale,
-  clientId = null,
-  photoUrls = [],
-  existingMetadata = {},
-  request = null,
 }) {
   try {
-    await createWinOnSiteEstimateForLead({
-      request,
-      tenantId,
-      leadId,
-      clientId,
-      clientName: cleanName,
-      clientEmail: cleanEmail,
-      clientPhone: cleanPhone,
-      serviceNeeded: cleanServiceNeeded,
-      description: cleanDescription,
-      address: fullAddress,
-      budgetRange: cleanBudgetRange,
-      timeline: cleanTimeline,
-      photoUrls,
-      existingMetadata,
-    });
-
     await notifyContractorOfWebsiteLead({
       tenantId,
       leadName: cleanName,
@@ -567,6 +548,55 @@ export async function POST(request, { params }) {
       companyProfile?.documentLanguage ||
       "en";
 
+    const packageTier = normalizeWinOnSitePackageTier(payload.packageTier, "better");
+
+    const draftResult = await createWinOnSiteEstimateForLead({
+      request,
+      tenantId: website.tenantId,
+      leadId,
+      clientId: client?.id || null,
+      clientName: cleanName,
+      clientEmail: cleanEmail,
+      clientPhone: cleanPhone,
+      serviceNeeded: cleanServiceNeeded,
+      description: cleanDescription,
+      address: fullAddress,
+      budgetRange: cleanBudgetRange,
+      timeline: cleanTimeline,
+      photoUrls: storedPhotoUrls,
+      existingMetadata: leadMetadata,
+      packageTier,
+    });
+
+    let checkoutUrl = "";
+    let depositSkipped = false;
+    let depositSkipReason = "";
+    let estimateId = draftResult?.estimateId || null;
+
+    if (draftResult?.ok && draftResult.selectedPackage) {
+      const depositResult = await createWinOnSiteDepositCheckout({
+        request,
+        tenantId: website.tenantId,
+        slug: canonicalSlug,
+        leadId,
+        clientId: client?.id || null,
+        clientName: cleanName,
+        clientEmail: cleanEmail,
+        estimateId,
+        selectedPackage: draftResult.selectedPackage,
+        existingMetadata: draftResult.metadata || leadMetadata,
+      });
+      if (depositResult?.ok && depositResult.checkoutUrl) {
+        checkoutUrl = depositResult.checkoutUrl;
+      } else {
+        depositSkipped = true;
+        depositSkipReason = depositResult?.reason || "stripe_missing";
+      }
+    } else {
+      depositSkipped = true;
+      depositSkipReason = draftResult?.reason || "estimate_insert_failed";
+    }
+
     after(() =>
       runWebsiteLeadSideEffects({
         tenantId: website.tenantId,
@@ -583,10 +613,6 @@ export async function POST(request, { params }) {
         cleanContactPreference,
         fullAddress,
         confirmLocale,
-        clientId: client?.id || null,
-        photoUrls: storedPhotoUrls,
-        existingMetadata: leadMetadata,
-        request,
       }),
     );
 
@@ -595,7 +621,14 @@ export async function POST(request, { params }) {
         success: true,
         leadId,
         slug: canonicalSlug,
-        message: "Quote request submitted. We'll contact you soon!",
+        estimateId,
+        packageTier,
+        checkoutUrl: checkoutUrl || null,
+        depositSkipped,
+        depositSkipReason: depositSkipped ? depositSkipReason : null,
+        message: checkoutUrl
+          ? "Estimate ready. Redirecting to secure deposit checkout…"
+          : "Quote request submitted. We'll contact you soon!",
       },
       { status: 200 },
     );
