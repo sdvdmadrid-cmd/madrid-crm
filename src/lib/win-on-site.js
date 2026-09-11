@@ -25,11 +25,12 @@ import {
   WIN_ON_SITE_PHASE,
 } from "@/lib/win-on-site-helpers";
 import {
-  buildWinOnSitePackages,
   normalizeWinOnSitePackageTier,
   selectWinOnSitePackage,
   WIN_ON_SITE_DEPOSIT_PERCENT,
 } from "@/lib/win-on-site-packages";
+import { resolveWinOnSitePackages } from "@/lib/win-on-site-catalog";
+import { normalizeMapMarkup } from "@/lib/win-on-site-map";
 import {
   buildWinOnSiteWeatherSlots,
   listUpcomingYmdDates,
@@ -160,6 +161,8 @@ export async function resolveWinOnSiteBaseDraft({
   timeline = "",
   clientName = "",
   photoUrls = [],
+  areaSqFt = null,
+  mapMarkup = null,
 } = {}) {
   const prompt = buildWinOnSitePrompt({
     serviceNeeded,
@@ -169,6 +172,8 @@ export async function resolveWinOnSiteBaseDraft({
     timeline,
     clientName,
     photoUrls,
+    areaSqFt,
+    mapMarkup,
   });
 
   const enabled = await isPlatformFeatureEnabled("feature_ai_estimate", true);
@@ -250,9 +255,13 @@ export async function createWinOnSiteEstimateForLead({
   existingMetadata = {},
   packageTier = "better",
   preferredSlot = null,
+  mapMarkup = null,
 } = {}) {
   try {
     if (!tenantId || !leadId) return { ok: false, reason: "missing_ids" };
+
+    const normalizedMap = normalizeMapMarkup(mapMarkup);
+    const areaSqFt = normalizedMap?.areaSqFt || null;
 
     const { draft, source } = await resolveWinOnSiteBaseDraft({
       request,
@@ -264,9 +273,21 @@ export async function createWinOnSiteEstimateForLead({
       timeline,
       clientName,
       photoUrls,
+      areaSqFt,
+      mapMarkup: normalizedMap,
     });
 
-    const packages = buildWinOnSitePackages(draft);
+    const {
+      packages,
+      pricingSource,
+      catalogItemIds,
+    } = await resolveWinOnSitePackages({
+      tenantId,
+      serviceNeeded,
+      description,
+      baseDraft: draft,
+      areaSqFt,
+    });
     const selectedTier = normalizeWinOnSitePackageTier(packageTier, "better");
     const selected = selectWinOnSitePackage(packages, selectedTier);
     const slot = normalizePreferredSlot(preferredSlot);
@@ -352,6 +373,10 @@ export async function createWinOnSiteEstimateForLead({
         depositAmount: selected?.depositAmount || 0,
         depositStatus: "pending",
         preferredSlot: slot,
+        pricingSource,
+        catalogItemIds,
+        mapMarkup: normalizedMap,
+        approxAreaSqFt: areaSqFt,
       },
     });
 
@@ -395,6 +420,8 @@ export async function createWinOnSiteEstimateForLead({
       packageTier: selectedTier,
       preferredSlot: slot,
       appointmentId,
+      pricingSource,
+      catalogItemIds,
     };
   } catch (error) {
     console.warn("[win-on-site] create draft failed", error?.message || error);
