@@ -629,27 +629,38 @@ export default function InvoicesPageClient({ initialList = null }) {
     }
   };
 
-  const editInvoice = (invoice) => {
+  const editInvoice = async (invoice) => {
+    let fullInvoice = invoice;
+    try {
+      const res = await apiFetch(`/api/invoices/${invoice._id || invoice.id}`);
+      if (res.ok) {
+        const payload = await res.json().catch(() => null);
+        fullInvoice = payload?.data || payload || invoice;
+      }
+    } catch {
+      fullInvoice = invoice;
+    }
+
     const nextForm = {
-      invoiceNumber: invoice.invoiceNumber || "",
-      clientId: invoice.clientId || "",
-      clientName: invoice.clientName || "",
-      clientEmail: invoice.clientEmail || "",
-      invoiceTitle: invoice.invoiceTitle || "",
-      quoteNumber: invoice.quoteNumber || "",
-      amount: invoice.amount || "",
-      invoiceDate: invoice.createdAt
-        ? String(invoice.createdAt).slice(0, 10)
+      invoiceNumber: fullInvoice.invoiceNumber || "",
+      clientId: fullInvoice.clientId || "",
+      clientName: fullInvoice.clientName || "",
+      clientEmail: fullInvoice.clientEmail || "",
+      invoiceTitle: fullInvoice.invoiceTitle || "",
+      quoteNumber: fullInvoice.quoteNumber || "",
+      amount: fullInvoice.amount || "",
+      invoiceDate: fullInvoice.createdAt
+        ? String(fullInvoice.createdAt).slice(0, 10)
         : todayIso(),
-      dueDate: invoice.dueDate || "",
-      status: invoice.status || "Sent",
-      preferredPaymentMethod: invoice.preferredPaymentMethod || "bank_transfer",
-      lineItems: normalizeInvoiceLineItemsForForm(invoice.lineItems),
-      notes: invoice.notes || "",
-      internalNotes: invoice.internalNotes || "",
+      dueDate: fullInvoice.dueDate || "",
+      status: fullInvoice.status || "Sent",
+      preferredPaymentMethod: fullInvoice.preferredPaymentMethod || "bank_transfer",
+      lineItems: normalizeInvoiceLineItemsForForm(fullInvoice.lineItems),
+      notes: fullInvoice.notes || "",
+      internalNotes: fullInvoice.internalNotes || "",
     };
     setForm(nextForm);
-    setSelectedId(invoice._id);
+    setSelectedId(fullInvoice._id || fullInvoice.id);
     setQuoteLookup(null);
     savedSnapshotRef.current = JSON.stringify(nextForm);
     setView("builder");

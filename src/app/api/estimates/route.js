@@ -27,7 +27,7 @@ import { recordEstimateRevision } from "@/lib/estimate-revisions";
 import { parseJsonBody } from "@/lib/parse-json-body";
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { listEstimatesForTenant } from "@/lib/estimates-list-server";
+import { listEstimatesForTenant, ESTIMATES_LIST_SELECT_COLUMNS } from "@/lib/estimates-list-server";
 import {
   applyUnpaginatedSafetyLimit,
   getListPaginationParams,
@@ -202,7 +202,7 @@ export async function GET(request) {
     let query = scopeByTenant(
       supabaseAdmin
         .from(ESTIMATES_TABLE)
-        .select("*")
+        .select(ESTIMATES_LIST_SELECT_COLUMNS)
         .order("updated_at", { ascending: false })
         .order("created_at", { ascending: false }),
       { tenantDbId, role },

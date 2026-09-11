@@ -12,19 +12,12 @@ import {
   normalizeDateOnly,
   normalizeUuid,
 } from "@/lib/supabase-db";
-import {
-  canManageSensitive,
-  canWrite,
-  forbiddenResponse,
-  getAuthenticatedTenantContext,
-  unauthenticatedResponse,
-} from "@/lib/tenant";
+import { billPayDisabledResponse } from "@/lib/bill-pay-disabled";
 import { getPlaidProcessorToken } from "@/lib/plaid-integration";
 import { attachPlaidBankAccountToStripeCustomer } from "@/lib/stripe-payments";
 import { decryptSensitive, encryptSensitive } from "@/lib/encryption";
 import { shouldPersistPlaidAccessToken } from "@/lib/bill-payments-security";
 import { BILL_CATEGORY_IDS } from "@/lib/bill-payments-catalog";
-import { canAccessBillPayments } from "@/lib/access-control";
 
 export const BILL_TABLE = "bills";
 export const BILL_PROVIDER_TABLE = "bill_providers";
@@ -94,28 +87,9 @@ export const AUTOPAY_SCHEDULE_TYPES = new Set([
 
 export const BILL_PAYMENTS_FREE_BILLS_LIMIT = 2;
 
-export async function requireBillPaymentsAccess(request, mode = "read") {
-  const context = await getAuthenticatedTenantContext(request);
-  if (!context.authenticated) {
-    return { response: unauthenticatedResponse() };
-  }
-
-  if (mode === "write" && !canWrite(context.role)) {
-    return { response: forbiddenResponse() };
-  }
-
-  if (mode === "sensitive" && !canManageSensitive(context.role)) {
-    return { response: forbiddenResponse() };
-  }
-
-  if (
-    (mode === "read" || mode === "write" || mode === "sensitive") &&
-    !canAccessBillPayments(context.role)
-  ) {
-    return { response: forbiddenResponse() };
-  }
-
-  return { context };
+export async function requireBillPaymentsAccess() {
+  // Legacy national bill-pay is retired — use /expenses for tracking and Invoices for collections.
+  return { response: billPayDisabledResponse() };
 }
 
 export function billPaymentsSubscriptionRequiredResponse({

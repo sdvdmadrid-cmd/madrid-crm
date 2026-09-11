@@ -13,6 +13,36 @@ import { applyListSearchOr } from "@/lib/list-search-server";
 
 const INVOICES = "invoices";
 
+/** Lean list projection — omit heavy items JSON; payments kept for status math. */
+export const INVOICES_LIST_SELECT_COLUMNS = [
+  "id",
+  "tenant_id",
+  "user_id",
+  "invoice_number",
+  "invoice_title",
+  "quote_id",
+  "quote_number",
+  "job_id",
+  "client_id",
+  "client_name",
+  "client_email",
+  "client_phone",
+  "client_address",
+  "property_address",
+  "amount",
+  "total_cents",
+  "due_date",
+  "notes",
+  "internal_notes",
+  "preferred_payment_method",
+  "payments",
+  "paid_amount",
+  "balance_due",
+  "status",
+  "created_at",
+  "updated_at",
+].join(",");
+
 export const INVOICES_UI_PAGE_SIZE = 50;
 
 export function serializeInvoiceRow(doc) {
@@ -71,7 +101,7 @@ export async function listInvoicesForTenant(
   let query = scopeByTenant(
     supabaseAdmin
       .from(INVOICES)
-      .select("*", { count: "exact" })
+      .select(INVOICES_LIST_SELECT_COLUMNS, { count: "exact" })
       .order("created_at", { ascending: false }),
     { tenantDbId, role },
   );

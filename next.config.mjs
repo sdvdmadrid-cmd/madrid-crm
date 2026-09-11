@@ -59,6 +59,8 @@ const nextConfig = {
   reactCompiler: true,
   poweredByHeader: false,
   images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "**.supabase.co" },
@@ -70,6 +72,46 @@ const nextConfig = {
         source: "/website-builder",
         destination: "/website",
         permanent: true,
+      },
+      {
+        source: "/estimate-builder",
+        destination: "/estimates/new",
+        permanent: true,
+      },
+      {
+        source: "/estimate-builder/:path*",
+        destination: "/estimates/new",
+        permanent: true,
+      },
+      {
+        source: "/bill-payments",
+        destination: "/expenses",
+        permanent: false,
+      },
+      {
+        source: "/bill-payments/:path*",
+        destination: "/expenses",
+        permanent: false,
+      },
+      {
+        source: "/payment-methods",
+        destination: "/expenses",
+        permanent: false,
+      },
+      {
+        source: "/payment-methods/:path*",
+        destination: "/expenses",
+        permanent: false,
+      },
+      {
+        source: "/public/bill-payments",
+        destination: "/",
+        permanent: false,
+      },
+      {
+        source: "/public/bill-payments/:path*",
+        destination: "/",
+        permanent: false,
       },
       {
         source: "/site/:slug",

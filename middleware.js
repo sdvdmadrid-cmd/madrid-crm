@@ -93,27 +93,27 @@ function isRateLimitExempt(pathname) {
 
 // Redis HTTP call via Upstash REST API (works in Edge Runtime)
 async function redisIncr(key, windowSeconds) {
-  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
 
   try {
-    // INCR key
-    const incrRes = await fetch(`${url}/incr/${encodeURIComponent(key)}`, {
+    // Pipeline INCR + EXPIRE so rate-limit writes are one round-trip.
+    const pipelineRes = await fetch(`${url}/pipeline`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["INCR", key],
+        ["EXPIRE", key, String(windowSeconds), "NX"],
+      ]),
     });
-    if (!incrRes.ok) return null;
-    const { result: count } = await incrRes.json();
-
-    // Set TTL only on first increment (count === 1)
-    if (count === 1) {
-      await fetch(`${url}/expire/${encodeURIComponent(key)}/${windowSeconds}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    }
-    return count;
+    if (!pipelineRes.ok) return null;
+    const rows = await pipelineRes.json();
+    const count = Number(rows?.[0]?.result);
+    return Number.isFinite(count) ? count : null;
   } catch {
     return null; // Redis unavailable → fall back to in-memory
   }
@@ -392,6 +392,32 @@ async function resolveSlugByCustomHostnameEdge(hostname) {
   const host = String(hostname || "").trim().toLowerCase();
   if (!host || host === "localhost" || host.endsWith(".localhost")) return "";
 
+  // Skip Supabase lookup for the FieldBase app host itself (apex / www / app / api).
+  // Custom contractor domains still resolve below.
+  const configuredDomain = String(process.env.NEXT_PUBLIC_SITE_DOMAIN || "fieldbaseapp.net")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+  if (configuredDomain) {
+    if (
+      host === configuredDomain ||
+      host === `www.${configuredDomain}` ||
+      host === `app.${configuredDomain}` ||
+      host === `api.${configuredDomain}`
+    ) {
+      return "";
+    }
+  }
+  // Common production host aliases when NEXT_PUBLIC_SITE_DOMAIN is a marketing brand.
+  if (
+    host === "fieldbaseapp.net" ||
+    host === "www.fieldbaseapp.net" ||
+    host === "app.fieldbaseapp.net"
+  ) {
+    return "";
+  }
+
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   if (!base || !key) return "";
@@ -480,6 +506,25 @@ export async function middleware(request) {
     redirectUrl.pathname = "/";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
+  }
+  // Disable legacy bill-pay pages for everyone (including anonymous). Authenticated
+  // contractors previously only hit this after session hydrate, so the shell leaked.
+  if (disabledBillPayTarget === "page") {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/expenses";
+    redirectUrl.search = "";
+    return NextResponse.redirect(redirectUrl);
+  }
+  if (disabledBillPayTarget === "api") {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Bill pay to external billers is not available. Use Expenses to track bills, or Invoices to collect from clients.",
+        code: "BILL_PAY_DISABLED",
+      },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } },
+    );
   }
 
   if (pathname.startsWith("/quotes/")) {
@@ -697,25 +742,6 @@ export async function middleware(request) {
 
   const sessionRole = String(session?.role || "").toLowerCase();
 
-  if (disabledBillPayTarget === "api" && sessionRole !== "super_admin") {
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Bill pay to external billers is not available. Use Invoices to send your clients a secure payment link.",
-        code: "BILL_PAY_DISABLED",
-      },
-      { status: 403, headers: { "Cache-Control": "private, no-store" } },
-    );
-  }
-
-  if (disabledBillPayTarget === "page") {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/invoices";
-    redirectUrl.search = "focus=client-payments";
-    return NextResponse.redirect(redirectUrl);
-  }
-
   const isPlatformOperatorPath =
     pathname.startsWith("/owner") ||
     pathname.startsWith("/api/admin") ||
@@ -873,7 +899,9 @@ export async function middleware(request) {
 }
 
 export const config = {
+  // Do not exclude app routes under /public/* (e.g. legacy bill-pay) — only skip
+  // static assets and public APIs that intentionally bypass middleware.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|public|api/public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|api/public).*)",
   ],
 };

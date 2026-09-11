@@ -1,15 +1,51 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { getIndustryStockImageUrl, getWebsiteBuilderPack } from "../../src/lib/website-builder-industry.js";
-import {
+import { existsSync } from "node:fs";
+import { registerHooks } from "node:module";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === "server-only") {
+      return {
+        url: "data:text/javascript,export default {};",
+        shortCircuit: true,
+      };
+    }
+
+    if (specifier.startsWith("@/")) {
+      const target = resolve(workspaceRoot, "src", specifier.slice(2));
+      const candidates = [target, `${target}.js`, `${target}.jsx`];
+      const match = candidates.find((candidate) => existsSync(candidate));
+      if (match) {
+        return {
+          url: pathToFileURL(match).href,
+          shortCircuit: true,
+        };
+      }
+    }
+
+    return nextResolve(specifier, context);
+  },
+});
+
+const { getIndustryStockImageUrl, getWebsiteBuilderPack } = await import(
+  "../../src/lib/website-builder-industry.js"
+);
+const {
   findGallerySlotsForAiEnhancement,
   findHeroSlotsForAiEnhancement,
   findWebsiteImageEnhancementPlan,
   isWebsiteStockImageUrl,
   mergeWebsiteCopySection,
   runWithConcurrency,
-} from "../../src/lib/website-builder-client-generation.js";
-import { buildWebsiteImagePrompt } from "../../src/lib/website-builder-image-generation.js";
+} = await import("../../src/lib/website-builder-client-generation.js");
+const { buildWebsiteImagePrompt } = await import(
+  "../../src/lib/website-builder-image-generation.js"
+);
 
 describe("website-builder speed helpers", () => {
   it("returns stock image URLs per industry", () => {

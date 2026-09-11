@@ -13,6 +13,26 @@ import { applyListSearchOr } from "@/lib/list-search-server";
 
 const ESTIMATES_TABLE = "estimates";
 
+/** Lean list projection — omit items JSON until detail fetch. */
+export const ESTIMATES_LIST_SELECT_COLUMNS = [
+  "id",
+  "tenant_id",
+  "user_id",
+  "created_by",
+  "client_name",
+  "client_id",
+  "status",
+  "subtotal",
+  "tax",
+  "total",
+  "notes",
+  "estimate_number",
+  "scheduled_visit_date",
+  "job_id",
+  "created_at",
+  "updated_at",
+].join(",");
+
 export const ESTIMATES_UI_PAGE_SIZE = 50;
 
 function serializeEstimate(row) {
@@ -35,7 +55,7 @@ export async function listEstimatesForTenant(
   let query = scopeByTenant(
     supabaseAdmin
       .from(ESTIMATES_TABLE)
-      .select("*", { count: "exact" })
+      .select(ESTIMATES_LIST_SELECT_COLUMNS, { count: "exact" })
       .order("updated_at", { ascending: false })
       .order("created_at", { ascending: false }),
     { tenantDbId, role },

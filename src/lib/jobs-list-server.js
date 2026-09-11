@@ -7,6 +7,39 @@ import { applyListSearchOr } from "@/lib/list-search-server";
 
 const JOBS = "jobs";
 
+/** Lean list projection — omit estimate_snapshot JSON until detail fetch. */
+export const JOBS_LIST_SELECT_COLUMNS = [
+  "id",
+  "tenant_id",
+  "user_id",
+  "title",
+  "description",
+  "client_id",
+  "client_name",
+  "service",
+  "status",
+  "price",
+  "due_date",
+  "tax_state",
+  "down_payment_percent",
+  "scope_details",
+  "square_meters",
+  "complexity",
+  "materials_included",
+  "travel_minutes",
+  "urgency",
+  "labor_cost_total",
+  "labor_hours_total",
+  "labor_burden_total",
+  "quote_token",
+  "quote_shared_at",
+  "quote_sent_at",
+  "quote_sent_to",
+  "invoiced",
+  "created_at",
+  "updated_at",
+].join(",");
+
 export const JOBS_UI_PAGE_SIZE = 50;
 
 export function serializeJobRow(doc) {
@@ -57,7 +90,7 @@ export async function listJobsForTenant(
   let query = scopeByTenant(
     supabaseAdmin
       .from(JOBS)
-      .select("*", { count: "exact" })
+      .select(JOBS_LIST_SELECT_COLUMNS, { count: "exact" })
       .order("created_at", { ascending: false }),
     { tenantDbId, role },
   );

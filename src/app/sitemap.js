@@ -10,8 +10,8 @@ export default async function sitemap() {
     { path: "/", changeFrequency: "daily", priority: 1.0 },
     { path: "/legal", changeFrequency: "monthly", priority: 0.6 },
     { path: "/legal-required", changeFrequency: "monthly", priority: 0.4 },
-    { path: "/estimate", changeFrequency: "weekly", priority: 0.7 },
-    { path: "/quote", changeFrequency: "weekly", priority: 0.7 },
+    { path: "/login", changeFrequency: "monthly", priority: 0.5 },
+    { path: "/subscribe", changeFrequency: "weekly", priority: 0.7 },
   ];
 
   const publishedSites = await listPublishedPublicWebsiteSlugs();
