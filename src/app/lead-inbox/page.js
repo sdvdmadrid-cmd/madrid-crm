@@ -52,6 +52,7 @@ const UI = {
     summaryNew: (n) => `${n} new`,
     summaryContacted: (n) => `${n} contacted`,
     openEstimate: "Open new estimate",
+    openDraftEstimate: "Open draft estimate",
     copyReply: "Copy reply",
     copied: "Copied",
     showMore: "Show full message",
@@ -100,6 +101,7 @@ const UI = {
     summaryNew: (n) => `${n} nuevos`,
     summaryContacted: (n) => `${n} contactados`,
     openEstimate: "Abrir estimado nuevo",
+    openDraftEstimate: "Abrir borrador de estimado",
     copyReply: "Copiar respuesta",
     copied: "Copiado",
     showMore: "Ver mensaje completo",
@@ -148,6 +150,7 @@ const UI = {
     summaryNew: (n) => `${n} nowych`,
     summaryContacted: (n) => `${n} skontaktowanych`,
     openEstimate: "Otwórz nową wycenę",
+    openDraftEstimate: "Otwórz szkic wyceny",
     copyReply: "Kopiuj odpowiedź",
     copied: "Skopiowano",
     showMore: "Pokaż całą wiadomość",
@@ -185,6 +188,7 @@ function LeadCard({
   isConverting,
   isUpdatingStatus,
   onConvert,
+  onOpenDraft,
   onSuggestReply,
   onStatusChange,
   suggestingReply,
@@ -291,16 +295,19 @@ function LeadCard({
               {expanded ? t.showLess : t.showMore}
             </button>
           ) : null}
-          {item.photoUrl ? (
+          {item.photoUrl || item.photoUrls?.length ? (
             <div style={{ marginTop: 12 }}>
               <p className={li.sectionLabel}>{t.photo}</p>
-              <a href={item.photoUrl} target="_blank" rel="noreferrer">
-                <img
-                  src={item.photoUrl}
-                  alt=""
-                  className={li.leadPhoto}
-                />
-              </a>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(item.photoUrls?.length ? item.photoUrls : [item.photoUrl])
+                  .filter(Boolean)
+                  .slice(0, 3)
+                  .map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} alt="" className={li.leadPhoto} />
+                    </a>
+                  ))}
+              </div>
             </div>
           ) : null}
         </div>
@@ -336,6 +343,15 @@ function LeadCard({
         >
           {suggestingReply ? t.suggestingReply : t.suggestReply}
         </button>
+        {item.draftEstimateId ? (
+          <button
+            type="button"
+            className={li.btnConvert}
+            onClick={() => onOpenDraft(item)}
+          >
+            {t.openDraftEstimate}
+          </button>
+        ) : null}
         <button
           type="button"
           className={li.btnConvert}
@@ -505,6 +521,12 @@ export default function LeadInboxPage() {
     }
   };
 
+  const openDraftEstimate = (item) => {
+    const estimateId = String(item?.draftEstimateId || "").trim();
+    if (!estimateId) return;
+    router.push(`/estimates/new?edit=${estimateId}`);
+  };
+
   const suggestReply = async (item) => {
     setReplyLoadingId(item.id);
     setError("");
@@ -620,6 +642,7 @@ export default function LeadInboxPage() {
                 isConverting={convertingId === item.id}
                 isUpdatingStatus={statusUpdatingId === item.id}
                 onConvert={convertToJob}
+                onOpenDraft={openDraftEstimate}
                 onSuggestReply={suggestReply}
                 onStatusChange={updateLeadStatus}
                 suggestingReply={replyLoadingId === item.id}

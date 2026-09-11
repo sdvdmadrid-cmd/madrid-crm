@@ -22,6 +22,11 @@ import {
   resolveWebsiteRequestServices,
 } from "@/lib/website-lead-form";
 import { insertWebsiteLeadRow } from "@/lib/website-lead-persist";
+import {
+  createWinOnSiteEstimateForLead,
+  mergeWinOnSiteLeadMetadata,
+  normalizeLeadPhotoDataUrls,
+} from "@/lib/win-on-site";
 import crypto from "crypto";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -182,8 +187,29 @@ async function runWebsiteLeadSideEffects({
   cleanContactPreference,
   fullAddress,
   confirmLocale,
+  clientId = null,
+  photoUrls = [],
+  existingMetadata = {},
+  request = null,
 }) {
   try {
+    await createWinOnSiteEstimateForLead({
+      request,
+      tenantId,
+      leadId,
+      clientId,
+      clientName: cleanName,
+      clientEmail: cleanEmail,
+      clientPhone: cleanPhone,
+      serviceNeeded: cleanServiceNeeded,
+      description: cleanDescription,
+      address: fullAddress,
+      budgetRange: cleanBudgetRange,
+      timeline: cleanTimeline,
+      photoUrls,
+      existingMetadata,
+    });
+
     await notifyContractorOfWebsiteLead({
       tenantId,
       leadName: cleanName,
@@ -302,7 +328,14 @@ export async function POST(request, { params }) {
     const cleanBudgetRange = payload.budgetRange;
     const cleanTimeline = payload.timeline;
     const cleanContactPreference = payload.contactPreference || "phone";
-    const cleanPhotoDataUrl = payload.photoDataUrl.slice(0, MAX_PHOTO_DATA_URL_CHARS);
+    const photoDataUrls = normalizeLeadPhotoDataUrls(
+      {
+        photoDataUrl: payload.photoDataUrl,
+        photoDataUrls: payload.photoDataUrls,
+      },
+      { maxChars: MAX_PHOTO_DATA_URL_CHARS },
+    );
+    const cleanPhotoDataUrl = photoDataUrls[0] || "";
     const submissionId =
       payload.submissionId || crypto.randomUUID().replace(/-/g, "").slice(0, 32);
     const fullAddress = buildFullAddress({
@@ -344,14 +377,34 @@ export async function POST(request, { params }) {
     }
 
     let photoUrl = "";
-    if (cleanPhotoDataUrl) {
-      photoUrl = await uploadWebsiteImageFromDataUrl({
+    const uploadedPhotoUrls = [];
+    for (const dataUrl of photoDataUrls) {
+      const uploaded = await uploadWebsiteImageFromDataUrl({
         tenantId: website.tenantId,
         slug: canonicalSlug,
-        dataUrl: cleanPhotoDataUrl,
+        dataUrl,
         kind: "lead-photo",
       });
+      if (uploaded) {
+        uploadedPhotoUrls.push(uploaded);
+        if (!photoUrl) photoUrl = uploaded;
+      }
     }
+    const storedPhotoUrls = uploadedPhotoUrls.length
+      ? uploadedPhotoUrls
+      : photoDataUrls.slice(0, 1);
+
+    const leadMetadata = mergeWinOnSiteLeadMetadata(
+      {
+        budgetRange: cleanBudgetRange,
+        timeline: cleanTimeline,
+        contactPreference: cleanContactPreference,
+        fullAddress,
+      },
+      {
+        photoUrls: storedPhotoUrls,
+      },
+    );
 
     const leadInsertBase = {
       tenant_id: website.tenantId,
@@ -372,12 +425,7 @@ export async function POST(request, { params }) {
       contact_preference: cleanContactPreference,
       submission_id: submissionId,
       status: "new",
-      metadata: {
-        budgetRange: cleanBudgetRange,
-        timeline: cleanTimeline,
-        contactPreference: cleanContactPreference,
-        fullAddress,
-      },
+      metadata: leadMetadata,
       created_at: nowIso,
       updated_at: nowIso,
     };
@@ -467,7 +515,9 @@ export async function POST(request, { params }) {
           `Service needed: ${cleanServiceNeeded}`,
           cleanDescription,
           `Address: ${fullAddress}`,
-          cleanPhotoDataUrl ? "Photo attached in website lead submission." : "",
+          cleanPhotoDataUrl || photoDataUrls.length
+            ? "Photo attached in website lead submission."
+            : "",
         ]
           .filter(Boolean)
           .join("\n\n"),
@@ -533,6 +583,10 @@ export async function POST(request, { params }) {
         cleanContactPreference,
         fullAddress,
         confirmLocale,
+        clientId: client?.id || null,
+        photoUrls: storedPhotoUrls,
+        existingMetadata: leadMetadata,
+        request,
       }),
     );
 
