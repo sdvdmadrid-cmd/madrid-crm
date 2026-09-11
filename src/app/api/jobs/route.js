@@ -1,5 +1,5 @@
 import { attachFreshPartyToJobDbRow } from "@/lib/client-document-party";
-import { listJobsForTenant, serializeJobRow } from "@/lib/jobs-list-server";
+import { JOBS_LIST_SELECT_COLUMNS, listJobsForTenant, serializeJobRow } from "@/lib/jobs-list-server";
 import { sanitizePayloadDeep } from "@/lib/input-sanitizer";
 import { trackMarketingEvent } from "@/lib/marketing-analytics";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -93,7 +93,7 @@ export async function GET(request) {
     let query = scopeByTenant(
       supabaseAdmin
         .from(JOBS)
-        .select("*", { count: paginate ? "exact" : undefined })
+        .select(JOBS_LIST_SELECT_COLUMNS, { count: paginate ? "exact" : undefined })
         .order("created_at", { ascending: false }),
       { tenantDbId, role },
     );

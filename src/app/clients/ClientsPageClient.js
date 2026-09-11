@@ -1,4 +1,5 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { validateContactFields } from "@/lib/field-validation";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,12 +18,16 @@ import "@/i18n";
 import ClientForm, { EMPTY_CLIENT_FORM } from "@/components/clients/ClientForm";
 import ClientFormModal from "@/components/clients/ClientFormModal";
 import ClientCsvActionsMenu from "@/components/clients/ClientCsvActionsMenu";
-import ClientCsvImportWizard from "@/components/clients/ClientCsvImportWizard";
 import ClientDetailsPanel from "@/components/clients/ClientDetailsPanel";
 import ClientsList from "@/components/clients/ClientsList";
 import PremiumPageShell from "@/components/workspace/PremiumPageShell";
 import pageStyles from "@/components/clients/clients-page.module.css";
 import ws from "@/styles/workspace-dark.module.css";
+
+const ClientCsvImportWizard = dynamic(
+  () => import("@/components/clients/ClientCsvImportWizard"),
+  { ssr: false, loading: () => null },
+);
 
 export default function ClientsPageClient({ initialList = null }) {
   const searchParams = useSearchParams();

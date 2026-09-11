@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import InstantNavigation from "@/components/InstantNavigation";
-import LoginAccessPanel from "@/components/auth/LoginAccessPanel";
+import PublicPageShell from "@/components/PublicPageShell";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import { performClientLogout } from "@/lib/auth-logout-client";
 import {
@@ -15,8 +15,6 @@ import {
 } from "@/lib/auth-logout-guard.js";
 import { supabase } from "@/lib/supabase";
 import "@/i18n";
-import AppFooter from "@/components/site/AppFooter";
-import PublicPageShell from "@/components/PublicPageShell";
 import WorkspaceCompanyCard from "@/components/workspace/WorkspaceCompanyCard";
 import { AuthSessionProvider } from "@/context/AuthSessionContext";
 import { TenantWorkspaceProvider } from "@/context/TenantWorkspaceContext";
@@ -35,6 +33,13 @@ import { performAuthHardNavigate } from "@/lib/auth-nav";
 import { getRoleCapabilities, normalizeAppRole } from "@/lib/access-control";
 import { EXPIRED_TRIAL_SUBSCRIBE_PATH } from "@/lib/subscription-routes";
 
+const LoginAccessPanel = dynamic(
+  () => import("@/components/auth/LoginAccessPanel"),
+  { ssr: false, loading: () => null },
+);
+const AppFooter = dynamic(() => import("@/components/site/AppFooter"), {
+  loading: () => null,
+});
 const AiBubbleClient = dynamic(() => import("@/components/AiBubbleClient"), {
   ssr: false,
   loading: () => null,

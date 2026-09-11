@@ -354,6 +354,14 @@ export default function QuoteClientPage() {
     signatureDrawDataUrl: "",
     acceptElectronicConsent: false,
   });
+  const [changesForm, setChangesForm] = useState({
+    requestType: "change",
+    item: "",
+    message: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+  });
   const [printSignedMode, setPrintSignedMode] = useState(false);
 
   const approveRef = useRef(null);
@@ -416,6 +424,15 @@ export default function QuoteClientPage() {
   const job = payload?.job || {};
   const signatureEvidence = payload?.signatureEvidence || null;
   const signedPdfUrl = payload?.signedPdfUrl || "";
+  const financials = useMemo(
+    () =>
+      computeEstimateFinancials({
+        baseAmount: job.price,
+        taxState: job.taxState,
+        downPaymentPercent: job.downPaymentPercent,
+      }),
+    [job.price, job.taxState, job.downPaymentPercent],
+  );
 
   const quoteStatus = String(job.quoteStatus || "sent").toLowerCase();
   const isFinalized = quoteStatus === "approved" || quoteStatus === "signed" || quoteStatus === "declined";

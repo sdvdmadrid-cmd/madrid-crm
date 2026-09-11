@@ -559,30 +559,41 @@ export default function JobsPageClient({ initialList = null }) {
     }
   };
 
-  const editJob = (job) => {
+  const editJob = async (job) => {
+    let fullJob = job;
+    try {
+      const res = await apiFetch(`/api/jobs/${job._id || job.id}`);
+      if (res.ok) {
+        const payload = await res.json().catch(() => null);
+        fullJob = payload?.data || payload || job;
+      }
+    } catch {
+      fullJob = job;
+    }
+
     setForm({
-      title: job.title || "",
-      clientName: job.clientName || "",
-      service: job.service || "",
-      status: job.status || "Pending",
-      price: job.price || "",
-      dueDate: job.dueDate || "",
-      taxState: job.taxState || "TX",
-      downPaymentPercent: job.downPaymentPercent || "0",
-      scopeDetails: job.scopeDetails || "",
+      title: fullJob.title || "",
+      clientName: fullJob.clientName || "",
+      service: fullJob.service || "",
+      status: fullJob.status || "Pending",
+      price: fullJob.price || "",
+      dueDate: fullJob.dueDate || "",
+      taxState: fullJob.taxState || "TX",
+      downPaymentPercent: fullJob.downPaymentPercent || "0",
+      scopeDetails: fullJob.scopeDetails || "",
       jobSiteStreet: "",
-      squareMeters: job.squareMeters || "",
-      complexity: job.complexity || "standard",
+      squareMeters: fullJob.squareMeters || "",
+      complexity: fullJob.complexity || "standard",
       materialsIncluded:
-        typeof job.materialsIncluded === "boolean"
-          ? job.materialsIncluded
+        typeof fullJob.materialsIncluded === "boolean"
+          ? fullJob.materialsIncluded
           : true,
-      travelMinutes: job.travelMinutes || "",
-      urgency: job.urgency || "flexible",
-      estimateSnapshot: job.estimateSnapshot || null,
+      travelMinutes: fullJob.travelMinutes || "",
+      urgency: fullJob.urgency || "flexible",
+      estimateSnapshot: fullJob.estimateSnapshot || null,
     });
-    setEstimateResult(job.estimateSnapshot || null);
-    setSelectedId(job._id);
+    setEstimateResult(fullJob.estimateSnapshot || null);
+    setSelectedId(fullJob._id || fullJob.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 

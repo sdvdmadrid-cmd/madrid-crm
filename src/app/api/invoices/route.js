@@ -33,7 +33,7 @@ import {
   resolveClientForInvoiceParty,
 } from "@/lib/invoice-party";
 import { normalizeInvoiceLineItemsForSave } from "@/lib/invoice-line-items";
-import { listInvoicesForTenant, serializeInvoiceRow } from "@/lib/invoices-list-server";
+import { INVOICES_LIST_SELECT_COLUMNS, listInvoicesForTenant, serializeInvoiceRow } from "@/lib/invoices-list-server";
 
 const INVOICES = "invoices";
 
@@ -108,7 +108,7 @@ export async function GET(request) {
     let query = scopeByTenant(
       supabaseAdmin
         .from(INVOICES)
-        .select("*", { count: paginate ? "exact" : undefined })
+        .select(INVOICES_LIST_SELECT_COLUMNS, { count: paginate ? "exact" : undefined })
         .order("created_at", { ascending: false }),
       { tenantDbId, role },
     );

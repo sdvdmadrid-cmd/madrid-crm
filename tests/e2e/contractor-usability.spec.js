@@ -243,7 +243,7 @@ test.describe("Contractor usability — core CRM workflows", () => {
       "/services-catalog",
       "/reputation",
       "/settings",
-      "/bill-payments",
+      "/expenses",
     ]) {
       await page.goto(path, { waitUntil: "domcontentloaded" });
       await expect(page.locator("h1").first()).toBeVisible({ timeout: 20_000 });
