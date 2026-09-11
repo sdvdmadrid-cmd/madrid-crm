@@ -1,5 +1,5 @@
 export const WIN_ON_SITE_MAX_PHOTOS = 12;
-export const WIN_ON_SITE_PHASE = 5;
+export const WIN_ON_SITE_PHASE = 6;
 
 /**
  * Normalize up to WIN_ON_SITE_MAX_PHOTOS photo data URLs from public lead payloads.
@@ -30,6 +30,8 @@ export function buildWinOnSitePrompt({
   timeline = "",
   clientName = "",
   photoUrls = [],
+  areaSqFt = null,
+  mapMarkup = null,
 } = {}) {
   const lines = [
     "Create a priced draft estimate for this website lead.",
@@ -38,6 +40,10 @@ export function buildWinOnSitePrompt({
     address ? `Job address: ${address}` : null,
     budgetRange ? `Budget range: ${budgetRange}` : null,
     timeline ? `Timeline: ${timeline}` : null,
+    areaSqFt ? `Approximate marked area: ${areaSqFt} sq ft` : null,
+    mapMarkup?.lat != null && mapMarkup?.lng != null
+      ? `Map pin: ${mapMarkup.lat}, ${mapMarkup.lng}`
+      : null,
     description ? `Homeowner description:\n${description}` : null,
   ].filter(Boolean);
 

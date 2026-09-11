@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TurnstileField from "@/components/security/TurnstileField";
+import LeadMapMarkup from "@/components/site/LeadMapMarkup";
 import { getPublicSiteCopy } from "@/lib/public-site-copy";
 import {
   LEAD_BUDGET_OPTIONS,
@@ -122,6 +123,7 @@ export default function PremiumLeadForm({
     photoDataUrls: [],
     packageTier: "better",
     preferredSlot: null,
+    mapMarkup: null,
     website: "",
     submissionId: "",
     formStartedAt: String(Date.now()),
@@ -818,6 +820,13 @@ export default function PremiumLeadForm({
                   {errors.zipCode ? <p className="ps-field-error">{errors.zipCode}</p> : null}
                 </div>
               </div>
+              <LeadMapMarkup
+                value={form.mapMarkup}
+                onChange={(next) =>
+                  setForm((prev) => ({ ...prev, mapMarkup: next }))
+                }
+                label={formCopy.mapArea || "Mark the work area (optional)"}
+              />
             </>
           ) : null}
 

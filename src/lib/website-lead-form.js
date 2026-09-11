@@ -207,6 +207,8 @@ export function normalizeLeadPayload(body = {}) {
       body.preferredSlot && typeof body.preferredSlot === "object"
         ? body.preferredSlot
         : null,
+    mapMarkup:
+      body.mapMarkup && typeof body.mapMarkup === "object" ? body.mapMarkup : null,
     submissionId: String(body.submissionId || "").trim().slice(0, 64),
     website: String(body.website || "").trim().slice(0, 200),
     formStartedAt: body.formStartedAt,

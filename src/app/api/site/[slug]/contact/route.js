@@ -30,6 +30,7 @@ import {
   normalizePreferredSlot,
   normalizeWinOnSitePackageTier,
 } from "@/lib/win-on-site";
+import { normalizeMapMarkup } from "@/lib/win-on-site-map";
 import crypto from "crypto";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -386,6 +387,10 @@ export async function POST(request, { params }) {
       },
       {
         photoUrls: storedPhotoUrls,
+        winOnSite: {
+          mapMarkup: normalizeMapMarkup(payload.mapMarkup),
+          approxAreaSqFt: normalizeMapMarkup(payload.mapMarkup)?.areaSqFt || null,
+        },
       },
     );
 
@@ -552,6 +557,7 @@ export async function POST(request, { params }) {
 
     const packageTier = normalizeWinOnSitePackageTier(payload.packageTier, "better");
     const preferredSlot = normalizePreferredSlot(payload.preferredSlot);
+    const mapMarkup = normalizeMapMarkup(payload.mapMarkup);
 
     const draftResult = await createWinOnSiteEstimateForLead({
       request,
@@ -570,6 +576,7 @@ export async function POST(request, { params }) {
       existingMetadata: leadMetadata,
       packageTier,
       preferredSlot,
+      mapMarkup,
     });
 
     let checkoutUrl = "";

@@ -15,8 +15,9 @@ import {
 import {
   resolveWinOnSiteBaseDraft,
   serializeWinOnSitePackagesForPublic,
-  buildWinOnSitePackages,
 } from "@/lib/win-on-site";
+import { resolveWinOnSitePackages } from "@/lib/win-on-site-catalog";
+import { normalizeMapMarkup } from "@/lib/win-on-site-map";
 import crypto from "crypto";
 
 const MIN_FORM_FILL_MS = 800;
@@ -92,6 +93,9 @@ export async function POST(request, { params }) {
       zipCode: payload.zipCode,
     });
 
+    const mapMarkup = normalizeMapMarkup(payload.mapMarkup);
+    const areaSqFt = mapMarkup?.areaSqFt || null;
+
     const { draft, source } = await resolveWinOnSiteBaseDraft({
       request,
       tenantId: website.tenantId,
@@ -102,9 +106,17 @@ export async function POST(request, { params }) {
       timeline: payload.timeline,
       clientName: payload.name,
       photoUrls: [],
+      areaSqFt,
+      mapMarkup,
     });
 
-    const packages = buildWinOnSitePackages(draft);
+    const { packages, pricingSource } = await resolveWinOnSitePackages({
+      tenantId: website.tenantId,
+      serviceNeeded,
+      description,
+      baseDraft: draft,
+      areaSqFt,
+    });
     const quoteSessionId = crypto.randomUUID().replace(/-/g, "").slice(0, 24);
 
     return publicWebsiteJson(
@@ -112,9 +124,12 @@ export async function POST(request, { params }) {
         success: true,
         quoteSessionId,
         source,
+        pricingSource,
         packages: serializeWinOnSitePackagesForPublic(packages),
         disclaimer:
-          "Prices are estimates. Your contractor will confirm the final quote before work begins.",
+          pricingSource === "catalog"
+            ? "Prices use this contractor's services catalog. Final quote may adjust after a site visit."
+            : "Prices are estimates. Your contractor will confirm the final quote before work begins.",
       },
       { status: 200 },
     );
