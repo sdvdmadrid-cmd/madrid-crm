@@ -116,11 +116,16 @@ export function buildPublicWebsiteRequestUrl(slug, requestOrOrigin) {
   return `${origin}${buildPublicWebsiteRequestPath(normalized)}`;
 }
 
-export function revalidatePublicWebsitePaths(slug, revalidatePath) {
+export function revalidatePublicWebsitePaths(slug, revalidatePath, revalidateTag) {
   const normalized = normalizeWebsiteSlug(slug);
-  if (!normalized || typeof revalidatePath !== "function") return;
-  revalidatePath(buildPublicWebsitePath(normalized));
-  revalidatePath(buildPublicWebsiteRequestPath(normalized));
-  revalidatePath(`${LEGACY_SITE_PREFIX}/${normalized}`);
-  revalidatePath(`${LEGACY_SITE_PREFIX}/${normalized}/request`);
+  if (!normalized) return;
+  if (typeof revalidatePath === "function") {
+    revalidatePath(buildPublicWebsitePath(normalized));
+    revalidatePath(buildPublicWebsiteRequestPath(normalized));
+    revalidatePath(`${LEGACY_SITE_PREFIX}/${normalized}`);
+    revalidatePath(`${LEGACY_SITE_PREFIX}/${normalized}/request`);
+  }
+  if (typeof revalidateTag === "function") {
+    revalidateTag(`public-site:${normalized}`);
+  }
 }

@@ -143,7 +143,7 @@ const nextConfig = {
           ...SECURITY_HEADERS,
           {
             key: "Cache-Control",
-            value: "public, s-maxage=120, stale-while-revalidate=600",
+            value: "public, s-maxage=300, stale-while-revalidate=600",
           },
         ],
       },
