@@ -18,7 +18,7 @@ import {
 
 const root = process.cwd();
 
-test("normalizeLeadPhotoDataUrls accepts legacy + array and caps at 3", () => {
+test("normalizeLeadPhotoDataUrls accepts legacy + array and caps at WIN_ON_SITE_MAX_PHOTOS", () => {
   const urls = normalizeLeadPhotoDataUrls({
     photoDataUrl: "data:image/png;base64,AAA",
     photoDataUrls: [
@@ -27,9 +27,11 @@ test("normalizeLeadPhotoDataUrls accepts legacy + array and caps at 3", () => {
       "data:image/png;base64,DDD",
       "data:image/png;base64,EEE",
       "not-an-image",
+      ...Array.from({ length: 20 }, (_, i) => `data:image/png;base64,EXTRA${i}`),
     ],
   });
   assert.equal(urls.length, WIN_ON_SITE_MAX_PHOTOS);
+  assert.ok(WIN_ON_SITE_MAX_PHOTOS >= 8);
   assert.ok(urls.every((u) => u.startsWith("data:image/")));
   assert.equal(urls[0], "data:image/jpeg;base64,BBB");
 });
@@ -134,12 +136,13 @@ test("lead inbox serializes draftEstimateId and convert reuses draft", () => {
   assert.match(page, /Open draft estimate/);
 });
 
-test("PremiumLeadForm supports up to 3 photos", () => {
+test("PremiumLeadForm supports up to 12 photos", () => {
   const src = readFileSync(
     path.join(root, "src/components/site/PremiumLeadForm.jsx"),
     "utf8",
   );
-  assert.match(src, /MAX_PHOTOS = 3/);
+  assert.match(src, /MAX_PHOTOS = 12/);
   assert.match(src, /photoDataUrls/);
   assert.match(src, /multiple/);
+  assert.match(src, /compressImageToDataUrl/);
 });

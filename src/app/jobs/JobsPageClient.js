@@ -1337,7 +1337,7 @@ export default function JobsPageClient({ initialList = null }) {
                               Upload Documents
                             </button>
                             <div style={{ color: "#64748b", fontSize: 12, paddingTop: 8 }}>
-                              Max {Math.round(JOB_FILE_MAX_BYTES / (1024 * 1024))}MB. Photos: JPG/PNG. Documents: PDF.
+                              Max {Math.round(JOB_FILE_MAX_BYTES / (1024 * 1024))}MB photos (JPG/PNG/WebP) · videos up to 50MB (MP4/WebM). Documents: PDF.
                             </div>
                           </div>
 

@@ -12,8 +12,31 @@ import {
 } from "@/lib/website-lead-form";
 import { normalizeWebsiteSlug, parsePublicWebsiteSlug } from "@/lib/public-website-routing";
 
-const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
-const MAX_PHOTOS = 3;
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const MAX_PHOTOS = 12;
+const COMPRESS_MAX_EDGE = 1600;
+const COMPRESS_QUALITY = 0.72;
+
+async function compressImageToDataUrl(file) {
+  if (typeof createImageBitmap !== "function") {
+    return fileToDataUrl(file);
+  }
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, COMPRESS_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return fileToDataUrl(file);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", COMPRESS_QUALITY);
+  } finally {
+    bitmap.close?.();
+  }
+}
 const STEPS = 5;
 
 function formatMoney(value) {
@@ -276,7 +299,7 @@ export default function PremiumLeadForm({
           setError(formCopy.imageLarge);
           return;
         }
-        const dataUrl = await fileToDataUrl(file);
+        const dataUrl = await compressImageToDataUrl(file);
         if (!nextUrls.includes(dataUrl)) nextUrls.push(dataUrl);
       }
       setForm((prev) => ({
@@ -881,17 +904,26 @@ export default function PremiumLeadForm({
               </div>
               <div className="ps-field">
                 <label className="ps-label" htmlFor="ps-photo">
-                  {formCopy.photo}
+                  {formCopy.photo || "Photos of the job site"}
                 </label>
+                <p className="ps-lead-sub" style={{ marginTop: 0, marginBottom: 8 }}>
+                  {formCopy.photoHint ||
+                    `Add up to ${MAX_PHOTOS} photos (JPG/PNG/WebP). Videos can be shared later on your live job progress timeline.`}
+                </p>
                 <input
                   id="ps-photo"
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/*"
                   multiple
                   onChange={handlePhotoChange}
                   className="ps-input"
                   disabled={(form.photoDataUrls?.length || 0) >= MAX_PHOTOS}
                 />
+                {(form.photoDataUrls?.length || 0) > 0 ? (
+                  <p className="ps-lead-sub" style={{ marginTop: 6 }}>
+                    {form.photoDataUrls.length} / {MAX_PHOTOS}
+                  </p>
+                ) : null}
                 {form.photoDataUrls?.length ? (
                   <div className="ps-photo-preview-grid" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                     {form.photoDataUrls.map((url, index) => (
