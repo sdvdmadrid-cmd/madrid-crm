@@ -1,9 +1,10 @@
-export const WIN_ON_SITE_MAX_PHOTOS = 3;
-export const WIN_ON_SITE_PHASE = 3;
+export const WIN_ON_SITE_MAX_PHOTOS = 12;
+export const WIN_ON_SITE_PHASE = 4;
 
 /**
- * Normalize 1–3 photo data URLs from public lead payloads.
+ * Normalize up to WIN_ON_SITE_MAX_PHOTOS photo data URLs from public lead payloads.
  * Accepts legacy `photoDataUrl` and/or `photoDataUrls[]`.
+ * Videos are not accepted on the lead form (use the job progress timeline instead).
  */
 export function normalizeLeadPhotoDataUrls(body = {}, { maxChars = 1_000_000 } = {}) {
   const fromArray = Array.isArray(body.photoDataUrls) ? body.photoDataUrls : [];

@@ -6,7 +6,7 @@ import { normalizeGalleryPhoto } from "@/lib/website-gallery";
 export const WEBSITE_MEDIA_BUCKET =
   process.env.SUPABASE_WEBSITE_MEDIA_BUCKET || "website-media";
 
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function parseDataUrl(dataUrl) {
   const raw = String(dataUrl || "").trim();

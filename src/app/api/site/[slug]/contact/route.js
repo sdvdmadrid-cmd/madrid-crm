@@ -34,7 +34,8 @@ import crypto from "crypto";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_FORM_FILL_MS = 1200;
-const MAX_PHOTO_DATA_URL_CHARS = 1_000_000; // 1MB limit (reduced from 4.5MB for security)
+// Per-photo cap after client compression (~0.75MB). Up to 12 photos total.
+const MAX_PHOTO_DATA_URL_CHARS = 1_000_000;
 
 function toText(value, max = 2000) {
   return String(value || "").trim().slice(0, max);

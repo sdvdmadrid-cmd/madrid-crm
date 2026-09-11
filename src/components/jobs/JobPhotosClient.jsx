@@ -5,7 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
 import { apiFetch } from "@/lib/client-auth";
-import { getJobFileValidationError } from "@/lib/job-files";
+import {
+  getJobFileValidationError,
+  JOB_FILE_MAX_BYTES,
+  JOB_VIDEO_MAX_BYTES,
+} from "@/lib/job-files";
 import JobWorkspaceNav from "@/components/jobs/JobWorkspaceNav";
 import jobStyles from "@/app/jobs/jobs.module.css";
 import "@/i18n";
@@ -47,6 +51,12 @@ function groupPhotosByDay(photos) {
   return [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 }
 
+function detectFileType(file) {
+  const mime = String(file?.type || "").toLowerCase();
+  if (mime.startsWith("video/")) return "video";
+  return "photo";
+}
+
 export default function JobPhotosClient({ jobId }) {
   const { t } = useTranslation();
   const cameraInputRef = useRef(null);
@@ -63,9 +73,10 @@ export default function JobPhotosClient({ jobId }) {
   const [viewMode, setViewMode] = useState("gallery");
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [editCaption, setEditCaption] = useState("");
+  const [progressUrl, setProgressUrl] = useState("");
 
   const loadPhotos = useCallback(async () => {
-    const params = new URLSearchParams({ type: "photo", limit: "120" });
+    const params = new URLSearchParams({ type: "media", limit: "200" });
     const res = await apiFetch(`/api/jobs/${jobId}/files?${params}`);
     const payload = await res.json();
     if (!res.ok || !payload.success) {
@@ -87,6 +98,16 @@ export default function JobPhotosClient({ jobId }) {
       }
     }
     return tally;
+  }, [photos]);
+
+  const mediaSummary = useMemo(() => {
+    let photoCount = 0;
+    let videoCount = 0;
+    for (const item of photos) {
+      if (item.fileType === "video") videoCount += 1;
+      else photoCount += 1;
+    }
+    return { photoCount, videoCount };
   }, [photos]);
 
   const load = useCallback(async () => {
@@ -111,6 +132,72 @@ export default function JobPhotosClient({ jobId }) {
     load();
   }, [load]);
 
+  const uploadViaSignedUrl = async (file, fileType) => {
+    const prepRes = await apiFetch(`/api/jobs/${jobId}/files/signed-upload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileType,
+        fileName: file.name,
+        mimeType: file.type,
+        size: file.size,
+        photoStage: uploadStage,
+        caption: "",
+      }),
+    });
+    const prep = await prepRes.json();
+    if (!prepRes.ok || !prep.success) {
+      throw new Error(prep.error || t("jobs.photos.uploadError"));
+    }
+
+    const putRes = await fetch(prep.data.signedUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+    if (!putRes.ok) {
+      throw new Error(t("jobs.photos.uploadError"));
+    }
+
+    const confirmRes = await apiFetch(`/api/jobs/${jobId}/files/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: prep.data.path,
+        fileType,
+        name: file.name,
+        size: file.size,
+        photoStage: uploadStage,
+        takenAt: new Date().toISOString(),
+      }),
+    });
+    const confirm = await confirmRes.json();
+    if (!confirmRes.ok || !confirm.success) {
+      throw new Error(confirm.error || t("jobs.photos.uploadError"));
+    }
+    return confirm.data;
+  };
+
+  const uploadViaFormData = async (file, fileType) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("fileType", fileType);
+    formData.append("photoStage", uploadStage);
+    formData.append("takenAt", new Date().toISOString());
+
+    const res = await apiFetch(`/api/jobs/${jobId}/files`, {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await res.json();
+    if (!res.ok || !payload.success) {
+      throw new Error(payload.error || t("jobs.photos.uploadError"));
+    }
+    return payload.data;
+  };
+
   const uploadFiles = async (fileList) => {
     const files = [...(fileList || [])];
     if (!files.length) return;
@@ -121,28 +208,24 @@ export default function JobPhotosClient({ jobId }) {
 
     let uploaded = 0;
     for (const file of files) {
-      const validationError = getJobFileValidationError("photo", file);
+      const fileType = detectFileType(file);
+      const validationError = getJobFileValidationError(fileType, file);
       if (validationError) {
         setError(validationError);
         continue;
       }
 
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("fileType", "photo");
-      formData.append("photoStage", uploadStage);
-      formData.append("takenAt", new Date().toISOString());
-
-      const res = await apiFetch(`/api/jobs/${jobId}/files`, {
-        method: "POST",
-        body: formData,
-      });
-      const payload = await res.json();
-      if (!res.ok || !payload.success) {
-        setError(payload.error || t("jobs.photos.uploadError"));
+      try {
+        if (fileType === "video" || file.size > 8 * 1024 * 1024) {
+          await uploadViaSignedUrl(file, fileType);
+        } else {
+          await uploadViaFormData(file, fileType);
+        }
+        uploaded += 1;
+      } catch (err) {
+        setError(err?.message || t("jobs.photos.uploadError"));
         break;
       }
-      uploaded += 1;
     }
 
     setUploading(false);
@@ -157,6 +240,46 @@ export default function JobPhotosClient({ jobId }) {
 
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     if (uploadInputRef.current) uploadInputRef.current.value = "";
+  };
+
+  const createProgressLink = async () => {
+    setError("");
+    const res = await apiFetch(`/api/jobs/${jobId}/progress-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const payload = await res.json();
+    if (!res.ok || !payload.success) {
+      setError(payload.error || t("jobs.photos.shareError"));
+      return;
+    }
+    const url = payload.data?.url || "";
+    setProgressUrl(url);
+    try {
+      await navigator.clipboard?.writeText(url);
+      setNotice(t("jobs.photos.shareCopied"));
+    } catch {
+      setNotice(t("jobs.photos.shareReady"));
+    }
+  };
+
+  const publishToPortfolio = async (photoId) => {
+    setError("");
+    const res = await apiFetch(
+      `/api/jobs/${jobId}/files/${photoId}/publish-portfolio`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const payload = await res.json();
+    if (!res.ok || !payload.success) {
+      setError(payload.error || t("jobs.photos.portfolioError"));
+      return;
+    }
+    setNotice(t("jobs.photos.portfolioAdded"));
   };
 
   const savePhotoMeta = async (photoId, updates) => {
@@ -230,7 +353,12 @@ export default function JobPhotosClient({ jobId }) {
         </div>
         <div className={jobStyles.photosSummaryPills}>
           <span className={jobStyles.photoCountPill}>
-            {t("jobs.photos.totalCount", { count: photos.length })}
+            {t("jobs.photos.totalCount", {
+              count: mediaSummary.photoCount,
+            })}
+          </span>
+          <span className={jobStyles.photoCountPill}>
+            {t("jobs.photos.videoCount", { count: mediaSummary.videoCount })}
           </span>
         </div>
       </header>
@@ -258,7 +386,7 @@ export default function JobPhotosClient({ jobId }) {
           <input
             ref={cameraInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             capture="environment"
             multiple
             className={jobStyles.hiddenFileInput}
@@ -267,7 +395,7 @@ export default function JobPhotosClient({ jobId }) {
           <input
             ref={uploadInputRef}
             type="file"
-            accept="image/jpeg,image/png"
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
             multiple
             className={jobStyles.hiddenFileInput}
             onChange={(e) => uploadFiles(e.target.files)}
@@ -291,7 +419,30 @@ export default function JobPhotosClient({ jobId }) {
           >
             {uploading ? t("jobs.photos.uploading") : t("jobs.photos.uploadPhotos")}
           </button>
+          <button
+            type="button"
+            className={jobStyles.btnFileLink}
+            data-testid="job-progress-share"
+            onClick={createProgressLink}
+          >
+            {t("jobs.photos.shareProgress")}
+          </button>
         </div>
+
+        <p className={jobStyles.plMuted}>
+          {t("jobs.photos.limitsHint", {
+            photoMb: Math.round(JOB_FILE_MAX_BYTES / (1024 * 1024)),
+            videoMb: Math.round(JOB_VIDEO_MAX_BYTES / (1024 * 1024)),
+          })}
+        </p>
+
+        {progressUrl ? (
+          <p className={jobStyles.plMuted} data-testid="job-progress-url">
+            <a href={progressUrl} target="_blank" rel="noopener noreferrer">
+              {progressUrl}
+            </a>
+          </p>
+        ) : null}
 
         <div className={jobStyles.photosFilterRow}>
           {STAGE_FILTERS.map((stage) => (
@@ -346,7 +497,15 @@ export default function JobPhotosClient({ jobId }) {
                 className={jobStyles.photoThumbBtn}
                 onClick={() => openPhoto(photo)}
               >
-                {photo.signedUrl ? (
+                {photo.fileType === "video" && photo.signedUrl ? (
+                  <video
+                    src={photo.signedUrl}
+                    className={jobStyles.photoThumbImage}
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : photo.signedUrl ? (
                   <JobPhotoImage
                     src={photo.signedUrl}
                     alt={photo.caption || photo.name}
@@ -358,6 +517,9 @@ export default function JobPhotosClient({ jobId }) {
               </button>
               <div className={jobStyles.photoCardMeta}>
                 <span className={jobStyles.photoStageBadge}>{stageLabel(photo.photoStage)}</span>
+                {photo.fileType === "video" ? (
+                  <span className={jobStyles.photoStageBadge}>{t("jobs.photos.videoBadge")}</span>
+                ) : null}
                 <time dateTime={photo.takenAt || photo.createdAt}>
                   {formatDateTime(photo.takenAt || photo.createdAt)}
                 </time>
@@ -379,7 +541,17 @@ export default function JobPhotosClient({ jobId }) {
                     className={jobStyles.photoTimelineItem}
                     onClick={() => openPhoto(photo)}
                   >
-                    {photo.signedUrl ? (
+                    {photo.fileType === "video" && photo.signedUrl ? (
+                      <video
+                        src={photo.signedUrl}
+                        width={96}
+                        height={96}
+                        className={jobStyles.photoTimelineThumb}
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : photo.signedUrl ? (
                       <JobPhotoImage
                         src={photo.signedUrl}
                         alt=""
@@ -417,7 +589,14 @@ export default function JobPhotosClient({ jobId }) {
             >
               ×
             </button>
-            {selectedPhoto.signedUrl ? (
+            {selectedPhoto.fileType === "video" && selectedPhoto.signedUrl ? (
+              <video
+                src={selectedPhoto.signedUrl}
+                className={jobStyles.photoLightboxImage}
+                controls
+                playsInline
+              />
+            ) : selectedPhoto.signedUrl ? (
               <JobPhotoImage
                 src={selectedPhoto.signedUrl}
                 alt={selectedPhoto.caption || selectedPhoto.name}
@@ -469,10 +648,19 @@ export default function JobPhotosClient({ jobId }) {
                 >
                   {t("jobs.photos.saveCaption")}
                 </button>
+                {selectedPhoto.fileType === "photo" ? (
+                  <button
+                    type="button"
+                    className={jobStyles.btnFileLink}
+                    onClick={() => publishToPortfolio(selectedPhoto.id)}
+                  >
+                    {t("jobs.photos.addToPortfolio")}
+                  </button>
+                ) : null}
                 {selectedPhoto.signedUrl ? (
                   <a
                     href={selectedPhoto.signedUrl}
-                    download={selectedPhoto.name || "job-photo.jpg"}
+                    download={selectedPhoto.name || "job-media"}
                     className={jobStyles.btnFileLink}
                     target="_blank"
                     rel="noopener noreferrer"

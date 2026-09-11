@@ -2,6 +2,7 @@ import { enforceSameOriginForMutation } from "@/lib/request-security";
 import {
   buildJobFilePath,
   getJobFileValidationError,
+  isJobTimelineMediaType,
   JOB_FILES_BUCKET,
   normalizePhotoStage,
 } from "@/lib/job-files";
@@ -77,8 +78,8 @@ export async function GET(request, { params }) {
     const context = await getAuthenticatedTenantContext(request);
     const subscriptionBlocked = getSubscriptionBlockedResponse(context);
     if (subscriptionBlocked) return subscriptionBlocked;
-    const { tenantDbId, role, userId, authenticated  } = context;
-        if (!authenticated) return unauthenticatedResponse();
+    const { tenantDbId, role, authenticated } = context;
+    if (!authenticated) return unauthenticatedResponse();
 
     const { id: jobId } = await params;
     if (!jobId) {
@@ -94,9 +95,13 @@ export async function GET(request, { params }) {
     const requestedType = String(searchParams.get("type") || "").trim().toLowerCase();
     const photoStage = String(searchParams.get("photoStage") || "").trim().toLowerCase();
     const page = Math.max(1, Number(searchParams.get("page") || 1));
+    const isMediaList =
+      requestedType === "photo" ||
+      requestedType === "video" ||
+      requestedType === "media";
     const limit = Math.min(
-      requestedType === "photo" ? 120 : 40,
-      Math.max(1, Number(searchParams.get("limit") || (requestedType === "photo" ? 120 : 12))),
+      isMediaList ? 200 : 40,
+      Math.max(1, Number(searchParams.get("limit") || (isMediaList ? 200 : 12))),
     );
 
     let query = supabaseAdmin
@@ -106,11 +111,17 @@ export async function GET(request, { params }) {
         { count: "exact" },
       )
       .eq("job_id", jobId)
-      .eq("user_id", userId)
       .order("taken_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 
-    if (requestedType === "photo" || requestedType === "document") {
+    if (requestedType === "media") {
+      query = query.in("file_type", ["photo", "video"]);
+    } else if (
+      requestedType === "photo" ||
+      requestedType === "document" ||
+      requestedType === "receipt" ||
+      requestedType === "video"
+    ) {
       query = query.eq("file_type", requestedType);
     }
 
@@ -178,6 +189,8 @@ export async function GET(request, { params }) {
   }
 }
 
+export const maxDuration = 60;
+
 export async function POST(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
   if (csrfResponse) return csrfResponse;
@@ -208,19 +221,19 @@ export async function POST(request, { params }) {
       return jsonResponse({ success: false, error: validationError }, 400);
     }
 
-    const photoStage =
-      fileType === "photo"
-        ? normalizePhotoStage(formData.get("photoStage"))
-        : null;
-    const caption =
-      fileType === "photo" ? String(formData.get("caption") || "").trim().slice(0, 500) : "";
+    const timelineMedia = isJobTimelineMediaType(fileType);
+    const photoStage = timelineMedia
+      ? normalizePhotoStage(formData.get("photoStage"))
+      : null;
+    const caption = timelineMedia
+      ? String(formData.get("caption") || "").trim().slice(0, 500)
+      : "";
     const takenAtRaw = String(formData.get("takenAt") || "").trim();
-    const takenAt =
-      fileType === "photo" && takenAtRaw
+    const takenAt = timelineMedia
+      ? takenAtRaw
         ? new Date(takenAtRaw).toISOString()
-        : fileType === "photo"
-          ? new Date().toISOString()
-          : null;
+        : new Date().toISOString()
+      : null;
 
     const filePath = buildJobFilePath({
       userId,
