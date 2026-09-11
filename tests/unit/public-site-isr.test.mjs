@@ -45,7 +45,7 @@ test("public site pages use cached getters and generateStaticParams", () => {
     "utf8",
   );
   for (const src of [home, request]) {
-    assert.match(src, /PUBLIC_SITE_REVALIDATE_SECONDS/);
+    assert.match(src, /export const revalidate = 300/);
     assert.match(src, /generateStaticParams/);
     assert.match(src, /getCachedPublicWebsiteBySlug/);
   }

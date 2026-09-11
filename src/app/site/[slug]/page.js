@@ -21,7 +21,6 @@ import { listPublishedPublicWebsiteSlugs } from "@/lib/public-website";
 import {
   getCachedPublicReviewsBySlug,
   getCachedPublicWebsiteBySlug,
-  PUBLIC_SITE_REVALIDATE_SECONDS,
 } from "@/lib/public-website-cache";
 import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
 import {
@@ -29,7 +28,7 @@ import {
   resolveWebsiteIndustryKey,
 } from "@/lib/website-builder-industry";
 
-export const revalidate = PUBLIC_SITE_REVALIDATE_SECONDS;
+export const revalidate = 300;
 
 export async function generateStaticParams() {
   try {

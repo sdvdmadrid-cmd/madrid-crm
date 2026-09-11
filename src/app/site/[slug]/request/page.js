@@ -10,12 +10,11 @@ import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { buildPublicSiteMetadata } from "@/lib/public-website-seo";
 import {
   getCachedPublicWebsiteBySlug,
-  PUBLIC_SITE_REVALIDATE_SECONDS,
 } from "@/lib/public-website-cache";
 import { listPublishedPublicWebsiteSlugs } from "@/lib/public-website";
 import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
 
-export const revalidate = PUBLIC_SITE_REVALIDATE_SECONDS;
+export const revalidate = 300;
 
 export async function generateStaticParams() {
   try {
