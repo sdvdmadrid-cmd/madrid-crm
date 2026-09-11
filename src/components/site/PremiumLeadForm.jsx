@@ -13,6 +13,7 @@ import {
 import { normalizeWebsiteSlug, parsePublicWebsiteSlug } from "@/lib/public-website-routing";
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
+const MAX_PHOTOS = 3;
 const STEPS = 4;
 
 function fileToDataUrl(file) {
@@ -84,6 +85,7 @@ export default function PremiumLeadForm({
     timeline: "",
     contactPreference: "phone",
     photoDataUrl: "",
+    photoDataUrls: [],
     website: "",
     submissionId: "",
     formStartedAt: String(Date.now()),
@@ -225,23 +227,50 @@ export default function PremiumLeadForm({
   };
 
   const handlePhotoChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError(formCopy.imageOnly);
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+
+    const remaining = MAX_PHOTOS - (form.photoDataUrls?.length || 0);
+    if (remaining <= 0) {
+      setError(formCopy.imageLimit || `You can upload up to ${MAX_PHOTOS} photos.`);
       return;
     }
-    if (file.size > MAX_IMAGE_SIZE) {
-      setError(formCopy.imageLarge);
-      return;
-    }
+
     try {
-      const dataUrl = await fileToDataUrl(file);
-      setForm((prev) => ({ ...prev, photoDataUrl: dataUrl }));
+      const nextUrls = [...(form.photoDataUrls || [])];
+      for (const file of files.slice(0, remaining)) {
+        if (!file.type.startsWith("image/")) {
+          setError(formCopy.imageOnly);
+          return;
+        }
+        if (file.size > MAX_IMAGE_SIZE) {
+          setError(formCopy.imageLarge);
+          return;
+        }
+        const dataUrl = await fileToDataUrl(file);
+        if (!nextUrls.includes(dataUrl)) nextUrls.push(dataUrl);
+      }
+      setForm((prev) => ({
+        ...prev,
+        photoDataUrls: nextUrls.slice(0, MAX_PHOTOS),
+        photoDataUrl: nextUrls[0] || "",
+      }));
       setError("");
     } catch {
       setError(formCopy.imageReadFailed);
     }
+  };
+
+  const removePhotoAt = (index) => {
+    setForm((prev) => {
+      const nextUrls = (prev.photoDataUrls || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        photoDataUrls: nextUrls,
+        photoDataUrl: nextUrls[0] || "",
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -300,6 +329,7 @@ export default function PremiumLeadForm({
         timeline: "",
         contactPreference: "phone",
         photoDataUrl: "",
+        photoDataUrls: [],
         website: "",
         submissionId:
           typeof crypto !== "undefined" && crypto.randomUUID
@@ -731,11 +761,35 @@ export default function PremiumLeadForm({
                   id="ps-photo"
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handlePhotoChange}
                   className="ps-input"
+                  disabled={(form.photoDataUrls?.length || 0) >= MAX_PHOTOS}
                 />
-                {form.photoDataUrl ? (
-                  <img src={form.photoDataUrl} alt="" className="ps-photo-preview" />
+                {form.photoDataUrls?.length ? (
+                  <div className="ps-photo-preview-grid" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    {form.photoDataUrls.map((url, index) => (
+                      <div key={`photo-${index}`} style={{ position: "relative" }}>
+                        <img src={url} alt="" className="ps-photo-preview" />
+                        <button
+                          type="button"
+                          onClick={() => removePhotoAt(index)}
+                          style={{
+                            display: "block",
+                            marginTop: 4,
+                            fontSize: 12,
+                            background: "transparent",
+                            border: "none",
+                            color: "#64748b",
+                            cursor: "pointer",
+                            padding: 0,
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
               </div>
               {turnstileRequired || turnstileSiteKey ? (

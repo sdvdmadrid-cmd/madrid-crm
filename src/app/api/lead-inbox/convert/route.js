@@ -14,6 +14,7 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { requireTenantIdForInsert } from "@/lib/tenant-row-guard";
+import { readDraftEstimateIdFromMetadata } from "@/lib/win-on-site-helpers";
 
 function clean(value, max = 200) {
   return String(value || "").trim().slice(0, max);
@@ -195,56 +196,71 @@ export async function POST(request) {
       if (jobError) throw new Error("Unable to save job");
       job = insertedJob;
     } else {
-      const { data: numberRows } = await supabaseAdmin
-        .from("estimates")
-        .select("estimate_number, created_at")
-        .eq("tenant_id", tenantDbId)
-        .ilike("estimate_number", "EST-%")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const existingDraftId = readDraftEstimateIdFromMetadata(record.metadata);
+      if (existingDraftId) {
+        const { data: existingEstimate } = await supabaseAdmin
+          .from("estimates")
+          .select("id, client_name")
+          .eq("id", existingDraftId)
+          .eq("tenant_id", tenantDbId)
+          .maybeSingle();
+        if (existingEstimate?.id) {
+          estimate = existingEstimate;
+        }
+      }
 
-      const estimateNumber = formatEstimateNumber(
-        pickMaxEstimateSequence(numberRows || []) + 1,
-      );
-      const clientName =
-        clean(body.title, 160) || `Lead estimate - ${name || "New client"}`;
+      if (!estimate) {
+        const { data: numberRows } = await supabaseAdmin
+          .from("estimates")
+          .select("estimate_number, created_at")
+          .eq("tenant_id", tenantDbId)
+          .ilike("estimate_number", "EST-%")
+          .order("created_at", { ascending: false })
+          .limit(50);
 
-      const { data: insertedEstimate, error: estimateError } = await supabaseAdmin
-        .from("estimates")
-        .insert({
-          tenant_id: insertTenantId,
-          user_id: userId || null,
-          created_by: userId || null,
-          client_name: clientName,
-          estimate_number: estimateNumber,
-          status: "draft",
-          currency: "USD",
-          items: [
-            {
-              id: "lead-line-1",
-              name: serviceNeeded || "Service",
-              qty: 1,
-              unitPrice: 0,
-              price: 0,
-            },
-          ],
-          subtotal: 0,
-          tax: 0,
-          total: 0,
-          notes: stringifyEstimateNotes({
-            noteText: `Converted from lead inbox\n\n${description}`,
-            clientUuid: client.id,
-            clientEmail: email || "",
-            clientPhone: phone || "",
-          }),
-          created_at: nowIso,
-          updated_at: nowIso,
-        })
-        .select("id, client_name")
-        .single();
+        const estimateNumber = formatEstimateNumber(
+          pickMaxEstimateSequence(numberRows || []) + 1,
+        );
+        const clientName =
+          clean(body.title, 160) || `Lead estimate - ${name || "New client"}`;
 
-      if (estimateError) throw new Error("Unable to save estimate");
-      estimate = insertedEstimate;
+        const { data: insertedEstimate, error: estimateError } = await supabaseAdmin
+          .from("estimates")
+          .insert({
+            tenant_id: insertTenantId,
+            user_id: userId || null,
+            created_by: userId || null,
+            client_name: clientName,
+            estimate_number: estimateNumber,
+            status: "draft",
+            currency: "USD",
+            items: [
+              {
+                id: "lead-line-1",
+                name: serviceNeeded || "Service",
+                qty: 1,
+                unitPrice: 0,
+                price: 0,
+              },
+            ],
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            notes: stringifyEstimateNotes({
+              noteText: `Converted from lead inbox\n\n${description}`,
+              clientUuid: client.id,
+              clientEmail: email || "",
+              clientPhone: phone || "",
+            }),
+            created_at: nowIso,
+            updated_at: nowIso,
+          })
+          .select("id, client_name")
+          .single();
+
+        if (estimateError) throw new Error("Unable to save estimate");
+        estimate = insertedEstimate;
+      }
     }
 
     if (leadId) {

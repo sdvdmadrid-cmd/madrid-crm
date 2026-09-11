@@ -8,11 +8,20 @@ import { scopeByTenant } from "@/lib/tenant-scope";
 import { isSuperAdminRole } from "@/lib/access-control";
 
 function serializeLead(row) {
+  const metadata =
+    row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+      ? row.metadata
+      : {};
+  const photoUrls = Array.isArray(metadata.photoUrls)
+    ? metadata.photoUrls.map((url) => String(url || "").trim()).filter(Boolean)
+    : [];
   const photoUrl =
     String(row.photo_url || "").trim() ||
+    photoUrls[0] ||
     (String(row.photo_data_url || "").startsWith("data:image/")
       ? row.photo_data_url
       : "");
+  const draftEstimateId = String(metadata.draftEstimateId || "").trim() || null;
   return {
     id: row.id,
     source: "website_lead",
@@ -23,11 +32,13 @@ function serializeLead(row) {
     email: row.email || "",
     phone: row.phone || "",
     serviceNeeded: row.service_needed || "",
-    budgetRange: row.budget_range || row.metadata?.budgetRange || "",
-    timeline: row.timeline || row.metadata?.timeline || "",
-    contactPreference: row.contact_preference || row.metadata?.contactPreference || "",
+    budgetRange: row.budget_range || metadata.budgetRange || "",
+    timeline: row.timeline || metadata.timeline || "",
+    contactPreference: row.contact_preference || metadata.contactPreference || "",
     photoUrl,
+    photoUrls: photoUrls.length ? photoUrls : photoUrl ? [photoUrl] : [],
     photoDataUrl: row.photo_data_url || "",
+    draftEstimateId,
     address: [row.address_line_1, row.city, row.state, row.zip_code]
       .filter(Boolean)
       .join(", "),

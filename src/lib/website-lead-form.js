@@ -196,6 +196,9 @@ export function normalizeLeadPayload(body = {}) {
     timeline: String(body.timeline || "").trim().slice(0, 40),
     contactPreference: String(body.contactPreference || "phone").trim().slice(0, 20),
     photoDataUrl: String(body.photoDataUrl || "").trim(),
+    photoDataUrls: Array.isArray(body.photoDataUrls)
+      ? body.photoDataUrls.map((v) => String(v || "").trim()).filter(Boolean)
+      : [],
     submissionId: String(body.submissionId || "").trim().slice(0, 64),
     website: String(body.website || "").trim().slice(0, 200),
     formStartedAt: body.formStartedAt,
