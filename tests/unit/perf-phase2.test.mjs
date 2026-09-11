@@ -8,7 +8,7 @@ const root = process.cwd();
 test("next.config enables CDN cache for public contractor sites", () => {
   const src = readFileSync(path.join(root, "next.config.mjs"), "utf8");
   assert.match(src, /source:\s*"\/sites\/:path\*"/);
-  assert.match(src, /s-maxage=120/);
+  assert.match(src, /s-maxage=300/);
   assert.match(src, /stale-while-revalidate=600/);
 });
 

@@ -1,3 +1,7 @@
-export const revalidate = 120;
+export const revalidate = 300;
 
-export { default, generateMetadata } from "@/app/site/[slug]/page";
+export {
+  default,
+  generateMetadata,
+  generateStaticParams,
+} from "@/app/site/[slug]/page";

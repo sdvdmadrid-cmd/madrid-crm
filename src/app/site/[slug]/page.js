@@ -9,7 +9,6 @@ import { filterHomeownerFacingServices } from "@/lib/website-lead-form";
 import { LANDSCAPING_DEFAULT_SERVICES } from "@/lib/website-content-purity";
 import PublicReviewsSection from "@/components/site/PublicReviewsSection";
 import PublicReviewsCta from "@/components/site/PublicReviewsCta";
-import { getPublicReviewsBySlug } from "@/lib/reputation-store";
 import PublicSiteEnhancements from "@/components/site/PublicSiteEnhancements";
 import PublicSiteScrollNav from "@/components/site/PublicSiteScrollNav";
 import { PUBLIC_SITE_SECTIONS } from "@/lib/public-site-navigation";
@@ -18,14 +17,27 @@ import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
 import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { getIndustryProfile } from "@/lib/industry-profiles";
 import { buildLocalBusinessJsonLd, buildPublicSiteMetadata } from "@/lib/public-website-seo";
-import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import { listPublishedPublicWebsiteSlugs } from "@/lib/public-website";
+import {
+  getCachedPublicReviewsBySlug,
+  getCachedPublicWebsiteBySlug,
+} from "@/lib/public-website-cache";
 import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
 import {
   getWebsiteBuilderPack,
   resolveWebsiteIndustryKey,
 } from "@/lib/website-builder-industry";
 
-export const revalidate = 120;
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  try {
+    const sites = await listPublishedPublicWebsiteSlugs(100);
+    return sites.map((site) => ({ slug: site.slug }));
+  } catch {
+    return [];
+  }
+}
 
 // ─── Contractor social proof stats (localized defaults) ───────────────
 function getContractorStats(copy) {
@@ -71,7 +83,7 @@ function WaveDivider({ fromColor, toColor }) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const data = await getPublicWebsiteBySlug(slug);
+  const data = await getCachedPublicWebsiteBySlug(slug);
 
   if (!data) return { title: "Contractor" };
 
@@ -83,14 +95,15 @@ export default async function PublicContractorSitePage({ params }) {
   const requestHref = `/sites/${slug}/request`;
   const quoteFormHref = `#request-service`;
 
-  const data = await getPublicWebsiteBySlug(slug);
+  const data = await getCachedPublicWebsiteBySlug(slug);
 
   if (!data) notFound();
 
   let publicReviews = [];
   let reviewStats = null;
   try {
-    ({ reviews: publicReviews, stats: reviewStats } = await getPublicReviewsBySlug(slug));
+    ({ reviews: publicReviews, stats: reviewStats } =
+      await getCachedPublicReviewsBySlug(slug));
   } catch (error) {
     console.error("[public-site] reviews load failed", error?.message || error);
   }

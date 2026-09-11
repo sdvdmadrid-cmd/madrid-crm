@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import {
   applyWebsiteRenderRepairs,
@@ -9,8 +10,6 @@ import {
 import BuilderWorkflowStepper from "@/components/website-builder/BuilderWorkflowStepper";
 import PlatformZoneBanner from "@/components/workspace/PlatformZoneBanner";
 import { WebsiteBuilderEditProvider } from "@/components/website-builder/WebsiteBuilderEditContext";
-import WebsiteBuilderSetupPanel from "@/components/website-builder/WebsiteBuilderSetupPanel";
-import WebsiteBuilderLaunch from "@/components/website-builder/WebsiteBuilderLaunch";
 import Link from "next/link";
 import { apiFetch, getJsonOrThrow } from "@/lib/client-auth";
 import {
@@ -47,10 +46,7 @@ import {
   normalizePortfolio,
 } from "@/lib/website-gallery";
 import { compressImageFile, fileToDataUrl } from "@/lib/website-image-compress";
-import WebsiteBuilderPortfolio from "./WebsiteBuilderPortfolio";
-import WebsiteMobileUploads from "./WebsiteMobileUploads";
 import { useWebsiteBuilderAi } from "@/contexts/WebsiteBuilderAiContext";
-import HeroImageEditor from "./HeroImageEditor";
 import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
 import {
   getCompanyDisplayName,
@@ -61,6 +57,27 @@ import WebsiteBuilderFloatingBar from "./WebsiteBuilderFloatingBar";
 import WebsiteBuilderPreview, { SECTION_REGEN_MAP } from "./WebsiteBuilderPreview";
 import { WEBSITE_BUILDER_UI } from "./website-builder-ui";
 import styles from "./website-builder.module.css";
+
+const WebsiteBuilderSetupPanel = dynamic(
+  () => import("@/components/website-builder/WebsiteBuilderSetupPanel"),
+  { ssr: false },
+);
+const WebsiteBuilderLaunch = dynamic(
+  () => import("@/components/website-builder/WebsiteBuilderLaunch"),
+  { ssr: false },
+);
+const WebsiteBuilderPortfolio = dynamic(
+  () => import("./WebsiteBuilderPortfolio"),
+  { ssr: false },
+);
+const WebsiteMobileUploads = dynamic(
+  () => import("./WebsiteMobileUploads"),
+  { ssr: false },
+);
+const HeroImageEditor = dynamic(
+  () => import("./HeroImageEditor"),
+  { ssr: false },
+);
 
 const MAX_GALLERY_IMAGE_SIZE = 8 * 1024 * 1024;
 const IMAGE_STYLES = [

@@ -8,10 +8,22 @@ import PublicSiteLeadExperience from "@/components/site/PublicSiteLeadExperience
 import { resolveCompanyLogoUrl } from "@/lib/resolve-company-logo-url";
 import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
 import { buildPublicSiteMetadata } from "@/lib/public-website-seo";
-import { getPublicWebsiteBySlug } from "@/lib/public-website";
+import {
+  getCachedPublicWebsiteBySlug,
+} from "@/lib/public-website-cache";
+import { listPublishedPublicWebsiteSlugs } from "@/lib/public-website";
 import { fillPublicSiteTemplate, getPublicSiteCopy, resolvePublicSiteLocale } from "@/lib/public-site-copy";
 
-export const revalidate = 120;
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  try {
+    const sites = await listPublishedPublicWebsiteSlugs(100);
+    return sites.map((site) => ({ slug: site.slug }));
+  } catch {
+    return [];
+  }
+}
 
 function normalizeRequestedService(rawValue, options) {
   const value = String(rawValue || "").trim();
@@ -21,7 +33,7 @@ function normalizeRequestedService(rawValue, options) {
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const data = await getPublicWebsiteBySlug(slug);
+  const data = await getCachedPublicWebsiteBySlug(slug);
 
   if (!data) return { title: "Request Service" };
 
@@ -32,7 +44,7 @@ export default async function PublicContractorRequestPage({ params, searchParams
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
 
-  const data = await getPublicWebsiteBySlug(slug);
+  const data = await getCachedPublicWebsiteBySlug(slug);
 
   if (!data) notFound();
 

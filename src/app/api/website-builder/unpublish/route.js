@@ -6,7 +6,7 @@ import {
   unauthenticatedResponse,
 } from "@/lib/tenant";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { revalidatePublicWebsitePaths } from "@/lib/public-website-routing";
 
 const WEBSITE_TABLE = "contractor_websites";
@@ -53,7 +53,7 @@ export async function POST(request) {
   }
 
   if (data?.slug) {
-    revalidatePublicWebsitePaths(data.slug, revalidatePath);
+    revalidatePublicWebsitePaths(data.slug, revalidatePath, revalidateTag);
   }
 
   return Response.json({

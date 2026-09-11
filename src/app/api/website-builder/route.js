@@ -31,7 +31,7 @@ import {
   normalizeWebsiteSlug,
   revalidatePublicWebsitePaths,
 } from "@/lib/public-website-routing";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { normalizeSiteAnalytics } from "@/lib/site-analytics";
 import { resolveWebsiteRequestServices } from "@/lib/website-lead-form";
@@ -635,10 +635,10 @@ export async function POST(request) {
     livePatch.published !== undefined ||
     dbPatch.headline !== undefined; // legacy fallback path
   if (liveChanged && publishedSlug) {
-    revalidatePublicWebsitePaths(publishedSlug, revalidatePath);
+    revalidatePublicWebsitePaths(publishedSlug, revalidatePath, revalidateTag);
   }
   if (liveChanged && previousSlug && previousSlug !== publishedSlug) {
-    revalidatePublicWebsitePaths(previousSlug, revalidatePath);
+    revalidatePublicWebsitePaths(previousSlug, revalidatePath, revalidateTag);
   }
 
     const projected = projectRowForBuilder(data);
