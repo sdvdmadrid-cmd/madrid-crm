@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCompanyProfileByTenant } from "@/lib/company-profile-store";
 import { JOB_FILES_BUCKET, isJobTimelineMediaType } from "@/lib/job-files";
 import { verifyJobProgressToken } from "@/lib/job-progress-access";
+import { listTenantSocialProfiles } from "@/lib/reputation-store";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,10 @@ function serializeTimelineItem(row, signedUrl = "") {
   };
 }
 
+function isCompletedStatus(status) {
+  return String(status || "").trim().toLowerCase() === "completed";
+}
+
 /**
  * GET /api/public/jobs/progress/[token]
  * Tokenized live job media timeline for homeowners (photos + videos).
@@ -54,19 +59,42 @@ export async function GET(_request, { params }) {
     }
 
     let companyName = "";
+    let googleReviewsUrl = "";
+    let yelpReviewsUrl = "";
+
     if (job.tenant_id) {
-      const [{ data: website }, companyProfile] = await Promise.all([
+      const [websiteResult, companyProfile, socialProfiles] = await Promise.all([
         supabaseAdmin
           .from("contractor_websites")
-          .select("headline, draft_content")
+          .select("headline, draft_content, site_meta")
           .eq("tenant_id", job.tenant_id)
           .maybeSingle(),
         getCompanyProfileByTenant({ tenantId: job.tenant_id }).catch(() => null),
+        listTenantSocialProfiles(job.tenant_id).catch(() => []),
       ]);
+      const website = websiteResult?.data || null;
       companyName =
         String(companyProfile?.companyName || "").trim() ||
         String(website?.draft_content?.businessName || "").trim() ||
         String(website?.headline || "").trim();
+
+      const socialLinks =
+        website?.site_meta && typeof website.site_meta === "object"
+          ? website.site_meta.socialLinks || {}
+          : {};
+      const googleFromSocial = (socialProfiles || []).find(
+        (p) => String(p.platform || "").toLowerCase() === "google",
+      );
+      const yelpFromSocial = (socialProfiles || []).find(
+        (p) => String(p.platform || "").toLowerCase() === "yelp",
+      );
+      googleReviewsUrl =
+        String(companyProfile?.googleReviewsUrl || "").trim() ||
+        String(socialLinks.google || "").trim() ||
+        String(googleFromSocial?.profileUrl || "").trim();
+      yelpReviewsUrl =
+        String(socialLinks.yelp || "").trim() ||
+        String(yelpFromSocial?.profileUrl || "").trim();
     }
 
     const { data: rows, error: filesError } = await supabaseAdmin
@@ -99,6 +127,11 @@ export async function GET(_request, { params }) {
     const items = mediaRows.map((row) =>
       serializeTimelineItem(row, signedUrlMap.get(row.file_path) || ""),
     );
+    const hasCompletionMedia = items.some(
+      (item) => String(item.photoStage || "").toLowerCase() === "completion",
+    );
+    const jobCompleted = isCompletedStatus(job.status);
+    const showReviewCta = jobCompleted || hasCompletionMedia;
 
     return jsonResponse({
       success: true,
@@ -111,8 +144,14 @@ export async function GET(_request, { params }) {
           address: "",
           description: String(job.description || "").slice(0, 240),
           clientName: job.client_name || "",
+          completed: jobCompleted,
         },
         companyName,
+        reviews: {
+          googleUrl: googleReviewsUrl,
+          yelpUrl: yelpReviewsUrl,
+          showCta: showReviewCta,
+        },
         items,
         photoCount: items.filter((item) => item.fileType === "photo").length,
         videoCount: items.filter((item) => item.fileType === "video").length,

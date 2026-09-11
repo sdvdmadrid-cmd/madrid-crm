@@ -79,5 +79,5 @@ test("phase 3 routes and form wire weather slots", () => {
   assert.match(contact, /normalizePreferredSlot/);
   assert.match(form, /weather-slots/);
   assert.match(form, /preferredSlot/);
-  assert.match(helpers, /WIN_ON_SITE_PHASE = [34]/);
+  assert.match(helpers, /WIN_ON_SITE_PHASE = [345]/);
 });

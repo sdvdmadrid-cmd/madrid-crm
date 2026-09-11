@@ -11,7 +11,7 @@ import {
 const root = process.cwd();
 
 test("phase 4 raises lead photo capacity", () => {
-  assert.equal(WIN_ON_SITE_PHASE, 4);
+  assert.ok(WIN_ON_SITE_PHASE >= 4);
   assert.ok(WIN_ON_SITE_MAX_PHOTOS >= 8);
   const form = readFileSync(
     path.join(root, "src/components/site/PremiumLeadForm.jsx"),
@@ -46,6 +46,10 @@ test("phase 4 wires job progress timeline + video capacity", () => {
     ),
     "utf8",
   );
+  const portfolioLib = readFileSync(
+    path.join(root, "src/lib/job-portfolio-publish.js"),
+    "utf8",
+  );
 
   assert.match(progressApi, /job-progress-public|verifyJobProgressToken/);
   assert.match(progressPage, /public-job-progress/);
@@ -55,5 +59,6 @@ test("phase 4 wires job progress timeline + video capacity", () => {
   assert.match(jobFiles, /video\/mp4/);
   assert.match(jobFiles, /JOB_VIDEO_MAX_BYTES = 50/);
   assert.match(migration, /'video'/);
-  assert.match(portfolio, /galleryPhotos/);
+  assert.match(portfolio, /publishJobPhotoToPortfolio/);
+  assert.match(portfolioLib, /galleryPhotos/);
 });

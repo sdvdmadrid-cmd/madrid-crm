@@ -1,5 +1,5 @@
 export const WIN_ON_SITE_MAX_PHOTOS = 12;
-export const WIN_ON_SITE_PHASE = 4;
+export const WIN_ON_SITE_PHASE = 5;
 
 /**
  * Normalize up to WIN_ON_SITE_MAX_PHOTOS photo data URLs from public lead payloads.

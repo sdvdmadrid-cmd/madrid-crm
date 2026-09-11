@@ -1,5 +1,7 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
+import { enrichJobWithPartyInfo } from "@/lib/client-document-party";
 import { buildPublicJobProgressLink } from "@/lib/job-progress-access";
+import { deliverJobProgressNotifications } from "@/lib/job-progress-notify";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -22,14 +24,14 @@ function jsonResponse(payload, status = 200) {
 async function resolveAuthorizedJob({ id, tenantDbId, role }) {
   let query = supabaseAdmin
     .from(JOBS)
-    .select("id, user_id, tenant_id, title")
+    .select("id, user_id, tenant_id, title, client_id, client_name")
     .eq("id", id)
     .maybeSingle();
 
   if ((role || "").toLowerCase() !== "super_admin") {
     query = supabaseAdmin
       .from(JOBS)
-      .select("id, user_id, tenant_id, title")
+      .select("id, user_id, tenant_id, title, client_id, client_name")
       .eq("id", id)
       .eq("tenant_id", tenantDbId)
       .maybeSingle();
@@ -49,7 +51,8 @@ async function resolveAuthorizedJob({ id, tenantDbId, role }) {
 
 /**
  * POST /api/jobs/[id]/progress-link
- * Create a shareable live progress URL for the homeowner.
+ * Create a shareable live progress URL; optionally email/SMS the client.
+ * Body: { notify?: boolean, email?: boolean, sms?: boolean }
  */
 export async function POST(request, { params }) {
   const csrfResponse = enforceSameOriginForMutation(request);
@@ -73,8 +76,35 @@ export async function POST(request, { params }) {
       return jsonResponse({ success: false, error: "Job not found" }, 404);
     }
 
+    const body = await request.json().catch(() => ({}));
+    const notify = body.notify !== false;
+    const wantEmail = body.email !== false;
+    const wantSms = body.sms !== false;
+
     const origin = new URL(request.url).origin;
     const url = buildPublicJobProgressLink(jobId, origin);
+
+    let delivery = {
+      email: { attempted: false, sent: false, error: null },
+      sms: { attempted: false, sent: false, error: null },
+    };
+
+    if (notify) {
+      const enriched = await enrichJobWithPartyInfo(supabaseAdmin, tenantDbId, {
+        clientId: job.client_id,
+        clientName: job.client_name,
+      });
+      delivery = await deliverJobProgressNotifications({
+        progressUrl: url,
+        clientName: enriched.clientName || job.client_name || "",
+        clientEmail: enriched.clientEmail || "",
+        clientPhone: enriched.clientPhone || "",
+        jobTitle: job.title || "",
+        tenantId: tenantDbId,
+        sendEmail: wantEmail,
+        sendSms: wantSms,
+      });
+    }
 
     return jsonResponse({
       success: true,
@@ -82,6 +112,8 @@ export async function POST(request, { params }) {
         jobId,
         url,
         expiresInDays: 90,
+        notified: notify,
+        delivery,
       },
     });
   } catch (error) {
