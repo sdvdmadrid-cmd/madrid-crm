@@ -1,5 +1,6 @@
 import { enforceSameOriginForMutation } from "@/lib/request-security";
 import { JOB_FILES_BUCKET, normalizePhotoStage } from "@/lib/job-files";
+import { maybeAutoPublishCompletionPhoto } from "@/lib/job-portfolio-publish";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -108,8 +109,7 @@ export async function PATCH(request, { params }) {
       .update(updateRow)
       .eq("id", fileId)
       .eq("job_id", jobId)
-      .eq("user_id", userId)
-      .eq("file_type", "photo")
+      .in("file_type", ["photo", "video"])
       .select(
         "id, user_id, job_id, file_url, file_path, file_type, name, size, photo_stage, caption, taken_at, created_at",
       )
@@ -118,6 +118,14 @@ export async function PATCH(request, { params }) {
     if (updateError) throw new Error(updateError.message);
     if (!updated) {
       return jsonResponse({ success: false, error: "Photo not found" }, 404);
+    }
+
+    if (updateRow.photo_stage === "completion") {
+      void maybeAutoPublishCompletionPhoto({
+        tenantId: tenantDbId,
+        jobId,
+        fileRow: updated,
+      });
     }
 
     const { data: signedData } = await supabaseAdmin.storage

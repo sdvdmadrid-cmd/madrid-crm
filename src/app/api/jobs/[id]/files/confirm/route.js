@@ -6,6 +6,7 @@ import {
   isJobTimelineMediaType,
   normalizePhotoStage,
 } from "@/lib/job-files";
+import { maybeAutoPublishCompletionPhoto } from "@/lib/job-portfolio-publish";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -173,6 +174,14 @@ export async function POST(request, { params }) {
       .from(JOB_FILES_BUCKET)
       .createSignedUrl(filePath, 3600);
     if (signedError) throw new Error(signedError.message);
+
+    if (isJobTimelineMediaType(fileType) && photoStage === "completion" && fileType === "photo") {
+      void maybeAutoPublishCompletionPhoto({
+        tenantId: tenantDbId,
+        jobId,
+        fileRow: inserted,
+      });
+    }
 
     return jsonResponse({
       success: true,

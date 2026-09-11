@@ -93,6 +93,12 @@ export default function PublicJobProgressPage() {
   }
 
   const job = payload?.job || {};
+  const reviews = payload?.reviews || {};
+  const reviewLinks = [
+    { key: "google", href: reviews.googleUrl, label: "Leave a Google review" },
+    { key: "yelp", href: reviews.yelpUrl, label: "Leave a Yelp review" },
+  ].filter((item) => String(item.href || "").startsWith("http"));
+  const showReviewCta = Boolean(reviews.showCta) && reviewLinks.length > 0;
 
   return (
     <main style={styles.page} data-testid="public-job-progress">
@@ -105,6 +111,7 @@ export default function PublicJobProgressPage() {
         </p>
         <p style={styles.counts}>
           {payload?.photoCount || 0} photos · {payload?.videoCount || 0} videos
+          {job.completed ? " · completed" : ""}
           {refreshing ? " · refreshing…" : ""}
         </p>
         <button type="button" style={styles.refreshBtn} onClick={() => load({ soft: true })}>
@@ -158,6 +165,29 @@ export default function PublicJobProgressPage() {
           </section>
         ))
       )}
+
+      {showReviewCta ? (
+        <section style={styles.review} data-testid="public-job-review-cta">
+          <h2 style={styles.reviewTitle}>How did we do?</h2>
+          <p style={styles.reviewSub}>
+            Thanks for trusting {payload?.companyName || "us"}. A quick review helps other
+            homeowners find great local work.
+          </p>
+          <div style={styles.reviewActions}>
+            {reviewLinks.map((link) => (
+              <a
+                key={link.key}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={styles.reviewBtn}
+              >
+                {link.label} →
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -243,4 +273,28 @@ const styles = {
     display: "block",
   },
   caption: { margin: "10px 0 0", color: "#334155" },
+  review: {
+    marginTop: 36,
+    background: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    border: "1px solid #e2e8f0",
+    textAlign: "center",
+  },
+  reviewTitle: { margin: "0 0 8px", fontSize: "1.25rem" },
+  reviewSub: { margin: "0 0 16px", color: "#475569" },
+  reviewActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "center",
+  },
+  reviewBtn: {
+    background: "#0f172a",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: 10,
+    padding: "12px 16px",
+    fontWeight: 600,
+  },
 };

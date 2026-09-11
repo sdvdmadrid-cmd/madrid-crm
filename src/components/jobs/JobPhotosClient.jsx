@@ -247,7 +247,7 @@ export default function JobPhotosClient({ jobId }) {
     const res = await apiFetch(`/api/jobs/${jobId}/progress-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}",
+      body: JSON.stringify({ notify: true, email: true, sms: true }),
     });
     const payload = await res.json();
     if (!res.ok || !payload.success) {
@@ -256,11 +256,24 @@ export default function JobPhotosClient({ jobId }) {
     }
     const url = payload.data?.url || "";
     setProgressUrl(url);
+    const delivery = payload.data?.delivery || {};
+    const emailed = delivery?.email?.sent;
+    const texted = delivery?.sms?.sent;
     try {
       await navigator.clipboard?.writeText(url);
-      setNotice(t("jobs.photos.shareCopied"));
     } catch {
-      setNotice(t("jobs.photos.shareReady"));
+      // clipboard optional
+    }
+    if (emailed || texted) {
+      setNotice(
+        t("jobs.photos.shareSent", {
+          channels: [emailed ? "email" : null, texted ? "SMS" : null]
+            .filter(Boolean)
+            .join(" + "),
+        }),
+      );
+    } else {
+      setNotice(t("jobs.photos.shareCopied"));
     }
   };
 

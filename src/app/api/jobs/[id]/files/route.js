@@ -6,6 +6,7 @@ import {
   JOB_FILES_BUCKET,
   normalizePhotoStage,
 } from "@/lib/job-files";
+import { maybeAutoPublishCompletionPhoto } from "@/lib/job-portfolio-publish";
 import { logSupabaseError } from "@/lib/supabase-db";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -291,6 +292,15 @@ export async function POST(request, { params }) {
 
     if (signedError) {
       throw new Error(signedError.message);
+    }
+
+    // Soft auto-publish completion photos to website draft gallery.
+    if (timelineMedia && photoStage === "completion" && fileType === "photo") {
+      void maybeAutoPublishCompletionPhoto({
+        tenantId: tenantDbId,
+        jobId,
+        fileRow: inserted,
+      });
     }
 
     return jsonResponse({
